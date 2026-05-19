@@ -1,53 +1,95 @@
 ---
 skill_id: "figure_missingness"
-version: "3.0.0"
+version: "8.0.0"
 category: "visualization"
-type: "static_figure"
 domain_compatibility: ["all"]
-required_tools: ["python", "matplotlib", "seaborn", "pandas"]
-estimated_tokens: 2000
-depends_on: ["detect_missingness"]
-produces: ["reports/figures/missingness_figures/"]
+required_tools: ["python", "matplotlib", "seaborn", "missingno"]
+depends_on: ["viz_design_system", "viz_code_standards", "detect_missingness"]
+produces: ["reports/figures/missingness/"]
+complexity: "basic"
 ---
 
-# Skill: Static Missingness Figures (Manuscript Quality)
+# Skill: Missingness Visualization
 
 ## Purpose
-Generate static figures mapping missing data density and patterns for publication.
+Generate figures showing missing data patterns, mechanisms, and impact on analysis.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to processed dataset |
+## When to Use
+- After missingness analysis
+- For methods section (missing data handling)
+- Diagnosing missingness mechanisms
 
-## Execution Protocol
+---
 
-### Step 1: Matplotlib Configuration
-- Load standard formatting (Helvetica/Arial, ticks-in, 6-7pt text labels, 0.5pt spines).
-- Define binary colormap: White (1) for present values, Dark Indigo/Slate (`#2b2b2b`) (0) for missing values.
+## Figure Specifications
 
-### Step 2: Density Map
-- Draw binary missingness matrix.
-- Sort columns by missingness rate (descending) to group gaps.
-- Remove row index labels. Add y-axis label showing observation scale (e.g., "Observations (N=1500)").
-- Add x-axis labels rotated at 45 degrees.
+### Missingness Matrix
+```python
+def plot_missingness_matrix(df, max_rows=1000, ax=None):
+    """Heatmap of missing data pattern.
+    
+    Features:
+    - Rows: observations (sampled if N > max_rows)
+    - Columns: variables (sorted by missingness)
+    - Missing: dark color, Present: light color
+    - Sparkline on right: missingness per row
+    - Bar chart on bottom: missingness per column
+    """
+```
 
-### Step 3: Nullity Correlation
-- Calculate correlation matrix of missingness indicators.
-- Plot heatmap using diverging color scheme (`RdBu_r` or `coolwarm`).
-- Mask upper triangle to avoid redundancy.
+### Missingness Bar Chart
+```python
+def plot_missingness_bars(df, ax=None, sort=True):
+    """Horizontal bar chart of missing proportions.
+    
+    Features:
+    - Sorted: highest missingness at top
+    - Annotated: exact percentage on each bar
+    - Color gradient: green (0%) → yellow (20%) → red (50%+)
+    - Threshold line: warning level (20%)
+    """
+```
 
-### Step 4: Export
-- Save to `reports/figures/missingness_figures/` as vector **PDF**, **SVG**, and 600 DPI **PNG**.
-- Use `bbox_inches='tight'` and `dpi=600` on save.
+### Missingness Correlation
+```python
+def plot_missingness_correlation(df, ax=None):
+    """Heatmap of pairwise missingness correlations.
+    
+    Features:
+    - Binary indicators: 1 if missing, 0 if present
+    - Phi coefficient (for binary-binary correlation)
+    - Diverging colormap
+    - Only show variables with > 5% missingness
+    """
+```
 
-## Output Specification
-Produces inside `reports/figures/missingness_figures/`:
-- `missingness_density.pdf`
-- `missingness_correlation.pdf`
-- Corresponding PNG formats.
+### Missingness by Subgroup
+```python
+def plot_missingness_by_subgroup(df, group_col, ax=None):
+    """Missing rate in other variables by subgroup.
+    
+    Features:
+    - Grouped bar chart
+    - One bar per variable, grouped by category
+    - Identifies MAR mechanism
+    """
+```
 
-## Validation Criteria
-- [ ] Heatmap colormap is binary and clearly labeled.
-- [ ] Row numbers are hidden.
-- [ ] Labels do not overlap.
+---
+
+## Output Standards
+
+### File Naming
+```
+fig_miss_001_matrix.png
+fig_miss_002_bars.png
+fig_miss_003_correlation.png
+fig_miss_004_by_subgroup.png
+```
+
+## Validation Checks
+- [ ] Matrix shows correct missing pattern
+- [ ] Bar chart percentages match computed values
+- [ ] Correlation matrix is symmetric
+- [ ] Subgroup analysis includes all categories
+- [ ] Design system theme applied

@@ -1,56 +1,74 @@
 ---
 skill_id: "figure_causal_dag"
-version: "3.0.0"
+version: "8.0.0"
 category: "visualization"
-type: "static_figure"
 domain_compatibility: ["all"]
-required_tools: ["python", "networkx", "matplotlib", "pygraphviz"]
-estimated_tokens: 2500
-depends_on: ["causal_inference"]
-produces: ["reports/figures/causal_dag/"]
+required_tools: ["python", "networkx", "matplotlib", "graphviz"]
+depends_on: ["viz_design_system", "viz_code_standards", "causal_inference"]
+produces: ["reports/figures/causal_dag.png", "reports/figures/causal_dag.svg"]
+complexity: "intermediate"
 ---
 
-# Skill: Static Causal DAG Figures (Manuscript Quality)
+# Skill: Causal DAG Visualization
 
 ## Purpose
-Render static Directed Acyclic Graphs (DAGs) representing structural causal models for publication.
+Render causal directed acyclic graphs showing hypothesized relationships between treatment, outcome, confounders, mediators, and colliders.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `dag_path` | Path | Yes | Path to causal_dag.json containing nodes and edges |
+## When to Use
+- After causal model specified
+- For methods section figure
+- Communicating identification strategy
 
-## Execution Protocol
+---
 
-### Step 1: Hierarchical Layout Layout
-- Load nodes and edges into NetworkX.
-- Enforce strict hierarchical layouts using Graphviz `dot` (left-to-right flow). Avoid spring or circular layouts.
+## Node Types & Styling
 
-### Step 2: Styling and Node Coloring
-- Color nodes based on causal roles using desaturated, print-friendly colors:
-  - **Exposure (Treatment)**: Light green (`#a1dab4`).
-  - **Outcome**: Light blue (`#41b6c4`).
-  - **Adjusted Confounders**: Light gray (`#d9d9d9`).
-  - **Unadjusted Confounders**: Light salmon/orange (`#fe9929`).
-- Node shapes: Render as rounded boxes or neat circles with a thin border (0.5pt).
-- Edge styles: Thin gray lines (`#737373`, 0.5pt) with sharp, small arrowheads.
+| Node Type | Shape | Color | Description |
+|-----------|-------|-------|-------------|
+| Treatment | Rectangle | `#0072B2` (blue) | Exposure/intervention |
+| Outcome | Rectangle | `#009E73` (green) | Dependent variable |
+| Confounder | Ellipse | `#999999` (gray) | Common cause |
+| Mediator | Diamond | `#E69F00` (orange) | On causal path |
+| Collider | Hexagon | `#D55E00` (vermillion) | Common effect |
+| Instrument | Triangle | `#56B4E9` (sky blue) | IV variable |
+| Unmeasured | Dashed border | `#CC79A7` (red) | Not observed |
 
-### Step 3: Typography
-- Node labels must use sans-serif typography (Helvetica/Arial) at 8pt.
-- Size nodes dynamically to fit label text lengths without clipping.
+## Edge Types
 
-### Step 4: Exporting
-- Save to `reports/figures/causal_dag/` as vector **PDF** and **SVG** files.
-- Save a backup **PNG** at 600 DPI.
-- Call `plt.savefig(..., bbox_inches='tight', dpi=600)`.
+| Edge Type | Style | Meaning |
+|-----------|-------|---------|
+| Causal | Solid arrow | Direct causal effect |
+| Unmeasured path | Dashed arrow | Hypothesized but unmeasured |
+| Backdoor path | Red highlight | Confounding path |
+| Blocked path | ⊥ symbol | Adjusted/blocked |
 
-## Output Specification
-Produces inside `reports/figures/causal_dag/`:
-- `causal_dag.pdf`
-- `causal_dag.svg`
-- `causal_dag.png`
+---
 
-## Validation Criteria
-- [ ] Diagram contains no cycles (is a valid DAG).
-- [ ] Nodes are colored distinctively by causal roles.
-- [ ] Arrows are clearly visible and do not clip.
+## Layout Rules
+
+1. **Hierarchical layout**: Treatment at top, outcome at bottom
+2. **Confounders**: Between treatment and outcome
+3. **Mediators**: On the causal path between treatment and outcome
+4. **Colliders**: Where two arrows meet
+5. **Minimize edge crossings**: Use force-directed or Sugiyama layout
+6. **Node spacing**: Enough room for labels
+
+---
+
+## Annotation
+
+- Label each node with variable name
+- Add legend for node types
+- Note identification strategy (backdoor set, frontdoor, IV)
+- Include minimal adjustment set
+- Highlight backdoor paths in red
+
+---
+
+## Validation Checks
+- [ ] Graph is acyclic (no cycles)
+- [ ] All variables from causal model included
+- [ ] Backdoor paths identified
+- [ ] Minimal adjustment set specified
+- [ ] Node types correctly styled
+- [ ] Design system colors used

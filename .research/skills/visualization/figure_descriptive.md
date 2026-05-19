@@ -1,67 +1,154 @@
 ---
 skill_id: "figure_descriptive"
-version: "3.0.0"
+version: "8.0.0"
 category: "visualization"
-type: "static_figure"
 domain_compatibility: ["all"]
-required_tools: ["python", "matplotlib", "seaborn", "pandas", "numpy"]
-estimated_tokens: 3000
-depends_on: ["descriptive_stats"]
-produces: ["reports/figures/descriptive_figures/"]
+required_tools: ["python", "matplotlib", "seaborn", "plotly"]
+depends_on: ["viz_design_system", "viz_code_standards", "descriptive_stats"]
+produces: ["reports/figures/descriptive/"]
+complexity: "basic"
 ---
 
-# Skill: Static Descriptive Figures (Manuscript Quality)
+# Skill: Descriptive Statistics Figures
 
 ## Purpose
-Generate publication-ready, static descriptive figures for scientific manuscripts conforming to Nature/Science guidelines.
+Generate publication-quality figures summarizing descriptive statistics. Every figure uses the design system theme, proper sizing, and accessibility standards.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to processed dataset |
-| `column_mapping` | Dict | No | Mapping of database column names to clean, publication labels |
-| `layout_type` | Str | No | Figure layout: 'single_column' (89mm / 3.5 in) or 'double_column' (180mm / 7.0 in). Default: 'single_column' |
+## When to Use
+- After descriptive statistics computed
+- For Table 1 visualizations
+- Exploratory data analysis
 
-## Execution Protocol
+---
 
-### Step 1: Global Matplotlib Setting Synchronization
-Initialize Matplotlib's `rcParams` to match top-tier journal guidelines:
-- **Font**: Set `font.family` to `sans-serif` and `font.sans-serif` to `['Helvetica', 'Arial']`. Font size for labels: 6-7pt. Panel titles: 8pt bold.
-- **Spines & Borders**: Spine line width: 0.5pt. Keep left and bottom spines only. Use `sns.despine(top=True, right=True)` to remove top and right spines.
-- **Ticks**: `xtick.direction` and `ytick.direction` set to `in`. Tick length: 3pt, width: 0.5pt. Limit to 3-5 major ticks per axis to avoid clutter.
-- **Resolution**: Force `savefig.dpi` to 600 DPI for raster fallbacks.
+## Figure Specifications
 
-### Step 2: Dimension Setup
-- Single-column figure: 3.5 inches width (89 mm). Set height using golden ratio (`width * 0.618`).
-- Double-column figure: 7.0 inches width (180 mm). Set height to balance panel density (`width * 0.5` to `width * 0.7`).
-- Always use `plt.subplots(..., constrained_layout=True)` or `GridSpec` to manage panel margins dynamically.
+### Distribution Plots
 
-### Step 3: Multi-Panel Grid Construction (a, b, c)
-- Group related univariate and bivariate plots into a unified composite figure.
-- Add panel identifiers (lowercase bold letters **a**, **b**, **c**) at the top-left of each sub-axis. Place labels upright, 8pt bold, with a minor offset from the axis margin.
-- If panels share the same axis metrics, enforce shared axes (`sharex=True` or `sharey=True`) and hide redundant tick labels.
+#### Histogram + KDE
+```python
+def plot_distribution(df, column, ax=None, bins=30, add_stats=True):
+    """Histogram with KDE overlay and statistics.
+    
+    Features:
+    - Density histogram (area = 1)
+    - KDE curve overlay
+    - Mean (solid line) and median (dashed line)
+    - Statistics box: mean, median, SD, skewness, N
+    - Proper axis labels with units
+    """
+```
 
-### Step 4: Distribution Panels
-- For continuous variables: Overlay a kernel density estimation (KDE) line on top of a rug plot of points. Avoid overlapping labels. Use desaturated, colorblind-friendly colors (e.g., Seaborn's `'colorblind'` or `'viridis'`).
-- For categorical variables: Generate horizontal bar plots to prevent vertical label overlapping. Use `ax.bar_label` to print clean counts or percentages at the end of each bar using a small font (6pt).
+#### Violin Plot (Grouped)
+```python
+def plot_violin_grouped(df, value_col, group_col, ax=None):
+    """Violin plot comparing distributions across groups.
+    
+    Features:
+    - Violin shape (distribution density)
+    - Box plot inside (median, IQR)
+    - Individual data points (jittered, if N < 200)
+    - Color: Okabe-Ito palette
+    - Sorted by median (descending)
+    """
+```
 
-### Step 5: Bivariate Relationship Panels
-- Plot scatter plots with `alpha=0.4` for point transparency to represent density. If N > 10,000, set `rasterized=True` for the scatter points only (while keeping text/labels vector).
-- Plot correlation heatmap of continuous features. Mask the redundant upper-triangular matrix using `np.triu`. Use a diverging colormap (`coolwarm` or `RdBu_r`). Annotate each cell with its correlation coefficient in 6pt font.
+#### Raincloud Plot
+```python
+def plot_raincloud(df, value_col, group_col, ax=None):
+    """Raincloud plot: half-violin + box + raw data.
+    
+    Features:
+    - Half-violin (distribution shape)
+    - Box plot (median, IQR, whiskers)
+    - Jittered raw data points
+    - Best for: group comparisons with moderate N
+    """
+```
 
-### Step 6: Vector Export
-- Save final outputs in both **PDF** and **SVG** vector formats to preserve resolution independence.
-- Save a **PNG** copy at 600 DPI for previewing.
-- Save files using `plt.savefig(..., bbox_inches='tight', dpi=600)`.
+### Categorical Plots
 
-## Output Specification
-Produces inside `reports/figures/descriptive_figures/`:
-- `descriptive_composite.pdf`
-- `descriptive_composite.svg`
-- `descriptive_composite.png`
+#### Bar Chart (Sorted)
+```python
+def plot_categorical_bar(df, column, ax=None, normalize=True):
+    """Bar chart of category frequencies, sorted descending.
+    
+    Features:
+    - Sorted by frequency (highest first)
+    - Proportion labels on bars
+    - Count labels below bars
+    - Color: single hue (Blues)
+    - Horizontal orientation (better for long labels)
+    """
+```
 
-## Validation Criteria
-- [ ] Output includes both vector (PDF/SVG) and high-res raster (PNG) formats.
-- [ ] Panel labels are lowercase bold letters (**a**, **b**, **c**) in the top-left margin.
-- [ ] No font sizes are smaller than 5pt or larger than 10pt.
-- [ ] Heatmap uses a masked upper triangle and diverging color scheme.
+#### Stacked Bar (Cross-tabulation)
+```python
+def plot_stacked_bar(df, row_col, col_col, ax=None, normalize="row"):
+    """Stacked bar chart for cross-tabulation.
+    
+    Features:
+    - Proportional stacking
+    - Legend with category labels
+    - Color: Okabe-Ito palette
+    - Normalize by row, column, or total
+    """
+```
+
+### Multivariate Plots
+
+#### Correlation Heatmap
+```python
+def plot_correlation_heatmap(df, columns=None, ax=None, 
+                              method="pearson", annot=True):
+    """Correlation matrix heatmap.
+    
+    Features:
+    - Diverging colormap (RdBu_r, centered at 0)
+    - Annotated with r values (2 decimal places)
+    - Sorted by hierarchical clustering
+    - Square cells
+    - Colorbar with labeled scale
+    """
+```
+
+#### Pairplot (Subset)
+```python
+def plot_pairplot(df, columns=None, max_vars=6, hue=None):
+    """Pairplot for key variables (max 6×6).
+    
+    Features:
+    - Diagonal: histogram + KDE
+    - Off-diagonal: scatter + regression line
+    - Color by hue variable if specified
+    - Size: 3" × 3" per panel
+    """
+```
+
+---
+
+## Output Standards
+
+### File Naming
+```
+fig_desc_001_distribution_[variable].png
+fig_desc_002_violin_[value]_by_[group].png
+fig_desc_003_correlation_heatmap.png
+fig_desc_004_pairplot_[vars].png
+```
+
+### Format
+- **Primary**: PNG at 300 DPI
+- **Editable**: SVG (for line art)
+- **Size**: Single column (3.35" wide) or double column (6.89" wide)
+
+---
+
+## Validation Checks
+- [ ] All figures have axis labels with units
+- [ ] Colorblind-safe palettes used
+- [ ] No overlapping text or labels
+- [ ] Figures match descriptive statistics values
+- [ ] Font sizes meet minimum (10pt)
+- [ ] Design system theme applied
+- [ ] Statistical annotations follow standards

@@ -1,50 +1,61 @@
 ---
 skill_id: "figure_workflow_dag"
-version: "3.0.0"
+version: "8.0.0"
 category: "visualization"
-type: "static_figure"
 domain_compatibility: ["all"]
-required_tools: ["python"]
-estimated_tokens: 2000
-depends_on: []
-produces: [".research/state/workflow_dag.mermaid"]
+required_tools: ["python", "networkx", "matplotlib"]
+depends_on: ["viz_design_system", "viz_code_standards"]
+produces: ["reports/figures/workflow_dag.png", "reports/workflow_dag.mermaid"]
+complexity: "intermediate"
 ---
 
-# Skill: Workflow DAG Figures (Mermaid)
+# Skill: Workflow DAG Visualization
 
 ## Purpose
-Generate a structured Mermaid.js diagram representing the step-by-step research execution workflow.
+Generate a visual representation of the entire research workflow as a directed acyclic graph, showing skill execution order and data flow.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `workflow_json` | Path | Yes | Path to workflow_dag.json containing node logs |
+## When to Use
+- After analysis pipeline executed
+- For reproducibility documentation
+- Tracking research provenance
 
-## Execution Protocol
+---
 
-### Step 1: Format Setup
-- Declare flowchart layout: `graph TD` (Top-Down) or `graph LR` (Left-to-Right).
+## Node Types
 
-### Step 2: Styling and Node Design
-- Generate nodes for each executed skill. Labels must display:
-  - Skill name.
-  - Duration in seconds.
-  - Status (Success, Failed, Skipped).
-- Define visual styles using CSS classes:
-  - Success nodes: Light green background, solid thin border.
-  - Failed nodes: Light red background, double border.
-  - Unexecuted nodes: White background, dashed border.
+| Status | Color | Description |
+|--------|-------|-------------|
+| Completed | `#009E73` (green) | Successfully executed |
+| Failed | `#D55E00` (vermillion) | Execution error |
+| Skipped | `#999999` (gray) | Not applicable |
+| Running | `#0072B2` (blue) | In progress |
 
-### Step 3: Link Mapping
-- Map dependencies matching file input-outputs. Annotate edges with data file names (e.g., `data_raw.csv`).
+## Layout
 
-### Step 4: Export
-- Save as `.mermaid` file. Ensure all labels with special characters are enclosed in double quotes.
+- **Direction**: Left-to-right (topological order)
+- **Node size**: Proportional to execution time
+- **Labels**: skill_id + status icon
+- **Edges**: Dependency relationships
 
-## Output Specification
-Produces:
-- `.research/state/workflow_dag.mermaid`
+## Mermaid Export
 
-## Validation Criteria
-- [ ] Output is a valid Mermaid.js graph string.
-- [ ] Nodes represent all executed phases.
+Generate Mermaid.js flowchart syntax for embedding in markdown:
+
+```mermaid
+flowchart LR
+    A[research_init] --> B[literature_deep]
+    B --> C[method_route]
+    C --> D[data_scaffold]
+    D --> E[execute_analysis]
+    E --> F[compile_outputs]
+    F --> G[audit_validate]
+```
+
+---
+
+## Validation Checks
+- [ ] Graph is acyclic
+- [ ] All executed skills included
+- [ ] Dependencies correctly represented
+- [ ] Mermaid syntax validates
+- [ ] Design system colors used
