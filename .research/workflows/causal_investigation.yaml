@@ -1,20 +1,56 @@
 workflow_id: "causal_investigation"
 name: "Causal Investigation"
-description: "Workflow for determining causal links using observational data"
-phases:
-  - name: "Data Ingestion & DAG Construction"
-    agent: "04_data_scaffold"
-    skills:
-      - profile_tabular
-      - detect_missingness
-      - figure_descriptive
-  - name: "Causal Estimation"
-    agent: "05_execute_analysis"
-    skills:
-      - causal_inference
-      - power_analysis
-  - name: "Robustness & Audit"
-    agent: "07_audit_validate"
-    skills:
-      - audit_reproducibility
-      - audit_causal_language
+description: "Intake → literature → route → data → causal analysis → audit with causal language check"
+
+agents:
+  - research_init
+  - literature_deep
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - compile_outputs
+  - audit_validate
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: method_route
+      trigger: "no valid identification strategy found"
+      options:
+        - method_switch: "try different identification strategy (IV, DiD, RDD, matching)"
+        - variable_change: "add/remove confounders"
+      after_iteration:
+        - "return to method_route with new strategy"
+        - "downgrade to associational if no strategy works"
+
+    - after: execute_analysis
+      trigger: "refutation tests failed or results unexpected"
+      options:
+        - investigate: "why did refutation fail?"
+        - method_switch: "try different causal method"
+        - variable_change: "adjust confounder set"
+        - robustness: "test sensitivity to unobserved confounding"
+        - validate: "replicate with alternative approach"
+      after_iteration:
+        - "return to execute_analysis with new method"
+        - "downgrade to associational if causal claim unsupported"
+        - "proceed to compile_outputs"
+
+branching:
+  - after: method_route
+    if: "no_identification_strategy"
+    then: "halt — causal inference not possible with this data"
+
+  - after: execute_analysis
+    if: "refutation_tests == failed"
+    then: "report as associational, not causal"
+
+  - after: execute_analysis
+    if: "user requests iteration"
+    then: "run research_iterate → return to execute_analysis or compile_outputs"
+
+notes:
+  - "Causal language audit is mandatory."
+  - "Use research_iterate to explore alternative identification strategies."
+  - "If causal claim fails, document why in docs/dead_ends/."

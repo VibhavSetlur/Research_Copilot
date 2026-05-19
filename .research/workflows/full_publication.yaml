@@ -1,6 +1,7 @@
 workflow_id: "full_publication"
 name: "Full Publication"
-description: "Init → deep literature → route → scaffold → analyze → compile → audit."
+description: "Intake → literature → route → data → analysis → manuscript → audit"
+
 agents:
   - research_init
   - literature_deep
@@ -9,3 +10,74 @@ agents:
   - execute_analysis
   - compile_outputs
   - audit_validate
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: literature_deep
+      trigger: "literature reveals gap in analysis plan"
+      options:
+        - literature_compare: "compare findings to new literature"
+        - method_switch: "adjust method based on literature"
+      after_iteration:
+        - "return to method_route with updated plan"
+        - "proceed to data_scaffold"
+
+    - after: execute_analysis
+      trigger: "user requests investigation, method change, or robustness check"
+      options:
+        - investigate: "why did we get this result?"
+        - method_switch: "try a different method"
+        - variable_change: "add/remove variables"
+        - robustness: "sensitivity analysis"
+        - validate: "double-check finding"
+        - literature_compare: "compare to prior work"
+        - optimize: "find better approach"
+      after_iteration:
+        - "return to execute_analysis with new method"
+        - "proceed to compile_outputs if satisfied"
+
+    - after: audit_validate
+      trigger: "audit reveals issue needing investigation"
+      options:
+        - validate: "fix and re-validate"
+        - investigate: "dig into audit finding"
+      after_iteration:
+        - "return to audit_validate"
+        - "proceed if resolved"
+
+branching:
+  - after: research_init
+    if: "feasibility == stop"
+    then: "halt — see follow_up_questions.md"
+
+  - after: research_init
+    if: "feasibility == caution"
+    then: "proceed — review follow_up_questions.md"
+
+  - after: execute_analysis
+    if: "primary_finding == not_supported"
+    then: "report null finding honestly"
+
+  - after: execute_analysis
+    if: "user requests iteration"
+    then: "run research_iterate → return to execute_analysis or compile_outputs"
+
+  - after: audit_validate
+    if: "verdict == FAIL"
+    then: "remediate and re-run audit"
+
+feedback:
+  - from: execute_analysis
+    to: method_route
+    when: "assumption violation not in analysis plan"
+
+  - from: audit_validate
+    to: compile_outputs
+    when: "reporting incomplete"
+
+notes:
+  - "Use research_iterate at any point to explore, pivot, or investigate."
+  - "All iterations are documented in docs/iterations/ — never deleted."
+  - "Null findings are reported with the same detail as significant results."

@@ -1,6 +1,36 @@
 workflow_id: "systematic_review"
 name: "Systematic Review"
-description: "Deep literature with citation chaining and evidence matrix; minimal data execution."
+description: "Intake → deep literature → synthesize → report → audit"
+
 agents:
   - research_init
   - literature_deep
+  - compile_outputs
+  - audit_validate
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: literature_deep
+      trigger: "gaps found in literature coverage or synthesis needs refinement"
+      options:
+        - literature_compare: "search for additional papers in gap areas"
+        - explore: "explore alternative synthesis approaches"
+        - method_switch: "try different meta-analysis method"
+      after_iteration:
+        - "return to literature_deep with expanded search"
+        - "proceed to compile_outputs"
+
+branching:
+  - after: literature_deep
+    if: "paper_count < 10"
+    then: "halt — too few papers for systematic review"
+
+  - after: literature_deep
+    if: "user requests iteration"
+    then: "run research_iterate → return to literature_deep or compile_outputs"
+
+notes:
+  - "Follow PRISMA 2020 guidelines."
+  - "Use research_iterate to refine search strategy or synthesis approach."

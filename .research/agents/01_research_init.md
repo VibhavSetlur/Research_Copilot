@@ -1,35 +1,114 @@
 ---
 agent_id: "research_init"
-version: "1.0.0"
-description: "Initialize the project: parse brief, profile data, classify design, and establish baseline."
+version: "12.0.0"
+description: "Parse intake, scan data, create full project structure, build research map"
 domain_compatibility: ["all"]
 depends_on: []
 composes:
-  - "parse_research_brief"
   - "profile_tabular"
+  - "classify_domain"
   - "detect_missingness"
   - "detect_outliers"
-  - "power_analysis"
   - "compute_hashes"
 produces:
-  - "reports/baseline/initial_epistemic_baseline.md"
-  - "reports/data_quality/missingness_report.md"
-  - "reports/data_quality/outlier_report.md"
-  - "reports/analysis/power_analysis.md"
-  - "reports/logs/file_hashes.md"
+  - "docs/manifest.json"
+  - "docs/research_log.md"
+  - "docs/methodology.md"
+  - "docs/changelog.md"
+  - "docs/iterations/registry.json"
+  - "reports/baseline/research_map.json"
+  - "reports/baseline/follow_up_questions.md"
+  - "README.md (in every subdirectory)"
+max_iterations: 1
 ---
 
 # Agent: Research Init
 
 ## Purpose
-Execute a skills-composed initialization pass that produces the epistemic baseline and core profiling artifacts.
+Read the user's intake, scan their raw data, create the COMPLETE project directory structure with documentation in every folder, build a research map, and assess feasibility. This is the ONLY agent that creates the project structure. All subsequent agents work within it.
 
-## Inputs
-- `docs_input/research_brief.md`
-- `data_raw/` (read-only)
+---
 
-## Execution Protocol
-Execute each skill listed in the YAML frontmatter in the order provided unless a dependency requires otherwise.
+## Protocol
 
-## Outputs
-See the `produces` contract in the frontmatter.
+### Step 1: Run CLI Scan
+Run: `python .research/research.py scan`
+This scans inputs/ and saves the research map to `.research/cache/research_map.json`.
+Read the output to understand what was found.
+
+### Step 2: Read Intake
+Parse `inputs/intake.md`. Extract:
+- **Project info**: title, researcher, institution
+- **Research questions**: all questions listed, each with type, hypothesis, variables, data files needed, data prep needed, prior research
+- **Data overview**: file descriptions, relationships between files, data preparation needed
+- **Domain & conventions**: field, target output, target venue
+- **Constraints**: timeline, IRB, limitations
+- **Prior work**: previous analyses
+
+If intake is empty or has no questions: generate follow-up questions and stop. Do NOT create directory structure yet.
+
+### Step 3: Scan Inputs
+- **Data**: profile every file in `inputs/data/raw/` using `profile_tabular`, `classify_domain`, `detect_missingness`, `detect_outliers`
+- **Context**: read all files in `inputs/context/` (abstracts, notes, links)
+- **Papers**: count PDFs in `inputs/papers/`
+- **Hashes**: run `compute_hashes` on all data files
+
+### Step 4: Create Full Directory Structure
+Run: `python .research/research.py init-dirs`
+This creates ALL directories with README.md in each, plus manifest.json, research_log.md, methodology.md, changelog.md, and the iteration registry.
+
+### Step 5: Customize Documentation
+After init-dirs creates the base structure, customize the files with project-specific content:
+
+**Update docs/README.md** with actual project title, researcher, institution, domain, question count, and list each research question.
+
+**Update docs/research_log.md** with the first entry documenting what you found during scan.
+
+**Update docs/methodology.md** with the methods appropriate for each question type.
+
+**Update docs/changelog.md** with the initial setup entry.
+
+**Update docs/manifest.json** with actual project info from intake.
+
+**Update docs/iterations/registry.json** with the first iteration.
+
+**Update reports/baseline/research_map.json** with the full research map including:
+- All questions with variable mappings
+- Data file profiles
+- Feasibility assessment
+- Follow-up questions if needed
+
+### Step 6: Cross-Reference Intake with Data
+For each research question:
+- Map stated variables to actual columns in the data files
+- Check if stated data files exist in `inputs/data/raw/`
+- Identify data preparation needed (merging, filtering, transformations)
+- Flag mismatches
+
+### Step 7: Assess Feasibility
+**go**: questions clear, data exists and readable, variables identifiable
+**caution**: missingness > 30%, sample small, data prep complex
+**stop**: no data, questions unanswerable, > 80% missing on outcomes
+
+### Step 8: Follow-Up (only if needed)
+If critical info is missing, write `reports/baseline/follow_up_questions.md`.
+
+---
+
+## Validation
+
+- [ ] CLI scan executed
+- [ ] Intake parsed (or flagged)
+- [ ] All data files profiled
+- [ ] Full directory structure created via init-dirs (docs/, reports/, data/, scripts/)
+- [ ] README.md in EVERY subdirectory with project-specific content
+- [ ] manifest.json created and customized
+- [ ] research_log.md created with first entry
+- [ ] methodology.md created
+- [ ] changelog.md created
+- [ ] iteration registry created
+- [ ] Each question mapped to actual data columns
+- [ ] Data preparation needs identified
+- [ ] Research map produced
+- [ ] Feasibility verdict assigned
+- [ ] Follow-up questions generated if needed
