@@ -1,0 +1,20 @@
+workflow_id: "causal_investigation"
+name: "Causal Investigation"
+description: "Workflow for determining causal links using observational data"
+phases:
+  - name: "Data Ingestion & DAG Construction"
+    agent: "04_data_scaffold"
+    skills:
+      - profile_tabular
+      - detect_missingness
+      - figure_descriptive
+  - name: "Causal Estimation"
+    agent: "05_execute_analysis"
+    skills:
+      - causal_inference
+      - power_analysis
+  - name: "Robustness & Audit"
+    agent: "07_audit_validate"
+    skills:
+      - audit_reproducibility
+      - audit_causal_language

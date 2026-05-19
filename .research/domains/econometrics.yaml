@@ -1,0 +1,17 @@
+domain_id: "econometrics"
+name: "Econometrics"
+reporting_standard: "generic"
+significance_threshold: 0.05
+default_effect_size_metric: "beta"
+required_confounders_check: true
+citation_style: "apa"
+default_skills:
+  - profile_tabular
+  - descriptive_stats
+  - inferential_parametric
+  - power_analysis
+preferred_visualizations:
+  - figure_workflow_dag
+quality_gates:
+  - parallel_trends
+  - weak_instrument_check

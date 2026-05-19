@@ -1,0 +1,6 @@
+workflow_id: "systematic_review"
+name: "Systematic Review"
+description: "Deep literature with citation chaining and evidence matrix; minimal data execution."
+agents:
+  - research_init
+  - literature_deep

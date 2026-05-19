@@ -1,0 +1,9 @@
+workflow_id: "quick_exploratory"
+name: "Quick Exploratory"
+description: "Baseline init → route → scaffold → analyze → compile."
+agents:
+  - research_init
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - compile_outputs

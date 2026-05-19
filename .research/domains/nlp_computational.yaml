@@ -1,0 +1,20 @@
+domain_id: "nlp_computational"
+name: "Computational Linguistics & NLP"
+reporting_standard: "ACL"
+significance_threshold: 0.05
+default_effect_size_metric: "f1_score"
+required_confounders_check: false
+default_skills:
+  - profile_text
+  - nlp_analysis
+  - topic_modeling
+  - sentiment_analysis
+preferred_visualizations:
+  - word_cloud
+  - topic_distribution
+  - confusion_matrix
+citation_style: "acl"
+data_type_defaults:
+  primary: "TEXT-CORPUS"
+quality_gates:
+  - inter_annotator_agreement

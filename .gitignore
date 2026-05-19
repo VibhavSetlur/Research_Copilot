@@ -1,3 +1,6 @@
+archive/ 
+OVERHAUL__PLAN.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
@@ -18,7 +21,7 @@ environment/venv/
 environment/env_manifest.json
 
 # Local research data (dynamically generated/validated/processed)
-data/
+/data/
 
 # Immutable raw data (ignore actual data files but keep README.md)
 data_raw/*
@@ -29,11 +32,20 @@ docs/data_dictionary.md
 docs/papers_and_tools_cited.md
 docs/methods_log.md
 docs/validation_audit_report.md
-reports/
+/reports/
 
 # Pipeline runtime state
 .research_state.json
 
+# Skills-first (v2) runtime state
+.research/state/
+.research/workflow_dag.json
+.research/workflow_dag.mermaid
+.research/data_versions.yaml
+
 # OS files
 .DS_Store
 Thumbs.db
+
+# Archived files
+archive/

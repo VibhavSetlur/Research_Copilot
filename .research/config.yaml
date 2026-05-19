@@ -1,0 +1,38 @@
+project_id: "research-copilot"
+project_name: "Research Copilot Project"
+schema_version: "1.0.0"
+
+default_domain: "custom"
+default_workflow: "quick_exploratory"
+default_provider: "generic"
+
+literature_recursion_depth: 3
+literature_top_k_per_seed: 25
+literature_max_results_total: 300
+
+max_prompt_tokens: 12000
+
+data_raw_dir: "data_raw"
+docs_input_dir: "docs_input"
+reports_dir: "reports"
+
+analysis_dir: "analysis"
+logs_dir: "reports/logs"
+baseline_dir: "reports/baseline"
+literature_dir: "reports/literature"
+data_quality_dir: "reports/data_quality"
+audit_dir: "reports/audit"
+manuscript_dir: "reports/manuscript"
+tables_dir: "reports/tables"
+figures_dir: "reports/figures"
+dashboards_dir: "reports/dashboards"
+
+methods_log_path: "reports/logs/methods_log.md"
+data_dictionary_path: "reports/data_dictionary.md"
+citations_path: "reports/papers_and_tools_cited.md"
+question_evolution_path: "reports/question_evolution.md"
+
+dag_json_path: ".research/workflow_dag.json"
+dag_mermaid_path: ".research/workflow_dag.mermaid"
+state_dir: ".research/state"
+data_versions_path: ".research/data_versions.yaml"

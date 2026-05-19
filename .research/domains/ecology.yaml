@@ -1,0 +1,18 @@
+domain_id: "ecology"
+name: "Ecology & Environmental Science"
+reporting_standard: "PRISMA-Eco"
+significance_threshold: 0.05
+default_effect_size_metric: "cohens_d"
+required_confounders_check: true
+default_skills:
+  - profile_spatial
+  - spatial_analysis
+  - species_distribution
+preferred_visualizations:
+  - map_distribution
+  - nmds_ordination
+citation_style: "apa"
+data_type_defaults:
+  primary: "SPATIAL-TABULAR"
+quality_gates:
+  - spatial_autocorrelation

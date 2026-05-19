@@ -1,0 +1,18 @@
+domain_id: "finance"
+name: "Finance & Quantitative Economics"
+reporting_standard: "AFA"
+significance_threshold: 0.05
+default_effect_size_metric: "sharpe_ratio"
+required_confounders_check: true
+default_skills:
+  - profile_temporal
+  - time_series_analysis
+  - event_study
+preferred_visualizations:
+  - time_series_plot
+  - volatility_plot
+citation_style: "chicago"
+data_type_defaults:
+  primary: "TIME-SERIES"
+quality_gates:
+  - stationarity_check

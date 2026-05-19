@@ -1,0 +1,15 @@
+domain_id: "custom"
+name: "Custom / Unspecified"
+reporting_standard: "generic"
+significance_threshold: 0.05
+default_effect_size_metric: "domain_specific"
+citation_style: "apa"
+default_skills:
+  - profile_tabular
+  - descriptive_stats
+  - inferential_parametric
+  - power_analysis
+preferred_visualizations:
+  - figure_workflow_dag
+quality_gates:
+  - reproducibility

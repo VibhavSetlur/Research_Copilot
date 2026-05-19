@@ -1,0 +1,21 @@
+workflow_id: "predictive_modeling"
+name: "Predictive Modeling"
+description: "Workflow for building and evaluating machine learning models"
+phases:
+  - name: "Data Preprocessing"
+    agent: "04_data_scaffold"
+    skills:
+      - profile_tabular
+      - detect_outliers
+      - detect_missingness
+  - name: "Model Training"
+    agent: "05_execute_analysis"
+    skills:
+      - descriptive_stats
+      - clustering
+      - dimensionality_reduction
+  - name: "Evaluation"
+    agent: "06_compile_outputs"
+    skills:
+      - dashboard_overview
+      - figure_inferential

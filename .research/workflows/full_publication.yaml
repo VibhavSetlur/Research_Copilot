@@ -1,0 +1,11 @@
+workflow_id: "full_publication"
+name: "Full Publication"
+description: "Init → deep literature → route → scaffold → analyze → compile → audit."
+agents:
+  - research_init
+  - literature_deep
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - compile_outputs
+  - audit_validate
