@@ -464,6 +464,91 @@ def cmd_sync() -> None:
     print("Synchronization complete. All client tools are aligned with research_runner.py.")
 
 
+def cmd_install() -> None:
+    """Install global CLI wrapper and Antigravity skills."""
+    logging.info("Installing global 'research' CLI wrapper...")
+    
+    # 1. Install global wrapper script to ~/.local/bin/research
+    bin_dir = Path.home() / ".local/bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    wrapper_path = bin_dir / "research"
+    
+    wrapper_content = (
+        "#!/usr/bin/env bash\n"
+        "# Global wrapper for the Research Co-Pilot\n\n"
+        "DIR=\"$(pwd)\"\n"
+        "while [ \"$DIR\" != \"\" ] && [ \"$DIR\" != \"/\" ]; do\n"
+        "    if [ -f \"$DIR/scripts/research_runner.py\" ]; then\n"
+        "        python3 \"$DIR/scripts/research_runner.py\" \"$@\"\n"
+        "        exit $?\n"
+        "    fi\n"
+        "    DIR=\"$(dirname \"$DIR\")\"\n"
+        "done\n\n"
+        "echo \"Error: Not inside a Research Co-Pilot project workspace (scripts/research_runner.py not found in parent directories).\" >&2\n"
+        "exit 1\n"
+    )
+    
+    try:
+        with open(wrapper_path, "w") as f:
+            f.write(wrapper_content)
+        wrapper_path.chmod(0o755)
+        logging.info("  Installed CLI wrapper at: %s", wrapper_path)
+    except Exception as e:
+        logging.error("Failed to install CLI wrapper: %s", e)
+        
+    # 2. Install Antigravity Skills
+    skills_dir = Path.home() / ".gemini/antigravity/skills"
+    if skills_dir.exists():
+        logging.info("Installing Antigravity global skills under %s...", skills_dir)
+        
+        # We install research-init, research-route, research-scaffold, research-analyze, research-compile, research-audit, research-status, research-pivot
+        all_skill_commands = list(COMMANDS.keys()) + ["status", "pivot"]
+        
+        for cmd in all_skill_commands:
+            skill_folder = skills_dir / f"research-{cmd}"
+            skill_folder.mkdir(parents=True, exist_ok=True)
+            skill_file = skill_folder / "SKILL.md"
+            
+            # Formulate the YAML metadata and XML tags
+            if cmd in COMMANDS:
+                meta = COMMANDS[cmd]
+                description = meta["description"]
+                objective = f"Execute Phase {meta['phase']} ({cmd}) of the Research Co-Pilot pipeline."
+                process = (
+                    f"Run the terminal command: python3 scripts/research_runner.py prompt {cmd}\n"
+                    f"This prints the fully hydrated system guardrails and phase instructions.\n"
+                    f"Read that output in full, then execute the task as specified."
+                )
+            elif cmd == "status":
+                description = "Check project pipeline completion status and recommended next steps."
+                objective = "Print current status of research co-pilot pipeline steps."
+                process = "Run the terminal command: python3 scripts/research_runner.py status"
+            else:  # pivot
+                description = "Log a statistical assumption pivot to the methods log."
+                objective = "Log statistical pivot for failed assumptions."
+                process = "Run the terminal command: python3 scripts/research_runner.py pivot $ARGUMENTS"
+                
+            skill_content = (
+                f"---\n"
+                f"name: research-{cmd}\n"
+                f"description: {description}\n"
+                f"---\n\n"
+                f"<objective>\n{objective}\n</objective>\n\n"
+                f"<process>\n{process}\n</process>\n"
+            )
+            
+            try:
+                with open(skill_file, "w") as f:
+                    f.write(skill_content)
+                logging.info("  Registered Antigravity Skill: research-%s", cmd)
+            except Exception as e:
+                logging.error("Failed to write skill file for research-%s: %s", cmd, e)
+                
+        print("Global installation complete! Run 'research status' or use '/research-*' slash commands in Antigravity.")
+    else:
+        logging.warning("Antigravity app directory not found. Standard global CLI wrapper was installed successfully.")
+
+
 def cmd_pivot(rq: int, assumption: str, alternative: str) -> None:
     """Manually log a statistical assumption pivot to the methods log.
 
@@ -527,6 +612,9 @@ def main() -> None:
     # sync command
     subparsers.add_parser("sync", help="Synchronize all client configurations (Cursor, OpenCode, Copilot)")
     
+    # install command
+    subparsers.add_parser("install", help="Install global CLI wrapper and Antigravity skills")
+    
     # pivot command
     pivot_parser = subparsers.add_parser("pivot", help="Manually log an assumption check pivot")
     pivot_parser.add_argument("--rq", type=int, required=True, help="Research question number")
@@ -541,6 +629,8 @@ def main() -> None:
         cmd_prompt(args.phase, args.rq)
     elif args.command == "sync":
         cmd_sync()
+    elif args.command == "install":
+        cmd_install()
     elif args.command == "pivot":
         cmd_pivot(args.rq, args.assumption, args.alternative)
     else:
