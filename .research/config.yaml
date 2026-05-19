@@ -1,38 +1,73 @@
 project_id: "research-copilot"
-project_name: "Research Copilot Project"
-schema_version: "1.0.0"
+schema_version: "6.0.0"
 
-default_domain: "custom"
 default_workflow: "quick_exploratory"
-default_provider: "generic"
 
-literature_recursion_depth: 3
-literature_top_k_per_seed: 25
-literature_max_results_total: 300
+# Input paths (user-provided, never modified by AI)
+intake_path: "inputs/intake.md"
+data_raw: "inputs/data/raw"
+context_dir: "inputs/context"
+papers_dir: "inputs/papers"
 
-max_prompt_tokens: 12000
+# CLI cache (internal working files, stored in .research/)
+cache_dir: ".research/cache"
+cache_research_map: ".research/cache/research_map.json"
+cache_followups: ".research/cache/follow_up_questions.md"
+cache_scan_result: ".research/cache/scan_result.json"
 
-data_raw_dir: "data_raw"
-docs_input_dir: "docs_input"
+# Documentation paths (created by AI during init)
+docs_dir: "docs"
+research_log: "docs/research_log.md"
+methodology: "docs/methodology.md"
+changelog: "docs/changelog.md"
+manifest: "docs/manifest.json"
+iterations_dir: "docs/iterations"
+decisions_dir: "docs/decisions"
+dead_ends_dir: "docs/dead_ends"
+
+# Report paths (created by AI during init)
 reports_dir: "reports"
+reports_baseline: "reports/baseline"
+reports_literature: "reports/literature"
+reports_analysis: "reports/analysis"
+reports_figures: "reports/figures"
+reports_tables: "reports/tables"
+reports_dashboards: "reports/dashboards"
+reports_manuscript: "reports/manuscript"
+reports_audit: "reports/audit"
+reports_summary: "reports/summary"
 
-analysis_dir: "analysis"
-logs_dir: "reports/logs"
-baseline_dir: "reports/baseline"
-literature_dir: "reports/literature"
-data_quality_dir: "reports/data_quality"
-audit_dir: "reports/audit"
-manuscript_dir: "reports/manuscript"
-tables_dir: "reports/tables"
-figures_dir: "reports/figures"
-dashboards_dir: "reports/dashboards"
+# Data pipeline paths (created by AI during init)
+data_dir: "data"
+data_ingested: "data/01_ingested"
+data_processed: "data/02_processed"
+data_analytical: "data/03_analytical"
 
-methods_log_path: "reports/logs/methods_log.md"
-data_dictionary_path: "reports/data_dictionary.md"
-citations_path: "reports/papers_and_tools_cited.md"
-question_evolution_path: "reports/question_evolution.md"
+# Script paths (created by AI during init)
+scripts_dir: "scripts"
+scripts_utils: "scripts/utils"
 
-dag_json_path: ".research/workflow_dag.json"
-dag_mermaid_path: ".research/workflow_dag.mermaid"
-state_dir: ".research/state"
-data_versions_path: ".research/data_versions.yaml"
+# File paths (where AI writes final outputs)
+research_map: "reports/baseline/research_map.json"
+follow_up_questions: "reports/baseline/follow_up_questions.md"
+evidence_matrix: "reports/literature/evidence_matrix.md"
+analysis_plan: "reports/analysis/analysis_plan.md"
+full_audit: "reports/audit/full_audit_report.md"
+manuscript_findings: "reports/manuscript/research_findings.md"
+key_findings: "reports/summary/key_findings.md"
+executive_summary: "reports/summary/executive_summary.md"
+
+# Iteration tracking
+iteration_registry: "docs/iterations/registry.json"
+
+# Workflow
+dag_json: ".research/workflow_dag.json"
+dag_mermaid: ".research/workflow_dag.mermaid"
+
+# Thresholds
+literature_min_papers: 10
+literature_recursion_depth: 2
+power_adequate: 0.80
+power_minimum: 0.50
+missingness_warning: 0.20
+sensitivity_tests_min: 3

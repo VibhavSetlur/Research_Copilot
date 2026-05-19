@@ -1,51 +1,36 @@
-archive/ 
-OVERHAUL__PLAN.md
-
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Caches
-.pytest_cache/
-.ipynb_checkpoints/
-.mypy_cache/
-
-# Environments
-venv/
+# Virtual environments
 .venv/
+venv/
 env/
-ENV/
-environment/venv/
-environment/env_manifest.json
 
-# Local research data (dynamically generated/validated/processed)
-/data/
-
-# Immutable raw data (ignore actual data files but keep README.md)
-data_raw/*
-!data_raw/README.md
-
-# Dynamically generated documents and reports
-docs/data_dictionary.md
-docs/papers_and_tools_cited.md
-docs/methods_log.md
-docs/validation_audit_report.md
+# Generated outputs (user's project)
 /reports/
+/data/
+/analysis/
 
-# Pipeline runtime state
-.research_state.json
-
-# Skills-first (v2) runtime state
+# Runtime state
 .research/state/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid
-.research/data_versions.yaml
+
+# User data (keep directories, ignore contents)
+inputs/data/raw/*
+!inputs/data/raw/.gitkeep
+inputs/context/*
+!inputs/context/.gitkeep
+inputs/papers/*
+!inputs/papers/.gitkeep
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Archived files
-archive/
+# AI assistant caches
+.aider*
+.cursor*
