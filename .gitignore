@@ -3,18 +3,30 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+dist/
+build/
 
 # Virtual environments
 .venv/
 venv/
 env/
 
-# Generated outputs (user's project)
+# Generated outputs (AI-created during research)
 /reports/
 /data/
-/analysis/
+/docs/
 
-# Runtime state
+# Generated scripts (numbered analysis scripts created by AI)
+/scripts/01_*.py
+/scripts/02_*.py
+/scripts/03_*.py
+/scripts/04_*.py
+/scripts/05_*.py
+/scripts/utils/*.py
+
+# CLI cache (inside .research/, safe to ignore)
+.research/cache/
 .research/state/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid
@@ -27,10 +39,36 @@ inputs/context/*
 inputs/papers/*
 !inputs/papers/.gitkeep
 
+# Large files (never commit)
+*.h5
+*.hdf5
+*.feather
+*.parquet
+*.sav
+*.dta
+*.sas7bdat
+*.zip
+*.tar.gz
+*.rar
+
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # AI assistant caches
 .aider*
 .cursor*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment files (user-specific)
+.env
+.env.local
