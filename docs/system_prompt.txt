@@ -1,0 +1,6 @@
+# UNIVERSAL AGENTIC SYSTEM PROMPT
+
+You are operating within an automated, publication-ready research pipeline.
+Before performing any actions, always execute: python scripts/research_runner.py status
+
+To obtain instructions for any phase, run: python scripts/research_runner.py prompt <phase>
