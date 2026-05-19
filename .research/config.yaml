@@ -1,5 +1,5 @@
 project_id: "research-copilot"
-schema_version: "6.0.0"
+schema_version: "7.0.0"
 
 default_workflow: "quick_exploratory"
 
@@ -21,9 +21,11 @@ research_log: "docs/research_log.md"
 methodology: "docs/methodology.md"
 changelog: "docs/changelog.md"
 manifest: "docs/manifest.json"
+data_lineage: "docs/data_lineage.json"
 iterations_dir: "docs/iterations"
 decisions_dir: "docs/decisions"
 dead_ends_dir: "docs/dead_ends"
+quality_gates_dir: "docs/quality_gates"
 
 # Report paths (created by AI during init)
 reports_dir: "reports"
@@ -50,7 +52,11 @@ scripts_utils: "scripts/utils"
 # File paths (where AI writes final outputs)
 research_map: "reports/baseline/research_map.json"
 follow_up_questions: "reports/baseline/follow_up_questions.md"
+literature_corpus: "reports/literature/literature_corpus.json"
 evidence_matrix: "reports/literature/evidence_matrix.md"
+gap_analysis: "reports/literature/gap_analysis.md"
+prisma_flow: "reports/literature/prisma_flow.json"
+bibliography: "reports/literature/bibliography.bib"
 analysis_plan: "reports/analysis/analysis_plan.md"
 full_audit: "reports/audit/full_audit_report.md"
 manuscript_findings: "reports/manuscript/research_findings.md"
@@ -71,3 +77,12 @@ power_adequate: 0.80
 power_minimum: 0.50
 missingness_warning: 0.20
 sensitivity_tests_min: 3
+
+# Reproducibility
+requirements_file: "requirements.txt"
+environment_check_script: "scripts/00_environment_check.py"
+pin_dependency_versions: true
+
+# Quality gates
+quality_gates_enabled: true
+gate_fail_blocks_pipeline: true

@@ -11,6 +11,35 @@ agents:
   - compile_outputs
   - audit_validate
 
+quality_gates:
+  - after: research_init
+    gate: "research_init"
+    on_fail: "halt — fix failed checks before proceeding"
+
+  - after: literature_deep
+    gate: "literature_deep"
+    on_fail: "expand literature search or document why minimum not met"
+
+  - after: method_route
+    gate: "method_route"
+    on_fail: "revise analysis plan — each question needs a valid method"
+
+  - after: data_scaffold
+    gate: "data_scaffold"
+    on_fail: "fix data pipeline — ensure lineage is recorded"
+
+  - after: execute_analysis
+    gate: "execute_analysis"
+    on_fail: "complete analysis for all questions before proceeding"
+
+  - after: compile_outputs
+    gate: "compile_outputs"
+    on_fail: "complete all manuscript sections"
+
+  - after: audit_validate
+    gate: "audit_validate"
+    on_fail: "remediate audit failures and re-run"
+
 iteration_support:
   enabled: true
   agent: research_iterate
@@ -81,3 +110,5 @@ notes:
   - "Use research_iterate at any point to explore, pivot, or investigate."
   - "All iterations are documented in docs/iterations/ — never deleted."
   - "Null findings are reported with the same detail as significant results."
+  - "Quality gates are checked between every phase — run 'research validate <phase>'"
+  - "Data lineage is recorded in docs/data_lineage.json — required for reproducibility"

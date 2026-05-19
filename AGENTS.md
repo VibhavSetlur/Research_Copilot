@@ -111,6 +111,23 @@ Each iteration:
 11. Document EVERY decision in docs/decisions/ or docs/research_log.md
 12. Dead ends are valuable — document them in docs/dead_ends/
 
+## Reproducibility Rules
+1. ALWAYS install dependencies from `requirements.txt` before running any code
+2. ALWAYS run `scripts/00_environment_check.py` to verify environment
+3. ALWAYS record data lineage in `docs/data_lineage.json` after every transformation
+4. ALWAYS compute SHA-256 hashes for raw data files
+5. NEVER modify raw data files — only create new processed versions
+6. ALWAYS pin package versions in requirements.txt
+7. Scripts MUST be numbered in execution order (01_, 02_, 03_...)
+8. Data pipeline MUST be reproducible: raw data + scripts = analytical data
+
+## Quality Gate Rules
+1. ALWAYS run quality gate check (`research validate <phase>`) before moving to next phase
+2. NEVER proceed if a quality gate FAILS — fix the issue first
+3. ALL checks in a gate must pass (warnings are noted but don't block)
+4. Gate results are recorded in `docs/quality_gates/`
+5. Failed gates are documented in docs/research_log.md with remediation steps
+
 ## Visualization Rules
 1. ALWAYS read `viz_design_system` skill before creating ANY figure or dashboard
 2. ALWAYS read `viz_code_standards` skill before writing ANY visualization code

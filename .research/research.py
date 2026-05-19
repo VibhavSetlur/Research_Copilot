@@ -1146,6 +1146,145 @@ Methods will be selected based on question types during method_route phase.
     print()
 
 
+def cmd_validate(args):
+    """Run quality gate check for a specific phase."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    config = get_config(root)
+    research_map = get_research_map(root, config)
+
+    phase = args.phase if args.phase else None
+
+    gates = {
+        "research_init": {
+            "name": "Research Init",
+            "checks": [
+                ("Intake filled", lambda: bool(load_markdown(root / config["intake_path"]) and "[Your answer]" not in load_markdown(root / config["intake_path"]))),
+                ("Research questions defined", lambda: len(research_map.get("questions", [])) > 0),
+                ("Data files exist", lambda: len(research_map.get("data", {}).get("files", [])) > 0),
+                ("Research map created", lambda: (root / config["research_map"]).exists()),
+                ("Feasibility verdict assigned", lambda: bool(research_map.get("feasibility", {}).get("verdict"))),
+                ("Directory: docs/", lambda: (root / "docs").exists()),
+                ("Directory: reports/", lambda: (root / "reports").exists()),
+                ("Directory: data/", lambda: (root / "data").exists()),
+                ("Directory: scripts/", lambda: (root / "scripts").exists()),
+                ("manifest.json exists", lambda: (root / config.get("manifest", "docs/manifest.json")).exists()),
+                ("research_log.md exists", lambda: (root / config.get("research_log", "docs/research_log.md")).exists()),
+                ("Iteration registry exists", lambda: (root / config.get("iteration_registry", "docs/iterations/registry.json")).exists()),
+            ]
+        },
+        "literature_deep": {
+            "name": "Literature Deep",
+            "checks": [
+                ("Literature corpus exists", lambda: (root / config.get("literature_corpus", "reports/literature/literature_corpus.json")).exists()),
+                ("Evidence matrix exists", lambda: (root / config.get("evidence_matrix", "reports/literature/evidence_matrix.md")).exists()),
+                ("Gap analysis exists", lambda: (root / config.get("gap_analysis", "reports/literature/gap_analysis.md")).exists()),
+                ("Minimum papers met", lambda: _check_min_papers(root, config)),
+            ]
+        },
+        "method_route": {
+            "name": "Method Route",
+            "checks": [
+                ("Analysis plan exists", lambda: (root / config.get("analysis_plan", "reports/analysis/analysis_plan.md")).exists()),
+            ]
+        },
+        "data_scaffold": {
+            "name": "Data Scaffold",
+            "checks": [
+                ("Ingested data exists", lambda: (root / config.get("data_ingested", "data/01_ingested")).exists()),
+                ("Processed data exists", lambda: (root / config.get("data_processed", "data/02_processed")).exists()),
+                ("Analytical data exists", lambda: (root / config.get("data_analytical", "data/03_analytical")).exists()),
+                ("Data lineage recorded", lambda: (root / config.get("data_lineage", "docs/data_lineage.json")).exists()),
+            ]
+        },
+        "execute_analysis": {
+            "name": "Execute Analysis",
+            "checks": [
+                ("Results exist for all questions", lambda: _has_analysis_results(root)),
+                ("Figures generated", lambda: bool(list((root / "reports/figures").glob("*.png"))) if (root / "reports/figures").exists() else False),
+                ("Tables generated", lambda: bool(list((root / "reports/tables").glob("*"))) if (root / "reports/tables").exists() else False),
+            ]
+        },
+        "compile_outputs": {
+            "name": "Compile Outputs",
+            "checks": [
+                ("Manuscript draft exists", lambda: (root / config.get("manuscript_findings", "reports/manuscript/research_findings.md")).exists()),
+                ("Key findings summary exists", lambda: (root / config.get("key_findings", "reports/summary/key_findings.md")).exists()),
+                ("Executive summary exists", lambda: (root / config.get("executive_summary", "reports/summary/executive_summary.md")).exists()),
+            ]
+        },
+        "audit_validate": {
+            "name": "Audit Validate",
+            "checks": [
+                ("Full audit report exists", lambda: (root / config.get("full_audit", "reports/audit/full_audit_report.md")).exists()),
+            ]
+        },
+    }
+
+    if phase and phase not in gates:
+        print(f"Unknown phase: {phase}")
+        print(f"Available phases: {', '.join(gates.keys())}")
+        return
+
+    phases_to_check = {phase: gates[phase]} if phase else gates
+
+    for phase_id, gate in phases_to_check.items():
+        print("=" * 60)
+        print(f"QUALITY GATE: {gate['name'].upper()}")
+        print("=" * 60)
+        print()
+
+        passed = 0
+        failed = 0
+        for check_name, check_fn in gate["checks"]:
+            try:
+                result = check_fn()
+                status = "PASS" if result else "FAIL"
+                if result:
+                    passed += 1
+                else:
+                    failed += 1
+                marker = "✓" if result else "✗"
+                print(f"  {marker} {check_name}")
+            except Exception as e:
+                failed += 1
+                print(f"  ✗ {check_name} — ERROR: {e}")
+
+        total = passed + failed
+        pct = round(passed / total * 100) if total > 0 else 0
+        print()
+        print(f"  Result: {passed}/{total} passed ({pct}%)")
+
+        if failed == 0:
+            print(f"  Status: PASS — Ready to proceed")
+        else:
+            print(f"  Status: FAIL — {failed} check(s) must pass before proceeding")
+        print()
+
+
+def _check_min_papers(root, config):
+    """Check if minimum paper count is met."""
+    corpus_path = root / config.get("literature_corpus", "reports/literature/literature_corpus.json")
+    if not corpus_path.exists():
+        return False
+    corpus = load_json(corpus_path)
+    papers = corpus.get("papers", [])
+    min_papers = config.get("literature_min_papers", 10)
+    return len(papers) >= min_papers
+
+
+def _has_analysis_results(root):
+    """Check if analysis results exist for all questions."""
+    analysis_dir = root / "reports/analysis"
+    if not analysis_dir.exists():
+        return False
+    q_dirs = [d for d in analysis_dir.iterdir() if d.is_dir() and d.name.startswith("q")]
+    return len(q_dirs) > 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Research Copilot CLI — context retrieval for AI agents",
@@ -1157,6 +1296,7 @@ Commands:
   intake          Show intake form status
   scan            Scan inputs/, save research map to .research/cache/
   init-dirs       Create full output directory structure (AI does this)
+  validate [phase]  Run quality gate check (all phases or specific)
   skills          List all skills
   skill <name>    Show a specific skill
   agents          List all agents
@@ -1169,14 +1309,17 @@ Design:
   - CLI stores working data in .research/cache/ (no new top-level dirs)
   - AI agent (research_init) creates all output directories
   - Run 'research init-dirs' to create dirs manually if needed
+  - Run 'research validate' to check phase completion
 
 Examples:
   research status
   research scan
   research init-dirs
+  research validate research_init
+  research validate
   research skill profile_tabular
   research agent research_init
-  research agent research_iterate
+  research agent literature_pipeline
   research map
   research iterations
         """,
@@ -1202,6 +1345,9 @@ Examples:
     sub.add_parser("followups", help="Show follow-up questions")
     sub.add_parser("iterations", help="Show iteration history")
 
+    p_validate = sub.add_parser("validate", help="Run quality gate check")
+    p_validate.add_argument("phase", nargs="?", help="Phase to validate (or all if omitted)")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1226,6 +1372,7 @@ Examples:
             "workflow": cmd_workflow,
             "followups": cmd_followups,
             "iterations": cmd_iterations,
+            "validate": cmd_validate,
         }
         commands[args.command](args)
 
