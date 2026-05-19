@@ -1,41 +1,64 @@
 ---
 skill_id: "compute_hashes"
-version: "3.0.0"
+version: "7.0.0"
 category: "data"
 domain_compatibility: ["all"]
 required_tools: ["python", "hashlib"]
-estimated_tokens: 2000
 depends_on: []
-produces: ["data/data_hashes.json"]
+produces: ["data/01_ingested/hash_manifest.json"]
+complexity: "basic"
 ---
 
-# Skill: Data Cryptographic Hashing
+# Skill: Data Integrity Hashing
 
 ## Purpose
-Compute SHA-256 hashes of input files to document dataset versions and ensure data integrity.
+Compute and record cryptographic hashes for all data files to enable integrity verification, provenance tracking, and reproducibility auditing.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `file_paths` | List[Path]| Yes | List of target file paths to hash |
+## When to Use
+- Immediately after data ingestion
+- After any data transformation
+- Before and after analysis runs
+- When sharing data between systems
+
+## When NOT to Use
+- Files are ephemeral/temporary
+- Data is streaming (use checkpoint hashing instead)
 
 ## Execution Protocol
 
-### Step 1: File Processing
-- Iterate over file paths. Verify files exist.
-- Read files in binary mode in 4MB chunks to prevent memory leaks on large datasets.
+### Step 1: File Discovery
+- Scan `data_raw/` and `data/` directories recursively
+- Identify all data files: CSV, Parquet, Excel, JSON, SAS, SPSS, Stata, Feather
+- Exclude: code files, documentation, hidden files
 
-### Step 2: Digest Compilation
-- Generate SHA-256 hexadecimal digests.
-- Retrieve file size and last modified date.
+### Step 2: Hash Computation
+- Compute SHA-256 for each file
+- For files > 1GB: read in 8192-byte chunks to avoid memory overflow
+- Record: file path, hash, file size, modification timestamp
 
-### Step 3: Export Manifest
-- Write parameters to `data_hashes.json`.
+### Step 3: Manifest Generation
+- Create JSON manifest with all file entries
+- Include metadata: computation timestamp, tool version, OS
+- Sort entries by file path for deterministic output
+
+### Step 4: Verification (if previous manifest exists)
+- Compare current hashes to previous manifest
+- Identify: new files, modified files, deleted files, unchanged files
+- Report delta summary
+
+## Diagnostics & Interpretation
+
+| Check | Pass | Fail → Action |
+|-------|------|---------------|
+| Hash matches previous | File unchanged | Investigate modification source |
+| File size consistent | Size matches expectation | Check for truncation or corruption |
+| All files accounted | No unexpected changes | Verify intentional vs accidental |
 
 ## Output Specification
-Produces:
-- `data/data_hashes.json` mapping paths to digests.
+- `data/01_ingested/hash_manifest.json`: file paths, SHA-256 hashes, sizes, timestamps, delta from previous manifest
 
-## Validation Criteria
-- [ ] Hex digests are exactly 64 characters long.
-- [ ] File sizes match local system records.
+## Validation Checks
+- [ ] All data files hashed
+- [ ] Hashes are reproducible (recompute matches)
+- [ ] Manifest is valid JSON
+- [ ] Delta correctly identifies changes

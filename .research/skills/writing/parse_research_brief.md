@@ -1,52 +1,63 @@
 ---
 skill_id: "parse_research_brief"
-version: "3.0.0"
+version: "7.0.0"
 category: "writing"
 domain_compatibility: ["all"]
 required_tools: ["python", "pyyaml"]
-estimated_tokens: 2000
 depends_on: []
-produces: ["docs/parsed_research_brief.json"]
+produces: ["briefs/parsed_research_brief.json"]
+complexity: "intermediate"
 ---
 
 # Skill: Parse Research Brief
 
 ## Purpose
-Parse, validate, and extract structured goals, hypotheses, and constraints from the researcher's raw Markdown brief.
+Extract structured research parameters from a natural language research brief: questions, variables, hypotheses, domain, and constraints.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `brief_path` | Path | Yes | Path to the raw research_brief.md file |
+## When to Use
+- First step in any research pipeline
+- When researcher provides a free-text brief
+- Before any analysis or literature search
+
+## When NOT to Use
+- Research parameters already structured
+- Only exploratory analysis with no specific question
 
 ## Execution Protocol
 
-### Step 1: Document Structure Parsing
-- Load `research_brief.md`.
-- Validate that it contains the 9 mandatory sections:
-  1. Study Title
-  2. Research Domain
-  3. Hypotheses/Questions
-  4. Dataset Description
-  5. Variable Taxonomy
-  6. Design Context
-  7. Exclusion Criteria
-  8. Deliverables
-  9. Known Issues
+### Step 1: Question Extraction
+- Identify primary research question(s)
+- Classify question type: descriptive, comparative, associational, causal, predictive, exploratory
+- Extract: independent variable(s), dependent variable(s), covariates
 
-### Step 2: Extraction and Normalization
-- Extract hypotheses and format them as an array of structured objects containing: `id`, `text`, `null_hypothesis`, and `dependent_variable`.
-- Parse variables and categorize them into `independent`, `dependent`, `confounders`, or `covariates`.
-- Extract text parameters for sample exclusion criteria.
+### Step 2: Hypothesis Formulation
+- Extract stated hypotheses (directional or non-directional)
+- If no hypothesis stated: generate null and alternative hypotheses
+- Specify: expected effect direction and magnitude (if stated)
 
-### Step 3: Validation checks
-- Ensure at least one hypothesis and one dependent variable are declared.
-- Output warning logs if the domain field does not match any of the standard system domain profiles.
+### Step 3: Domain & Context
+- Identify research domain from keywords and variable names
+- Extract: population of interest, setting, time period
+- Identify: reporting standard (APA, STROBE, AEA, etc.)
+
+### Step 4: Constraints & Preferences
+- Extract: significance level preference (default α = 0.05)
+- Extract: analysis method preferences (if any)
+- Extract: output format preferences
+- Note: any ethical constraints or data use restrictions
+
+### Step 5: Validation
+- Check: all required fields populated
+- Check: variables referenced in hypotheses exist in data (if data available)
+- Check: question type is answerable with available data
+- Flag: ambiguities for researcher clarification
 
 ## Output Specification
-Produces:
-- `docs/parsed_research_brief.json` containing normalized parameters.
+- `briefs/parsed_research_brief.json`: structured brief with questions, hypotheses, variables, domain, constraints
 
-## Validation Criteria
-- [ ] Output JSON contains the `hypotheses` and `variables` keys.
-- [ ] No section headers are empty.
+## Validation Checks
+- [ ] At least one research question identified
+- [ ] Question type classified
+- [ ] Variables mapped to roles (IV, DV, covariate)
+- [ ] Domain identified
+- [ ] Ambiguities flagged

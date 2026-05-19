@@ -1,51 +1,75 @@
 ---
 skill_id: "write_imrad"
-version: "3.0.0"
+version: "7.0.0"
 category: "writing"
 domain_compatibility: ["all"]
-required_tools: ["python", "openai|anthropic"]
-estimated_tokens: 4000
-depends_on: ["write_methods_section", "write_results_narrative", "generate_bibtex"]
+required_tools: ["python", "openai|anthropic|litellm", "pandoc"]
+depends_on: ["write_methods_section", "write_results_narrative", "synthesize_literature", "generate_bibtex"]
 produces: ["reports/research_findings.md"]
+complexity: "advanced"
 ---
 
-# Skill: Write IMRAD Paper
+# Skill: Write IMRAD Manuscript
 
 ## Purpose
-Assemble and write the complete IMRAD format academic manuscript ready for submission.
+Assemble a complete IMRAD-format academic manuscript from component sections, with integrated literature review, results interpretation, and formatted references.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `parsed_brief` | Path | Yes | Path to parsed_research_brief.json |
-| `methods_section` | Path | Yes | Path to methods_section.md |
-| `results_section` | Path | Yes | Path to results_section.md |
-| `bibtex_file` | Path | Yes | Path to references.bib |
+## When to Use
+- All component sections written
+- Final manuscript assembly
+- Ready for submission or review
+
+## When NOT to Use
+- Sections not yet complete
+- Only a report (not manuscript) needed
 
 ## Execution Protocol
 
-### Step 1: Introduction Integration
-- Draft the Introduction detailing:
-  - Context and setting.
-  - Literature gap identified during search.
-  - Statement of objectives, research questions, and hypotheses.
+### Step 1: Introduction
+- Context: background and significance
+- Literature gap: what is unknown (from literature synthesis)
+- Research question: clearly stated
+- Hypotheses: specific and testable
+- Objectives: primary and secondary
 
-### Step 2: Assembly
-- Append the Introduction, the Methods section (`methods_section.md`), and the Results section (`results_section.md`) into a single markdown manuscript.
+### Step 2: Methods
+- Insert methods_section.md
+- Verify: all analysis methods described
+- Verify: ethical considerations included
 
-### Step 3: Discussion Drafting
-- Interpret findings directly in relation to the original hypotheses.
-- Compare results with literature references present in the BibTeX manifest.
-- Define a dedicated "Limitations" sub-section identifying statistical caveats (e.g., missingness adjustments, observational design limits, sample size restrictions).
-- Propose future research paths based on the gaps.
+### Step 3: Results
+- Insert results_section.md
+- Verify: all hypotheses addressed
+- Verify: tables and figures referenced correctly
+- Add: table and figure captions
 
-### Step 4: Reference Formatting
-- Append a "References" section at the end. Use a formatting engine (e.g., `pandoc-citeproc` or similar) to generate styled references from the `.bib` file.
+### Step 4: Discussion
+- Interpret findings: what do results mean?
+- Compare to literature: consistent or contradictory with prior work?
+- Mechanisms: plausible explanations for findings
+- Limitations: statistical, methodological, generalizability
+- Implications: theoretical, practical, policy
+- Future research: specific directions
+
+### Step 5: References
+- Insert formatted references from references.bib
+- Use pandoc-citeproc for citation formatting
+- Verify: all in-text citations have reference entries
+- Verify: all reference entries cited in text
+
+### Step 6: Final Checks
+- Title: concise, informative, includes key variables
+- Abstract: structured (Background, Methods, Results, Conclusion)
+- Keywords: 3-6 domain-appropriate terms
+- Word count: within journal limits
+- Formatting: journal-specific style guide
 
 ## Output Specification
-Produces:
-- `reports/research_findings.md`
+- `reports/research_findings.md`: complete IMRAD manuscript
 
-## Validation Criteria
-- [ ] Section headers match IMRAD standard (Introduction, Methods, Results, Discussion).
-- [ ] References section is populated and matches in-text citations.
+## Validation Checks
+- [ ] All four IMRAD sections present
+- [ ] In-text citations match reference list
+- [ ] Tables and figures referenced
+- [ ] Abstract matches manuscript content
+- [ ] Word count within limits

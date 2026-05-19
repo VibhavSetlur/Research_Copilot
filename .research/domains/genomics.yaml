@@ -3,19 +3,9 @@ name: "Genomics & Bioinformatics"
 reporting_standard: "MIAME"
 significance_threshold: 0.05
 default_effect_size_metric: "log2_fold_change"
-required_confounders_check: true
-default_skills:
-  - profile_genomic
-  - descriptive_stats
-  - differential_expression
-  - pathway_enrichment
-preferred_visualizations:
-  - volcano_plot
-  - heatmap
-  - pca_plot
+preferred_visualizations: ["volcano_plot", "heatmap", "pca_plot"]
 citation_style: "nature"
-data_type_defaults:
-  primary: "GENOMIC-SEQ"
 quality_gates:
   - sequencing_depth
   - batch_effect_correction
+  - multiple_testing_correction

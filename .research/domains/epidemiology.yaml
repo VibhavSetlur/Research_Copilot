@@ -3,15 +3,9 @@ name: "Epidemiology & Public Health"
 reporting_standard: "STROBE"
 significance_threshold: 0.05
 default_effect_size_metric: "odds_ratio"
-required_confounders_check: true
+preferred_visualizations: ["forest_plot", "kaplan_meier", "choropleth"]
 citation_style: "vancouver"
-default_skills:
-  - profile_tabular
-  - descriptive_stats
-  - inferential_parametric
-  - power_analysis
-preferred_visualizations:
-  - figure_workflow_dag
 quality_gates:
   - confounder_adjustment
   - missing_data_rationale
+  - selection_bias_assessment

@@ -1,42 +1,55 @@
 ---
 skill_id: "write_executive_summary"
-version: "3.0.0"
+version: "7.0.0"
 category: "writing"
 domain_compatibility: ["all"]
-required_tools: ["python", "openai|anthropic"]
-estimated_tokens: 2500
-depends_on: ["write_imrad"]
+required_tools: ["python", "openai|anthropic|litellm"]
+depends_on: ["write_results_narrative"]
 produces: ["reports/executive_summary.md"]
+complexity: "basic"
 ---
 
 # Skill: Write Executive Summary
 
 ## Purpose
-Condense the full research findings into a 1-page executive summary for stakeholders.
+Generate a concise, non-technical summary of research findings for stakeholders, policymakers, or decision-makers.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `paper_path` | Path | Yes | Path to the compiled IMRAD paper |
+## When to Use
+- Results finalized
+- Need to communicate to non-research audience
+- Policy brief or briefing document
+
+## When NOT to Use
+- Only academic audience
+- Results preliminary
 
 ## Execution Protocol
 
-### Step 1: Key Component Extraction
-- Extract the core research objective, total sample size, primary findings, and key recommendations from the manuscript.
+### Step 1: Key Findings
+- 3-5 main findings in plain language
+- Each finding: what was found, how big the effect is, confidence level
+- No statistical jargon: no p-values, CIs, or test names
 
-### Step 2: Outlining and Structuring
-- Organize the summary into three sections:
-  1. **Background**: Brief context and goal of the study.
-  2. **Key Findings**: Bulleted list of findings. Each bullet must state a quantitative value (e.g., effect size, percentage difference).
-  3. **Strategic Implications**: What the results mean for policy, business, or further development.
+### Step 2: Context
+- Why this research matters
+- What question was asked
+- How it was studied (one sentence)
 
-### Step 3: Precision Editing
-- Refine text to ensure total length does not exceed 500 words.
+### Step 3: Implications
+- What the findings mean for practice or policy
+- Recommended actions (if applicable)
+- Caveats: limitations in plain language
+
+### Step 4: Format
+- Length: 1-2 pages maximum
+- Structure: headings, bullet points, short paragraphs
+- Visual: include 1-2 key figures (simplified)
 
 ## Output Specification
-Produces:
-- `reports/executive_summary.md`
+- `reports/executive_summary.md`: plain-language summary
 
-## Validation Criteria
-- [ ] Total word count is under 500 words.
-- [ ] Contains a minimum of 3 quantitative bullet points under Key Findings.
+## Validation Checks
+- [ ] No statistical jargon
+- [ ] All findings supported by results
+- [ ] Limitations acknowledged
+- [ ] Length ≤ 2 pages

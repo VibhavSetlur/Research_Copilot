@@ -1,49 +1,62 @@
 ---
 skill_id: "generate_apa_tables"
-version: "3.0.0"
+version: "7.0.0"
 category: "writing"
-domain_compatibility: ["all"]
-required_tools: ["python", "pandas", "tabulate"]
-estimated_tokens: 2500
-depends_on: ["interpret_effect_sizes"]
+domain_compatibility: ["psychology", "education", "social_sciences"]
+required_tools: ["python", "pandas", "jinja2"]
+depends_on: ["descriptive_stats", "inferential_parametric"]
 produces: ["reports/tables/"]
+complexity: "intermediate"
 ---
 
-# Skill: Generate APA Tables (LaTeX/Markdown)
+# Skill: Generate APA-Style Tables
 
 ## Purpose
-Convert raw descriptive and inferential statistics into publication-ready APA-7th styled tables in Markdown and LaTeX.
+Generate publication-ready tables in APA 7th edition format for descriptive statistics, regression results, and ANOVA tables.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `descriptive_results` | Path | Yes | Path to descriptive_stats.json |
-| `inferential_results` | Path | Yes | Path to results_interpreted.json |
+## When to Use
+- Results finalized
+- Need tables for manuscript
+- APA or similar formatting required
+
+## When NOT to Use
+- Only figures needed
+- Non-APA format required (e.g., AMA, Chicago)
 
 ## Execution Protocol
 
-### Step 1: Layout Designing
-- Descriptive Tables: Format as Variable name, Stratified Columns, and overall metrics. Format continuous values as `Mean (SD)` and categorical as `n (%)`.
-- Regression/Inferential Tables: Column structure must represent: Parameter, Coefficient (b), Standard Error (SE), 95% Confidence Interval [LL, UL], test statistic (t/z/F), and p-value.
+### Step 1: Table 1 (Descriptive Statistics)
+- Columns: Variable, M, SD, [Min, Max], Skew, Kurtosis, N
+- For categorical: n (%)
+- Grouped: if comparing groups, one column per group
+- Footnotes: note any transformations, exclusions
 
-### Step 2: LaTeX Generation Rules
-- Enforce the three-line rule:
-  - Header top line (`\toprule`).
-  - Header bottom line (`\midrule`).
-  - Table bottom line (`\bottomrule`).
-- Remove all vertical lines (`|`).
-- Place table titles **above** the table.
+### Step 2: Regression Table
+- Columns: Predictor, B (or β), SE, 95% CI, p
+- Organize: blocks of predictors (Step 1, Step 2, etc.)
+- Bottom rows: R², ΔR², F, df
+- Significance: * p < .05, ** p < .01, *** p < .001
 
-### Step 3: Markdown Generation
-- Format markdown tables using standard GFM headers.
+### Step 3: ANOVA Table
+- Columns: Source, SS, df, MS, F, p, η²
+- Rows: between-groups, within-groups, total
+- Post-hoc: pairwise comparisons with adjusted p-values
+
+### Step 4: Formatting Rules (APA 7th)
+- No vertical lines
+- Horizontal lines: top, bottom, below column headers
+- Font: same as manuscript (typically Times New Roman, 12pt)
+- Table number and title above table
+- Notes below table: general, specific, probability
+- Decimal alignment: align on decimal point
+- Leading zero: 0 for statistics that can exceed 1 (p, r), no 0 for statistics that cannot (F, t, χ²)
 
 ## Output Specification
-Produces in `reports/tables/`:
-- `descriptive_table.md`
-- `descriptive_table.tex`
-- `inferential_table.md`
-- `inferential_table.tex`
+- `reports/tables/`: individual table files in Markdown and LaTeX format
 
-## Validation Criteria
-- [ ] LaTeX output does not contain the vertical cell separator character (`|`).
-- [ ] Table headers explicitly define measurement units where applicable.
+## Validation Checks
+- [ ] No vertical lines
+- [ ] Correct horizontal line placement
+- [ ] Decimal formatting follows APA rules
+- [ ] All statistics match computed values
+- [ ] Table numbers sequential

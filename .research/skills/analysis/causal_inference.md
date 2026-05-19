@@ -1,88 +1,105 @@
 ---
 skill_id: "causal_inference"
-version: "5.0.0"
+version: "7.0.0"
 category: "analysis"
 domain_compatibility: ["all"]
-required_tools: ["python", "doubleml", "dowhy", "scikit-learn", "notebooklm-py"]
-estimated_tokens: 4500
+required_tools: ["python", "dowhy", "econml|doubleml", "scikit-learn"]
 depends_on: ["descriptive_stats"]
 produces: ["analysis/03_analytical/causal_results.json"]
+complexity: "advanced"
 ---
 
 # Skill: Causal Inference & Identification
 
 ## Purpose
-Estimate structural causal effects (ATE and CATE) using double machine learning and validate causal DAG models with NotebookLM.
+Estimate causal effects (ATE, CATE) using structural causal models, double machine learning, and refutation testing.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to dataset |
-| `treatment` | Str | Yes | Treatment variable |
-| `outcome` | Str | Yes | Outcome variable |
-| `confounders` | List | Yes | Confounding variables |
-| `notebook_id` | Str | No | NotebookLM ID for model auditing |
+## When to Use
+- Research question is causal ("does X cause Y?") not associational
+- Observational data with potential confounding
+- RCT data (use simple difference-in-means, but validate randomization)
 
-## Methodological Framework
+## When NOT to Use
+- Only associational question asked
+- No plausible identification strategy
+- Treatment and outcome measured simultaneously with no temporal ordering
 
-### 1. Mathematical Formulations
-- **Double Machine Learning (DML)**:
-  Establishes orthogonalized score functions to estimate treatment effect $\theta_0$:
-  1. $Y = g_0(X) + \theta_0 D + U, \quad E[U|D, X] = 0$
-  2. $D = m_0(X) + V, \quad E[V|X] = 0$
-  3. Run machine learning estimators to find predicted $\hat{g}_0(X)$ and $\hat{m}_0(X)$.
-  4. Obtain residuals $\tilde{Y} = Y - \hat{g}_0(X)$ and $\tilde{D} = D - \hat{m}_0(X)$.
-  5. Estimate $\theta_0$ via OLS of $\tilde{Y}$ on $\tilde{D}$.
+## Decision Protocol
 
-## Step-by-Step Analytical Protocol
+### Method Selection
+| Design | Data Type | Method |
+|--------|-----------|--------|
+| RCT | Any | Difference-in-means (validate randomization) |
+| Observational, measured confounders | Any | Propensity score matching / weighting |
+| Observational, high-dimensional confounders | Any | Double Machine Learning (DML) |
+| Natural experiment | Binary treatment | Instrumental Variables (2SLS) |
+| Policy intervention, panel data | Panel | Difference-in-Differences (DiD) |
+| Threshold-based assignment | Continuous running variable | Regression Discontinuity (RDD) |
+| Time-varying treatment | Longitudinal | Marginal Structural Models (MSM) |
 
-### Step 1: Causal DAG Audit via NotebookLM
-Query NotebookLM to evaluate confounders:
-```
-Target Causal Setup: Treatment = [treatment], Outcome = [outcome], Controls = [confounders]. Are there any potential colliders or mediator variables in this control list?
-```
-Adjust lists based on returned literature findings.
+## Execution Protocol
 
-### Step 2: DoubleML Execution
-Configure DoubleML using Random Forest regressors as the nuisance parameter estimators. Fit the model to obtain the treatment effect.
+### Step 1: Causal Model Specification
+- Define: treatment (D), outcome (Y), confounders (X), instruments (Z), mediators (M)
+- Draw causal DAG: nodes = variables, edges = causal relationships
+- Identify backdoor paths: all non-causal paths from D to Y
+- Determine identification strategy: backdoor criterion, frontdoor criterion, or IV
 
-### Step 3: Robustness and Refutation Testing
-Run DoWhy refutation tests:
-- Placebo Treatment: Replaces treatment with random noise. Causal effect should equal 0.
-- Random Common Cause: Adds a random confounder. Estimate should remain stable.
+### Step 2: Confounder Selection
+- Include pre-treatment variables that affect both D and Y
+- Exclude: mediators (on causal path D → M → Y), colliders (D → C ← Y), instruments (Z → D, Z ⊥ Y)
+- Validate confounder list against domain literature
 
-## Diagnostics & Interpretation Guide (What to Look For)
-- **Placebo Treatment Refutation p < .05**:
-  - *Interpret*: Critical violation. The model finds a causal effect even when treatment is random. This indicates severe unobserved confounding or model overfitting.
-  - *Action*: Re-evaluate confounders, review the causal DAG, and verify if the background ML models are overfitting.
-- **Random Common Cause Estimate Shifts > 5%**:
-  - *Interpret*: The model is highly sensitive to model specification variations, indicating instability.
-  - *Action*: Increase regularization in the ML nuisance estimators or bootstrap the causal estimator.
+### Step 3: Effect Estimation
+**Propensity Score Methods:**
+- Estimate propensity: P(D=1|X) using logistic regression or ML
+- Check overlap: propensity distributions should overlap between treated and control
+- Match: nearest neighbor (1:1 or 1:k), caliper = 0.2 × SD of logit
+- Weight: IPTW (inverse probability of treatment weighting)
+- Check balance: standardized mean differences < 0.10 after matching/weighting
 
-## Writing & Reporting Standards
-Report causal findings following this template:
-> "We estimated the causal effect of treatment $D$ on outcome $Y$ using Double Machine Learning (DML) with Random Forest models to partial out the confounding effects of $X$. Causal assumptions were audited using literature queries. The estimated Average Treatment Effect (ATE) was significant ($ATE = 1.42$, $SE = 0.31$, $95\%\text{ CI } [0.81, 2.03]$, $p < .001$). Causal identification was validated using refutation tests; replacing the treatment with a placebo variable yielded no significant effect ($ATE_{\text{placebo}} = 0.02$, $p = .89$)."
+**Double Machine Learning:**
+- Nuisance models: ML for Y|X and D|X (Random Forest, Lasso, or gradient boosting)
+- Cross-fitting: split data into K folds, estimate nuisances on K-1 folds
+- Orthogonalized residuals: Ỹ = Y - Ê[Y|X], D̃ = D - Ê[D|X]
+- Final estimate: OLS of Ỹ on D̃
+- Report: ATE, SE, 95% CI
 
-## Reference Python Implementation
-```python
-import pandas as pd
-from doubleml import DoubleMLData, DoubleMLPLR
-from sklearn.ensemble import RandomForestRegressor
+### Step 4: Refutation Testing (DoWhy)
+- **Placebo treatment**: replace D with random noise → effect should be 0
+- **Random common cause**: add random confounder → estimate should be stable
+- **Data subset**: remove 50% of data → estimate should be stable
+- **Unobserved confounder**: simulate hidden confounder → sensitivity bound
 
-def run_dml(df, treatment, outcome, confounders):
-    dml_data = DoubleMLData(df, y_col=outcome, d_cols=treatment, x_cols=confounders)
-    ml_l = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42)
-    ml_m = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42)
-    
-    dml_plr = DoubleMLPLR(dml_data, ml_l=ml_l, ml_m=ml_m, dml_procedure='dml2')
-    dml_plr.fit()
-    
-    return dml_plr.summary
-```
+### Step 5: Heterogeneous Treatment Effects (CATE)
+- If treatment effect varies by subgroup: estimate CATE
+- Methods: causal forest, meta-learners (T-learner, S-learner, X-learner)
+- Report: which subgroups benefit most/least
+
+## Diagnostics & Interpretation
+
+| Diagnostic | Pass | Fail → Interpret | Fail → Action |
+|------------|------|-------------------|---------------|
+| Propensity overlap | Distributions overlap | No common support | Trim to overlap region |
+| Balance | SMD < 0.10 | Residual confounding | Add interaction terms, re-match |
+| Placebo refuter | p > 0.05 | Unobserved confounding | Reconsider identification strategy |
+| Common cause stability | Estimate change < 5% | Model unstable | Increase regularization |
+
+### Red Flags
+- **No overlap in propensity scores**: treated and control are fundamentally different; cannot estimate causal effect
+- **Placebo refuter significant**: model finds effect in random noise → severe misspecification
+- **CATE varies wildly**: treatment effect highly heterogeneous; report subgroup-specific effects
+- **IV weak (F-stat < 10)**: instrument too weak; biased 2SLS estimates
+
+## Reporting Template
+> "We estimated the causal effect of [treatment] on [outcome] using [method]. The ATE was [value] (SE = [value], 95% CI [lower, upper], p = [value]). Causal identification was validated through [refutation tests]. Placebo treatment refutation yielded ATE = [value] (p = [value]), supporting the validity of our identification strategy."
 
 ## Output Specification
-Produces a JSON mapping estimated parameters and refutation checks.
+- `analysis/03_analytical/causal_results.json`: ATE, CATE, SEs, CIs, refutation results, propensity diagnostics, causal DAG
 
-## Validation Criteria
-- [ ] Placebo refuter test p-value is > .05.
-- [ ] Random common cause estimate changes by < 5%.
+## Validation Checks
+- [ ] Causal DAG specified and justified
+- [ ] Confounders pre-treatment only
+- [ ] Propensity overlap verified
+- [ ] At least 2 refutation tests passed
+- [ ] Effect size plausible given domain knowledge

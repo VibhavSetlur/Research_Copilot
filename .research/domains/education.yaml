@@ -1,18 +1,11 @@
 domain_id: "education"
-name: "Educational Research"
+name: "Education Research"
 reporting_standard: "AERA"
 significance_threshold: 0.05
 default_effect_size_metric: "cohens_d"
-required_confounders_check: true
-default_skills:
-  - profile_tabular
-  - mixed_effects
-  - propensity_score_matching
-preferred_visualizations:
-  - error_bar_chart
-  - growth_curve
+preferred_visualizations: ["forest_plot", "box_plot", "growth_curve"]
 citation_style: "apa"
-data_type_defaults:
-  primary: "TABULAR-PANEL"
 quality_gates:
-  - nested_data_check
+  - sampling_frame
+  - response_rate
+  - hierarchical_structure

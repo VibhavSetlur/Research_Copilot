@@ -1,48 +1,77 @@
 ---
 skill_id: "write_methods_section"
-version: "3.0.0"
+version: "7.0.0"
 category: "writing"
 domain_compatibility: ["all"]
-required_tools: ["python", "openai|anthropic"]
-estimated_tokens: 3000
-depends_on: ["parse_research_brief"]
-produces: ["docs/methods_section.md"]
+required_tools: ["python", "openai|anthropic|litellm"]
+depends_on: ["parse_research_brief", "detect_missingness"]
+produces: ["reports/sections/methods_section.md"]
+complexity: "intermediate"
 ---
 
-# Skill: Write Methods Section (Academic Standards)
+# Skill: Write Methods Section
 
 ## Purpose
-Generate a peer-reviewed standard Methodology section based on the append-only methods log, aligning with reporting guidelines (e.g., STROBE, PRISMA, AERA).
+Generate a complete, domain-appropriate methods section covering study design, data, variables, analytical procedures, and ethical considerations.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `methods_log_path` | Path | Yes | Path to the methods log file |
-| `domain_reporting` | Str | Yes | Reporting standard (e.g., 'STROBE', 'PRISMA', 'APA') |
+## When to Use
+- After analysis plan determined
+- Before results section
+- For manuscript assembly
+
+## When NOT to Use
+- Only results needed
+- Methods already written
 
 ## Execution Protocol
 
-### Step 1: Sub-section Outlining
-Structure the section into four standard academic components:
-1. **Study Design & Context**: Type of study (observational, RCT, cohort), setting, and timeline.
-2. **Participants & Ingestion**: Selection criteria, final sample size calculation, and exclusions applied.
-3. **Measures & Variables**: Detailed operationalization of variables and scaling.
-4. **Statistical Analysis**: Statistical models defined with equations, software package names, version pinning, and alpha thresholds.
+### Step 1: Study Design Description
+- Design type: cross-sectional, longitudinal, experimental, quasi-experimental, observational
+- Setting: where and when data was collected
+- Participants/sample: N, inclusion/exclusion criteria, recruitment method
+- For experiments: randomization procedure, blinding, control condition
 
-### Step 2: Narrative Generation
-- Translate technical command runs from `methods_log.md` into descriptive, formal English.
-- Insert mathematical model specifications in LaTeX format (e.g., `$$Y_i = \beta_0 + \beta_1 X_i + \epsilon_i$$`).
-- Document all tests run to verify statistical assumptions (e.g., Shapiro-Wilk, Levene's) and state justifications for non-parametric fallbacks.
-- Specify significance level conventions: e.g., "All tests used a two-sided significance threshold of alpha = .05."
+### Step 2: Data Description
+- Data source: survey, administrative records, experimental, scraped, public dataset
+- Time period: collection dates
+- Variables: list with operational definitions
+- Measurement instruments: validated scales, custom measures
 
-### Step 3: Software Logging
-- Explicitly state the statistical libraries utilized with their exact versions parsed from the execution manifest (e.g., "analyses were performed using Statsmodels version 0.14.0").
+### Step 3: Analytical Procedures
+- Software: name and version
+- Preprocessing: cleaning, transformation, imputation method
+- Statistical tests: each test with rationale
+- Model specifications: formula, covariates, interaction terms
+- Assumption checks: which tests, results
+- Multiple testing correction: method used
+- Significance level: α threshold
+
+### Step 4: Missing Data Handling
+- Extent of missingness: per variable
+- Mechanism: MCAR, MAR, or MNAR (with test results)
+- Handling method: complete-case, imputation, weighting
+- Sensitivity analysis: alternative methods tested
+
+### Step 5: Ethical Considerations
+- IRB approval: status and number
+- Informed consent: obtained or waived
+- Data privacy: anonymization, secure storage
+- Conflicts of interest: declared or none
+
+## Reporting Standards by Domain
+| Domain | Standard | Required Elements |
+|--------|----------|------------------|
+| Medicine/Epi | STROBE | Flow diagram, confounder justification |
+| Psychology | APA 7th | Reliability coefficients, manipulation checks |
+| Economics | AEA | Data availability statement, pre-registration |
+| Education | AERA | Sampling frame, response rate |
 
 ## Output Specification
-Produces:
-- `docs/methods_section.md` containing formatted LaTeX and narrative.
+- `reports/sections/methods_section.md`: complete methods section
 
-## Validation Criteria
-- [ ] Section contains explicit descriptions of outlier removal or missingness handling.
-- [ ] Mathematical equations for primary models are present in LaTeX format.
-- [ ] Version numbers for primary packages (e.g., Pandas, Scipy) are declared.
+## Validation Checks
+- [ ] All analysis methods described
+- [ ] Software and versions specified
+- [ ] Missing data handling documented
+- [ ] Ethical considerations addressed
+- [ ] Domain reporting standard followed

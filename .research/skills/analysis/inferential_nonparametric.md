@@ -1,103 +1,92 @@
 ---
 skill_id: "inferential_nonparametric"
-version: "5.0.0"
+version: "7.0.0"
 category: "analysis"
 domain_compatibility: ["all"]
-required_tools: ["python", "scipy", "numpy"]
-estimated_tokens: 3500
+required_tools: ["python", "scipy", "statsmodels"]
 depends_on: ["descriptive_stats"]
 produces: ["analysis/03_analytical/nonparametric_results.json"]
+complexity: "intermediate"
 ---
 
-# Skill: Non-Parametric Inferential Analysis
+# Skill: Non-Parametric Inferential Testing
 
 ## Purpose
-Execute non-parametric statistical tests (Mann-Whitney, Wilcoxon, Kruskal-Wallis) and permutation inference when data violates parametric assumptions.
+Conduct distribution-free hypothesis tests when parametric assumptions are violated or data is ordinal.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to dataset |
-| `group_column` | Str | Yes | Categorical grouping variable |
-| `value_column` | Str | Yes | Continuous dependent variable |
+## When to Use
+- Parametric assumptions violated (normality, homoscedasticity)
+- Data is ordinal (Likert scales, rankings)
+- Sample size too small for CLT (N < 30 per group)
+- Data has extreme outliers that cannot be removed
 
-## Methodological Framework
+## When NOT to Use
+- Parametric assumptions met (parametric tests are more powerful)
+- Data is nominal categorical (use chi-square instead)
+- Sample is large and approximately normal (parametric is fine)
 
-### 1. Mathematical Formulations
-- **Mann-Whitney U Test**:
-  Ranks all combined observations. Compute $U$:
-  $$U_1 = n_1 n_2 + \frac{n_1(n_1+1)}{2} - R_1, \quad U_2 = n_1 n_2 - U_1$$
-  where $R_1$ is the rank sum of group 1. Test statistic $U = \min(U_1, U_2)$.
-- **Empirical Permutation Test**:
-  Shuffles group labels to construct the empirical null distribution.
-  $$\text{Empirical } p = \frac{1 + \sum_{m=1}^{M} I(|\Delta^*_m| \ge |\Delta_{\text{obs}}|)}{M + 1}$$
-  where $\Delta_{\text{obs}}$ is the observed median difference and $\Delta^*_m$ are permuted differences.
+## Decision Protocol
 
-## Step-by-Step Analytical Protocol
+### Test Selection
+| Parametric Equivalent | Non-Parametric Alternative | Design |
+|----------------------|---------------------------|--------|
+| Independent t-test | Mann-Whitney U (Wilcoxon rank-sum) | 2 independent groups |
+| Paired t-test | Wilcoxon signed-rank | 2 paired groups |
+| One-way ANOVA | Kruskal-Wallis H | 3+ independent groups |
+| Repeated measures ANOVA | Friedman test | 3+ paired groups |
+| Pearson correlation | Spearman rank correlation | Continuous association |
+| Pearson correlation | Kendall's tau | Ordinal association, small N |
 
-### Step 1: Normality Screening
-Run Shapiro-Wilk test on `value_column` for each group. If p < .05, group distributions are non-normal. Proceed with non-parametric tests.
+## Execution Protocol
 
-### Step 2: Test Selection & Execution
-- If 2 independent groups -> Mann-Whitney U.
-- If 2 paired groups -> Wilcoxon signed-rank.
-- If > 2 independent groups -> Kruskal-Wallis H test, followed by post-hoc Dunn's tests with Bonferroni correction.
+### Step 1: Test Selection & Rationale
+- Document why non-parametric is chosen (assumption violation, ordinal data, small N)
+- Select appropriate test from decision table
 
-### Step 3: Permutation Testing
-Execute a 10,000 iteration permutation test to compute empirical p-values for difference in medians.
+### Step 2: Test Execution
+- Run selected test
+- Report: test statistic, exact p-value (not asymptotic if N < 20)
+- For Mann-Whitney U: report U statistic and rank-biserial correlation
+- For Kruskal-Wallis: report H statistic and epsilon-squared effect size
 
-## Diagnostics & Interpretation Guide (What to Look For)
-- **Shapiro-Wilk W p < .05**:
-  - *Interpret*: The data violates the assumption of normality. A t-test would be invalid.
-  - *Action*: Continue with the non-parametric Mann-Whitney U or Wilcoxon test.
-- **Discrepancy Between Mann-Whitney p and Permutation p**:
-  - *Interpret*: Mann-Whitney assumes similar distribution shapes. If shapes differ greatly, Mann-Whitney tests differences in distributions, not medians.
-  - *Action*: Rely on the empirical permutation test p-value, which is robust to shape differences.
+### Step 3: Effect Size Computation
+**Mann-Whitney U:**
+- Rank-biserial correlation: r_rb = 1 - (2U) / (n₁ × n₂)
+- Common language effect size: probability that random X > random Y
 
-## Writing & Reporting Standards
-Report findings following this template:
-> "Because the Shapiro-Wilk test indicated that the dependent variable was non-normally distributed ($W = \text{value}, p < .001$), we conducted a Mann-Whitney U test to compare groups. A permutation test with 10,000 shuffles was run to calculate empirical p-values for differences in medians. Group A ($Mdn = 12.0$) significantly differed from Group B ($Mdn = 8.5$), $U = \text{value}$, $p_{\text{asymp}} = .002$, $p_{\text{perm}} = .003$."
+**Kruskal-Wallis:**
+- Epsilon-squared: ε² = (H - k + 1) / (N - k)
+- Interpret: 0.01 = small, 0.04 = medium, 0.16 = large
 
-## Reference Python Implementation
-```python
-import numpy as np
-from scipy import stats
+**Spearman/Kendall:**
+- Report correlation coefficient with 95% CI
+- Interpret as monotonic (not linear) association
 
-def run_nonparametric(df, group_col, val_col):
-    grp_names = df[group_col].unique()
-    g1 = df[df[group_col] == grp_names[0]][val_col].values
-    g2 = df[df[group_col] == grp_names[1]][val_col].values
-    
-    # Shapiro-Wilk
-    _, p_w1 = stats.shapiro(g1)
-    _, p_w2 = stats.shapiro(g2)
-    
-    # Mann-Whitney
-    u_stat, mwu_p = stats.mannwhitneyu(g1, g2, alternative='two-sided')
-    
-    # Permutation
-    obs_diff = np.median(g1) - np.median(g2)
-    combined = np.concatenate([g1, g2])
-    n1 = len(g1)
-    
-    perm_diffs = []
-    for _ in range(10000):
-        shuffled = np.random.permutation(combined)
-        perm_diffs.append(np.median(shuffled[:n1]) - np.median(shuffled[n1:]))
-        
-    emp_p = (1 + np.sum(np.abs(perm_diffs) >= np.abs(obs_diff))) / 10001
-    
-    return {
-        "normality_p": [p_w1, p_w2],
-        "mwu_p": mwu_p,
-        "permutation_p": emp_p,
-        "median_diff": obs_diff
-    }
-```
+### Step 4: Post-Hoc Tests (Kruskal-Wallis only)
+- If omnibus test significant: pairwise Mann-Whitney U with Holm-Bonferroni correction
+- Report adjusted p-values for each pair
+
+## Diagnostics & Interpretation
+
+| Diagnostic | Pass | Fail → Interpret | Fail → Action |
+|------------|------|-------------------|---------------|
+| Ties | < 10% of observations | Many tied ranks | Use exact test or permutation |
+| Sample size | N ≥ 10 per group | Very small | Use exact permutation test |
+| Effect direction | Consistent with medians | Paradoxical result | Check for Simpson's paradox |
+
+### Red Flags
+- **Mann-Whitney significant but medians equal**: distributions differ in shape, not location; report distributional difference
+- **Many ties (> 25%)**: rank-based tests lose power; consider permutation test
+- **Kruskal-Wallis significant but no post-hoc pairs significant**: omnibus detects subtle differences; report with caution
+
+## Reporting Template
+> "Due to violation of normality assumptions (Shapiro-Wilk p < .001), a Mann-Whitney U test was conducted. [Group A] (Median = [value], N = [value]) scored significantly [higher/lower] than [Group B] (Median = [value], N = [value]), U = [value], p = [value], r_rb = [value], 95% CI [lower, upper]."
 
 ## Output Specification
-Produces a JSON detailing normality p-values, test statistics, and empirical p-values.
+- `analysis/03_analytical/nonparametric_results.json`: test results, effect sizes, CIs, rationale for non-parametric choice
 
-## Validation Criteria
-- [ ] Post-hoc testing applies Bonferroni correction.
-- [ ] Permutation count is at least 10,000.
+## Validation Checks
+- [ ] Test statistic matches rank-based formula
+- [ ] p-value in [0, 1]
+- [ ] Effect size in [-1, 1] for correlation measures
+- [ ] Post-hoc tests corrected for multiple comparisons

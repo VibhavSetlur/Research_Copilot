@@ -1,50 +1,84 @@
 ---
 skill_id: "profile_temporal"
-version: "3.0.0"
+version: "7.0.0"
 category: "data"
 domain_compatibility: ["all"]
-required_tools: ["python", "pandas", "statsmodels"]
-estimated_tokens: 3000
-depends_on: []
-produces: ["data/01_ingested/profile_temporal.json"]
+required_tools: ["python", "pandas", "numpy"]
+depends_on: ["profile_tabular"]
+produces: ["data/01_ingested/temporal_profile.json"]
+complexity: "intermediate"
 ---
 
-# Skill: Time Series Profiling
+# Skill: Temporal Data Profiling
 
 ## Purpose
-Analyze temporal data structures to identify frequency, gaps, stationarity, and seasonal components.
+Profile time-indexed data to understand temporal structure, frequency, seasonality, gaps, and stationarity properties.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to dataset |
-| `time_column` | Str | Yes | Column name containing date/time variables |
-| `value_column` | Str | Yes | Continuous column for time-series diagnostics |
+## When to Use
+- Dataset has datetime columns
+- Data is time series or panel (longitudinal)
+- Before time series analysis or forecasting
+
+## When NOT to Use
+- No temporal columns exist
+- Time is not analytically relevant (e.g., timestamp is metadata only)
 
 ## Execution Protocol
 
-### Step 1: Chronological Alignment
-- Convert `time_column` to datetime objects. Sort rows chronologically.
-- Infer temporal frequency (e.g., daily `D`, monthly `M`).
+### Step 1: Temporal Column Identification
+- Identify all datetime columns
+- Determine primary time index (most granular, most complete)
+- Identify secondary time indices (e.g., event dates, cohort dates)
 
-### Step 2: Gap & Discontinuity Analysis
-- Check for missing intervals based on inferred frequency.
-- Locate the longest continuous block of observations.
-- Compute the proportion of missing time points.
+### Step 2: Temporal Range & Span
+- Min/max dates, total span (days, months, years)
+- Number of unique time points
+- Time point frequency: infer from median interval (daily, weekly, monthly, quarterly, annual, irregular)
 
-### Step 3: Stationarity Diagnostics
-- Execute Augmented Dickey-Fuller (ADF) test on `value_column`.
-- Execute Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test.
-- Categorize series as stationary, trend-stationary, or non-stationary.
+### Step 3: Gap Detection
+- Compute intervals between consecutive time points
+- Identify gaps: intervals > 2× median interval
+- Classify gaps: expected (weekends, holidays) vs unexpected
+- Report gap count, total gap duration, largest gap
 
-### Step 4: Seasonal Decomposition
-- Run STL (Seasonal-Trend decomposition using Loess) to extract seasonal, trend, and residual components.
-- Calculate strength of trend and strength of seasonality indices.
+### Step 4: Seasonality Assessment
+- Decompose by time unit: day-of-week, month-of-year, quarter
+- Compute mean value per time unit
+- Visualize: seasonal plot, autocorrelation function (ACF)
+- Flag strong seasonal patterns (coefficient of variation across seasons > 0.20)
+
+### Step 5: Stationarity Screening
+- Visual inspection: rolling mean and rolling SD plots
+- Augmented Dickey-Fuller test: null = unit root (non-stationary)
+- If non-stationary: determine differencing order (d) needed
+- Check for structural breaks: Chow test or visual inspection
+
+### Step 6: Panel Structure (if applicable)
+- Identify cross-sectional units (e.g., firms, individuals, regions)
+- Compute: N units, T time points, balanced vs unbalanced panel
+- For unbalanced: entry/exit patterns, attrition rate
+- Gap analysis per unit
+
+## Diagnostics & Interpretation
+
+| Diagnostic | Pass | Fail → Interpret | Fail → Action |
+|------------|------|-------------------|---------------|
+| ADF p < 0.05 | Stationary | Non-stationary series | Difference or use ARIMA/SARIMAX |
+| Gap frequency | < 5% of intervals | Irregular sampling | Interpolate or use irregular-time models |
+| Seasonality strength | CV < 0.20 across seasons | Strong seasonality | Include seasonal terms or use SARIMAX |
+| Panel balance | Balanced or > 80% complete | High attrition | Use unbalanced panel methods |
+
+### Red Flags
+- **Non-chronological ordering**: sort by time index before any analysis
+- **Multiple time zones**: standardize to single timezone (UTC preferred)
+- **Future dates in historical data**: data entry error or projection; flag
+- **Duplicate timestamps**: aggregate or investigate (multiple events at same time)
 
 ## Output Specification
-Produces:
-- `data/01_ingested/profile_temporal.json` containing stationarity parameters, gap lists, and decomposition metrics.
+- `data/01_ingested/temporal_profile.json`: time range, frequency, gaps, seasonality assessment, stationarity test results, panel structure (if applicable)
 
-## Validation Criteria
-- [ ] Time frequency is matching standard Pandas offset aliases.
-- [ ] ADF and KPSS test statistics and p-values are valid numeric values.
+## Validation Checks
+- [ ] Time index is monotonically non-decreasing
+- [ ] Date range is plausible (no year 1900 or 2100 unless expected)
+- [ ] Frequency is classified
+- [ ] Stationarity test result recorded

@@ -1,15 +1,11 @@
 domain_id: "custom"
-name: "Custom / Unspecified"
-reporting_standard: "generic"
+name: "Custom / Multidisciplinary"
+reporting_standard: "APA 7th"
 significance_threshold: 0.05
-default_effect_size_metric: "domain_specific"
+default_effect_size_metric: "cohens_d"
+preferred_visualizations: ["box_plot", "scatter", "forest_plot"]
 citation_style: "apa"
-default_skills:
-  - profile_tabular
-  - descriptive_stats
-  - inferential_parametric
-  - power_analysis
-preferred_visualizations:
-  - figure_workflow_dag
 quality_gates:
-  - reproducibility
+  - assumption_checks
+  - effect_size_reporting
+  - multiple_testing_correction

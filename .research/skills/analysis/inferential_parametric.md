@@ -1,109 +1,115 @@
 ---
 skill_id: "inferential_parametric"
-version: "5.0.0"
+version: "7.0.0"
 category: "analysis"
 domain_compatibility: ["all"]
-required_tools: ["python", "statsmodels", "scipy", "notebooklm-py"]
-estimated_tokens: 4500
-depends_on: ["descriptive_stats"]
+required_tools: ["python", "scipy", "statsmodels", "pandas"]
+depends_on: ["descriptive_stats", "detect_outliers"]
 produces: ["analysis/03_analytical/parametric_results.json"]
+complexity: "intermediate"
 ---
 
-# Skill: Parametric Inferential Modeling (OLS/GLM)
+# Skill: Parametric Inferential Testing
 
 ## Purpose
-Fit parametric regression models (OLS, GLM) while auditing assumptions (linearity, normality, homoscedasticity, collinearity) and verifying covariate selections using NotebookLM.
+Conduct parametric hypothesis tests (t-tests, ANOVA, regression) with assumption verification and effect size reporting.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data_path` | Path | Yes | Path to dataset |
-| `dependent` | Str | Yes | Dependent variable name |
-| `independent` | List | Yes | List of independent variables |
-| `notebook_id` | Str | No | NotebookLM ID for literature verification |
+## When to Use
+- Research question involves comparing groups or testing associations
+- Data meets parametric assumptions (normality, homoscedasticity, independence)
+- Sample size adequate for asymptotic approximations (N ≥ 30 per group)
 
-## Methodological Framework
+## When NOT to Use
+- Assumptions severely violated → use inferential_nonparametric
+- Sample size too small → use exact tests
+- Data is dependent/paired → use paired tests or mixed_effects
 
-### 1. Mathematical Formulations
-- **Multiple Linear Regression (OLS)**:
-  $$Y = X\beta + \epsilon, \quad \epsilon \sim N(0, \sigma^2 I)$$
-- **Variance Inflation Factor (VIF)**:
-  $$\text{VIF}_j = \frac{1}{1 - R_j^2}$$
-  where $R_j^2$ is the coefficient of determination when regressing $X_j$ on all other predictors.
-- **Breusch-Pagan Test**:
-  Regresses squared residuals $e_i^2$ on the independent variables:
-  $$e^2 = X\gamma + \nu, \quad H_0: \gamma_1 = \gamma_2 = ... = 0 \text{ (Homoscedasticity)}$$
-- **HC3 Covariance Estimator**:
-  Corrects for heteroscedasticity by dividing squared residuals by the square of $(1 - h_{ii})$, where $h_{ii}$ are the hat matrix diagonal values:
-  $$\Sigma_{\text{HC3}} = (X^T X)^{-1} X^T \text{diag}\left( \frac{e_i^2}{(1 - h_{ii})^2} \right) X (X^T X)^{-1}$$
+## Decision Protocol
 
-## Step-by-Step Analytical Protocol
+### Test Selection
+| Design | DV Type | IV Type | Test |
+|--------|---------|---------|------|
+| 2 independent groups | Continuous | Binary (2 levels) | Independent t-test (Welch) |
+| 2 paired groups | Continuous | Binary (2 levels, repeated) | Paired t-test |
+| 3+ independent groups | Continuous | Categorical (3+ levels) | One-way ANOVA |
+| 3+ paired groups | Continuous | Categorical (repeated) | Repeated measures ANOVA |
+| 2×2 design | Continuous | 2 categorical factors | Two-way ANOVA |
+| Continuous association | Continuous | Continuous | Pearson correlation / Linear regression |
+| Continuous outcome, multiple predictors | Continuous | Mixed | Multiple regression (OLS) |
 
-### Step 1: Pre-estimation Check & NotebookLM Literature Search
-Query NotebookLM using the provided `notebook_id`:
-```
-Identify standard covariates for a model predicting [dependent] using [independent]. Are there known mediators or colliders in this set?
-```
-Ensure the predictor list is updated based on literature.
+## Execution Protocol
 
-### Step 2: Model Ingestion and Fitting
-Fit the baseline model using Ordinary Least Squares (OLS) or GLM depending on the dependent variable scale (e.g. continuous -> OLS, binary -> Logistic).
+### Step 1: Assumption Verification
+**Normality:**
+- Shapiro-Wilk (N < 5000) or Kolmogorov-Smirnov (N ≥ 5000)
+- Visual: Q-Q plot
+- If violated but N > 30 per group: CLT applies, proceed with caution
 
-### Step 3: Run Diagnostic Tests
-1. **Multicollinearity**: Calculate VIF for each predictor.
-2. **Heteroscedasticity**: Run the Breusch-Pagan test.
-3. **Residual Normality**: Run the Jarque-Bera and Omnibus tests.
+**Homoscedasticity (equal variances):**
+- Levene's test (robust to non-normality) or Brown-Forsythe
+- If p < 0.05: use Welch correction (unequal variance t-test, Welch ANOVA)
 
-### Step 4: Robust Adjustments
-If the Breusch-Pagan test rejects homoscedasticity ($p < .05$), re-fit the model applying the **HC3 robust covariance estimator**.
+**Independence:**
+- Study design check: are observations independent?
+- If repeated measures: use paired tests or mixed_effects skill
+- If clustered: use cluster-robust SEs
 
-## Diagnostics & Interpretation Guide (What to Look For)
-- **VIF > 5.0**:
-  - *Interpret*: High multicollinearity. Standard errors of coefficients are inflated, making them unstable.
-  - *Action*: If the collinear variable is a control, keep it but warn. If it is a primary variable, consider dropping it, combining variables, or using Ridge regression.
-- **Breusch-Pagan test p < .05**:
-  - *Interpret*: Heteroscedasticity is present. Standard OLS errors are biased.
-  - *Action*: Enforce **HC3 standard errors**. Note this choice in the manuscript.
-- **Jarque-Bera/Omnibus test p < .05**:
-  - *Interpret*: Non-normal residuals. Hypothesis tests (t/F) may be inaccurate in small samples.
-  - *Action*: If sample size $N < 100$, consider log-transforming $Y$, utilizing a GLM (e.g., Gamma), or switching to a non-parametric alternative.
+**Linearity (regression):**
+- Residual vs fitted plot: check for patterns
+- If non-linear: add polynomial terms or use GAM
 
-## Writing & Reporting Standards
-Report coefficients and diagnostics following this template:
-> "We fitted a multiple linear regression model predicting $Y$. The Breusch-Pagan test indicated significant heteroscedasticity ($\chi^2(df) = \text{value}, p = \text{val}$), prompting the use of heteroscedasticity-robust standard errors (HC3). Multicollinearity was ruled out as all VIF values were below 2.1. The model explained [adjusted $R^2$]% of the variance ($F(df_1, df_2) = \text{value}, p < .001$). The primary predictor was significantly associated with $Y$ ($b = 2.45$, $95\%\text{ CI } [1.12, 3.78]$, $t(df) = 3.65$, $p < .001$)."
+### Step 2: Test Execution
+- Run selected test
+- Report: test statistic, degrees of freedom, p-value, exact p (not just < 0.05)
+- Compute effect size: Cohen's d (t-test), η² (ANOVA), R² (regression)
+- Compute 95% CI for effect size and mean differences
 
-## Reference Python Implementation
-```python
-import pandas as pd
-import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from statsmodels.stats.diagnostic import het_breuschpagan
+### Step 3: Multiple Comparison Correction
+- If > 1 hypothesis tested: apply correction
+- Default: Bonferroni (conservative) or Holm-Bonferroni (step-down, less conservative)
+- For exploratory analyses: Benjamini-Hochberg FDR control
+- Report both raw and adjusted p-values
 
-def analyze_parametric(df, dep, indeps):
-    X = sm.add_constant(df[indeps])
-    y = df[dep]
-    
-    # Collinearity
-    vifs = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
-    
-    model = sm.OLS(y, X)
-    results = model.fit()
-    
-    # Breusch-Pagan
-    _, bp_p, _, _ = het_breuschpagan(results.resid, X)
-    
-    if bp_p < 0.05:
-        results = model.fit(cov_type='HC3')
-        cov_type = "HC3"
-    else:
-        cov_type = "nonrobust"
-        
-    return results, vifs, cov_type
-```
+### Step 4: Regression Diagnostics (if regression)
+- Multicollinearity: VIF > 10 indicates problematic collinearity
+- Residual normality: Shapiro-Wilk on residuals
+- Residual homoscedasticity: Breusch-Pagan test
+- Influential points: Cook's D > 4/n
+- If diagnostics fail: report robust SEs (HC3) or use robust regression
+
+## Diagnostics & Interpretation
+
+| Diagnostic | Pass | Fail → Interpret | Fail → Action |
+|------------|------|-------------------|---------------|
+| Normality | p > 0.05 or N > 30 | Non-normal | Non-parametric or transform |
+| Homoscedasticity | Levene p > 0.05 | Unequal variances | Welch correction |
+| VIF | < 10 | Multicollinearity | Remove correlated predictor |
+| Cook's D | < 4/n | Influential observation | Report sensitivity analysis |
+
+### Red Flags
+- **p = 0.000**: report as p < 0.001, never p = 0.000
+- **Effect size trivial (d < 0.10) but p < 0.05**: large sample driving significance; report effect size prominently
+- **Significant but CI includes null**: check computation; this is impossible
+- **VIF > 100**: perfect collinearity; one predictor is linear combination of others
+
+## Domain Conventions
+
+| Domain | Effect Size | Small | Medium | Large |
+|--------|------------|-------|--------|-------|
+| Psychology | Cohen's d | 0.20 | 0.50 | 0.80 |
+| Medicine | Cohen's d | 0.20 | 0.50 | 0.80 |
+| Education | Cohen's d | 0.20 | 0.50 | 0.80 |
+| Economics | Standardized β | 0.10 | 0.30 | 0.50 |
+
+## Reporting Template
+> "An independent-samples Welch t-test indicated that [Group A] (M = [value], SD = [value], N = [value]) scored significantly [higher/lower] than [Group B] (M = [value], SD = [value], N = [value]), t([df]) = [value], p = [value], d = [value], 95% CI [lower, upper]. Levene's test indicated [equal/unequal] variances, F([df]) = [value], p = [value]."
 
 ## Output Specification
-Produces a detailed JSON of coefficients, standard errors, p-values, 95% CIs, VIF, and diagnostic test parameters.
+- `analysis/03_analytical/parametric_results.json`: test results, effect sizes, CIs, assumption test results, multiple comparison adjustments
 
-## Validation Criteria
-- [ ] Robust standard errors (HC3) are applied if Breusch-Pagan p < .05.
-- [ ] VIF scores are calculated for all non-constant columns.
+## Validation Checks
+- [ ] Test statistic matches formula
+- [ ] p-value in [0, 1]
+- [ ] Effect size in plausible range
+- [ ] CI direction consistent with test statistic sign
+- [ ] All assumptions tested and reported

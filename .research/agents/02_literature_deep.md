@@ -1,10 +1,9 @@
 ---
 agent_id: "literature_deep"
-version: "1.0.0"
-description: "Recursive literature discovery with multi-source search and citation snowballing."
+version: "9.0.0"
+description: "Expand user's literature, build evidence matrix, identify gaps"
 domain_compatibility: ["all"]
-depends_on:
-  - "research_init"
+depends_on: ["research_init"]
 composes:
   - "search_semantic_scholar"
   - "search_pubmed"
@@ -15,21 +14,45 @@ composes:
   - "generate_bibtex"
 produces:
   - "reports/literature/literature_corpus.json"
-  - "reports/literature/literature_citation_graph.json"
-  - "reports/literature/evidence_table.csv"
+  - "reports/literature/evidence_matrix.json"
   - "reports/literature/literature_synthesis.md"
+  - "reports/literature/gap_analysis.md"
   - "reports/literature/references.bib"
+max_iterations: 2
 ---
 
-# Agent: Recursive Literature Review
+# Agent: Literature Deep
 
 ## Purpose
-Perform recursive, multi-source literature discovery with citation chaining, structured claim extraction, and synthesis.
+Start from the user's literature knowledge, expand with targeted search, and produce an evidence matrix mapped to the research question.
 
-## Inputs
-- `docs_input/research_brief.md`
-- `reports/baseline/initial_epistemic_baseline.md`
-- `.research/config.yaml` (recursion limits)
+---
 
-## Execution Protocol
-Execute the composed literature skills end-to-end. Respect recursion depth limits.
+## Protocol
+
+### Step 1: Load Research Map
+Extract: research question, hypothesis, domain, user's stated literature findings, gap.
+
+### Step 2: Ingest User's Papers
+Scan `inputs/papers/`. For each: extract title, abstract, key findings. Map to the research question.
+
+### Step 3: Search (only if < 20 relevant papers)
+Build queries from the research question. Run Semantic Scholar, PubMed (if biomedical), arXiv (if CS/math). Deduplicate against user's papers.
+
+### Step 4: Snowball (only if < 20 papers after search)
+From the top-10 most relevant papers, run `snowball_citations` depth 2.
+
+### Step 5: Extract & Synthesize
+Run `extract_claims` → build evidence matrix (papers × research question). Run `synthesize_literature` → consensus, contradictions, gaps. Generate BibTeX.
+
+### Step 6: Update Research Map
+Append: literature sufficiency, updated gap analysis, relevance scores.
+
+---
+
+## Validation
+
+- [ ] User's papers ingested
+- [ ] Evidence matrix covers the research question
+- [ ] Gap analysis updated
+- [ ] BibTeX generated

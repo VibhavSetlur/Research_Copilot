@@ -1,35 +1,76 @@
 ---
 skill_id: "audit_statistical_reporting"
-version: "2.0.0"
+version: "7.0.0"
 category: "audit"
 domain_compatibility: ["all"]
-required_tools: ["python", "re"]
-estimated_tokens: 2500
+required_tools: ["python", "openai|anthropic|litellm"]
 depends_on: ["write_imrad"]
-produces: ["stats_reporting_report.md"]
+produces: ["audit/statistical_reporting_audit.json"]
+complexity: "intermediate"
 ---
 
-# Skill: Audit Statistical Reporting
+# Skill: Statistical Reporting Audit
 
 ## Purpose
-Ensure all reported statistics comply with APA guidelines (e.g., leading zeros, decimal precision).
+Verify that all statistical results are reported completely and correctly: test statistics, degrees of freedom, p-values, effect sizes, and confidence intervals.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `manuscript_path` | Path | Yes | Path to manuscript |
+## When to Use
+- After manuscript written
+- Before submission
+- For quality assurance
+
+## When NOT to Use
+- Manuscript not yet complete
+- Only exploratory analysis
 
 ## Execution Protocol
 
-### Step 1: P-Value Checking
-- Ensure p-values do not have leading zeros (e.g., `.04` not `0.04`)
-- Ensure p-values are not reported as `p = 0.000`
+### Step 1: Completeness Check
+For each reported statistical test, verify presence of:
+- Test name (e.g., "independent-samples t-test")
+- Test statistic value (e.g., t = 2.34)
+- Degrees of freedom (e.g., df = 48)
+- Exact p-value (e.g., p = .023, not p < .05)
+- Effect size (e.g., d = 0.67)
+- 95% confidence interval for effect size
 
-### Step 2: Statistic Formatting
-- Ensure test statistics are italicized (e.g., *t*, *F*, *p*)
+### Step 2: Consistency Check
+- Values in text match values in tables
+- Values in tables match values in analysis output
+- Percentages sum to 100% (or noted otherwise)
+- Sample sizes consistent across sections
+
+### Step 3: Formatting Check
+- p-values: italicized, no leading zero (p = .023)
+- Statistics: italicized (t, F, χ², r, β)
+- Degrees of freedom: in parentheses, not italicized
+- Effect sizes: reported with interpretation benchmarks
+- Confidence intervals: square brackets, 95% specified
+
+### Step 4: Multiple Testing Check
+- If multiple tests: correction method stated
+- Adjusted p-values reported alongside raw p-values
+- Family-wise error rate or FDR controlled
+
+### Step 5: Assumption Reporting
+- For parametric tests: normality and homoscedasticity checks reported
+- For regression: multicollinearity, residual diagnostics reported
+- For violations: alternative methods or robust SEs stated
+
+## Diagnostics & Interpretation
+
+| Check | Pass | Fail → Action |
+|-------|------|---------------|
+| Completeness | All 6 elements present | Add missing elements |
+| Consistency | All values match | Correct discrepancies |
+| Formatting | APA/domain style | Fix formatting |
+| Multiple testing | Correction applied | Add correction or justify |
 
 ## Output Specification
-- List of formatting violations
+- `audit/statistical_reporting_audit.json`: per-test completeness, consistency, formatting results
 
-## Validation Criteria
-- [ ] Must flag any instance of 'p = 0' or 'p = 0.00'
+## Validation Checks
+- [ ] Every statistical test has all required elements
+- [ ] No value discrepancies between text and tables
+- [ ] Formatting follows domain standard
+- [ ] Multiple testing addressed

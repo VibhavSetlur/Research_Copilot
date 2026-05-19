@@ -1,48 +1,87 @@
 ---
 skill_id: "profile_network"
-version: "3.0.0"
+version: "7.0.0"
 category: "data"
 domain_compatibility: ["all"]
 required_tools: ["python", "networkx", "pandas"]
-estimated_tokens: 3000
-depends_on: []
-produces: ["data/01_ingested/profile_network.json"]
+depends_on: ["profile_tabular"]
+produces: ["data/01_ingested/network_profile.json"]
+complexity: "advanced"
 ---
 
-# Skill: Network Graph Profiling
+# Skill: Network Data Profiling
 
 ## Purpose
-Profile network and relational datasets to extract topological properties and connectivity metrics.
+Profile graph/network data to understand connectivity, centrality, community structure, and topological properties.
 
-## Input Specification
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `edges_path` | Path | Yes | Edge list file path |
-| `directed` | Bool | No | Flag indicating directed edges (default: False) |
+## When to Use
+- Data represents relationships between entities (edges between nodes)
+- Before network analysis, community detection, or graph ML
+- When data has source-target or adjacency structure
+
+## When NOT to Use
+- Data is tabular without relational structure
+- Network is trivially small (< 5 nodes)
 
 ## Execution Protocol
 
-### Step 1: Graph Ingestion
-- Load edges using NetworkX. Add weights if present in input files.
+### Step 1: Graph Construction
+- Identify node list and edge list
+- Determine: directed vs undirected, weighted vs unweighted, bipartite vs monopartite
+- Build graph using NetworkX
+- Verify: no self-loops (unless expected), no duplicate edges (unless multigraph)
 
-### Step 2: Global Topology Analysis
-- Count total Nodes (N) and Edges (E).
-- Calculate Network Density.
-- Identify connected components (strongly and weakly for directed graphs).
-- Compute transitivity (clustering coefficient) and reciprocity.
+### Step 2: Basic Graph Properties
+- Node count (N), edge count (E)
+- Density: E / [N(N-1)/2] for undirected
+- Average degree, degree distribution
+- Connected components: count, size distribution
+- Largest connected component: node count, proportion of total
 
-### Step 3: Centrality Metrics Distributions
-- Compute degree distribution parameters.
-- Calculate Betweenness and Eigenvector centrality summaries (Mean, Max, Variance).
+### Step 3: Centrality Analysis
+- Degree centrality: most connected nodes
+- Betweenness centrality: nodes bridging communities
+- Closeness centrality: nodes closest to all others
+- Eigenvector centrality: nodes connected to other important nodes
+- Report top-10 nodes by each measure
 
-### Step 4: Small-world & Scale-free Screening
-- Calculate the average clustering coefficient and average path length.
-- Test fit of degree distribution to a power-law distribution.
+### Step 4: Community Structure
+- Detect communities: Louvain or Leiden algorithm
+- Number of communities, modularity score (Q)
+- Community size distribution
+- Inter-community vs intra-community edge ratio
+
+### Step 5: Path Analysis
+- Average shortest path length
+- Graph diameter (longest shortest path)
+- Clustering coefficient (local and global)
+- Small-world check: high clustering + short path length
+
+### Step 6: Degree Distribution Fitting
+- Fit power law, exponential, log-normal to degree distribution
+- Determine best-fitting distribution
+- If power law: estimate exponent γ (scale-free if 2 < γ < 3)
+
+## Diagnostics & Interpretation
+
+| Diagnostic | Pass | Fail → Interpret | Fail → Action |
+|------------|------|-------------------|---------------|
+| Graph connected | Single component or giant component | Fragmented network | Analyze components separately |
+| Modularity Q > 0.3 | Community structure present | No clear communities | Use alternative clustering |
+| Degree distribution | Fits known model | Unknown structure | Use non-parametric methods |
+| Density | 0.01 - 0.5 | Too sparse or too dense | Check for missing edges or over-reporting |
+
+### Red Flags
+- **Isolated nodes (> 20% of network)**: data collection incomplete; consider removing or treating separately
+- **Single hub dominates**: star topology; results driven by one node
+- **Disconnected graph**: analyze largest component only, report fragmentation
+- **Bipartite treated as monopartite**: project correctly before analysis
 
 ## Output Specification
-Produces:
-- `data/01_ingested/profile_network.json` containing network matrices and degree distributions.
+- `data/01_ingested/network_profile.json`: graph properties, centrality rankings, community structure, path metrics, degree distribution fit
 
-## Validation Criteria
-- [ ] Density is bounded between 0 and 1.
-- [ ] Node count equals total unique values in edges list.
+## Validation Checks
+- [ ] Graph is constructible from edge list
+- [ ] Node and edge counts consistent
+- [ ] Centrality measures sum to expected totals
+- [ ] Modularity score in [-0.5, 1]

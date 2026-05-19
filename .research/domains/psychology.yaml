@@ -1,16 +1,11 @@
 domain_id: "psychology"
-name: "Psychology"
-reporting_standard: "APA7"
+name: "Psychology & Social Sciences"
+reporting_standard: "APA 7th"
 significance_threshold: 0.05
 default_effect_size_metric: "cohens_d"
-required_confounders_check: false
+preferred_visualizations: ["box_plot", "forest_plot", "path_diagram"]
 citation_style: "apa"
-default_skills:
-  - profile_tabular
-  - descriptive_stats
-  - inferential_parametric
-  - power_analysis
-preferred_visualizations:
-  - figure_workflow_dag
 quality_gates:
-  - measurement_reliability
+  - reliability_coefficients
+  - manipulation_checks
+  - power_analysis
