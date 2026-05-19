@@ -79,3 +79,30 @@ If PIVOT:
 - Publication-ready, no vertical lines
 - Significance in footnotes only
 - Save as .md and .tex (booktabs)
+
+## 11. Dead End Enforcement (MANDATORY)
+
+BEFORE writing any new code, trying any new method, or choosing any new approach:
+
+1. **Read ALL files in `docs/dead_ends/`** — understand what has already failed
+2. **Check your planned approach against dead ends** — if it matches, DO NOT try it
+3. **Choose a different approach** — document why the dead end was rejected
+4. **If ALL approaches are dead ends** — report to user, do not loop infinitely
+
+This prevents the agent from getting stuck in infinite loops, repeatedly trying the same
+failed technique (e.g., Multiple Imputation, a specific model, a data cleaning method).
+
+Dead ends are created when:
+- An approach produces invalid results
+- A method's assumptions are violated and cannot be fixed
+- A technique fails to converge
+- A result is contradicted by robustness checks
+- The user explicitly rejects an approach
+
+Format dead end entries as:
+```
+Approach: [what was tried]
+Reason: [why it failed]
+Date: [when]
+Alternatives to try: [what to try instead]
+```

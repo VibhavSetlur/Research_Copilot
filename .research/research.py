@@ -608,6 +608,7 @@ def cmd_scan(args):
 
     data_dir = root / config["data_raw"]
     data_files = []
+    schema_cache = {}
     if data_dir.exists():
         for f in data_dir.iterdir():
             if f.is_file() and not f.name.startswith("."):
@@ -618,11 +619,77 @@ def cmd_scan(args):
                     ".sav": "SPSS", ".dta": "Stata", ".sas7bdat": "SAS",
                     ".feather": "Feather", ".h5": "HDF5", ".hdf5": "HDF5",
                 }
-                data_files.append({
+                file_info = {
                     "path": str(f.relative_to(root)),
                     "format": fmt_map.get(ext, ext.lstrip(".").upper()),
                     "size_kb": round(f.stat().st_size / 1024, 1),
-                })
+                }
+
+                # Schema sniffing: read first 100 rows of sniffable files
+                if ext in (".csv", ".tsv", ".xlsx", ".xls"):
+                    try:
+                        import pandas as pd
+                        if ext == ".csv":
+                            df = pd.read_csv(f, nrows=100)
+                        elif ext == ".tsv":
+                            df = pd.read_csv(f, sep="\t", nrows=100)
+                        elif ext in (".xlsx", ".xls"):
+                            df = pd.read_excel(f, nrows=100)
+                        else:
+                            df = None
+
+                        if df is not None:
+                            schema = {
+                                "columns": {},
+                                "total_rows_estimated": None,
+                            }
+                            for col in df.columns:
+                                col_info = {
+                                    "dtype": str(df[col].dtype),
+                                    "non_null_in_sample": int(df[col].notna().sum()),
+                                    "null_in_sample": int(df[col].isna().sum()),
+                                    "sample_values": [str(v) for v in df[col].dropna().head(3).tolist()],
+                                }
+                                # Infer semantic type
+                                if df[col].dtype in ("float64", "float32", "int64", "int32"):
+                                    col_info["semantic_type"] = "numeric"
+                                    col_info["min"] = float(df[col].min()) if df[col].notna().any() else None
+                                    col_info["max"] = float(df[col].max()) if df[col].notna().any() else None
+                                elif df[col].dtype == "bool":
+                                    col_info["semantic_type"] = "boolean"
+                                elif df[col].dtype == "object":
+                                    nunique = df[col].nunique()
+                                    if nunique <= 10:
+                                        col_info["semantic_type"] = "categorical"
+                                        col_info["unique_values"] = [str(v) for v in df[col].unique()[:10]]
+                                    else:
+                                        col_info["semantic_type"] = "text"
+                                elif "datetime" in str(df[col].dtype):
+                                    col_info["semantic_type"] = "datetime"
+                                else:
+                                    col_info["semantic_type"] = "unknown"
+                                schema["columns"][col] = col_info
+
+                            # Estimate total rows
+                            try:
+                                full_df = pd.read_csv(f, nrows=1) if ext == ".csv" else None
+                                if full_df is not None:
+                                    with open(f, "rb") as fh:
+                                        total_lines = sum(1 for _ in fh)
+                                    schema["total_rows_estimated"] = total_lines - 1  # minus header
+                            except Exception:
+                                pass
+
+                            schema_cache[f.name] = schema
+                            file_info["columns"] = list(df.columns)
+                            file_info["column_count"] = len(df.columns)
+                            file_info["sample_row_count"] = len(df)
+                    except ImportError:
+                        pass  # pandas not installed, skip schema sniffing
+                    except Exception:
+                        pass  # file unreadable, skip schema sniffing
+
+                data_files.append(file_info)
 
     context_dir = root / config["context_dir"]
     context_files = []
@@ -687,11 +754,12 @@ def cmd_scan(args):
     question_summary = f"{len(questions)} question(s)" if questions else "N/A"
 
     research_map = {
-        "schema_version": "6.0.0",
+        "schema_version": "7.0.0",
         "project": {"title": project_title},
         "questions": questions,
         "data": {
             "files": data_files,
+            "schema_cache": schema_cache,
         },
         "domain": {"name": domain, "reporting_standard": ""},
         "literature": {
@@ -719,6 +787,13 @@ def cmd_scan(args):
     with open(cache_path, "w") as f:
         json.dump(research_map, f, indent=2)
 
+    # Save schema cache separately for AI access
+    if schema_cache:
+        schema_path = root / config.get("cache_dir", ".research/cache") / "schema_cache.json"
+        schema_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(schema_path, "w") as f:
+            json.dump(schema_cache, f, indent=2)
+
     print("=" * 60)
     print("SCAN COMPLETE")
     print("=" * 60)
@@ -733,7 +808,10 @@ def cmd_scan(args):
     print()
     print(f"  Data files found: {len(data_files)}")
     for df in data_files:
-        print(f"    - {df['path']} ({df['format']}, {df['size_kb']} KB)")
+        cols_info = f", {df['column_count']} cols" if "column_count" in df else ""
+        print(f"    - {df['path']} ({df['format']}, {df['size_kb']} KB{cols_info})")
+        if "columns" in df:
+            print(f"      Columns: {', '.join(df['columns'][:10])}{'...' if len(df['columns']) > 10 else ''}")
     print(f"  Context files: {len(context_files)}")
     for cf in context_files:
         print(f"    - {cf}")
@@ -745,6 +823,8 @@ def cmd_scan(args):
     print(f"  Feasibility: {research_map['feasibility']['verdict']}")
     print()
     print(f"  Research map saved to: {cache_path}")
+    if schema_cache:
+        print(f"  Schema cache saved: {len(schema_cache)} file(s) sniffed")
     print(f"  NOTE: Output directories (docs/, reports/, data/, scripts/) are NOT created.")
     print(f"  The AI agent (research_init) will create them when you run it.")
     print()
