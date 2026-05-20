@@ -5,9 +5,11 @@ description: "Intake → literature → route → data → causal analysis → a
 agents:
   - research_init
   - literature_deep
+  - methodology_scout
   - method_route
   - data_scaffold
   - execute_analysis
+  - replication_validator
   - compile_outputs
   - audit_validate
 
@@ -35,7 +37,7 @@ iteration_support:
       after_iteration:
         - "return to execute_analysis with new method"
         - "downgrade to associational if causal claim unsupported"
-        - "proceed to compile_outputs"
+        - "proceed to replication_validator"
 
 branching:
   - after: method_route

@@ -45,9 +45,10 @@ data_ingested: "data/01_ingested"
 data_processed: "data/02_processed"
 data_analytical: "data/03_analytical"
 
-# Script paths (created by AI during init)
+# Script paths (system scripts in .research/, user scripts in scripts/)
 scripts_dir: "scripts"
-scripts_utils: "scripts/utils"
+system_scripts: ".research/scripts"
+system_scripts_utils: ".research/scripts/utils"
 
 # File paths (where AI writes final outputs)
 research_map: "reports/baseline/research_map.json"
@@ -79,10 +80,16 @@ missingness_warning: 0.20
 sensitivity_tests_min: 3
 
 # Reproducibility
-requirements_file: "requirements.txt"
-environment_check_script: "scripts/00_environment_check.py"
+requirements_file: "environment/requirements.txt"
+environment_check_script: ".research/scripts/00_environment_check.py"
 pin_dependency_versions: true
 
 # Quality gates
 quality_gates_enabled: true
 gate_fail_blocks_pipeline: true
+
+# State ledger & checkpoint system
+state_ledger: ".research/cache/state.json"
+checkpoint_dir: ".research/cache/checkpoints"
+core_dir: ".research/core"
+token_budget_limit: 200000
