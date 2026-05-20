@@ -7,10 +7,8 @@ All interceptors work with the synchronous trigger_sync() interface so any AI
 agent can use them without async infrastructure.
 """
 
-import json
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
 
 try:
     from pydantic import ValidationError
@@ -18,38 +16,12 @@ except ImportError:
     ValidationError = None
 
 from hooks import hook_engine
+from core.utils import (
+    find_project_root, load_json_safe, save_json_atomic,
+    now_iso, get_data_scale_thresholds,
+)
 
 logger = logging.getLogger("research.interceptors")
-
-
-def find_project_root() -> Path:
-    """Find project root by looking for .research/ directory."""
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
-
-
-def load_json_safe(path: Path) -> dict:
-    """Load JSON file safely, returning empty dict on failure."""
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def save_json_atomic(path: Path, data: dict):
-    """Write JSON atomically (write to temp, then rename)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2)
-    tmp.replace(path)
 
 
 # =============================================================================
@@ -123,7 +95,7 @@ def detect_data_scale_constraints(state: dict, *args, **kwargs) -> dict:
     if not data_raw.exists():
         return state
 
-    thresholds = _load_data_scale_thresholds(project_root)
+    thresholds = get_data_scale_thresholds()
     profile = {}
     has_large_files = False
     constraint_parts = []
@@ -180,33 +152,6 @@ def detect_data_scale_constraints(state: dict, *args, **kwargs) -> dict:
         state["data_processing_constraint"] = None
 
     return state
-
-
-def _load_data_scale_thresholds(project_root: Path) -> dict:
-    """Load data scale thresholds from config.yaml, with defaults."""
-    config_path = project_root / ".research" / "config.yaml"
-    defaults = {
-        "medium_mb": 100,
-        "large_gb": 1,
-        "massive_gb": 10,
-    }
-
-    if not config_path.exists():
-        return defaults
-
-    try:
-        import yaml
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-
-        thresholds = config.get("data_scale_thresholds", {})
-        return {
-            "medium_mb": thresholds.get("medium_mb", defaults["medium_mb"]),
-            "large_gb": thresholds.get("large_gb", defaults["large_gb"]),
-            "massive_gb": thresholds.get("massive_gb", defaults["massive_gb"]),
-        }
-    except Exception:
-        return defaults
 
 
 # =============================================================================
@@ -272,11 +217,8 @@ def _generate_context_transfer_memo(state: dict, token_pct: float) -> dict:
 
     Returns a CTM dict ready for serialization.
     """
-    from datetime import datetime, timezone
-
     project_root = find_project_root()
-    now = datetime.now(timezone.utc)
-    ctm_id = f"ctm_{now.strftime('%Y%m%d_%H%M%S')}"
+    ctm_id = f"ctm_{now_timestamp()}"
 
     ctm_dir = project_root / ".research" / "cache" / "context_transfer_memos"
     ctm_dir.mkdir(parents=True, exist_ok=True)
@@ -285,7 +227,7 @@ def _generate_context_transfer_memo(state: dict, token_pct: float) -> dict:
         "ctm_id": ctm_id,
         "phase": state.get("phase", "unknown"),
         "token_usage_pct": round(token_pct, 4),
-        "generated_at": now.isoformat(),
+        "generated_at": now_iso(),
         "abandoned_paths": state.get("dead_ends", []),
         "micro_decisions": [],
         "immediate_goals": [],
@@ -535,7 +477,7 @@ def run_critic_review(state: dict, *args, **kwargs) -> dict:
 
     critic_brief = {
         "phase": phase,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_iso(),
         "status": "pending_review",
         "checks": [
             "logical_consistency",
@@ -580,7 +522,7 @@ def run_reviewer2(state: dict, *args, **kwargs) -> dict:
 
     reviewer2_brief = {
         "phase": "compile_outputs",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_iso(),
         "status": "pending_adversarial_review",
         "review_type": "reviewer2_critic",
         "checks": [
@@ -720,7 +662,7 @@ def check_approval_gate(state: dict, *args, **kwargs) -> dict:
     pending_data = {
         "phase": phase,
         "message": f"Please approve the completion of phase '{phase}'.",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_iso(),
     }
     save_json_atomic(pending_path, pending_data)
 
@@ -753,7 +695,7 @@ def freeze_state_on_failure(state: dict, *args, **kwargs) -> dict:
     dead_ends_dir = project_root / "docs" / "dead_ends"
     dead_ends_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = now_timestamp()
     error_log = dead_ends_dir / f"failure_{phase}_{timestamp}.json"
 
     error_data = {
@@ -766,7 +708,7 @@ def freeze_state_on_failure(state: dict, *args, **kwargs) -> dict:
             "checkpoints": state.get("checkpoints", {}),
             "loaded_data": state.get("loaded_data", []),
         },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now_iso(),
         "recovery_point": f"{phase}:step_{state.get('step', 0)}",
     }
 

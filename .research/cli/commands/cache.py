@@ -4,36 +4,11 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+from core.utils import find_project_root, load_json, require_project_root
 
 
 def cmd_cache(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     cache_dir = root / ".research" / "cache"
     db_path = cache_dir / "research_cache.db"

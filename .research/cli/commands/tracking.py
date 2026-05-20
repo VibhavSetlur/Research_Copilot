@@ -1,83 +1,36 @@
 """Tracking commands: dag, data-scale, budget, state, resume, hooks."""
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
+from core.utils import find_project_root, load_json, get_config, require_project_root
 
 
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
+def _import_core_module(root: Path, module_name: str):
+    """Import a module from .research/core/."""
+    sys.path.insert(0, str(root / ".research" / "core"))
     try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
+        return __import__(module_name)
+    except ImportError:
+        print(f"ERROR: {module_name} module not found in .research/core/")
+        sys.exit(1)
 
 
-def load_json(path: Path):
+def _import_script_utils(root: Path, module_name: str):
+    """Import a module from .research/scripts/utils/."""
+    sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
     try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "cache_dir": ".research/cache",
-        "state_ledger": ".research/cache/state.json",
-        "checkpoint_dir": ".research/cache/checkpoints",
-        "core_dir": ".research/core",
-        "token_budget_limit": 200000,
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
+        return __import__(module_name)
+    except ImportError:
+        print(f"ERROR: {module_name} module not found in .research/scripts/utils/")
+        sys.exit(1)
 
 
 def cmd_state(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "core"))
-        from state_ledger import ResearchLedger
-    except ImportError:
-        print("ERROR: state_ledger module not found in .research/core/")
-        sys.exit(1)
-
-    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
+    state_ledger = _import_core_module(root, "state_ledger")
+    ledger = state_ledger.ResearchLedger(root / ".research" / "cache" / "state.json")
     print(ledger.summary())
 
     if hasattr(args, 'json') and args.json:
@@ -85,21 +38,13 @@ def cmd_state(args):
 
 
 def cmd_resume(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "core"))
-        from state_ledger import ResearchLedger
-        from checkpoint_manager import CheckpointManager
-    except ImportError:
-        print("ERROR: core modules not found in .research/core/")
-        sys.exit(1)
+    state_ledger = _import_core_module(root, "state_ledger")
+    checkpoint_manager = _import_core_module(root, "checkpoint_manager")
 
-    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
-    cp_manager = CheckpointManager(root / ".research" / "cache" / "checkpoints")
+    ledger = state_ledger.ResearchLedger(root / ".research" / "cache" / "state.json")
+    cp_manager = checkpoint_manager.CheckpointManager(root / ".research" / "cache" / "checkpoints")
 
     phase = args.phase if args.phase else None
 
@@ -158,19 +103,10 @@ def cmd_resume(args):
 
 
 def cmd_budget(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "core"))
-        from state_ledger import ResearchLedger
-    except ImportError:
-        print("ERROR: state_ledger module not found in .research/core/")
-        sys.exit(1)
-
-    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
+    state_ledger = _import_core_module(root, "state_ledger")
+    ledger = state_ledger.ResearchLedger(root / ".research" / "cache" / "state.json")
     state = ledger.get()
     budget = state.get("token_budget", {"used": 0, "remaining": 200000, "limit": 200000})
 
@@ -217,19 +153,10 @@ def cmd_budget(args):
 
 
 def cmd_dag(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
-        from dag_manager import ExecutionDAGManager
-    except ImportError:
-        print("ERROR: dag_manager module not found in .research/scripts/utils/")
-        sys.exit(1)
-
-    dag = ExecutionDAGManager(root)
+    dag_manager = _import_script_utils(root, "dag_manager")
+    dag = dag_manager.ExecutionDAGManager(root)
     print(dag.summary())
 
     dag_path = root / ".research" / "cache" / "execution_dag.json"
@@ -243,19 +170,10 @@ def cmd_dag(args):
 
 
 def cmd_data_scale(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
-        from data_scale_detector import DataScaleDetector
-    except ImportError:
-        print("ERROR: data_scale_detector module not found in .research/scripts/utils/")
-        sys.exit(1)
-
-    detector = DataScaleDetector(root)
+    detector_mod = _import_script_utils(root, "data_scale_detector")
+    detector = detector_mod.DataScaleDetector(root)
     profile = detector.scan()
 
     print("=" * 60)
@@ -297,18 +215,11 @@ def cmd_data_scale(args):
 
 
 def cmd_hooks(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
-    try:
-        sys.path.insert(0, str(root / ".research" / "core"))
-        from hooks import hook_engine
-        import interceptors  # noqa: F401
-    except ImportError:
-        print("ERROR: hooks module not found in .research/core/")
-        sys.exit(1)
+    hooks_mod = _import_core_module(root, "hooks")
+    hook_engine = hooks_mod.hook_engine
+    __import__("interceptors")
 
     hooks = hook_engine.list_hooks()
     log = hook_engine.get_execution_log()

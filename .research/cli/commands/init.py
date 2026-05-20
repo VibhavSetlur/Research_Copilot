@@ -1,273 +1,19 @@
-"""Init commands: setup, preflight, init-dirs."""
-import json
-import os
+"""Init commands: init-dirs."""
 import shutil
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
+from core.utils import (
+    find_project_root, load_json, load_markdown, save_json, get_config,
+    get_research_map, require_project_root,
+)
 
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.name == ".research" and (p.parent / "inputs").exists():
-            return p.parent
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def load_markdown(path: Path):
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-
-def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "intake_path": "inputs/intake.md",
-        "data_raw": "inputs/data/raw",
-        "cache_dir": ".research/cache",
-        "cache_research_map": ".research/cache/research_map.json",
-        "research_map": "reports/baseline/research_map.json",
-        "manifest": "docs/manifest.json",
-        "iteration_registry": "docs/iterations/registry.json",
-        "research_log": "docs/research_log.md",
-        "methodology": "docs/methodology.md",
-        "changelog": "docs/changelog.md",
-        "data_ingested": "data/01_ingested",
-        "data_processed": "data/02_processed",
-        "data_analytical": "data/03_analytical",
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
-
-
-def get_research_map(root: Path, config: dict):
-    ai_map = load_json(root / config["research_map"])
-    if ai_map:
-        return ai_map
-    return load_json(root / config["cache_research_map"])
-
-
-def cmd_setup(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        print("This doesn't look like a Research Copilot project.")
-        print("Copy .research/, inputs/, environment/, and AGENTS.md from the template.")
-        sys.exit(1)
-
-    config = get_config(root)
-
-    print("=" * 60)
-    print("RESEARCH COPILOT — SETUP CHECK")
-    print("=" * 60)
-    print()
-
-    all_ok = True
-
-    print("  System files:")
-    system_checks = [
-        (".research/research.py", "CLI tool"),
-        (".research/config.yaml", "Configuration"),
-        ("AGENTS.md", "AI agent instructions"),
-    ]
-    for path, desc in system_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path} — {desc}")
-        if not exists:
-            all_ok = False
-    print()
-
-    print("  System directories:")
-    dir_checks = [
-        (".research/agents", "Agent instructions"),
-        (".research/skills", "Methodology skills"),
-        (".research/workflows", "Workflow templates"),
-        (".research/domains", "Domain profiles"),
-        (".research/core", "Hook system & state ledger"),
-        (".research/schemas", "Pydantic validation models"),
-        (".research/scripts", "System scripts"),
-        (".research/scripts/utils", "System utility scripts"),
-    ]
-    for path, desc in dir_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path}/ — {desc}")
-        if not exists:
-            all_ok = False
-    print()
-
-    print("  Environment:")
-    env_checks = [
-        ("environment/requirements.txt", "Pinned dependencies"),
-        ("environment/setup.sh", "venv setup script"),
-        ("environment/setup_conda.sh", "Conda setup script"),
-    ]
-    for path, desc in env_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path} — {desc}")
-        if not exists:
-            all_ok = False
-
-    venv_active = sys.prefix != sys.base_prefix
-    conda_active = "CONDA_DEFAULT_ENV" in os.environ
-    if venv_active or conda_active:
-        env_name = os.environ.get("CONDA_DEFAULT_ENV", sys.prefix.split("/")[-1])
-        print(f"    ✓ Active environment: {env_name}")
-    else:
-        print(f"    ○ No virtual environment active")
-        print(f"      Run: source environment/venv/bin/activate  (or conda activate research-copilot)")
-    print()
-
-    print("  User inputs:")
-    input_checks = [
-        ("inputs/intake.md", "Intake form"),
-        ("inputs/data/raw", "Data directory"),
-        ("inputs/context", "Context directory"),
-        ("inputs/papers", "Papers directory"),
-    ]
-    for path, desc in input_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path}/ — {desc}")
-        if not exists:
-            all_ok = False
-
-    data_dir = root / config["data_raw"]
-    if data_dir.exists():
-        data_files = [f for f in data_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
-        if data_files:
-            print(f"    ✓ {len(data_files)} data file(s) found")
-        else:
-            print(f"    ○ No data files yet — add files to inputs/data/raw/")
-    print()
-
-    print("  Utility scripts:")
-    script_checks = [
-        (".research/scripts/00_environment_check.py", "Environment check"),
-        (".research/scripts/utils/cache_manager.py", "Cache manager"),
-        (".research/scripts/utils/citation_verifier.py", "Citation verifier"),
-        (".research/scripts/utils/claim_tracer.py", "Claim tracer"),
-        (".research/scripts/utils/parallel_runner.py", "Parallel runner"),
-        (".research/scripts/utils/figure_validator.py", "Figure validator"),
-        (".research/scripts/utils/auto_debug.py", "Auto debugger"),
-        (".research/scripts/research_dashboard.py", "Dashboard"),
-    ]
-    for path, desc in script_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path} — {desc}")
-        if not exists:
-            all_ok = False
-    print()
-
-    print("  Core modules:")
-    core_checks = [
-        (".research/core/hooks.py", "Hook registry"),
-        (".research/core/interceptors.py", "Hook interceptors"),
-        (".research/core/state_ledger.py", "State ledger"),
-        (".research/core/checkpoint_manager.py", "Checkpoint manager"),
-    ]
-    for path, desc in core_checks:
-        exists = (root / path).exists()
-        marker = "✓" if exists else "✗"
-        print(f"    {marker} {path} — {desc}")
-        if not exists:
-            all_ok = False
-    print()
-
-    print("=" * 60)
-    if all_ok:
-        print("  STATUS: READY")
-        print()
-        print("  Next steps:")
-        print("    1. Fill out inputs/intake.md")
-        print("    2. Add data files to inputs/data/raw/")
-        print("    3. Open your AI agent and run: python .research/research.py scan")
-    else:
-        print("  STATUS: INCOMPLETE")
-        print()
-        print("  Some system files are missing. Re-copy from the template:")
-        print("    cp -r template/.research ./")
-        print("    cp -r template/inputs ./")
-        print("    cp -r template/environment ./")
-        print("    cp template/AGENTS.md ./")
-    print()
-
-
-def cmd_preflight(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
-
-    script_path = root / "environment" / "preflight_check.py"
-    if not script_path.exists():
-        print(f"ERROR: preflight script not found at {script_path}")
-        sys.exit(1)
-
-    result = subprocess.run([sys.executable, str(script_path)], check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+# Re-export shared commands from project module
+from cli.commands.project import cmd_setup, cmd_preflight
 
 
 def cmd_init_dirs(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     research_map = get_research_map(root, config)
@@ -322,7 +68,7 @@ def cmd_init_dirs(args):
         created.append(dir_path)
 
     manifest = {
-        "schema_version": "6.0.0",
+        "schema_version": "8.0.0",
         "project": {"title": project_title, "researcher": researcher, "institution": institution, "domain": domain},
         "created": today,
         "last_updated": today,
@@ -350,7 +96,7 @@ def cmd_init_dirs(args):
 
     registry_path = root / config.get("iteration_registry", "docs/iterations/registry.json")
     save_json(registry_path, {
-        "schema_version": "6.0.0",
+        "schema_version": "8.0.0",
         "project": project_title,
         "iterations": [{"id": "001", "type": "initial_setup", "trigger": "research_init agent", "date": today, "status": "complete", "summary": "Initial project structure created, intake parsed, data scanned"}],
         "total": 1,

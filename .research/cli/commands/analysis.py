@@ -1,106 +1,38 @@
 """Analysis commands: validate, debug, parallel, export, dashboard."""
 import json
+import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def load_markdown(path: Path):
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "intake_path": "inputs/intake.md",
-        "data_raw": "inputs/data/raw",
-        "cache_dir": ".research/cache",
-        "research_map": "reports/baseline/research_map.json",
-        "literature_corpus": "reports/literature/literature_corpus.json",
-        "evidence_matrix": "reports/literature/evidence_matrix.md",
-        "gap_analysis": "reports/literature/gap_analysis.md",
-        "analysis_plan": "reports/analysis/analysis_plan.md",
-        "data_ingested": "data/01_ingested",
-        "data_processed": "data/02_processed",
-        "data_analytical": "data/03_analytical",
-        "data_lineage": "docs/data_lineage.json",
-        "manuscript_findings": "reports/manuscript/research_findings.md",
-        "key_findings": "reports/summary/key_findings.md",
-        "executive_summary": "reports/summary/executive_summary.md",
-        "full_audit": "reports/audit/full_audit_report.md",
-        "literature_min_papers": 10,
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
-
-
-def get_research_map(root: Path, config: dict):
-    ai_map = load_json(root / config["research_map"])
-    if ai_map:
-        return ai_map
-    return load_json(root / config["cache_research_map"])
+from core.utils import (
+    find_project_root, load_json, load_markdown, get_config,
+    get_research_map, require_project_root,
+)
 
 
 def cmd_validate(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     research_map = get_research_map(root, config)
 
     phase = args.phase if args.phase else None
+
+    def _check_min_papers():
+        corpus_path = root / config.get("literature_corpus", "reports/literature/literature_corpus.json")
+        if not corpus_path.exists():
+            return False
+        corpus = load_json(corpus_path)
+        papers = corpus.get("papers", [])
+        min_papers = config.get("literature_min_papers", 10)
+        return len(papers) >= min_papers
+
+    def _has_analysis_results():
+        analysis_dir = root / "reports/analysis"
+        if not analysis_dir.exists():
+            return False
+        q_dirs = [d for d in analysis_dir.iterdir() if d.is_dir() and d.name.startswith("q")]
+        return len(q_dirs) > 0
 
     gates = {
         "research_init": {
@@ -126,7 +58,7 @@ def cmd_validate(args):
                 ("Literature corpus exists", lambda: (root / config.get("literature_corpus", "reports/literature/literature_corpus.json")).exists()),
                 ("Evidence matrix exists", lambda: (root / config.get("evidence_matrix", "reports/literature/evidence_matrix.md")).exists()),
                 ("Gap analysis exists", lambda: (root / config.get("gap_analysis", "reports/literature/gap_analysis.md")).exists()),
-                ("Minimum papers met", lambda: _check_min_papers(root, config)),
+                ("Minimum papers met", lambda: _check_min_papers()),
             ]
         },
         "method_route": {
@@ -150,7 +82,7 @@ def cmd_validate(args):
         "execute_analysis": {
             "name": "Execute Analysis",
             "checks": [
-                ("Results exist for all questions", lambda: _has_analysis_results(root)),
+                ("Results exist for all questions", lambda: _has_analysis_results()),
                 ("Figures generated", lambda: bool(list((root / "reports/figures").glob("*.png"))) if (root / "reports/figures").exists() else False),
                 ("Tables generated", lambda: bool(list((root / "reports/tables").glob("*"))) if (root / "reports/tables").exists() else False),
             ]
@@ -218,29 +150,8 @@ def cmd_validate(args):
         print()
 
 
-def _check_min_papers(root, config):
-    corpus_path = root / config.get("literature_corpus", "reports/literature/literature_corpus.json")
-    if not corpus_path.exists():
-        return False
-    corpus = load_json(corpus_path)
-    papers = corpus.get("papers", [])
-    min_papers = config.get("literature_min_papers", 10)
-    return len(papers) >= min_papers
-
-
-def _has_analysis_results(root):
-    analysis_dir = root / "reports/analysis"
-    if not analysis_dir.exists():
-        return False
-    q_dirs = [d for d in analysis_dir.iterdir() if d.is_dir() and d.name.startswith("q")]
-    return len(q_dirs) > 0
-
-
 def cmd_debug(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     script_path = Path(args.script) if Path(args.script).is_absolute() else root / args.script
     if not script_path.exists():
@@ -260,10 +171,7 @@ def cmd_debug(args):
 
 
 def cmd_parallel(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     runner_path = root / ".research" / "scripts" / "utils" / "parallel_runner.py"
     if not runner_path.exists():
@@ -282,7 +190,7 @@ def cmd_parallel(args):
     try:
         sys.path.insert(0, str(root / ".research" / "core"))
         from hooks import hook_engine
-        import interceptors  # noqa: F401
+        __import__("interceptors")
 
         state = {
             "task": f"parallel_execution:{','.join(question_list)}",
@@ -299,7 +207,6 @@ def cmd_parallel(args):
     print(f"  Questions: {', '.join(question_list)}")
     print()
 
-    import subprocess
     cmd = [
         sys.executable, str(runner_path),
         "--questions", ",".join(question_list),
@@ -317,10 +224,7 @@ def cmd_parallel(args):
 
 
 def cmd_export(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     fmt = args.format or "markdown"
     journal = args.journal
@@ -375,11 +279,7 @@ def cmd_export(args):
 
 
 def cmd_dashboard(args):
-    import subprocess
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     dashboard_path = root / ".research" / "scripts" / "research_dashboard.py"
     if not dashboard_path.exists():

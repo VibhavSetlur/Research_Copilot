@@ -1,63 +1,8 @@
 """Tool commands: tools, tool."""
-import json
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "cache_dir": ".research/cache",
-        "registries": {"tool_registry": ".research/domains/tool_registry.json"},
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
+from core.utils import find_project_root, load_json, load_markdown, get_config, require_project_root
 
 
 def _load_tool_registry(root, config):
@@ -67,10 +12,7 @@ def _load_tool_registry(root, config):
 
 
 def cmd_tools(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     registry = _load_tool_registry(root, config)
@@ -97,10 +39,7 @@ def cmd_tools(args):
 
 
 def cmd_tool(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     registry = _load_tool_registry(root, config)

@@ -5,28 +5,22 @@ Generates a timestamped, OSF-compatible pre-registration document detailing
 hypotheses, power analysis, and exact statistical tests before analysis begins.
 """
 
-import json
-import sys
 from pathlib import Path
-from datetime import datetime, timezone
+import json
+
+from core.utils import load_json, save_json, save_json_atomic, now_iso, now_timestamp
 
 
 def _load_state() -> dict:
     """Load the research state ledger."""
     state_path = Path(".research/cache/state.json")
-    if state_path.exists():
-        with open(state_path) as f:
-            return json.load(f)
-    return {}
+    return load_json(state_path)
 
 
 def _load_research_map() -> dict:
     """Load the research map."""
     map_path = Path(".research/cache/research_map.json")
-    if map_path.exists():
-        with open(map_path) as f:
-            return json.load(f)
-    return {}
+    return load_json(map_path)
 
 
 def _load_intake() -> dict:
@@ -73,7 +67,7 @@ def generate_preregistration(hypotheses: list = None, analysis_plan: str = "") -
     prereg_dir = Path("reports/literature")
     prereg_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = now_timestamp()
     prereg_path = prereg_dir / f"preregistration_{timestamp}.md"
     prereg_json_path = prereg_dir / f"preregistration_{timestamp}.json"
 
@@ -118,7 +112,7 @@ def generate_preregistration(hypotheses: list = None, analysis_plan: str = "") -
     # Generate the pre-registration document
     prereg_content = f"""# Pre-Registration Document
 
-**Generated**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+**Generated**: {now_iso()}
 **Project**: {intake.get('title', state.get('project', 'Research Copilot Project'))}
 **Schema Version**: OSF Preregistration Template v2.0
 **Pre-Registration ID**: PREREG-{timestamp}
@@ -268,7 +262,7 @@ It is timestamped and intended for submission to the Open Science Framework (OSF
     # Write the JSON metadata
     prereg_json = {
         "preregistration_id": f"PREREG-{timestamp}",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now_iso(),
         "project": intake.get("title", state.get("project", "")),
         "research_question": intake.get("research_question", ""),
         "hypotheses": hyp_list,
@@ -284,7 +278,7 @@ It is timestamped and intended for submission to the Open Science Framework (OSF
     }
 
     with open(prereg_json_path, "w") as f:
-        json.dump(prereg_json, f, indent=2)
+        json.dump(prereg_json, f, indent=2, default=str)
 
     return (
         f"✅ Pre-registration generated:\n\n"

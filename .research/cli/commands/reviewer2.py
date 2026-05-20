@@ -5,10 +5,10 @@ Reads research findings and explicitly tries to destroy the conclusions by
 finding unaddressed confounders, alternative explanations, and methodological flaws.
 """
 
-import json
 import re
 from pathlib import Path
-from datetime import datetime, timezone
+
+from core.utils import load_json, load_markdown, save_json, now_iso, now_timestamp
 
 
 def _load_findings(findings_path: str = "") -> str:
@@ -33,10 +33,7 @@ def _load_findings(findings_path: str = "") -> str:
 def _load_state() -> dict:
     """Load research state."""
     state_path = Path(".research/cache/state.json")
-    if state_path.exists():
-        with open(state_path) as f:
-            return json.load(f)
-    return {}
+    return load_json(state_path)
 
 
 def _load_methodology() -> str:
@@ -178,7 +175,7 @@ def run_reviewer2(findings_path: str = "") -> str:
     critique = _analyze_findings(findings, methodology)
 
     # Generate report
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = now_timestamp()
     audit_dir = Path("reports/audit")
     audit_dir.mkdir(parents=True, exist_ok=True)
 
@@ -189,7 +186,7 @@ def run_reviewer2(findings_path: str = "") -> str:
 
     report_lines = [
         "# Reviewer 2 — Adversarial Critique Report",
-        f"\n**Generated**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"\n**Generated**: {now_iso()}",
         f"**Findings File**: {findings_path or 'reports/manuscript/research_findings.md'}",
         f"**Total Issues Found**: {total_issues}",
         "",
@@ -263,7 +260,7 @@ def run_reviewer2(findings_path: str = "") -> str:
     # JSON version for programmatic access
     critique_json = {
         "critique_id": f"REVIEWER2-{timestamp}",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now_iso(),
         "findings_file": findings_path or "reports/manuscript/research_findings.md",
         "total_issues": total_issues,
         "categories": {k: len(v) for k, v in critique.items()},
@@ -271,7 +268,7 @@ def run_reviewer2(findings_path: str = "") -> str:
     }
 
     with open(json_path, "w") as f:
-        json.dump(critique_json, f, indent=2)
+        json.dump(critique_json, f, indent=2, default=str)
 
     # Console output
     output = [

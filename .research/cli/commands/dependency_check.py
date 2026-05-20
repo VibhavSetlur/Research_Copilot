@@ -10,7 +10,8 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
+
+from core.utils import now_iso
 
 
 # Mapping of import names to pip package names
@@ -223,7 +224,7 @@ def check_dependencies(script: str, auto_install: bool = False) -> str:
             output.append("")
             output.append("📝 **Updating requirements.txt...**")
             with open(req_path, "a") as f:
-                f.write(f"\n# Auto-added by dependency checker ({datetime.now(timezone.utc).strftime('%Y-%m-%d')})\n")
+                f.write(f"\n# Auto-added by dependency checker ({now_iso()[:10]})\n")
                 for pkg in packages_not_in_req:
                     f.write(f"{pkg}\n")
             output.append(f"Added {len(packages_not_in_req)} package(s) to requirements.txt:")

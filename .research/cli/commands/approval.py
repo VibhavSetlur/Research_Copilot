@@ -1,45 +1,14 @@
 """Approval commands: approve, reject."""
-import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+from core.utils import (
+    find_project_root, load_json, save_json, require_project_root, now_iso,
+)
 
 
 def cmd_approve(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     cache_dir = root / ".research" / "cache"
     pending_path = cache_dir / "pending_approval.json"
@@ -58,7 +27,7 @@ def cmd_approve(args):
     try:
         sys.path.insert(0, str(root / ".research" / "core"))
         from hooks import hook_engine
-        import interceptors  # noqa: F401
+        __import__("interceptors")
 
         state = {"phase": args.phase, "approval_status": "approved"}
         state = hook_engine.trigger_sync(
@@ -70,7 +39,7 @@ def cmd_approve(args):
     response = {
         "phase": args.phase,
         "status": "approved",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": now_iso()
     }
     save_json(response_path, response)
 
@@ -83,10 +52,7 @@ def cmd_approve(args):
 
 
 def cmd_reject(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     cache_dir = root / ".research" / "cache"
     pending_path = cache_dir / "pending_approval.json"
@@ -106,7 +72,7 @@ def cmd_reject(args):
         "phase": args.phase,
         "status": "rejected",
         "reason": args.reason,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": now_iso()
     }
     save_json(response_path, response)
 

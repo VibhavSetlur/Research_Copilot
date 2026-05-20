@@ -3,94 +3,10 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.name == ".research" and (p.parent / "inputs").exists():
-            return p.parent
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def load_markdown(path: Path):
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-
-def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "default_workflow": "quick_exploratory",
-        "intake_path": "inputs/intake.md",
-        "data_raw": "inputs/data/raw",
-        "context_dir": "inputs/context",
-        "papers_dir": "inputs/papers",
-        "cache_dir": ".research/cache",
-        "cache_research_map": ".research/cache/research_map.json",
-        "cache_followups": ".research/cache/follow_up_questions.md",
-        "docs_dir": "docs",
-        "reports_dir": "reports",
-        "research_map": "reports/baseline/research_map.json",
-        "follow_up_questions": "reports/baseline/follow_up_questions.md",
-        "manifest": "docs/manifest.json",
-        "iteration_registry": "docs/iterations/registry.json",
-        "research_log": "docs/research_log.md",
-        "data_ingested": "data/01_ingested",
-        "data_processed": "data/02_processed",
-        "data_analytical": "data/03_analytical",
-        "dag_json": ".research/workflow_dag.json",
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
+from core.utils import (
+    find_project_root, load_json, load_markdown, save_json, get_config,
+    require_project_root,
+)
 
 
 def _load_format_router(root):
@@ -106,121 +22,8 @@ def _load_format_router(root):
     return module
 
 
-def cmd_scan(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
-
-    config = get_config(root)
-    intake = load_markdown(root / config["intake_path"])
-
-    data_dir = root / config["data_raw"]
-    data_files = []
-    schema_cache = {}
-    format_router = _load_format_router(root)
-    format_manifest = None
-    format_meta_by_path = {}
-    manifest_path = root / config.get("cache_dir", ".research/cache") / "data_format_manifest.json"
-    if format_router and data_dir.exists():
-        try:
-            format_manifest = format_router.scan_directory(str(data_dir), str(manifest_path))
-            for item in format_manifest.get("files", []):
-                format_meta_by_path[Path(item.get("path", "")).resolve()] = item
-        except Exception:
-            format_manifest = None
-
-    if data_dir.exists():
-        for f in data_dir.rglob("*"):
-            if f.is_file() and not f.name.startswith("."):
-                ext = f.suffix.lower()
-                fmt_map = {
-                    ".csv": "CSV", ".tsv": "TSV", ".parquet": "Parquet",
-                    ".xlsx": "Excel", ".xls": "Excel", ".json": "JSON",
-                    ".sav": "SPSS", ".dta": "Stata", ".sas7bdat": "SAS",
-                    ".feather": "Feather", ".h5": "HDF5", ".hdf5": "HDF5",
-                }
-                meta = format_meta_by_path.get(f.resolve())
-                file_info = {
-                    "path": str(f.relative_to(root)),
-                    "format": meta.get("format") if meta else fmt_map.get(ext, ext.lstrip(".").upper()),
-                    "size_kb": round(f.stat().st_size / 1024, 1),
-                }
-                if meta:
-                    file_info["pandera_applicable"] = bool(meta.get("pandera_applicable"))
-                    file_info["domain_hint"] = meta.get("domain_hint")
-                    file_info["parser_available"] = bool(meta.get("parser_available"))
-
-                if ext in (".csv", ".tsv", ".xlsx", ".xls"):
-                    try:
-                        import pandas as pd
-                        if ext == ".csv":
-                            df = pd.read_csv(f, nrows=100)
-                        elif ext == ".tsv":
-                            df = pd.read_csv(f, sep="\t", nrows=100)
-                        elif ext in (".xlsx", ".xls"):
-                            df = pd.read_excel(f, nrows=100)
-                        else:
-                            df = None
-
-                        if df is not None:
-                            schema = {"columns": {}, "total_rows_estimated": None}
-                            for col in df.columns:
-                                col_info = {
-                                    "dtype": str(df[col].dtype),
-                                    "non_null_in_sample": int(df[col].notna().sum()),
-                                    "null_in_sample": int(df[col].isna().sum()),
-                                    "sample_values": [str(v) for v in df[col].dropna().head(3).tolist()],
-                                }
-                                if df[col].dtype in ("float64", "float32", "int64", "int32"):
-                                    col_info["semantic_type"] = "numeric"
-                                    col_info["min"] = float(df[col].min()) if df[col].notna().any() else None
-                                    col_info["max"] = float(df[col].max()) if df[col].notna().any() else None
-                                elif df[col].dtype == "bool":
-                                    col_info["semantic_type"] = "boolean"
-                                elif df[col].dtype == "object":
-                                    nunique = df[col].nunique()
-                                    if nunique <= 10:
-                                        col_info["semantic_type"] = "categorical"
-                                        col_info["unique_values"] = [str(v) for v in df[col].unique()[:10]]
-                                    else:
-                                        col_info["semantic_type"] = "text"
-                                elif "datetime" in str(df[col].dtype):
-                                    col_info["semantic_type"] = "datetime"
-                                else:
-                                    col_info["semantic_type"] = "unknown"
-                                schema["columns"][col] = col_info
-
-                            try:
-                                full_df = pd.read_csv(f, nrows=1) if ext == ".csv" else None
-                                if full_df is not None:
-                                    with open(f, "rb") as fh:
-                                        total_lines = sum(1 for _ in fh)
-                                    schema["total_rows_estimated"] = total_lines - 1
-                            except Exception:
-                                pass
-
-                            schema_cache[f.name] = schema
-                            file_info["columns"] = list(df.columns)
-                            file_info["column_count"] = len(df.columns)
-                            file_info["sample_row_count"] = len(df)
-                    except ImportError:
-                        pass
-                    except Exception:
-                        pass
-
-                data_files.append(file_info)
-
-    context_dir = root / config["context_dir"]
-    context_files = []
-    if context_dir.exists():
-        for f in context_dir.iterdir():
-            if f.is_file() and not f.name.startswith("."):
-                context_files.append(str(f.relative_to(root)))
-
-    papers_dir = root / config["papers_dir"]
-    paper_count = len(list(papers_dir.glob("*.pdf"))) if papers_dir.exists() else 0
-
+def _parse_intake_questions(intake: str) -> list:
+    """Parse research questions from intake markdown."""
     questions = []
     lines = intake.split("\n")
     current_q = None
@@ -259,10 +62,132 @@ def cmd_scan(args):
                 current_q["prior"] = stripped.split(":", 1)[-1].strip().strip("[]")
     if current_q and current_q["text"]:
         questions.append(current_q)
+    return questions
+
+
+def _sniff_schema(f: Path, ext: str) -> tuple:
+    """Sniff CSV/TSV/Excel file schema. Returns (schema_dict, column_list, row_count)."""
+    try:
+        import pandas as pd
+        if ext == ".csv":
+            df = pd.read_csv(f, nrows=100)
+        elif ext == ".tsv":
+            df = pd.read_csv(f, sep="\t", nrows=100)
+        elif ext in (".xlsx", ".xls"):
+            df = pd.read_excel(f, nrows=100)
+        else:
+            return None, [], 0
+
+        schema = {"columns": {}, "total_rows_estimated": None}
+        for col in df.columns:
+            col_info = {
+                "dtype": str(df[col].dtype),
+                "non_null_in_sample": int(df[col].notna().sum()),
+                "null_in_sample": int(df[col].isna().sum()),
+                "sample_values": [str(v) for v in df[col].dropna().head(3).tolist()],
+            }
+            if df[col].dtype in ("float64", "float32", "int64", "int32"):
+                col_info["semantic_type"] = "numeric"
+                col_info["min"] = float(df[col].min()) if df[col].notna().any() else None
+                col_info["max"] = float(df[col].max()) if df[col].notna().any() else None
+            elif df[col].dtype == "bool":
+                col_info["semantic_type"] = "boolean"
+            elif df[col].dtype == "object":
+                nunique = df[col].nunique()
+                if nunique <= 10:
+                    col_info["semantic_type"] = "categorical"
+                    col_info["unique_values"] = [str(v) for v in df[col].unique()[:10]]
+                else:
+                    col_info["semantic_type"] = "text"
+            elif "datetime" in str(df[col].dtype):
+                col_info["semantic_type"] = "datetime"
+            else:
+                col_info["semantic_type"] = "unknown"
+            schema["columns"][col] = col_info
+
+        try:
+            if ext == ".csv":
+                with open(f, "rb") as fh:
+                    total_lines = sum(1 for _ in fh)
+                schema["total_rows_estimated"] = total_lines - 1
+        except Exception:
+            pass
+
+        return schema, list(df.columns), len(df)
+    except ImportError:
+        return None, [], 0
+    except Exception:
+        return None, [], 0
+
+
+def cmd_scan(args):
+    root = require_project_root()
+
+    config = get_config(root)
+    intake = load_markdown(root / config["intake_path"])
+
+    data_dir = root / config["data_raw"]
+    data_files = []
+    schema_cache = {}
+    format_router = _load_format_router(root)
+    format_manifest = None
+    format_meta_by_path = {}
+    manifest_path = root / config.get("cache_dir", ".research/cache") / "data_format_manifest.json"
+    if format_router and data_dir.exists():
+        try:
+            format_manifest = format_router.scan_directory(str(data_dir), str(manifest_path))
+            for item in format_manifest.get("files", []):
+                format_meta_by_path[Path(item.get("path", "")).resolve()] = item
+        except Exception:
+            format_manifest = None
+
+    fmt_map = {
+        ".csv": "CSV", ".tsv": "TSV", ".parquet": "Parquet",
+        ".xlsx": "Excel", ".xls": "Excel", ".json": "JSON",
+        ".sav": "SPSS", ".dta": "Stata", ".sas7bdat": "SAS",
+        ".feather": "Feather", ".h5": "HDF5", ".hdf5": "HDF5",
+    }
+
+    if data_dir.exists():
+        for f in data_dir.rglob("*"):
+            if f.is_file() and not f.name.startswith("."):
+                ext = f.suffix.lower()
+                meta = format_meta_by_path.get(f.resolve())
+                file_info = {
+                    "path": str(f.relative_to(root)),
+                    "format": meta.get("format") if meta else fmt_map.get(ext, ext.lstrip(".").upper()),
+                    "size_kb": round(f.stat().st_size / 1024, 1),
+                }
+                if meta:
+                    file_info["pandera_applicable"] = bool(meta.get("pandera_applicable"))
+                    file_info["domain_hint"] = meta.get("domain_hint")
+                    file_info["parser_available"] = bool(meta.get("parser_available"))
+
+                if ext in (".csv", ".tsv", ".xlsx", ".xls"):
+                    schema, columns, row_count = _sniff_schema(f, ext)
+                    if schema:
+                        schema_cache[f.name] = schema
+                        file_info["columns"] = columns
+                        file_info["column_count"] = len(columns)
+                        file_info["sample_row_count"] = row_count
+
+                data_files.append(file_info)
+
+    context_dir = root / config["context_dir"]
+    context_files = []
+    if context_dir.exists():
+        for f in context_dir.iterdir():
+            if f.is_file() and not f.name.startswith("."):
+                context_files.append(str(f.relative_to(root)))
+
+    papers_dir = root / config["papers_dir"]
+    paper_count = len(list(papers_dir.glob("*.pdf"))) if papers_dir.exists() else 0
+
+    questions = _parse_intake_questions(intake)
 
     project_title = ""
     domain = ""
-    for line in lines:
+    for line in intake.split("\n"):
         stripped = line.strip()
         if stripped.startswith("**Title**"):
             project_title = stripped.split(":", 1)[-1].strip().strip("[]")
@@ -272,7 +197,7 @@ def cmd_scan(args):
     question_summary = f"{len(questions)} question(s)" if questions else "N/A"
 
     research_map = {
-        "schema_version": "7.0.0",
+        "schema_version": "8.0.0",
         "project": {"title": project_title},
         "questions": questions,
         "data": {
@@ -299,15 +224,11 @@ def cmd_scan(args):
         research_map["follow_up"].append("No research questions found in intake. Fill in inputs/intake.md.")
 
     cache_path = root / config["cache_research_map"]
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(cache_path, "w") as f:
-        json.dump(research_map, f, indent=2)
+    save_json(cache_path, research_map)
 
     if schema_cache:
         schema_path = root / config.get("cache_dir", ".research/cache") / "schema_cache.json"
-        schema_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(schema_path, "w") as f:
-            json.dump(schema_cache, f, indent=2)
+        save_json(schema_path, schema_cache)
 
     print("=" * 60)
     print("SCAN COMPLETE")
@@ -354,10 +275,7 @@ def cmd_scan(args):
 
 
 def cmd_format_scan(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     data_dir = root / config["data_raw"]

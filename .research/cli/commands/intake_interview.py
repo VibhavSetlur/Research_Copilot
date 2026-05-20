@@ -5,10 +5,9 @@ Generates intake.md through an interactive Q&A session rather than requiring
 the user to fill out a static form.
 """
 
-import json
-import sys
 from pathlib import Path
-from datetime import datetime, timezone
+
+from core.utils import save_json, load_json, now_iso, find_project_root
 
 
 INTAKE_QUESTIONS = [
@@ -102,7 +101,7 @@ def _generate_intake_md(answers: dict) -> str:
 
     lines = [
         "# Research Intake Form",
-        f"\nGenerated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"\nGenerated: {now_iso()}",
         f"Method: Conversational Interview",
         "",
         "## Project Information",
@@ -161,7 +160,7 @@ def run_intake_interview(start: bool = False, message: str = "") -> str:
         session = {
             "current_question": 0,
             "answers": {},
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": now_iso(),
         }
         session_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -169,8 +168,7 @@ def run_intake_interview(start: bool = False, message: str = "") -> str:
         session["answers"] = {}
 
         # Save session
-        with open(session_file, "w") as f:
-            json.dump(session, f, indent=2)
+        save_json(session_file, session)
 
         return (
             f"🔬 **Research Intake Interview — Question 1/{len(INTAKE_QUESTIONS)}**\n\n"
@@ -179,8 +177,7 @@ def run_intake_interview(start: bool = False, message: str = "") -> str:
         )
 
     # Load existing session
-    with open(session_file) as f:
-        session = json.load(f)
+    session = load_json(session_file)
 
     current_idx = session["current_question"]
 
@@ -211,8 +208,7 @@ def run_intake_interview(start: bool = False, message: str = "") -> str:
         )
 
     # Save updated session
-    with open(session_file, "w") as f:
-        json.dump(session, f, indent=2)
+    save_json(session_file, session)
 
     q = INTAKE_QUESTIONS[current_idx]
     return (

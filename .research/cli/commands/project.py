@@ -1,105 +1,12 @@
 """Project commands: setup, preflight, init-dirs, status, map, intake."""
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.name == ".research" and (p.parent / "inputs").exists():
-            return p.parent
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def load_markdown(path: Path):
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-
-def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "default_workflow": "quick_exploratory",
-        "intake_path": "inputs/intake.md",
-        "data_raw": "inputs/data/raw",
-        "context_dir": "inputs/context",
-        "papers_dir": "inputs/papers",
-        "cache_dir": ".research/cache",
-        "cache_research_map": ".research/cache/research_map.json",
-        "cache_followups": ".research/cache/follow_up_questions.md",
-        "docs_dir": "docs",
-        "reports_dir": "reports",
-        "research_map": "reports/baseline/research_map.json",
-        "follow_up_questions": "reports/baseline/follow_up_questions.md",
-        "manifest": "docs/manifest.json",
-        "iteration_registry": "docs/iterations/registry.json",
-        "research_log": "docs/research_log.md",
-        "data_ingested": "data/01_ingested",
-        "data_processed": "data/02_processed",
-        "data_analytical": "data/03_analytical",
-        "dag_json": ".research/workflow_dag.json",
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
-
-
-def get_research_map(root: Path, config: dict):
-    ai_map = load_json(root / config["research_map"])
-    if ai_map:
-        return ai_map
-    return load_json(root / config["cache_research_map"])
+from core.utils import (
+    find_project_root, load_json, load_markdown, get_config, get_research_map,
+    require_project_root,
+)
 
 
 def _load_format_router(root):
@@ -271,10 +178,7 @@ def cmd_setup(args):
 
 
 def cmd_preflight(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     script_path = root / "environment" / "preflight_check.py"
     if not script_path.exists():
@@ -287,11 +191,21 @@ def cmd_preflight(args):
         sys.exit(result.returncode)
 
 
+def _has_content(dir_path: Path) -> bool:
+    """Check if directory has any files besides README.md / .gitkeep."""
+    if not dir_path.exists():
+        return False
+    for f in dir_path.iterdir():
+        if f.is_file() and f.name not in ("README.md", ".gitkeep"):
+            return True
+    for f in dir_path.rglob("*"):
+        if f.is_file() and f.name not in ("README.md", ".gitkeep"):
+            return True
+    return False
+
+
 def cmd_status(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     research_map = get_research_map(root, config)
@@ -309,23 +223,12 @@ def cmd_status(args):
     data_pipeline_exists = (root / "data").exists()
     scripts_exists = (root / "scripts").exists()
 
-    def has_content(dir_path):
-        if not dir_path.exists():
-            return False
-        for f in dir_path.iterdir():
-            if f.is_file() and f.name not in ("README.md", ".gitkeep"):
-                return True
-        for f in dir_path.rglob("*"):
-            if f.is_file() and f.name not in ("README.md", ".gitkeep"):
-                return True
-        return False
-
     phases = {
         "research_init": (root / config["research_map"]).exists(),
         "literature_deep": (root / "reports/literature/literature_corpus.json").exists(),
         "method_route": (root / "reports/analysis/analysis_plan.md").exists(),
-        "data_scaffold": has_content(root / config.get("data_ingested", "data/01_ingested")),
-        "execute_analysis": has_content(root / config["data_analytical"]),
+        "data_scaffold": _has_content(root / config.get("data_ingested", "data/01_ingested")),
+        "execute_analysis": _has_content(root / config["data_analytical"]),
         "replication_validator": (root / "reports/analysis/replication_validation_report.md").exists(),
         "compile_outputs": (root / "reports/manuscript/research_findings.md").exists(),
         "audit_validate": (root / "reports/audit/full_audit_report.md").exists(),
@@ -458,10 +361,7 @@ def cmd_status(args):
 
 
 def cmd_map(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     research_map = get_research_map(root, config)
@@ -528,10 +428,7 @@ def cmd_map(args):
 
 
 def cmd_intake(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     intake = load_markdown(root / config["intake_path"])

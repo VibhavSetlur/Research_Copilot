@@ -4,90 +4,14 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    yaml = None
-
-
-def find_project_root():
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return None
-
-
-def load_yaml(path: Path):
-    if yaml is None:
-        result = {}
-        try:
-            with open(path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and ":" in line:
-                        key, _, val = line.partition(":")
-                        val = val.strip().strip('"').strip("'")
-                        result[key.strip()] = val
-        except FileNotFoundError:
-            return {}
-        return result
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except (FileNotFoundError, Exception):
-        return {}
-
-
-def load_json(path: Path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def load_markdown(path: Path):
-    try:
-        with open(path) as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-
-def get_config(root: Path):
-    config = load_yaml(root / ".research" / "config.yaml")
-    defaults = {
-        "default_workflow": "quick_exploratory",
-        "intake_path": "inputs/intake.md",
-        "data_raw": "inputs/data/raw",
-        "cache_dir": ".research/cache",
-        "cache_research_map": ".research/cache/research_map.json",
-        "cache_followups": ".research/cache/follow_up_questions.md",
-        "research_map": "reports/baseline/research_map.json",
-        "follow_up_questions": "reports/baseline/follow_up_questions.md",
-        "iteration_registry": "docs/iterations/registry.json",
-    }
-    for k, v in defaults.items():
-        config.setdefault(k, v)
-    return config
-
-
-def get_research_map(root: Path, config: dict):
-    ai_map = load_json(root / config["research_map"])
-    if ai_map:
-        return ai_map
-    return load_json(root / config["cache_research_map"])
+from core.utils import (
+    find_project_root, load_json, load_markdown, load_yaml, get_config,
+    get_research_map, require_project_root,
+)
 
 
 def cmd_agents(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     agents_dir = root / ".research" / "agents"
 
@@ -125,10 +49,7 @@ def cmd_agents(args):
 
 
 def cmd_skills(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     skills_dir = root / ".research" / "skills"
 
@@ -164,10 +85,7 @@ def cmd_skills(args):
 
 
 def cmd_skill_search(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     index_path = root / ".research" / "cache" / "skill_index.json"
     if not index_path.exists():
@@ -241,10 +159,7 @@ def cmd_skill_search(args):
 
 
 def cmd_workflow(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     workflow_id = config["default_workflow"]
@@ -295,10 +210,7 @@ def cmd_workflow(args):
 
 
 def cmd_iterations(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     registry = load_json(root / config.get("iteration_registry", "docs/iterations/registry.json"))
@@ -336,10 +248,7 @@ def cmd_iterations(args):
 
 
 def cmd_followups(args):
-    root = find_project_root()
-    if not root:
-        print("ERROR: No .research/ directory found.")
-        sys.exit(1)
+    root = require_project_root()
 
     config = get_config(root)
     research_map = get_research_map(root, config)
