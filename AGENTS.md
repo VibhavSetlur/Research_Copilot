@@ -48,7 +48,7 @@ Always use `python .research/research.py <command>`:
 
 | Command | Purpose |
 |---------|---------|
-| `status` | Project state, pipeline, iterations, docs status |
+| `status` | Project state, token budget, pipeline status, iterations, docs status |
 | `scan` | Scan inputs/, build research map |
 | `map` | Show research map (grounding context) |
 | `intake` | Show intake form status |
@@ -59,6 +59,9 @@ Always use `python .research/research.py <command>`:
 | `agents` | List all agents with descriptions |
 | `agent <name>` | Show a specific agent's full instructions |
 | `workflow` | Show current workflow, pipeline, iteration support |
+| `budget` | Show token budget status and CTM history |
+| `dag` | Show execution DAG summary |
+| `data-scale` | Show data scale analysis and library constraints |
 
 ## Workflow
 Run agents in this order:
@@ -99,6 +102,9 @@ Each iteration:
 8. Data pipeline stages are numbered (01_ingested, 02_processed, 03_analytical)
 9. Figures/tables are numbered and organized by question (q1/, q2/, etc.)
 10. System scripts are in `.research/scripts/` — do NOT modify these
+11. Iteration scripts use `_ITER<XXX>` branching — NEVER overwrite prior scripts
+12. Execution DAG (`.research/cache/execution_dag.json`) tracks all script runs
+13. Context Transfer Memoranda (CTMs) are generated at 90% token budget — read them when resuming
 
 ## Rules
 1. Read agent instructions with `research agent <name>` before executing
@@ -123,6 +129,10 @@ Each iteration:
 6. ALWAYS pin package versions in `environment/requirements.txt`
 7. Scripts MUST be numbered in execution order (01_, 02_, 03_...) in `scripts/`
 8. Data pipeline MUST be reproducible: raw data + scripts = analytical data
+9. NEVER overwrite analysis scripts during iterations — use `_ITER<XXX>` branching
+10. ALWAYS register script executions in the execution DAG (`.research/cache/execution_dag.json`)
+11. ALWAYS check data scale profile before loading data — use polars lazy for files >= 1GB
+12. ALWAYS read the latest CTM when starting a new conversation after a token budget split
 
 ## Quality Gate Rules
 1. ALWAYS run quality gate check (`research validate <phase>`) before moving to next phase

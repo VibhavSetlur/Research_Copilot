@@ -158,3 +158,104 @@ Before executing any task:
 2. Load ONLY skills directly relevant to the current step
 3. If unsure which skill applies, match by keyword
 4. Never load more than 4 skills simultaneously unless explicitly required
+
+## 17. Context Transfer Memorandum (CTM) Protocol
+
+When the token budget reaches 90%, the system automatically generates a Context Transfer Memorandum (CTM) to preserve latent context that cannot be transferred via structured state alone.
+
+### CTM Generation (automatic at 90%)
+The CTM captures:
+- **abandoned_paths**: Approaches tried and why they were abandoned
+- **micro_decisions**: Subtle tactical decisions made during analysis
+- **immediate_goals**: What was being worked on right before the cutoff
+- **partial_results**: Incomplete computations or analyses in progress
+- **open_questions**: Unresolved items the next conversation must address
+
+### CTM Reading (when starting a new conversation after split)
+1. Read the latest CTM from `.research/cache/context_transfer_memos/`
+2. Read `.research/cache/state.json` for structured state
+3. Load the latest checkpoint from `.research/cache/checkpoints/`
+4. Follow the `immediate_goals` from the CTM
+5. Check `open_questions` for unresolved items
+6. Review `abandoned_paths` to avoid repeating failed approaches
+
+### CTM Location
+- Individual CTMs: `.research/cache/context_transfer_memos/ctm_<timestamp>.json`
+- CTM history in state: `state.json > context_transfer_memos[]`
+- Latest CTM: `state.json > context_transfer_memos[-1]`
+
+## 18. Script Branching Nomenclature
+
+Scripts are numbered in execution order (01_, 02_, 03_) but iterations create branches.
+
+### Naming Convention
+- **Base script**: `scripts/02_analysis.py` (original, no iteration)
+- **Iteration branch**: `scripts/02_analysis_ITER001.py` (first iteration)
+- **Second iteration**: `scripts/02_analysis_ITER002.py` (second iteration)
+- **Pattern**: `<base_name>_ITER<iteration_id>.py`
+
+### Rules
+1. **NEVER overwrite** a script that produced results referenced in reports
+2. **ALWAYS create a new branch** for method_switch or variable_change iterations
+3. **Suffix format**: `_ITER<3-digit-id>` (e.g., `_ITER001`, `_ITER002`)
+4. **Execution DAG**: Every script run is tracked in `.research/cache/execution_dag.json`
+5. **Data lineage**: Input/output hashes are recorded per node in the DAG
+6. **Reproducibility**: Use `dag_manager.py` to verify outputs can be reproduced from inputs
+
+### DAG Management
+```python
+from dag_manager import ExecutionDAGManager
+dag = ExecutionDAGManager()
+dag.add_node("02_analysis_ITER001_01", "scripts/02_analysis_ITER001.py",
+             input_files=["data/01_ingested/clean.csv"],
+             output_files=["data/02_processed/analysis.csv"],
+             depends_on=["01_data_prep_01"],
+             iteration_id="001")
+```
+
+### When to Branch vs. When to Create New
+| Action | Script naming |
+|--------|--------------|
+| Original analysis | `02_analysis.py` |
+| method_switch iteration | `02_analysis_ITER001.py` |
+| variable_change iteration | `02_analysis_ITER002.py` |
+| robustness check | `02_analysis_ITER003.py` |
+| New question | New base: `03_new_analysis.py` |
+
+## 19. Data Scale Constraints
+
+The system automatically scans input data files and enforces library constraints based on file size to prevent Out-Of-Memory (OOM) errors.
+
+### Size Classifications
+| Class | Size | Required Library |
+|-------|------|-----------------|
+| small | <100MB | pandas OK |
+| medium | 100MB-1GB | polars recommended |
+| large | 1GB-10GB | polars lazy frames REQUIRED |
+| massive | >10GB | pyarrow + chunked REQUIRED |
+
+### Enforcement Rules
+1. **Check data scale profile** before writing any data loading code: `state["data_scale_profile"]`
+2. **For large/massive files**: NEVER use `pd.read_csv()` or `pl.read_*()` (eager loading)
+3. **For large files (1-10GB)**: MUST use `pl.scan_*()` (lazy frames). Call `.collect()` only after ALL transformations.
+4. **For massive files (>10GB)**: MUST use `pyarrow.dataset` with chunked processing or `pl.scan_*().collect(streaming=True)`
+5. **Constraint message**: If large files exist, `state["data_processing_constraint"]` contains the enforcement message
+
+### Code Templates
+Use `data_scale_detector.py` for code templates:
+```bash
+python .research/scripts/utils/data_scale_detector.py
+```
+
+### Detection Utility
+```python
+from data_scale_detector import DataScaleDetector
+detector = DataScaleDetector()
+profile = detector.scan()
+constraint = detector.get_constraint_message()
+```
+
+### Profile Location
+- Runtime: `state.json > data_scale_profile`
+- Cached: `.research/cache/data_scale_profile.json`
+- Thresholds: `.research/config.yaml > data_scale_thresholds`

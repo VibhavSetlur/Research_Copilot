@@ -72,6 +72,8 @@ The SYSTEM triggers iteration when:
 - Read `reports/baseline/research_map.json` — understand questions, data, variables
 - Read relevant analysis results in `reports/analysis/`
 - Read schema cache from `.research/cache/schema_cache.json` — know exact column names and types
+- **Read latest CTM** from `.research/cache/context_transfer_memos/` (if exists) — understand abandoned paths and micro-decisions
+- **Read execution DAG** from `.research/cache/execution_dag.json` — understand script lineage and dependencies
 
 ### Step 2: Understand the Request
 Classify the iteration type:
@@ -126,6 +128,20 @@ If the iteration needs new directories, create them:
 - New decision doc: `docs/decisions/decision_XXX_[topic].md`
 - Dead end (if applicable): `docs/dead_ends/dead_end_XXX_[approach].md`
 
+**Script Branching (for method_switch, variable_change, robustness, optimize types):**
+- Identify the base script being modified (e.g., `02_analysis.py`)
+- Create a NEW branched script: `scripts/<base_name>_ITER<XXX>.py`
+- Example: `02_analysis_ITER001.py` for iteration 001
+- NEVER overwrite the original script — it may be referenced by prior reports
+- Register the new script in the execution DAG:
+  ```python
+  from dag_manager import ExecutionDAGManager
+  dag = ExecutionDAGManager()
+  dag.add_node("02_analysis_ITER001_01", "scripts/02_analysis_ITER001.py",
+               input_files=[...], output_files=[...],
+               depends_on=[...], iteration_id="001")
+  ```
+
 ALWAYS update README.md in any directory you create or modify:
 - Add new files to the index
 - Update "Last updated" date
@@ -134,9 +150,11 @@ ALWAYS update README.md in any directory you create or modify:
 ### Step 7: Run the Analysis
 Execute the iteration:
 - Load appropriate data
+- **Check data scale profile** (`state["data_scale_profile"]`) — use polars lazy frames for files >= 1GB
 - Run the analysis (method, variables, checks as needed)
 - Generate results, figures, tables as appropriate
 - Compare to previous iterations if applicable
+- Register script execution in the DAG (see Step 6)
 
 ### Step 8: Document the Iteration
 Write `docs/iterations/iteration_XXX_[type].md`:
@@ -280,6 +298,10 @@ Summarize:
 11. **Number iterations sequentially** — 001, 002, 003, etc.
 12. **Classify the iteration type** — use the standard types for consistency
 13. **For validate type: fix ALL failures in the remediation brief** — don't skip any
+14. **NEVER overwrite scripts** — always create branched scripts with `_ITER<XXX>` suffix
+15. **Register all script runs in the execution DAG** — use dag_manager.py
+16. **Check data scale before loading data** — use polars lazy for files >= 1GB
+17. **Read CTM before starting** — understand abandoned paths and micro-decisions from prior conversations
 
 ---
 
@@ -287,8 +309,13 @@ Summarize:
 
 - [ ] Dead ends read and checked before choosing approach
 - [ ] Current state read (manifest, log, registry, research map, schema cache)
+- [ ] Latest CTM read (if exists) — abandoned paths and micro-decisions understood
+- [ ] Execution DAG read — script lineage and dependencies understood
 - [ ] Iteration type classified
 - [ ] New iteration number assigned
+- [ ] Script branched correctly (NEVER overwrite) — `_ITER<XXX>` suffix applied
+- [ ] Script execution registered in DAG via dag_manager.py
+- [ ] Data scale checked — polars lazy used for files >= 1GB
 - [ ] Analysis executed (or fixes applied for validate type)
 - [ ] Iteration document written with dead ends checked section
 - [ ] Registry updated

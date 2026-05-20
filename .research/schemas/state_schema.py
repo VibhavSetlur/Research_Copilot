@@ -21,6 +21,81 @@ class TokenBudget(BaseModel):
         return v
 
 
+class ContextTransferMemo(BaseModel):
+    """Context Transfer Memorandum — generated at 90% token budget to preserve
+    latent context that cannot be transferred via structured state alone.
+
+    Captures abandoned paths, micro-decisions, and immediate tactical goals
+    so a new conversation can resume with full situational awareness.
+    """
+
+    ctm_id: str = Field(..., description="Unique ID for this CTM (format: ctm_<timestamp>)")
+    phase: str = Field(..., description="Pipeline phase when CTM was generated")
+    token_usage_pct: float = Field(..., ge=0.9, le=1.0, description="Token budget percentage at generation (>=0.9)")
+    generated_at: str = Field(..., description="ISO 8601 timestamp of generation")
+
+    abandoned_paths: List[Dict[str, str]] = Field(
+        default=[],
+        description="Paths/approaches abandoned during this conversation with reasons"
+    )
+    micro_decisions: List[Dict[str, str]] = Field(
+        default=[],
+        description="Micro-decisions made during analysis (what, why, alternatives considered)"
+    )
+    immediate_goals: List[str] = Field(
+        default=[],
+        description="Immediate tactical goals right before the cutoff"
+    )
+    partial_results: List[Dict[str, str]] = Field(
+        default=[],
+        description="Incomplete results or computations in progress"
+    )
+    open_questions: List[str] = Field(
+        default=[],
+        description="Unresolved questions the next conversation should address"
+    )
+    state_file_refs: List[str] = Field(
+        default=[],
+        description="Paths to relevant state files, checkpoints, and outputs"
+    )
+    handoff_notes: str = Field(
+        default="",
+        description="Free-form notes for the next conversation to understand context"
+    )
+
+
+class DAGNode(BaseModel):
+    """A single node in the execution DAG representing a script run."""
+
+    node_id: str = Field(..., description="Unique node ID (format: <script_name>_<iteration_id>_<run_index>)")
+    script_path: str = Field(..., description="Path to the script that was executed")
+    iteration_id: Optional[str] = Field(default=None, description="Iteration ID if this was part of an iteration (e.g., 001, 002)")
+    depends_on: List[str] = Field(default=[], description="List of node_ids this execution depends on")
+    input_files: List[str] = Field(default=[], description="Input data files consumed by this script")
+    output_files: List[str] = Field(default=[], description="Output files produced by this script")
+    status: str = Field(default="pending", description="Execution status: pending, running, complete, failed")
+    timestamp: str = Field(..., description="ISO 8601 timestamp of execution")
+    data_hash_in: Dict[str, str] = Field(default={}, description="SHA-256 hashes of input files at execution time")
+    data_hash_out: Dict[str, str] = Field(default={}, description="SHA-256 hashes of output files at execution time")
+
+
+class ExecutionDAG(BaseModel):
+    """Directed Acyclic Graph tracking script execution lineage across iterations.
+
+    Maintains a complete record of which scripts ran, in what order, what data
+    they consumed/produced, and how iterations branch from prior executions.
+    """
+
+    schema_version: str = Field(default="7.0.0", description="Schema version")
+    project: str = Field(default="", description="Project title")
+    nodes: Dict[str, DAGNode] = Field(default={}, description="All execution nodes keyed by node_id")
+    edges: List[Dict[str, str]] = Field(
+        default=[],
+        description="Directed edges: [{from: node_id, to: node_id}]"
+    )
+    last_updated: str = Field(..., description="ISO 8601 timestamp of last update")
+
+
 class ResearchState(BaseModel):
     """Global research state ledger — single source of truth."""
 
@@ -38,3 +113,12 @@ class ResearchState(BaseModel):
     last_checkpoint: str = Field(..., description="ISO 8601 timestamp of last checkpoint")
     errors: List[str] = Field(default=[], description="List of error messages")
     resumable_from: Optional[str] = Field(default=None, description="Phase:step to resume from")
+    context_transfer_memos: List[ContextTransferMemo] = Field(
+        default=[], description="History of CTMs generated at token budget thresholds"
+    )
+    execution_dag_path: Optional[str] = Field(
+        default=None, description="Path to the execution DAG JSON file"
+    )
+    data_scale_profile: Optional[Dict[str, str]] = Field(
+        default=None, description="Data scale profile: {file_path: 'small'|'medium'|'large'|'massive'}"
+    )

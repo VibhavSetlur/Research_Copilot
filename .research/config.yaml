@@ -93,3 +93,9 @@ state_ledger: ".research/cache/state.json"
 checkpoint_dir: ".research/cache/checkpoints"
 core_dir: ".research/core"
 token_budget_limit: 200000
+
+# Data scale thresholds (file size classification for library selection)
+data_scale_thresholds:
+  medium_mb: 100      # Files >= 100MB: polars recommended
+  large_gb: 1         # Files >= 1GB: polars lazy frames REQUIRED
+  massive_gb: 10      # Files >= 10GB: pyarrow + chunked processing REQUIRED

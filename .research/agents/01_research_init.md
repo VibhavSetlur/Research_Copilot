@@ -49,6 +49,7 @@ If intake is empty or has no questions: generate follow-up questions and stop. D
 
 ### Step 3: Scan Inputs
 - **Data**: profile every file in `inputs/data/raw/` using `profile_tabular`, `classify_domain`, `detect_missingness`, `detect_outliers`
+- **Data Scale**: run `data_scale_detector.py` to classify files by size and set library constraints
 - **Context**: read all files in `inputs/context/` (abstracts, notes, links)
 - **Papers**: count PDFs in `inputs/papers/`
 - **Hashes**: run `compute_hashes` on all data files

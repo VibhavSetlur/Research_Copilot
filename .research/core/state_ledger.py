@@ -75,6 +75,9 @@ class ResearchLedger:
             "resumable_from": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
+            "context_transfer_memos": [],
+            "execution_dag_path": None,
+            "data_scale_profile": None,
         }
 
     def _run_pre_commit_hooks(self, state: dict, action: str, **kwargs) -> dict:
@@ -180,6 +183,210 @@ class ResearchLedger:
             state["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save(state)
         return state
+
+    def save_ctm(self, ctm_data: dict) -> dict:
+        """Save a Context Transfer Memorandum to state and write to disk.
+
+        CTMs are generated at 90% token budget to preserve latent context
+        that cannot be transferred via structured state alone.
+
+        Args:
+            ctm_data: Dict with keys: phase, token_usage_pct, abandoned_paths,
+                      micro_decisions, immediate_goals, partial_results,
+                      open_questions, state_file_refs, handoff_notes
+
+        Returns:
+            Updated state dict
+        """
+        state = self._load()
+        now = datetime.now(timezone.utc)
+
+        ctm = {
+            "ctm_id": f"ctm_{now.strftime('%Y%m%d_%H%M%S')}",
+            "phase": ctm_data.get("phase", state.get("phase", "unknown")),
+            "token_usage_pct": ctm_data.get("token_usage_pct", 0.9),
+            "generated_at": now.isoformat(),
+            "abandoned_paths": ctm_data.get("abandoned_paths", []),
+            "micro_decisions": ctm_data.get("micro_decisions", []),
+            "immediate_goals": ctm_data.get("immediate_goals", []),
+            "partial_results": ctm_data.get("partial_results", []),
+            "open_questions": ctm_data.get("open_questions", []),
+            "state_file_refs": ctm_data.get("state_file_refs", []),
+            "handoff_notes": ctm_data.get("handoff_notes", ""),
+        }
+
+        state.setdefault("context_transfer_memos", []).append(ctm)
+        state["updated_at"] = now.isoformat()
+        self._save(state)
+
+        ctm_dir = self._path.parent / "context_transfer_memos"
+        ctm_dir.mkdir(parents=True, exist_ok=True)
+        ctm_path = ctm_dir / f"{ctm['ctm_id']}.json"
+        self._save_to_path(ctm_path, ctm)
+
+        return state
+
+    def get_latest_ctm(self) -> Optional[dict]:
+        """Retrieve the most recent Context Transfer Memorandum."""
+        state = self._load()
+        memos = state.get("context_transfer_memos", [])
+        if memos:
+            return memos[-1]
+        return None
+
+    def get_all_ctms(self) -> list:
+        """Retrieve all Context Transfer Memoranda."""
+        state = self._load()
+        return state.get("context_transfer_memos", [])
+
+    def get_dag_path(self) -> Path:
+        """Get or create the execution DAG file path."""
+        state = self._load()
+        dag_path_str = state.get("execution_dag_path")
+        if dag_path_str:
+            return Path(dag_path_str)
+
+        dag_path = self._path.parent / "execution_dag.json"
+        state["execution_dag_path"] = str(dag_path)
+        self._save(state)
+
+        if not dag_path.exists():
+            self._init_dag(dag_path)
+
+        return dag_path
+
+    def _init_dag(self, dag_path: Path) -> None:
+        """Initialize a new execution DAG file."""
+        state = self._load()
+        dag = {
+            "schema_version": "7.0.0",
+            "project": state.get("project", ""),
+            "nodes": {},
+            "edges": [],
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        }
+        self._save_to_path(dag_path, dag)
+
+    def _save_to_path(self, path: Path, data: dict) -> None:
+        """Save data to a specific path atomically."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2, default=str)
+            os.replace(tmp_path, str(path))
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+    def add_dag_node(self, node_id: str, script_path: str, input_files: list,
+                     output_files: list, depends_on: list = None,
+                     iteration_id: str = None, status: str = "complete") -> dict:
+        """Add a node to the execution DAG.
+
+        Args:
+            node_id: Unique node ID (format: <script_name>_<iteration_id>_<run_index>)
+            script_path: Path to the executed script
+            input_files: List of input data files consumed
+            output_files: List of output files produced
+            depends_on: List of node_ids this execution depends on
+            iteration_id: Iteration ID if part of an iteration
+            status: Execution status (pending, running, complete, failed)
+
+        Returns:
+            Updated state dict
+        """
+        dag_path = self.get_dag_path()
+
+        if not dag_path.exists():
+            self._init_dag(dag_path)
+
+        with open(dag_path) as f:
+            dag = json.load(f)
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        input_hashes = {}
+        for fp in input_files:
+            p = Path(fp)
+            if p.exists():
+                input_hashes[fp] = self._compute_file_hash(p)
+
+        node = {
+            "node_id": node_id,
+            "script_path": script_path,
+            "iteration_id": iteration_id,
+            "depends_on": depends_on or [],
+            "input_files": input_files,
+            "output_files": output_files,
+            "status": status,
+            "timestamp": now,
+            "data_hash_in": input_hashes,
+            "data_hash_out": {},
+        }
+
+        dag["nodes"][node_id] = node
+
+        for dep in (depends_on or []):
+            if dep in dag["nodes"]:
+                dag["edges"].append({"from": dep, "to": node_id})
+
+        dag["last_updated"] = now
+        self._save_to_path(dag_path, dag)
+
+        state = self._load()
+        state["execution_dag_path"] = str(dag_path)
+        state["updated_at"] = now
+        self._save(state)
+
+        return state
+
+    def update_dag_node_output_hashes(self, node_id: str) -> dict:
+        """Compute and store SHA-256 hashes for a node's output files."""
+        dag_path = self.get_dag_path()
+        if not dag_path.exists():
+            return self._load()
+
+        with open(dag_path) as f:
+            dag = json.load(f)
+
+        if node_id not in dag["nodes"]:
+            return self._load()
+
+        node = dag["nodes"][node_id]
+        output_hashes = {}
+        for fp in node.get("output_files", []):
+            p = Path(fp)
+            if p.exists():
+                output_hashes[fp] = self._compute_file_hash(p)
+
+        node["data_hash_out"] = output_hashes
+        dag["last_updated"] = datetime.now(timezone.utc).isoformat()
+        self._save_to_path(dag_path, dag)
+
+        return self._load()
+
+    def get_dag(self) -> dict:
+        """Load and return the full execution DAG."""
+        dag_path = self.get_dag_path()
+        if not dag_path.exists():
+            self._init_dag(dag_path)
+        with open(dag_path) as f:
+            return json.load(f)
+
+    @staticmethod
+    def _compute_file_hash(file_path: Path) -> str:
+        """Compute SHA-256 hash of a file."""
+        import hashlib
+        sha256 = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256.update(chunk)
+            return sha256.hexdigest()
+        except (FileNotFoundError, PermissionError):
+            return "error"
 
     def summary(self) -> str:
         state = self._load()

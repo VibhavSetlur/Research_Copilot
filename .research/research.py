@@ -1611,6 +1611,14 @@ def cmd_budget(args):
 
     print()
 
+    ctms = state.get("context_transfer_memos", [])
+    if ctms:
+        print("  Context Transfer Memoranda (CTMs):")
+        for ctm in ctms:
+            print(f"    - {ctm.get('ctm_id', 'unknown')} (phase: {ctm.get('phase', '?')}, "
+                  f"usage: {ctm.get('token_usage_pct', 0)*100:.0f}%)")
+        print()
+
     checkpoints = state.get("checkpoints", {})
     if checkpoints:
         print("  Phase checkpoints:")
@@ -2230,17 +2238,115 @@ def cmd_hooks(args):
         sys.exit(1)
 
     try:
-        sys.path.insert(0, str(root / ".research" / "core"))
         from hooks import hook_engine
         import interceptors  # noqa: F401
     except ImportError:
-        print("ERROR: Hook system not available.")
+        print("ERROR: hooks module not found in .research/core/")
         sys.exit(1)
 
+    hooks = hook_engine.list_hooks()
+    log = hook_engine.get_execution_log()
+
     print("=" * 60)
-    print("HOOK REGISTRY")
+    print("REGISTERED HOOKS")
     print("=" * 60)
-    print()
+    for hook_name, funcs in hooks.items():
+        if funcs:
+            print(f"  {hook_name}:")
+            for fn in funcs:
+                print(f"    - {fn}")
+        else:
+            print(f"  {hook_name}: (none)")
+        print()
+
+    if log:
+        print(f"  Execution log: {len(log)} entries")
+        for entry in log[-10:]:
+            status = "+" if entry["status"] == "success" else "x"
+            print(f"    {status} {entry['hook']} -> {entry['interceptor']} ({entry['timestamp']})")
+        print()
+
+
+def cmd_dag(args):
+    """Show execution DAG summary."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
+        from dag_manager import ExecutionDAGManager
+    except ImportError:
+        print("ERROR: dag_manager module not found in .research/scripts/utils/")
+        sys.exit(1)
+
+    dag = ExecutionDAGManager(root)
+    print(dag.summary())
+
+    dag_path = root / ".research" / "cache" / "execution_dag.json"
+    if dag_path.exists():
+        print(f"  DAG file: {dag_path}")
+        with open(dag_path) as f:
+            data = json.load(f)
+        print(f"  Nodes: {len(data.get('nodes', {}))}")
+        print(f"  Edges: {len(data.get('edges', []))}")
+        print()
+
+
+def cmd_data_scale(args):
+    """Show data scale analysis and library constraints."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
+        from data_scale_detector import DataScaleDetector
+    except ImportError:
+        print("ERROR: data_scale_detector module not found in .research/scripts/utils/")
+        sys.exit(1)
+
+    detector = DataScaleDetector(root)
+    profile = detector.scan()
+
+    print("=" * 60)
+    print("DATA SCALE ANALYSIS")
+    print("=" * 60)
+
+    summary = profile["summary"]
+    print(f"\nTotal files: {summary['total_files']}")
+    print(f"Total size: {summary['total_size_gb']:.2f} GB")
+    print(f"Has large files: {summary['has_large_files']}")
+
+    if summary["by_classification"]:
+        print("\nBy classification:")
+        for cls, count in sorted(summary["by_classification"].items()):
+            print(f"  {cls}: {count} file(s)")
+
+    print("\n" + "-" * 60)
+    print("FILE DETAILS")
+    print("-" * 60)
+
+    for rel_path, info in sorted(profile["files"].items()):
+        marker = "!!!" if info["classification"] in ("large", "massive") else "   "
+        print(f"{marker} {info['file_name']}")
+        print(f"    Size: {info['size_gb']:.2f} GB | Class: {info['classification']}")
+        print(f"    Library: {info['recommended_library']}")
+        print(f"    Read: {info['read_function']}")
+        print()
+
+    constraint = detector.get_constraint_message()
+    if constraint:
+        print("=" * 60)
+        print("CONSTRAINT MESSAGE")
+        print("=" * 60)
+        print(constraint)
+        print()
+
+    output_path = detector.save_profile()
+    print(f"Profile saved to: {output_path}")
 
     hooks = hook_engine.list_hooks()
     for hook_name, interceptors_list in hooks.items():
@@ -2413,6 +2519,9 @@ Examples:
     # Hooks
     sub.add_parser("hooks", help="Show registered hooks and execution log")
 
+    sub.add_parser("dag", help="Show execution DAG summary")
+    sub.add_parser("data-scale", help="Show data scale analysis and library constraints")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -2454,6 +2563,8 @@ Examples:
             "parallel": cmd_parallel,
             "export": cmd_export,
             "hooks": cmd_hooks,
+            "dag": cmd_dag,
+            "data-scale": cmd_data_scale,
         }
         commands[args.command](args)
 
