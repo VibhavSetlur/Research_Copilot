@@ -9,11 +9,13 @@ You are a research assistant using the Research Copilot system.
 - Skills: `.research/skills/`
 - Workflows: `.research/workflows/`
 - Config: `.research/config.yaml`
+- System scripts: `.research/scripts/` and `.research/scripts/utils/`
+- Environment: `environment/` — requirements.txt, setup scripts
 - User data: `inputs/` — user provides, AI never modifies
 - User intake: `inputs/intake.md`
 
 ## Output Structure (created by AI during research_init)
-The template starts with ONLY `.research/` and `inputs/`. The `research_init` agent creates:
+The template starts with ONLY `.research/`, `inputs/`, `environment/`, and `AGENTS.md`. The `research_init` agent creates:
 
 ```
 docs/                    # Research documentation
@@ -38,8 +40,7 @@ data/                    # Processed data pipeline
   01_ingested/           # Cleaned raw data
   02_processed/          # Transformed data
   03_analytical/         # Analysis-ready datasets
-scripts/                 # Reproducible code
-  utils/                 # Shared helpers
+scripts/                 # USER'S analysis scripts (numbered: 01_, 02_, 03_...)
 ```
 
 ## CLI Commands
@@ -66,8 +67,9 @@ Run agents in this order:
 3. `method_route` — select analysis methods
 4. `data_scaffold` — build validated data pipeline
 5. `execute_analysis` — run analysis, compare to literature
-6. `compile_outputs` — assemble manuscript
-7. `audit_validate` — multi-dimensional audit
+6. `replication_validator` — replicate similar studies from literature on project data
+7. `compile_outputs` — assemble manuscript
+8. `audit_validate` — multi-dimensional audit
 
 ## Research Iteration
 At ANY point, the user can request iteration. Use `research_iterate` agent:
@@ -93,9 +95,10 @@ Each iteration:
 4. `docs/manifest.json` tracks the entire structure — update it when creating/modifying dirs
 5. Never delete previous iterations, decisions, or dead ends
 6. Research log is append-only
-7. Scripts are numbered in execution order (01_, 02_, 03_...)
+7. Scripts are numbered in execution order (01_, 02_, 03_...) in `scripts/`
 8. Data pipeline stages are numbered (01_ingested, 02_processed, 03_analytical)
 9. Figures/tables are numbered and organized by question (q1/, q2/, etc.)
+10. System scripts are in `.research/scripts/` — do NOT modify these
 
 ## Rules
 1. Read agent instructions with `research agent <name>` before executing
@@ -112,13 +115,13 @@ Each iteration:
 12. Dead ends are valuable — document them in docs/dead_ends/
 
 ## Reproducibility Rules
-1. ALWAYS install dependencies from `requirements.txt` before running any code
-2. ALWAYS run `scripts/00_environment_check.py` to verify environment
+1. ALWAYS check environment is active before running any code
+2. ALWAYS run `.research/scripts/00_environment_check.py` to verify environment
 3. ALWAYS record data lineage in `docs/data_lineage.json` after every transformation
 4. ALWAYS compute SHA-256 hashes for raw data files
 5. NEVER modify raw data files — only create new processed versions
-6. ALWAYS pin package versions in requirements.txt
-7. Scripts MUST be numbered in execution order (01_, 02_, 03_...)
+6. ALWAYS pin package versions in `environment/requirements.txt`
+7. Scripts MUST be numbered in execution order (01_, 02_, 03_...) in `scripts/`
 8. Data pipeline MUST be reproducible: raw data + scripts = analytical data
 
 ## Quality Gate Rules
@@ -143,9 +146,10 @@ Each iteration:
 12. ALWAYS apply theme module (viz_theme.py) — no manual styling
 
 ## First Steps
-1. Run `research scan`
-2. Run `research status`
-3. Read `inputs/intake.md`
-4. Read `research agent research_init`
-5. Execute the research_init protocol (this creates the full directory structure)
-6. Continue through the pipeline, using `research_iterate` when the user wants to explore
+1. Run `research setup` — verify all system files are in place
+2. Run `research scan` — scan inputs, build research map
+3. Run `research status` — check project state
+4. Read `inputs/intake.md`
+5. Read `research agent research_init`
+6. Execute the research_init protocol (this creates the full directory structure)
+7. Continue through the pipeline, using `research_iterate` when the user wants to explore

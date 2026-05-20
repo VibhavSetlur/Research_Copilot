@@ -1,3 +1,8 @@
+# Research Copilot — Git Ignore Rules
+# Pattern: ignore generated outputs, commit all system files
+
+TODO.md
+
 # Python
 __pycache__/
 *.pyc
@@ -11,22 +16,41 @@ build/
 .venv/
 venv/
 env/
+environment/venv/
 
 # Generated outputs (AI-created during research)
 /reports/
 /data/
 /docs/
 
-# Generated scripts (numbered analysis scripts created by AI)
+# User's analysis scripts (numbered, created by AI during pipeline)
 /scripts/01_*.py
 /scripts/02_*.py
 /scripts/03_*.py
 /scripts/04_*.py
 /scripts/05_*.py
-/scripts/utils/*.py
+/scripts/06_*.py
+/scripts/07_*.py
+/scripts/08_*.py
+/scripts/09_*.py
+/scripts/10_*.py
 
-# CLI cache (inside .research/, safe to ignore)
-.research/cache/
+# Task logs (temporary)
+task_*.log
+*.log
+
+# Scratch directory (temporary work)
+scratch/
+
+# CLI cache (inside .research/, runtime data)
+.research/cache/research_cache.db
+.research/cache/research_map.json
+.research/cache/schema_cache.json
+.research/cache/skill_index.json
+.research/cache/state.json
+.research/cache/pending_approval.json
+.research/cache/approval_response.json
+.research/cache/checkpoints/
 .research/state/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid

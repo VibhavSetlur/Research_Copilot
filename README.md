@@ -1,70 +1,78 @@
 # Research Copilot
 
-AI-driven research assistant. Drop data in `inputs/`, fill out one intake file, and let an AI agent run the full research pipeline — with full iteration support.
+A self-healing, citation-verified, multi-modal research engine that any LLM can operate — from raw data to publication-ready paper.
 
-## Setup (30 seconds)
+---
+
+## Setup (Copy to Your Project)
+
+This is a **template repository**. Do not clone it directly as your project. Instead:
 
 ```bash
-# 1. Clone this template
+# 1. Clone the template temporarily
 git clone https://github.com/your-org/research-copilot-template.git _tmp
+cd _tmp
 
-# 2. Copy the system into your project folder
-cp -r _tmp/.research ./
-cp -r _tmp/inputs ./
-cp _tmp/AGENTS.md ./
+# 2. Copy ONLY the required files to your project folder
+cp -r .research ../your-project/
+cp -r inputs ../your-project/
+cp -r environment ../your-project/
+cp AGENTS.md ../your-project/
 
-# 3. Delete the template
+# 3. Go to your project and clean up
+cd ../your-project
 rm -rf _tmp
 ```
 
-That's it. Your project now has:
-- `.research/` — all AI instructions, skills, agents, workflows, and the CLI tool
-- `inputs/` — where you put your data and fill out one intake file
-- `AGENTS.md` — tells your AI agent how to work with this system
+Your project now has exactly 4 things:
+- **`.research/`** — the entire system (13 agents, 92 skills, 19 domains, CLI, hooks, scripts)
+- **`inputs/`** — where you put data and fill out one intake file
+- **`environment/`** — reproducible dependencies (requirements.txt, setup scripts)
+- **`AGENTS.md`** — tells your AI agent how to work with this system
+
+You write your own `README.md`, `.gitignore`, and `scripts/` for your research.
+
+---
+
+## Environment Setup
+
+```bash
+# Using venv (recommended)
+bash environment/setup.sh
+source environment/venv/bin/activate
+
+# Using Conda
+bash environment/setup_conda.sh
+conda activate research-copilot
+```
+
+---
 
 ## Using It
 
 ### Step 1: Put your data in `inputs/data/raw/`
 
-Drop any data files here — CSV, Parquet, Excel, SAS, SPSS, Stata, JSON. Any number of files, any state.
+CSV, Parquet, Excel, SAS, SPSS, Stata, JSON — any format, any number of files.
 
-### Step 2: Fill out `inputs/intake.md`
+### Step 2: Fill out `inputs/intake.md` (or `intake.yaml` / `intake.json`)
 
-One file. Everything in one place:
-- **Project info** — title, researcher, institution
-- **Research questions** — as many as you need, each with variables, hypothesis, data prep needed
-- **Data overview** — describe your files, relationships between them, what cleaning is needed
-- **Domain & constraints** — field, target journal, timeline, IRB status
+One file with: project info, research questions, data overview, domain, constraints.
 
 ### Step 3: Open your AI agent and paste the init prompt
-
-Open opencode, Cursor, Claude, or any AI agent in your project folder and paste:
 
 ```
 I'm using the Research Copilot system. Here's how it works:
 
-1. All system files are in .research/ — agents, skills, workflows, and the CLI tool (.research/research.py)
-2. My data and research context are in inputs/ — everything is in inputs/intake.md
-3. The CLI has these commands:
-   - python .research/research.py status       → project state, iterations, next step
-   - python .research/research.py scan         → scan inputs, build research map
-   - python .research/research.py map          → show research map (grounding context)
-   - python .research/research.py intake       → show intake form status
-   - python .research/research.py followups    → questions I need to answer
-   - python .research/research.py iterations   → show iteration history
-   - python .research/research.py skills       → list all skills
-   - python .research/research.py skill <name> → show a skill's methodology
-   - python .research/research.py agents       → list all agents
-   - python .research/research.py agent <name> → show an agent's instructions
-   - python .research/research.py workflow     → show current workflow + iteration support
-
-4. The workflow is: research_init → literature_deep → method_route → data_scaffold → execute_analysis → compile_outputs → audit_validate
-5. At ANY point I can say "research_iterate" to explore, pivot, or investigate results
-6. Skills are in .research/skills/ — read them with `research skill <name>` for methodology
-7. Agents are in .research/agents/ — read them with `research agent <name>` for next steps
-8. Always cite sources for methodological choices
-9. Always compare findings to literature
-10. Always try to disprove your own conclusions
+1. All system files are in .research/ — agents, skills, workflows, CLI tool, scripts
+2. My data and context are in inputs/ — everything is in inputs/intake.md
+3. Environment is in environment/ — requirements.txt, setup scripts
+4. CLI: python .research/research.py status → project state, next step
+5. CLI: python .research/research.py scan → scan inputs, build research map
+6. Workflow: research_init → literature_deep → method_route → data_scaffold → execute_analysis → compile_outputs → audit_validate
+7. At ANY point I can say "research_iterate" to explore, pivot, or investigate
+8. Skills are in .research/skills/ — read with `research skill <name>`
+9. Agents are in .research/agents/ — read with `research agent <name>`
+10. Always cite sources, compare to literature, try to disprove conclusions
 
 Start by running:
   python .research/research.py scan
@@ -75,75 +83,186 @@ Then read the intake and begin:
 
 ### Step 4: The AI creates your project structure
 
-The `research_init` agent will:
-- Parse your intake and scan your data
-- Create the FULL directory structure (docs/, reports/, data/, scripts/)
-- Write README.md in every directory with project-specific info
-- Build the research map and assess feasibility
-- Create the documentation system (research log, methodology, changelog, manifest)
+The `research_init` agent creates `docs/`, `reports/`, `data/`, `scripts/` with README.md in every directory.
 
-### Step 5: Work with the AI through the pipeline
+### Step 5: Work through the pipeline
 
-The AI proceeds through the workflow. At each step, you can:
-- Ask about results: "What did you find?"
-- Request iteration: "Why did we get this result?"
-- Change methods: "Try a different approach"
-- Add variables: "What if we control for X?"
-- Check robustness: "Does this hold up?"
-- Compare to literature: "How does this compare to prior work?"
+At each approval gate, review results:
+```bash
+python .research/research.py approve method_route    # Continue
+python .research/research.py reject method_route --reason "Need more controls"  # Send back
+```
 
-Every iteration is documented. Nothing is ever deleted. You get a complete research trail.
+Or launch the Panel dashboard:
+```bash
+python .research/research.py dashboard
+```
 
 ### Step 6: When done, you have everything for your paper
 
 - `docs/` — full research log, methodology, decisions, dead ends
-- `reports/` — all analysis results, figures, tables, manuscript drafts
+- `reports/` — analysis results, figures, tables, manuscript drafts
 - `data/` — processed data pipeline (ingested → processed → analytical)
-- `scripts/` — reproducible code for everything
-- `reports/summary/` — key findings and executive summary
+- `scripts/` — your reproducible analysis code (numbered: 01_, 02_, 03_...)
+
+---
 
 ## Project Structure
 
 ```
 your-project/
-├── .research/              # AI system (don't edit)
-│   ├── research.py         # CLI tool (11 commands)
-│   ├── agents/             # 9 agent instructions (incl. research_iterate)
-│   ├── skills/             # 57 methodology skills
-│   ├── workflows/          # 5 workflow templates (all with iteration support)
-│   ├── domains/            # 9 domain profiles
-│   └── config.yaml         # configuration
-├── inputs/                 # User-provided (AI never modifies)
-│   ├── data/raw/           # Drop all data files here
-│   ├── context/            # Optional: abstracts, notes, links
-│   ├── papers/             # Optional: PDFs
-│   └── intake.md           # Everything in one file
-├── docs/                   # Created by AI — research documentation
-│   ├── research_log.md     # Chronological log of ALL decisions
-│   ├── methodology.md      # Methods used and WHY
-│   ├── changelog.md        # What changed between iterations
-│   ├── manifest.json       # Machine-readable directory registry
-│   ├── iterations/         # Each research iteration documented
-│   ├── decisions/          # Key methodological decisions
-│   └── dead_ends/          # Approaches tried and abandoned
-├── reports/                # Created by AI — analysis outputs
-│   ├── baseline/           # Initial research map, follow-ups
-│   ├── literature/         # Literature corpus, evidence matrix
-│   ├── analysis/           # Results by question (q1/, q2/, etc.)
-│   ├── figures/            # Generated plots
-│   ├── tables/             # Generated tables
-│   ├── dashboards/         # Interactive summaries
-│   ├── manuscript/         # Draft paper sections
-│   ├── audit/              # Audit reports
-│   └── summary/            # Key findings, executive summary
-├── data/                   # Created by AI — processed data
-│   ├── 01_ingested/        # Cleaned raw data
-│   ├── 02_processed/       # Transformed data
-│   └── 03_analytical/      # Analysis-ready datasets
-├── scripts/                # Created by AI — reproducible code
-│   └── utils/              # Shared helpers
-└── AGENTS.md               # AI agent instructions
+├── .research/                  # AI system (don't edit)
+│   ├── research.py             # CLI tool (24 commands)
+│   ├── agents/                 # 13 agent instructions
+│   ├── skills/                 # 92 methodology skills
+│   ├── workflows/              # 5 workflow templates
+│   ├── domains/                # 19 domain profiles
+│   ├── core/                   # Hook system, state ledger, checkpoints
+│   ├── schemas/                # Pydantic models for validation
+│   ├── scripts/                # System scripts
+│   │   ├── 00_environment_check.py
+│   │   ├── research_dashboard.py
+│   │   └── utils/              # Core utilities (citation verifier, claim tracer, etc.)
+│   └── config.yaml
+├── inputs/                     # User-provided (AI never modifies)
+│   ├── data/raw/               # Drop all data files here
+│   ├── context/                # Optional: abstracts, notes, links
+│   ├── papers/                 # Optional: PDFs
+│   ├── intake.md               # Primary intake form
+│   ├── intake.yaml             # Alternative YAML intake
+│   └── intake.json             # Alternative JSON intake
+├── environment/                # Reproducible dependencies
+│   ├── requirements.txt        # Pinned Python dependencies
+│   ├── setup.sh                # venv setup script
+│   └── setup_conda.sh          # Conda setup script
+├── scripts/                    # Created by AI — YOUR analysis code
+│   ├── 01_data_prep.py         # Numbered in execution order
+│   ├── 02_analysis.py
+│   ├── 03_figures.py
+│   └── ...
+├── docs/                       # Created by AI — research documentation
+├── reports/                    # Created by AI — analysis outputs
+├── data/                       # Created by AI — processed data pipeline
+└── AGENTS.md                   # AI agent instructions
 ```
+
+---
+
+## CLI Commands
+
+### Core Commands
+
+| Command | Purpose |
+|---------|---------|
+| `research scan` | Scan inputs/, build research map |
+| `research status` | Project state, pipeline progress, next step |
+| `research map` | Show research map (grounding context) |
+| `research intake` | Show intake form status |
+| `research followups` | Questions the user needs to answer |
+| `research iterations` | Show iteration history |
+
+### System Commands
+
+| Command | Purpose |
+|---------|---------|
+| `research state` | Print current state.json ledger |
+| `research resume --from <phase>` | Resume from checkpoint |
+| `research budget` | Show token budget usage by phase |
+| `research validate [phase]` | Run quality gate check |
+| `research hooks` | Show registered hooks and execution log |
+
+### Approval Gates
+
+| Command | Purpose |
+|---------|---------|
+| `research approve <phase>` | Approve a pending phase gate |
+| `research reject <phase> --reason "..."` | Reject with feedback |
+| `research dashboard` | Launch Panel dashboard (localhost:5006) |
+
+### Analysis Commands
+
+| Command | Purpose |
+|---------|---------|
+| `research verify-citations` | Run three-pass citation verification |
+| `research trace-claims` | Run claim-to-evidence graph builder |
+| `research parallel --questions q1,q2,q3` | Run questions in parallel |
+| `research debug <script>` | Auto-debug a failing script |
+
+### Cache Management
+
+| Command | Purpose |
+|---------|---------|
+| `research cache stats` | Show cache hit rates, size, table counts |
+| `research cache clear --older-than 7d` | Prune old cache entries |
+
+### Export Commands
+
+| Command | Purpose |
+|---------|---------|
+| `research export --format latex` | Export manuscript to LaTeX |
+| `research export --format pdf` | Export manuscript to PDF |
+| `research export --format journal --journal nature` | Format for specific journal |
+
+### Reference Commands
+
+| Command | Purpose |
+|---------|---------|
+| `research skills` | List all 92 skills by category |
+| `research skill <name>` | Show a specific skill's methodology |
+| `research skill-search "time series"` | Search skills by keyword |
+| `research agents` | List all 13 agents |
+| `research agent <name>` | Show an agent's full instructions |
+| `research workflow` | Show current workflow + iteration support |
+
+---
+
+## Architecture
+
+### Lifecycle Hook System
+
+The hook system intercepts pipeline execution at 5 stages, enabling any AI agent to use caching, validation, approval gates, and auto-debugging without async infrastructure.
+
+```
+User/Agent → research.py
+    │
+    ├── pre_routing ─────→ Skill router (loads only relevant skills)
+    │                        Token budget throttle
+    │                        Cache lookup (skip redundant computation)
+    │
+    ├── pre_execution ───→ Token budget management
+    │                        Cache hit/miss checking
+    │
+    ├── post_execution ──→ Code syntax validation (AST parse)
+    │                        Critic agent trigger
+    │
+    ├── pre_ledger_commit → Pydantic schema validation
+    │                        Approval gate (blocks until human approves)
+    │
+    └── on_failure ──────→ State freeze + error logging
+                             Recovery point for resume
+```
+
+### Schema Enforcement
+
+Every agent output validates against Pydantic schemas before being accepted. Schemas in `.research/schemas/`.
+
+### Citation Verification (Anti-Hallucination)
+
+Three-pass verification: existence (CrossRef/arXiv/PubMed), content (Semantic Scholar), retraction (Retraction Watch).
+
+Run: `research verify-citations`
+
+### Claim Tracer
+
+Builds a claim-to-evidence graph for the entire manuscript.
+
+Run: `research trace-claims`
+
+### Context7 Integration
+
+Before writing any code using a library, agents MUST verify API signatures via Context7. Mandatory for: scipy, statsmodels, pandas, sklearn, lifelines, pymc, networkx, geopandas, altair, bokeh, panel, holoviews, dash, plotly.
+
+---
 
 ## Workflows
 
@@ -157,9 +276,37 @@ your-project/
 
 Change workflow in `.research/config.yaml`: `default_workflow: full_publication`
 
-## Iteration Types
+---
 
-The `research_iterate` agent supports these iteration types:
+## Domains
+
+19 domain profiles with reporting standards, effect size benchmarks, confounders, and preferred methods:
+
+| Domain | Reporting Standard | Effect Size |
+|--------|-------------------|-------------|
+| Psychology & Social Sciences | APA 7th | Cohen's d |
+| Epidemiology | STROBE | Risk ratio / OR |
+| Econometrics | AEA | AME / IV |
+| Finance | Journal of Finance | Alpha / Beta |
+| Education | APA | Cohen's d / Hedges' g |
+| Genomics | Nature Genetics | log2FC |
+| NLP/Computational | ACL | F1 / BLEU |
+| Ecology | Ecology | Effect ratio |
+| Climate Science | AGU | Anomaly magnitude |
+| Materials Science | ACS | Property change % |
+| Neuroscience | APA + SfN | Cohen's d + BOLD % |
+| Computational Biology | PLOS | log2FC |
+| Political Science | APSR | AME |
+| Anthropology | AAA | Thematic / Cohen's d |
+| Sociology | ASA | Standardized coefficient |
+| Empirical Legal Studies | Bluebook | Odds ratio |
+| Public Policy | Policy brief | Impact magnitude |
+| Bayesian-First (any domain) | HDI not CI | Posterior mean + HDI |
+| Custom template | Configurable | Configurable |
+
+---
+
+## Iteration Types
 
 | Type | User says | What happens |
 |------|-----------|--------------|
@@ -173,3 +320,79 @@ The `research_iterate` agent supports these iteration types:
 | `validate` | "Double-check this" | Replicate with different approach |
 
 Each iteration gets a unique ID, is fully documented, and never deleted.
+
+---
+
+## Key Features
+
+### Anti-Hallucination Rules (Non-Negotiable)
+
+1. Never invent a citation. If you cannot find a real DOI, write `[CITATION NEEDED]`.
+2. Never invent a p-value, effect size, or sample size. Compute or mark `[COMPUTED NEEDED]`.
+3. Never assume a file exists without checking via `Path.exists()`.
+4. Never assume a variable name exists in data without checking `schema_cache.json`.
+5. If unsure about a library API, invoke Context7 before writing code.
+6. If a number in your output cannot be traced to a file, flag it.
+7. When uncertain: understate, not overstate. Use "may" not "demonstrates".
+
+### Auto-Healing Audit
+
+The `audit_validate` agent runs 8 audits with auto-healing (up to 3 attempts):
+
+| Audit | What It Checks | Auto-Healing |
+|-------|---------------|--------------|
+| Reproducibility | Scripts reproduce results | Fix imports, paths, re-run |
+| Statistical Reporting | Every test has stat, df, p, effect size, CI | Re-compute missing values |
+| Causal Language | Claims match study design | Fix language, add limitations |
+| Figure Completeness | All referenced figures exist | Generate missing figures |
+| Code Quality | Style, error handling, no hardcoded paths | Fix code issues |
+| Citation Verification | Three-pass: existence, content, retraction | Find correct DOI, remove retractions |
+| Claim Tracing | Every claim traced to data or citation | Find traces or remove claims |
+| Visualization Standards | DPI, colorblind safety, axis labels | Re-render with correct parameters |
+
+### Token Budget Management
+
+| Threshold | Action |
+|-----------|--------|
+| 60% | Summarize completed phases into 3-sentence abstracts |
+| 80% | Flush non-essential skill docs, keep only active skill |
+| 90% | Force checkpoint, split into new conversation with state transfer |
+
+Check: `research budget`
+
+---
+
+## Reproducibility Rules
+
+1. ALWAYS install dependencies from `environment/requirements.txt` before running any code
+2. ALWAYS run `.research/scripts/00_environment_check.py` to verify environment
+3. ALWAYS record data lineage in `docs/data_lineage.json` after every transformation
+4. ALWAYS compute SHA-256 hashes for raw data files
+5. NEVER modify raw data files — only create new processed versions
+6. ALWAYS pin package versions in `environment/requirements.txt`
+7. Scripts MUST be numbered in execution order (01_, 02_, 03_...) in `scripts/`
+8. Data pipeline MUST be reproducible: raw data + scripts = analytical data
+
+---
+
+## Requirements
+
+See `environment/requirements.txt` for full list. Key dependencies:
+
+- **Data**: pandas, numpy, scipy, polars, pyarrow
+- **Statistics**: statsmodels, scikit-learn, pingouin
+- **Visualization**: matplotlib, seaborn, plotly, altair, bokeh, panel, holoviews
+- **Literature**: habanero (CrossRef), semanticscholar, metapub (PubMed)
+- **State**: diskcache, SQLAlchemy, pydantic
+- **Export**: pypandoc (LaTeX/PDF)
+
+```bash
+bash environment/setup.sh
+source environment/venv/bin/activate
+```
+
+---
+
+## License
+
+MIT
