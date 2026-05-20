@@ -1,0 +1,274 @@
+{
+  "version": "0.1.0",
+  "generated_by": "research_copilot",
+  "categories": [
+    {
+      "id": "life_sciences",
+      "description": "Genomics, transcriptomics, and related omics workflows",
+      "leaf_nodes": [
+        {
+          "id": "genomics_wgs",
+          "name": "Genomics - WGS",
+          "primary_tools": ["GATK4", "BWA-MEM2"],
+          "workflow_managers": ["nextflow", "snakemake"],
+          "file_formats": ["FASTQ", "FASTQ_GZ", "BAM", "VCF"],
+          "container": "genomics",
+          "reporting_standard": "STREGA",
+          "assumption_checks": ["variant_calling"],
+          "typical_effect_sizes": ["odds_ratio"]
+        },
+        {
+          "id": "transcriptomics_bulk",
+          "name": "Transcriptomics - Bulk RNA-seq",
+          "primary_tools": ["STAR", "Salmon", "DESeq2"],
+          "workflow_managers": ["nextflow", "snakemake"],
+          "file_formats": ["FASTQ", "FASTQ_GZ", "BAM"],
+          "container": "genomics",
+          "reporting_standard": "STREGA",
+          "assumption_checks": ["differential_expression_rna"],
+          "typical_effect_sizes": ["log2_fold_change"]
+        },
+        {
+          "id": "transcriptomics_single_cell",
+          "name": "Transcriptomics - Single Cell",
+          "primary_tools": ["Seurat", "Scanpy"],
+          "workflow_managers": ["nextflow", "snakemake"],
+          "file_formats": ["H5AD", "MTX", "TSV"],
+          "container": "genomics",
+          "reporting_standard": "STREGA",
+          "assumption_checks": ["single_cell_qc"],
+          "typical_effect_sizes": ["log2_fold_change"]
+        },
+        {
+          "id": "proteomics_ms",
+          "name": "Proteomics - Mass Spec",
+          "primary_tools": ["MaxQuant"],
+          "workflow_managers": ["nextflow"],
+          "file_formats": ["RAW", "MGF"],
+          "container": "genomics",
+          "reporting_standard": "MIAPE",
+          "assumption_checks": ["proteomics_qc"],
+          "typical_effect_sizes": ["log2_fold_change"]
+        },
+        {
+          "id": "metagenomics",
+          "name": "Metagenomics",
+          "primary_tools": ["Kraken2"],
+          "workflow_managers": ["nextflow", "snakemake"],
+          "file_formats": ["FASTQ", "FASTQ_GZ"],
+          "container": "genomics",
+          "reporting_standard": "STROBE",
+          "assumption_checks": ["metagenomics_qc"],
+          "typical_effect_sizes": ["relative_abundance"]
+        },
+        {
+          "id": "structural_biology",
+          "name": "Structural Biology",
+          "primary_tools": ["OpenMM", "GROMACS"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["PDB", "CIF"],
+          "container": "materials",
+          "reporting_standard": "PDB",
+          "assumption_checks": ["molecular_dynamics"],
+          "typical_effect_sizes": ["rmsd"]
+        }
+      ]
+    },
+    {
+      "id": "chemistry",
+      "description": "Cheminformatics, molecular simulation, and quantum chemistry",
+      "leaf_nodes": [
+        {
+          "id": "cheminformatics_qsar",
+          "name": "Cheminformatics - QSAR",
+          "primary_tools": ["RDKit", "scikit-learn"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["SDF", "SMI", "CSV"],
+          "container": "cheminformatics",
+          "reporting_standard": "OECD_QSAR",
+          "assumption_checks": ["parametric_regression"],
+          "typical_effect_sizes": ["r_squared"]
+        },
+        {
+          "id": "molecular_dynamics",
+          "name": "Molecular Dynamics",
+          "primary_tools": ["OpenMM", "GROMACS"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["PDB", "TOP", "TRR"],
+          "container": "materials",
+          "reporting_standard": "MD",
+          "assumption_checks": ["molecular_dynamics"],
+          "typical_effect_sizes": ["rmsd"]
+        }
+      ]
+    },
+    {
+      "id": "neuroscience_imaging",
+      "description": "Neuroimaging and electrophysiology",
+      "leaf_nodes": [
+        {
+          "id": "fmri_task",
+          "name": "fMRI - Task",
+          "primary_tools": ["FSL"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["NIFTI", "NIFTI_GZ"],
+          "container": "neuroimaging",
+          "reporting_standard": "COBIDAS",
+          "assumption_checks": ["fmri_glm"],
+          "typical_effect_sizes": ["beta_weight"]
+        },
+        {
+          "id": "eeg_meg",
+          "name": "EEG/MEG",
+          "primary_tools": ["MNE-Python"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["FIF", "EDF", "BDF"],
+          "container": "neuroimaging",
+          "reporting_standard": "COBIDAS",
+          "assumption_checks": ["eeg_meg_qc"],
+          "typical_effect_sizes": ["cohens_d"]
+        }
+      ]
+    },
+    {
+      "id": "quantitative_finance",
+      "description": "Financial modeling and forecasting",
+      "leaf_nodes": [
+        {
+          "id": "time_series_forecasting",
+          "name": "Time Series Forecasting",
+          "primary_tools": ["statsmodels", "QuantLib"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "PARQUET"],
+          "container": "general",
+          "reporting_standard": "FINRA",
+          "assumption_checks": ["time_series_forecasting"],
+          "typical_effect_sizes": ["mape"]
+        },
+        {
+          "id": "factor_modeling",
+          "name": "Factor Modeling",
+          "primary_tools": ["statsmodels"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "PARQUET"],
+          "container": "general",
+          "reporting_standard": "FINRA",
+          "assumption_checks": ["parametric_regression"],
+          "typical_effect_sizes": ["r_squared"]
+        }
+      ]
+    },
+    {
+      "id": "psychology_social",
+      "description": "Psychology, social science, and behavioral research",
+      "leaf_nodes": [
+        {
+          "id": "sem_path",
+          "name": "Structural Equation Modeling",
+          "primary_tools": ["lavaan"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "SAV", "DTA"],
+          "container": "psychology",
+          "reporting_standard": "APA",
+          "assumption_checks": ["sem_lavaan"],
+          "typical_effect_sizes": ["rmsea"]
+        },
+        {
+          "id": "multilevel_longitudinal",
+          "name": "Multilevel Longitudinal",
+          "primary_tools": ["lme4"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "SAV", "DTA"],
+          "container": "psychology",
+          "reporting_standard": "APA",
+          "assumption_checks": ["parametric_regression"],
+          "typical_effect_sizes": ["cohens_d"]
+        }
+      ]
+    },
+    {
+      "id": "ecology_environmental",
+      "description": "Ecology, environmental, and climate data",
+      "leaf_nodes": [
+        {
+          "id": "community_ecology",
+          "name": "Community Ecology",
+          "primary_tools": ["vegan"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "PARQUET"],
+          "container": "ecology",
+          "reporting_standard": "STROBE",
+          "assumption_checks": ["nonparametric_multivariate"],
+          "typical_effect_sizes": ["r_squared"]
+        },
+        {
+          "id": "climate_data",
+          "name": "Climate Data",
+          "primary_tools": ["xarray"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["NETCDF", "HDF5"],
+          "container": "ecology",
+          "reporting_standard": "IPCC",
+          "assumption_checks": ["time_series_forecasting"],
+          "typical_effect_sizes": ["rmse"]
+        }
+      ]
+    },
+    {
+      "id": "materials_physics",
+      "description": "Materials science and physics simulation",
+      "leaf_nodes": [
+        {
+          "id": "dft_electronic",
+          "name": "DFT - Electronic Structure",
+          "primary_tools": ["pymatgen", "ase"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CIF", "POSCAR"],
+          "container": "materials",
+          "reporting_standard": "MATERIALS",
+          "assumption_checks": ["materials_qc"],
+          "typical_effect_sizes": ["band_gap"]
+        },
+        {
+          "id": "molecular_simulation",
+          "name": "Molecular Simulation",
+          "primary_tools": ["OpenMM", "GROMACS"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["PDB", "TOP"],
+          "container": "materials",
+          "reporting_standard": "MD",
+          "assumption_checks": ["molecular_dynamics"],
+          "typical_effect_sizes": ["rmsd"]
+        }
+      ]
+    },
+    {
+      "id": "clinical_epidemiology",
+      "description": "Clinical trials and epidemiology",
+      "leaf_nodes": [
+        {
+          "id": "survival_analysis",
+          "name": "Survival Analysis",
+          "primary_tools": ["survival", "lifelines"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "SAV", "DTA"],
+          "container": "general",
+          "reporting_standard": "CONSORT",
+          "assumption_checks": ["survival_analysis"],
+          "typical_effect_sizes": ["hazard_ratio"]
+        },
+        {
+          "id": "clinical_trial",
+          "name": "Clinical Trial",
+          "primary_tools": ["statsmodels"],
+          "workflow_managers": ["snakemake"],
+          "file_formats": ["CSV", "SAV", "DTA"],
+          "container": "general",
+          "reporting_standard": "CONSORT",
+          "assumption_checks": ["parametric_regression"],
+          "typical_effect_sizes": ["risk_ratio"]
+        }
+      ]
+    }
+  ]
+}
