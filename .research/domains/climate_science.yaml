@@ -1,0 +1,24 @@
+domain_id: "climate_science"
+name: "Climate & Environmental Science"
+reporting_standard: "AGU (American Geophysical Union)"
+significance_threshold: 0.05
+default_effect_size_metric: "anomaly_magnitude"
+preferred_visualizations: ["time_series", "spatial_map", "anomaly_plot", "heatmap"]
+citation_style: "agu"
+quality_gates:
+  - temporal_autocorrelation_check
+  - spatial_independence_check
+  - trend_significance_test
+  - baseline_period_validation
+confounders_to_check:
+  - seasonal_cycles
+  - el_nino_southern_oscillation
+  - volcanic_aerosols
+  - solar_irradiance
+  - urban_heat_island_effect
+typical_effect_size_benchmarks:
+  global_temperature_trend: "0.18°C per decade (IPCC AR6)"
+  precipitation_change: "2-3% per degree warming"
+  sea_level_rise: "3.3 mm/year (1993-2020)"
+outlier_handling: "robust_regression_with_autocorrelation_correction"
+default_method: "time_series_analysis_with_trend_detection"
