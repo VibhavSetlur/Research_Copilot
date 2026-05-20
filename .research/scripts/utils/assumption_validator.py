@@ -27,6 +27,11 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.tsa.stattools import adfuller
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 
 def find_project_root() -> Path:
     p = Path.cwd()
@@ -37,6 +42,46 @@ def find_project_root() -> Path:
             break
         p = p.parent
     return Path.cwd()
+
+
+def load_yaml(path: Path) -> Dict[str, Any]:
+    if yaml is None:
+        return {}
+    try:
+        with open(path) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def load_json(path: Path) -> Dict[str, Any]:
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def load_assumption_registry(root: Path) -> Dict[str, Any]:
+    config = load_yaml(root / ".research" / "config.yaml")
+    registries = config.get("registries", {}) if isinstance(config, dict) else {}
+    registry_path = registries.get("assumption_registry", ".research/domains/assumption_registry.json")
+    return load_json(root / registry_path)
+
+
+def build_manual_registry_result(method: str, entry: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str, str]:
+    checks = ", ".join(entry.get("checks", [])) if entry else ""
+    results = [{
+        "assumption": "Registry-driven checks",
+        "test_name": "Manual review required",
+        "statistic": None,
+        "p_value": None,
+        "status": "MANUAL",
+        "message": f"Automated checks not implemented for '{method}'. Refer to registry checks: {checks}"
+    }]
+    verdict = "MANUAL"
+    fallback_method = entry.get("pivot_if_fail", "manual_review") if entry else "manual_review"
+    return results, verdict, fallback_method
 
 
 def run_ttest_validation(df: pd.DataFrame, y_col: str, group_col: str) -> Tuple[List[Dict[str, Any]], str, str]:
@@ -386,12 +431,17 @@ def main():
     parser.add_argument("--y", type=str, required=True, help="Dependent variable (outcome)")
     parser.add_argument("--x", type=str, help="Independent variable(s), comma-separated")
     parser.add_argument("--group", type=str, help="Grouping column (for t-test or ANOVA)")
-    parser.add_argument("--method", type=str, required=True, choices=["ttest", "anova", "ols", "arima"], help="Target analysis method")
+    parser.add_argument("--method", type=str, required=True, help="Target analysis method")
     parser.add_argument("--question-id", type=str, default="q_unknown", help="ID of the research question being checked")
     parser.add_argument("--output", type=str, help="Custom output path for the JSON validation report")
+    parser.add_argument("--registry", type=str, help="Override path to assumption_registry.json")
     args = parser.parse_args()
 
     root = find_project_root()
+    registry = load_assumption_registry(root)
+    if args.registry:
+        reg_path = Path(args.registry) if Path(args.registry).is_absolute() else root / args.registry
+        registry = load_json(reg_path) if reg_path.exists() else registry
     data_path = Path(args.data) if Path(args.data).is_absolute() else root / args.data
     
     if not data_path.exists():
@@ -432,6 +482,7 @@ def main():
             sys.exit(1)
 
     # Run tests
+    registry_entry = registry.get(args.method, {}) if isinstance(registry, dict) else {}
     if args.method == "ttest":
         if not args.group:
             print("ERROR: --group is required for ttest", file=sys.stderr)
@@ -449,6 +500,8 @@ def main():
         results, verdict, fallback_method = run_ols_validation(df, args.y, x_cols)
     elif args.method == "arima":
         results, verdict, fallback_method = run_arima_validation(df, args.y)
+    elif registry_entry:
+        results, verdict, fallback_method = build_manual_registry_result(args.method, registry_entry)
     else:
         print(f"ERROR: Unknown method {args.method}", file=sys.stderr)
         sys.exit(1)
@@ -460,10 +513,11 @@ def main():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "verdict": verdict,
         "results": results,
+        "registry_entry": registry_entry,
         "routing": {
-            "action": "execute_primary" if verdict == "PASS" else "execute_fallback",
+            "action": "execute_primary" if verdict == "PASS" else ("manual_review" if verdict == "MANUAL" else "execute_fallback"),
             "target_method": args.method if verdict == "PASS" else fallback_method,
-            "reason": "All assumptions passed" if verdict == "PASS" else f"Failed assumptions under {args.method}"
+            "reason": "All assumptions passed" if verdict == "PASS" else ("Manual checks required" if verdict == "MANUAL" else f"Failed assumptions under {args.method}")
         }
     }
 
@@ -498,7 +552,7 @@ def main():
     except Exception as e:
         print(f"ERROR: Could not write validation report JSON: {e}", file=sys.stderr)
 
-    sys.exit(0 if verdict == "PASS" else 1)
+    sys.exit(0 if verdict in ("PASS", "MANUAL") else 1)
 
 
 if __name__ == "__main__":

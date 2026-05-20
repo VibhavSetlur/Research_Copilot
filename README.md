@@ -25,7 +25,7 @@ rm -rf _tmp
 ```
 
 Your project now has exactly 4 things:
-- **`.research/`** — the entire system (13 agents, 92 skills, 19 domains, CLI, hooks, scripts)
+- **`.research/`** — the entire system (16 agents, 95 skills, 19 domains, CLI, hooks, scripts)
 - **`inputs/`** — where you put data and fill out one intake file
 - **`environment/`** — reproducible dependencies (requirements.txt, setup scripts)
 - **`AGENTS.md`** — tells your AI agent how to work with this system
@@ -50,15 +50,34 @@ conda activate research-copilot
 
 ## Using It
 
+### Step 0 (Optional): Preflight check
+
+```bash
+python .research/research.py preflight
+```
+
 ### Step 1: Put your data in `inputs/data/raw/`
 
 CSV, Parquet, Excel, SAS, SPSS, Stata, JSON — any format, any number of files.
 
-### Step 2: Fill out `inputs/intake.md` (or `intake.yaml` / `intake.json`)
+### Step 2: Fill out `inputs/intake.md` (or use conversational interview)
 
+**Option A: Fill out manually**
 One file with: project info, research questions, data overview, domain, constraints.
 
+**Option B: Conversational Interview (Recommended for beginners)**
+```bash
+python .research/research.py intake-interview --start
+# Then reply to each question until intake.md is auto-generated
+```
+
 ### Step 3: Open your AI agent and paste the init prompt
+
+**OR** use the MCP Server for seamless AI IDE integration:
+```bash
+python .research/research.py mcp
+# Then configure your AI IDE (Claude Desktop, Cursor) to connect
+```
 
 ```
 I'm using the Research Copilot system. Here's how it works:
@@ -66,8 +85,9 @@ I'm using the Research Copilot system. Here's how it works:
 1. All system files are in .research/ — agents, skills, workflows, CLI tool, scripts
 2. My data and context are in inputs/ — everything is in inputs/intake.md
 3. Environment is in environment/ — requirements.txt, setup scripts
-4. CLI: python .research/research.py status → project state, next step
-5. CLI: python .research/research.py scan → scan inputs, build research map
+4. CLI: python .research/research.py preflight → runtime availability and connectivity
+5. CLI: python .research/research.py status → project state, next step
+6. CLI: python .research/research.py scan → scan inputs, build research map
 6. Workflow: research_init → literature_deep → method_route → data_scaffold → execute_analysis → compile_outputs → audit_validate
 7. At ANY point I can say "research_iterate" to explore, pivot, or investigate
 8. Skills are in .research/skills/ — read with `research skill <name>`
@@ -75,6 +95,7 @@ I'm using the Research Copilot system. Here's how it works:
 10. Always cite sources, compare to literature, try to disprove conclusions
 
 Start by running:
+  python .research/research.py preflight
   python .research/research.py scan
   python .research/research.py status
 Then read the intake and begin:
@@ -154,7 +175,9 @@ your-project/
 
 | Command | Purpose |
 |---------|---------|
+| `research preflight` | Run environment preflight checks |
 | `research scan` | Scan inputs/, build research map |
+| `research format-scan` | Run format router on raw data |
 | `research status` | Project state, pipeline progress, next step |
 | `research map` | Show research map (grounding context) |
 | `research intake` | Show intake form status |
@@ -187,6 +210,8 @@ your-project/
 | `research trace-claims` | Run claim-to-evidence graph builder |
 | `research parallel --questions q1,q2,q3` | Run questions in parallel |
 | `research debug <script>` | Auto-debug a failing script |
+| `research tools` | List tools from registry |
+| `research tool <name>` | Show details for a tool |
 
 ### Cache Management
 
@@ -194,6 +219,17 @@ your-project/
 |---------|---------|
 | `research cache stats` | Show cache hit rates, size, table counts |
 | `research cache clear --older-than 7d` | Prune old cache entries |
+
+### New in v8.0
+
+| Command | Purpose |
+|---------|---------|
+| `research mcp` | Start MCP server for AI IDE integration |
+| `research intake-interview --start` | Conversational intake interview |
+| `research preregistration` | Generate OSF pre-registration document |
+| `research reviewer2` | Run adversarial 'Reviewer 2' critique |
+| `research dependency-check <script>` | Check and auto-install missing dependencies |
+| `research dag-viewer` | Generate interactive DAG visualization |
 
 ### Export Commands
 
@@ -210,9 +246,88 @@ your-project/
 | `research skills` | List all 92 skills by category |
 | `research skill <name>` | Show a specific skill's methodology |
 | `research skill-search "time series"` | Search skills by keyword |
-| `research agents` | List all 13 agents |
+| `research agents` | List all 16 agents |
 | `research agent <name>` | Show an agent's full instructions |
 | `research workflow` | Show current workflow + iteration support |
+
+---
+
+## Architecture
+
+### MCP Server (Model Context Protocol)
+
+Research Copilot now exposes all CLI commands as MCP tools, allowing any MCP-compatible AI IDE (Claude Desktop, Cursor, etc.) to call research commands as native functions.
+
+```bash
+python .research/research.py mcp
+```
+
+Configure your AI IDE:
+```json
+{
+  "mcpServers": {
+    "research-copilot": {
+      "command": "python",
+      "args": ["/path/to/.research/mcp_server.py"]
+    }
+  }
+}
+```
+
+### Multi-Agent LLM Delegation
+
+Configure different LLMs for different tasks via `.research/models.yaml`:
+- **Claude Sonnet**: Orchestration, code generation, writing
+- **Gemini 2.5 Pro**: Literature review (1M token context)
+- **OpenAI o3-mini**: Deep reasoning, adversarial review
+
+### Conversational Intake
+
+Beginners can use the interview mode instead of filling out a static form:
+```bash
+python .research/research.py intake-interview --start
+```
+
+### OSF Pre-Registration
+
+Generate timestamped, OSF-compatible pre-registration documents:
+```bash
+python .research/research.py preregistration
+```
+
+### Adversarial Reviewer 2
+
+Before finalizing, run the adversarial critic:
+```bash
+python .research/research.py reviewer2
+```
+
+### DAG Visualizer
+
+Interactive web visualization of your data pipeline:
+```bash
+python .research/research.py dag-viewer
+# Open: reports/dashboards/dag_viewer.html
+```
+
+### Dynamic Dependency Management
+
+Auto-detect and install missing packages:
+```bash
+python .research/research.py dependency-check scripts/02_analysis.py --auto-install
+```
+
+### Cloud/HPC Execution
+
+For TB-scale data, the system supports:
+- SQL pushdown (Snowflake, BigQuery, Redshift)
+- PySpark distributed compute
+- Slurm batch jobs for HPC clusters
+
+### Zotero & Semantic Scholar Integration
+
+Sync with your reference manager for enhanced literature review.
+Configure in `.research/config.yaml` under `literature:`.
 
 ---
 

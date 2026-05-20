@@ -1,7 +1,15 @@
 project_id: "research-copilot"
-schema_version: "7.0.0"
+schema_version: "8.0.0"
 
 default_workflow: "quick_exploratory"
+
+# Multi-agent LLM delegation
+multi_agent:
+  enabled: false
+  models_config: ".research/models.yaml"
+  cost_tracking: true
+  budget_warning_pct: 0.80
+  budget_hard_limit_usd: 50.00
 
 # Input paths (user-provided, never modified by AI)
 intake_path: "inputs/intake.md"
@@ -58,11 +66,15 @@ evidence_matrix: "reports/literature/evidence_matrix.md"
 gap_analysis: "reports/literature/gap_analysis.md"
 prisma_flow: "reports/literature/prisma_flow.json"
 bibliography: "reports/literature/bibliography.bib"
+preregistration_dir: "reports/literature"
 analysis_plan: "reports/analysis/analysis_plan.md"
 full_audit: "reports/audit/full_audit_report.md"
 manuscript_findings: "reports/manuscript/research_findings.md"
 key_findings: "reports/summary/key_findings.md"
 executive_summary: "reports/summary/executive_summary.md"
+layman_summary: "reports/summary/layman_summary.md"
+reviewer2_critique: "reports/audit/reviewer2_critique.md"
+dag_viewer: "reports/dashboards/dag_viewer.html"
 
 # Iteration tracking
 iteration_registry: "docs/iterations/registry.json"
@@ -123,3 +135,38 @@ containers:
     - "scripts"
     - "reports"
   cache_dir: ".research/cache/containers"
+
+# Literature integration
+literature:
+  zotero:
+    enabled: false
+    api_key_env: "ZOTERO_API_KEY"
+    user_id_env: "ZOTERO_USER_ID"
+    collection_key: ""
+  semantic_scholar:
+    enabled: true
+    api_key_env: "SEMANTIC_SCHOLAR_API_KEY"
+    rate_limit_per_5min: 100
+
+# Cloud/HPC execution
+cloud_hpc:
+  enabled: false
+  supported_platforms: ["snowflake", "bigquery", "redshift", "emr", "dataproc", "slurm"]
+  snowflake:
+    account_env: "SNOWFLAKE_ACCOUNT"
+    user_env: "SNOWFLAKE_USER"
+    password_env: "SNOWFLAKE_PASSWORD"
+  bigquery:
+    project_env: "GOOGLE_CLOUD_PROJECT"
+    credentials_env: "GOOGLE_APPLICATION_CREDENTIALS"
+  slurm:
+    default_partition: "compute"
+    default_time: "24:00:00"
+    default_mem: "64G"
+
+# Dependency management
+dependency_management:
+  auto_detect: true
+  preferred_installer: "uv"
+  fallback_installer: "pip"
+  requirements_file: "environment/requirements.txt"

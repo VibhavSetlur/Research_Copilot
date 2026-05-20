@@ -23,3 +23,11 @@ typical_effect_size_benchmarks:
   network_studies: "qap_p_less_than_0.05"
 outlier_handling: "multiple_imputation_with_sensitivity_analysis"
 default_method: "multilevel_modeling_for_nested_data"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

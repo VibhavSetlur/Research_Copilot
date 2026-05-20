@@ -51,6 +51,11 @@ scratch/
 .research/cache/pending_approval.json
 .research/cache/approval_response.json
 .research/cache/checkpoints/
+.research/cache/execution_dag.json
+.research/cache/execution_metadata.json
+.research/cache/intake_session.json
+.research/cache/context_transfer_memos/
+.research/cache/cost_log.jsonl
 .research/state/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid

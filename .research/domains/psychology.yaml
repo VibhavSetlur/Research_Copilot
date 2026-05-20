@@ -9,3 +9,14 @@ quality_gates:
   - reliability_coefficients
   - manipulation_checks
   - power_analysis
+leaf_nodes:
+  - sem_path
+  - multilevel_longitudinal
+primary_tools:
+  - lavaan
+  - lme4
+container: "psychology"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

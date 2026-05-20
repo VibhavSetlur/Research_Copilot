@@ -9,3 +9,10 @@ quality_gates:
   - inter_annotator_agreement
   - train_test_split
   - baseline_comparison
+leaf_nodes: []
+primary_tools:
+  - scikit-learn
+container: "general"
+file_formats:
+  - CSV
+  - JSON

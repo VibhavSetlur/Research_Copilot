@@ -23,3 +23,11 @@ typical_effect_size_benchmarks:
   survey_based_anthropology: "cramers_v_0.1-0.3"
 outlier_handling: "contextual_analysis_rather_than_exclusion"
 default_method: "mixed_methods_with_thematic_analysis"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

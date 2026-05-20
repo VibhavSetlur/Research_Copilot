@@ -23,3 +23,11 @@ typical_effect_size_benchmarks:
   policy_impact: "ame_2-10_percentage_points"
 outlier_handling: "robust_standard_errors_with_cluster_adjustment"
 default_method: "ols_with_robust_se_or_logit_probit_for_binary"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

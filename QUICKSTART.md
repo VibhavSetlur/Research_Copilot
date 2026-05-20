@@ -58,11 +58,15 @@ I'm using the Research Copilot system.
 3. Environment: environment/ — requirements.txt, setup scripts
 
 Start by running:
+  python .research/research.py preflight
   python .research/research.py scan
   python .research/research.py status
 
 Then read inputs/intake.md and begin:
   python .research/research.py agent research_init
+
+Optional: run format routing if you have non-tabular data
+  python .research/research.py format-scan
 ```
 
 ### Step 5: The AI does the rest

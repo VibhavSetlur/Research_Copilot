@@ -16,6 +16,11 @@ bash environment/setup_conda.sh
 conda activate research-copilot
 ```
 
+### Optional: Preflight Check
+```bash
+python .research/research.py preflight
+```
+
 ## Recreating Environment
 
 If you need to rebuild from scratch:
@@ -55,3 +60,7 @@ and all dependencies are installed before proceeding.
 | `requirements.txt` | Pinned Python dependencies |
 | `setup.sh` | venv setup script |
 | `setup_conda.sh` | Conda setup script |
+| `preflight_check.py` | Environment readiness report |
+| `runtime_selector.py` | Container/runtime availability report |
+| `base/` | Base container definitions and compose file |
+| `domains/` | Domain container stubs |

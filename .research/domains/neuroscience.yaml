@@ -23,3 +23,16 @@ typical_effect_size_benchmarks:
   connectivity_changes: "r_0.2-0.5_for_task_modulation"
 outlier_handling: "motion_based_exclusion_with_sensitivity_analysis"
 default_method: "glm_with_mixed_effects_for_fmri"
+leaf_nodes:
+  - fmri_task
+  - eeg_meg
+primary_tools:
+  - FSL
+  - MNE-Python
+container: "neuroimaging"
+file_formats:
+  - NIFTI
+  - NIFTI_GZ
+  - FIF
+  - EDF
+  - BDF

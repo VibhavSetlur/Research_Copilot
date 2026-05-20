@@ -26,6 +26,13 @@ Extract: question type, variables, data quality, domain, constraints.
 ### Step 2: Route
 Run `route_method` to get data-driven recommendations.
 
+### Step 2b: Tool Registry Cross-Reference
+Map each selected method to a `tool_id` in `.research/domains/tool_registry.json`.
+If no tool matches, propose a registry addition or select a validated alternative.
+
+### Step 2c: Bioinformatics Pipeline Check (if applicable)
+For genomics pipelines, check nf-core for an existing validated workflow before writing custom code.
+
 ### Step 3: Compare to Literature
 From the literature corpus: what methods have been used for similar questions? Does the recommended method match?
 
@@ -37,6 +44,11 @@ From the literature corpus: what methods have been used for similar questions? D
 4. Fallback → if assumptions fail
 5. Effect size metrics → which ones, why
 6. Multiple testing correction → method
+
+Also record in `reports/analysis/methods_routing.json`:
+- `required_tools` (list of tool_ids)
+- `required_containers` (list of containers)
+- `execution_runtimes` (python, r, bash, etc.)
 
 No iteration needed unless routing fails.
 

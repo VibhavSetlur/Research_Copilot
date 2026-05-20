@@ -7,10 +7,12 @@ agents:
   - literature_deep
   - methodology_scout
   - method_route
+  - generate_preregistration
   - data_scaffold
   - execute_analysis
   - replication_validator
   - compile_outputs
+  - reviewer2_critic
   - audit_validate
 
 quality_gates:
@@ -25,6 +27,10 @@ quality_gates:
   - after: method_route
     gate: "method_route"
     on_fail: "revise analysis plan — each question needs a valid method"
+
+  - after: generate_preregistration
+    gate: "generate_preregistration"
+    on_fail: "complete pre-registration before proceeding to analysis"
 
   - after: data_scaffold
     gate: "data_scaffold"
@@ -41,6 +47,10 @@ quality_gates:
   - after: compile_outputs
     gate: "compile_outputs"
     on_fail: "complete all manuscript sections"
+
+  - after: reviewer2_critic
+    gate: "reviewer2_critic"
+    on_fail: "address critical reviewer2 findings or add to limitations"
 
   - after: audit_validate
     gate: "audit_validate"
@@ -91,6 +101,10 @@ branching:
     if: "feasibility == caution"
     then: "proceed — review follow_up_questions.md"
 
+  - after: generate_preregistration
+    if: "preregistration_complete"
+    then: "timestamp and lock pre-registration — no method changes allowed without documented deviation"
+
   - after: execute_analysis
     if: "primary_finding == not_supported"
     then: "report null finding honestly"
@@ -102,6 +116,14 @@ branching:
   - after: audit_validate
     if: "verdict == FAIL"
     then: "remediate and re-run audit"
+
+  - after: reviewer2_critic
+    if: "critique.has_critical_issues"
+    then: "run research_iterate with type 'robustness' to address issues, then re-run reviewer2"
+
+  - after: reviewer2_critic
+    if: "critique.has_major_issues"
+    then: "add issues to limitations section, proceed with audit"
 
 feedback:
   - from: execute_analysis
@@ -129,7 +151,7 @@ The hook system intercepts pipeline execution at 5 stages. Each hook triggers sp
 |-----------|--------------|-------------------|-------------|
 | `pre_routing` | User submits query to CLI or agent starts | `semantic_skill_router` | Scans task against skill index. Loads only 2-4 relevant skills into `state["loaded_skills"]`. Suppresses remaining 88+ unused skills. |
 | `pre_execution` | Prompt payload packaged for LLM | `apply_token_budget_throttle`<br>`check_cache_before_execution` | 1. Checks token budget. At 60%: summarize phases. At 80%: flush non-essential. At 90%: force split.<br>2. Queries `research_cache.db`. On cache hit: returns cached result, skips execution. |
-| `post_execution` | LLM returns text or script payload | `evaluate_code_sandbox`<br>`run_critic_review` | 1. Validates generated Python syntax via `ast.parse`. On failure: sets `execution_failure=True`.<br>2. For critical phases: triggers critic agent, writes brief to `reports/audit/critic_report_<phase>.json`. |
+| `post_execution` | LLM returns text or script payload | `evaluate_code_sandbox`<br>`run_critic_review`<br>`check_dependencies`<br>`run_reviewer2` | 1. Validates generated Python syntax via `ast.parse`. On failure: sets `execution_failure=True`.<br>2. For critical phases: triggers critic agent, writes brief to `reports/audit/critic_report_<phase>.json`.<br>3. Detects uninstalled imports, auto-resolves via uv/pip.<br>4. After compile_outputs: runs adversarial Reviewer 2 critique. |
 | `pre_ledger_commit` | Output passes validation, before state save | `enforce_pydantic_gatekeeper`<br>`check_approval_gate` | 1. Validates output against Pydantic schema for the active task. On failure: `rollback_triggered=True`.<br>2. For target phases (method_route, execute_analysis, compile_outputs, audit_validate): creates approval gate, blocks until human approves. |
 | `on_failure` | Unresolvable script error or structural failure | `freeze_state_on_failure` | Freezes current state. Serializes to JSON snapshot in `docs/dead_ends/`. Records recovery point for `research resume --from <phase>`. |
 

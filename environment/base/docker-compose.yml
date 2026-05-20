@@ -1,0 +1,58 @@
+version: "3.9"
+services:
+  genomics:
+    image: research-copilot-genomics:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  cheminformatics:
+    image: research-copilot-cheminformatics:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  neuroimaging:
+    image: research-copilot-neuroimaging:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  quantfin:
+    image: research-copilot-quantfin:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  psychology:
+    image: research-copilot-psychology:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  ecology:
+    image: research-copilot-ecology:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  materials:
+    image: research-copilot-materials:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports
+  general:
+    image: research-copilot-general:latest
+    volumes:
+      - ../../inputs:/workspace/inputs
+      - ../../data:/workspace/data
+      - ../../scripts:/workspace/scripts
+      - ../../reports:/workspace/reports

@@ -23,3 +23,11 @@ typical_effect_size_benchmarks:
   policy_impact_studies: "interrupted_time_series_slope_change"
 outlier_handling: "robust_regression_with_legal_justification"
 default_method: "logistic_regression_with_fixed_effects"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

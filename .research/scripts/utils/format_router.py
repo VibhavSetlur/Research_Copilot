@@ -18,9 +18,11 @@ FORMAT_REGISTRY = {
     ".json": {"format": "JSON_TABLE", "pandera_applicable": True, "domain_hint": "general", "parser": "json"},
     # genomics
     ".fastq": {"format": "FASTQ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
+    ".fastq.gz": {"format": "FASTQ_GZ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
     ".fq": {"format": "FASTQ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
     ".bam": {"format": "BAM", "pandera_applicable": False, "domain_hint": "genomics", "parser": "pysam"},
     ".vcf": {"format": "VCF", "pandera_applicable": False, "domain_hint": "genomics", "parser": "cyvcf2"},
+    ".vcf.gz": {"format": "VCF_GZ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "cyvcf2"},
     # neuro
     ".nii": {"format": "NIFTI", "pandera_applicable": False, "domain_hint": "neuroimaging", "parser": "nibabel"},
     ".nii.gz": {"format": "NIFTI_GZ", "pandera_applicable": False, "domain_hint": "neuroimaging", "parser": "nibabel"},

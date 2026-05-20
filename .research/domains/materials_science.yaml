@@ -21,3 +21,16 @@ typical_effect_size_benchmarks:
   thermal_stability: "10-50°C improvement typical"
 outlier_handling: "grubbs_test_with_material_justification"
 default_method: "anova_with_post_hoc_tukey"
+leaf_nodes:
+  - dft_electronic
+  - molecular_simulation
+primary_tools:
+  - pymatgen
+  - ase
+  - OpenMM
+  - GROMACS
+container: "materials"
+file_formats:
+  - CIF
+  - POSCAR
+  - PDB

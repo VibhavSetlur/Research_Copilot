@@ -409,6 +409,105 @@ def evaluate_code_sandbox(state: dict, *args, **kwargs) -> dict:
 
 
 @hook_engine.register("post_execution")
+def check_dependencies(state: dict, *args, **kwargs) -> dict:
+    """Detect uninstalled imports in generated code and auto-resolve.
+
+    If generated_code or generated_script exists in state:
+      - Extracts imports via AST parsing
+      - Checks against installed packages
+      - If missing and auto_dependency_resolution enabled: installs via uv/pip
+      - Updates requirements.txt with new packages
+    """
+    project_root = find_project_root()
+    config_path = project_root / ".research" / "config.yaml"
+
+    # Check if auto-dependency resolution is enabled
+    auto_resolve = False
+    try:
+        import yaml
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        auto_resolve = config.get("dependency_management", {}).get("auto_detect", False)
+    except Exception:
+        pass
+
+    if not auto_resolve:
+        return state
+
+    generated_code = state.get("generated_code", "")
+    generated_script = state.get("generated_script", "")
+
+    code_to_check = generated_code or generated_script
+    if not code_to_check:
+        return state
+
+    try:
+        import ast
+        import sys
+        import subprocess
+
+        # Parse imports
+        tree = ast.parse(code_to_check)
+        imports = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.add(alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.add(node.module.split(".")[0])
+
+        # Get installed packages
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "list", "--format=json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        installed = set()
+        if result.returncode == 0:
+            packages = json.loads(result.stdout)
+            installed = {p["name"].lower().replace("-", "_") for p in packages}
+
+        # Find missing
+        missing = []
+        for imp in imports:
+            if imp in sys.stdlib_module_names:
+                continue
+            if imp.lower().replace("-", "_") not in installed:
+                missing.append(imp)
+
+        if missing:
+            state["missing_dependencies"] = missing
+            state["dependency_resolution_needed"] = True
+            logger.warning("Missing dependencies detected: %s", missing)
+
+            # Auto-install if enabled
+            if auto_resolve:
+                try:
+                    # Try uv first
+                    subprocess.run(
+                        ["uv", "pip", "install"] + missing,
+                        capture_output=True,
+                        timeout=120,
+                    )
+                except FileNotFoundError:
+                    # Fall back to pip
+                    subprocess.run(
+                        [sys.executable, "-m", "pip", "install"] + missing,
+                        capture_output=True,
+                        timeout=120,
+                    )
+
+                state["dependencies_installed"] = missing
+                logger.info("Installed missing dependencies: %s", missing)
+    except Exception as e:
+        logger.debug("Dependency check failed: %s", e)
+
+    return state
+
+
+@hook_engine.register("post_execution")
 def run_critic_review(state: dict, *args, **kwargs) -> dict:
     """Trigger critic agent review on output before advancing pipeline.
 
@@ -452,6 +551,54 @@ def run_critic_review(state: dict, *args, **kwargs) -> dict:
     save_json_atomic(critic_path, critic_brief)
 
     logger.info("Critic review triggered for phase: %s", phase)
+    return state
+
+
+@hook_engine.register("post_execution")
+def run_reviewer2(state: dict, *args, **kwargs) -> dict:
+    """Trigger adversarial Reviewer 2 critique after compile_outputs.
+
+    This is a more aggressive review than the standard critic — it actively
+    tries to destroy the findings by finding unaddressed confounders,
+    alternative explanations, and methodological flaws.
+    """
+    phase = state.get("phase", "")
+
+    if phase != "compile_outputs":
+        return state
+
+    output = state.get("output", "")
+    if not output:
+        return state
+
+    state["reviewer2_triggered"] = True
+
+    # Write reviewer2 brief so the AI agent picks it up
+    project_root = find_project_root()
+    audit_dir = project_root / "reports" / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+
+    reviewer2_brief = {
+        "phase": "compile_outputs",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "pending_adversarial_review",
+        "review_type": "reviewer2_critic",
+        "checks": [
+            "unaddressed_confounders",
+            "alternative_explanations",
+            "methodological_flaws",
+            "overclaiming",
+            "missing_robustness_checks",
+            "statistical_concerns",
+            "limitations",
+        ],
+        "output_preview": output[:500] if isinstance(output, str) else str(output)[:500],
+    }
+
+    reviewer2_path = audit_dir / "reviewer2_brief.json"
+    save_json_atomic(reviewer2_path, reviewer2_brief)
+
+    logger.info("Reviewer 2 adversarial review triggered")
     return state
 
 

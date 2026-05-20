@@ -25,19 +25,28 @@ Transform raw data into analysis-ready format using only the variables the resea
 ### Step 1: Load Research Map
 Extract: outcome variables, predictors, covariates, missingness mechanism, outlier classification.
 
-### Step 2: Validate
-Run `validate_schema`. Check all required variables exist, types match, ranges plausible.
+### Step 2: Format Router
+Read `.research/cache/data_format_manifest.json` if present; otherwise run `research format-scan`.
+Only apply Pandera to files marked `pandera_applicable: true`.
 
-### Step 3: Transform
+### Step 3: Validate
+Run `validate_schema` for tabular files only. Check required variables exist, types match, ranges plausible.
+For non-tabular formats, run domain-specific QC (e.g., FASTQ header check, NIFTI header check).
+
+### Step 4: Transform
 Apply only needed transformations:
 - Missing data handling (per missingness mechanism)
 - Outlier handling (per classification)
 - Encoding, scaling, transformation (per analysis plan)
 
-### Step 4: Execute
+### Step 5: Execute
 Write and run `analysis/01_validation.py`. Verify output. Compute hashes.
 
-### Step 5: Data Dictionary
+### Step 6: Tool Capability Check
+Run `python .research/scripts/utils/tool_capability_check.py` and record `tool_availability_report.json`.
+If critical tools are `MISSING_REQUIRES_CONTAINER`, stop and request user action.
+
+### Step 7: Data Dictionary
 Document each variable: name, type, description, transformations, missingness handling.
 
 ---

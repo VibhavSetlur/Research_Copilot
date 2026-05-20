@@ -8,3 +8,15 @@ citation_style: "ecology"
 quality_gates:
   - spatial_autocorrelation
   - taxonomic_standardization
+leaf_nodes:
+  - community_ecology
+  - climate_data
+primary_tools:
+  - vegan
+  - xarray
+container: "ecology"
+file_formats:
+  - CSV
+  - PARQUET
+  - NETCDF
+  - HDF5

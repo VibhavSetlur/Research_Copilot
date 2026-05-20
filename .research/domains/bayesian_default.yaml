@@ -29,3 +29,9 @@ bayesian_defaults:
   warmup: 1000
   hdi_level: 0.95
   decision_rule: "hdi_excludes_zero_or_rope"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV

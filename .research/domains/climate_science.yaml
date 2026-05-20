@@ -22,3 +22,11 @@ typical_effect_size_benchmarks:
   sea_level_rise: "3.3 mm/year (1993-2020)"
 outlier_handling: "robust_regression_with_autocorrelation_correction"
 default_method: "time_series_analysis_with_trend_detection"
+leaf_nodes:
+  - climate_data
+primary_tools:
+  - xarray
+container: "ecology"
+file_formats:
+  - NETCDF
+  - HDF5

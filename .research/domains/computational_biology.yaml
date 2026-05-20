@@ -23,3 +23,14 @@ typical_effect_size_benchmarks:
   classification_accuracy: "auc_greater_than_0.8_for_biomarkers"
 outlier_handling: "pca_based_outlier_detection_with_quanorm"
 default_method: "deseq2_or_limma_for_differential_analysis"
+leaf_nodes:
+  - genomics_wgs
+primary_tools:
+  - GATK4
+  - BWA-MEM2
+container: "genomics"
+file_formats:
+  - FASTQ
+  - FASTQ_GZ
+  - BAM
+  - VCF

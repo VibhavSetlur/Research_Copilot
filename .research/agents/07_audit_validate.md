@@ -77,6 +77,14 @@ Execute automated figure validation:
 - Every literature claim cites a paper from the corpus
 - No orphan claims (untraceable to research map, data, or literature)
 
+### Step 4b: Container & Runtime Reproducibility
+- Record container image IDs or digests for each runtime
+- Log non-Python tool versions (R, Bioconductor, FSL, GATK, etc.) in `env_manifest.json`
+
+### Step 4c: Domain Sanity Checks
+- Run domain-specific sanity checks (e.g., RNA-seq DE gene counts not 0% or 100%)
+- Flag implausible outputs with remediation steps
+
 ### Step 5: Run Quality Gate
 Run `research validate audit_validate`. Record results in `docs/quality_gates/gate_007_audit_validate.md`.
 

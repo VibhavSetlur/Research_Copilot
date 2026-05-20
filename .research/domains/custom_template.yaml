@@ -9,3 +9,7 @@ quality_gates:
   - assumption_checks
   - effect_size_reporting
   - multiple_testing_correction
+leaf_nodes: []
+primary_tools: []
+container: "general"
+file_formats: []

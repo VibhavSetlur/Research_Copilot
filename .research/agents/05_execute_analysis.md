@@ -39,10 +39,13 @@ Run the analysis plan. Compare every finding to the literature. Test robustness.
 Run `descriptive_stats`. Compare distributions to what the user expected. Flag surprises.
 
 ### Step 2: Test Assumptions
-For each method in the analysis plan: test assumptions. If one fails → use fallback. Log it.
+For each method in the analysis plan: test assumptions using `assumption_registry.json`.
+If one fails → use fallback. Log it.
 
 ### Step 3: Primary Analysis
-Run the primary method. Map result to the research question: supports or contradicts hypothesis? Compare effect size to literature expectations.
+Generate scripts in the correct runtime (`.py`, `.R`, `.sh`, `.nf`, `.jl`) and execute via `executor.py`.
+Never invent command syntax; pull it from `tool_registry.json`.
+Map result to the research question: supports or contradicts hypothesis? Compare effect size to literature expectations.
 
 ### Step 4: Sensitivity (only if primary finding is significant)
 Test robustness: different outlier treatment, different missing data handling, different model spec. Record which checks support vs weaken the finding.

@@ -790,6 +790,266 @@ def build_checkpoints_tab():
         sizing_mode="stretch_both",
     )
 
+# ── Domain-Specific Tabs ─────────────────────────────────────────────────
+
+def _get_domain_context() -> Optional[dict]:
+    research_map = get_research_map()
+    if not research_map:
+        return None
+    domain = research_map.get("domain", {})
+    format_manifest = load_json_safe(CACHE_DIR / "data_format_manifest.json")
+    return {
+        "name": domain.get("name", "general"),
+        "reporting_standard": domain.get("reporting_standard", ""),
+        "format_manifest": format_manifest,
+        "questions": research_map.get("questions", []),
+    }
+
+def _load_domain_registry() -> Optional[dict]:
+    domain_reg_path = PROJECT_ROOT / ".research" / "domains" / "domain_registry.json"
+    return load_json_safe(domain_reg_path)
+
+def _load_tool_registry() -> Optional[dict]:
+    tool_reg_path = PROJECT_ROOT / ".research" / "domains" / "tool_registry.json"
+    return load_json_safe(tool_reg_path)
+
+def _find_leaf_node(domain_name: str) -> Optional[dict]:
+    reg = _load_domain_registry()
+    if not reg:
+        return None
+    name_lower = domain_name.lower()
+    for cat in reg.get("categories", []):
+        for leaf in cat.get("leaf_nodes", []):
+            if leaf["id"].lower() in name_lower or name_lower in leaf["id"].lower():
+                return leaf
+    return None
+
+def build_genomics_tab():
+    ctx = _get_domain_context()
+    leaf = _find_leaf_node(ctx["name"] if ctx else "")
+    tools = _load_tool_registry()
+    tool_list = [t for t in tools.get("tools", []) if t.get("container") == "genomics"] if tools else []
+
+    header = f"### Genomics Dashboard"
+    if leaf:
+        header += f"\n- **Leaf node**: {leaf.get('name', 'N/A')}"
+        header += f"\n- **Reporting standard**: {leaf.get('reporting_standard', 'N/A')}"
+        header += f"\n- **Primary tools**: {', '.join(leaf.get('primary_tools', []))}"
+        header += f"\n- **File formats**: {', '.join(leaf.get('file_formats', []))}"
+
+    # Variant summary table
+    variant_files = []
+    for d in [PROJECT_ROOT / "data" / "03_analytical", PROJECT_ROOT / "reports" / "analysis"]:
+        if d.exists():
+            for f in d.rglob("*"):
+                if f.is_file() and f.suffix.lower() in (".vcf", ".csv", ".parquet"):
+                    if any(kw in f.name.lower() for kw in ["variant", "snp", "vcf", "de", "expression"]):
+                        variant_files.append({"name": f.name, "path": str(f.relative_to(PROJECT_ROOT)), "size": format_size(f.stat().st_size)})
+
+    variant_df = pn.widgets.Tabulator(
+        value=variant_files,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "name", "title": "File", "width": 300},
+            {"field": "path", "title": "Path", "width": 400},
+            {"field": "size", "title": "Size", "width": 100},
+        ],
+    )
+
+    # Tool availability
+    tool_rows = [{"id": t.get("id"), "category": t.get("category"), "language": t.get("language")} for t in tool_list]
+    tool_df = pn.widgets.Tabulator(
+        value=tool_rows,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "id", "title": "Tool", "width": 150},
+            {"field": "category", "title": "Category", "width": 200},
+            {"field": "language", "title": "Language", "width": 100},
+        ],
+    )
+
+    return pn.Column(
+        pn.Tabs(
+            ("Overview", pn.Column(pn.pane.Markdown(header, margin=(0, 0, 10, 0)), sizing_mode="stretch_both")),
+            ("Variant/DE Files", pn.Column(pn.pane.Markdown("### Variant & Differential Expression Files", margin=(0, 0, 5, 0)), variant_df, sizing_mode="stretch_both")),
+            ("Tool Registry", pn.Column(pn.pane.Markdown(f"### Genomics Tools ({len(tool_list)} registered)", margin=(0, 0, 5, 0)), tool_df, sizing_mode="stretch_both")),
+            dynamic=True,
+            sizing_mode="stretch_both",
+        ),
+        sizing_mode="stretch_both",
+    )
+
+def build_chemistry_tab():
+    ctx = _get_domain_context()
+    leaf = _find_leaf_node(ctx["name"] if ctx else "")
+    tools = _load_tool_registry()
+    tool_list = [t for t in tools.get("tools", []) if t.get("container") in ("cheminformatics", "materials")] if tools else []
+
+    header = f"### Chemistry / Cheminformatics Dashboard"
+    if leaf:
+        header += f"\n- **Leaf node**: {leaf.get('name', 'N/A')}"
+        header += f"\n- **Primary tools**: {', '.join(leaf.get('primary_tools', []))}"
+        header += f"\n- **File formats**: {', '.join(leaf.get('file_formats', []))}"
+
+    mol_files = []
+    for d in [PROJECT_ROOT / "inputs" / "data" / "raw", PROJECT_ROOT / "data" / "01_ingested"]:
+        if d.exists():
+            for f in d.rglob("*"):
+                if f.is_file() and f.suffix.lower() in (".sdf", ".mol", ".mol2", ".pdb", ".cif", ".xyz"):
+                    mol_files.append({"name": f.name, "path": str(f.relative_to(PROJECT_ROOT)), "format": f.suffix.upper(), "size": format_size(f.stat().st_size)})
+
+    mol_df = pn.widgets.Tabulator(
+        value=mol_files,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "name", "title": "File", "width": 250},
+            {"field": "path", "title": "Path", "width": 350},
+            {"field": "format", "title": "Format", "width": 100},
+            {"field": "size", "title": "Size", "width": 100},
+        ],
+    )
+
+    tool_rows = [{"id": t.get("id"), "category": t.get("category"), "language": t.get("language")} for t in tool_list]
+    tool_df = pn.widgets.Tabulator(
+        value=tool_rows,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "id", "title": "Tool", "width": 150},
+            {"field": "category", "title": "Category", "width": 200},
+            {"field": "language", "title": "Language", "width": 100},
+        ],
+    )
+
+    return pn.Column(
+        pn.Tabs(
+            ("Overview", pn.Column(pn.pane.Markdown(header, margin=(0, 0, 10, 0)), sizing_mode="stretch_both")),
+            ("Molecule Files", pn.Column(pn.pane.Markdown("### Molecule / Structure Files", margin=(0, 0, 5, 0)), mol_df, sizing_mode="stretch_both")),
+            ("Tool Registry", pn.Column(pn.pane.Markdown(f"### Chemistry Tools ({len(tool_list)} registered)", margin=(0, 0, 5, 0)), tool_df, sizing_mode="stretch_both")),
+            dynamic=True,
+            sizing_mode="stretch_both",
+        ),
+        sizing_mode="stretch_both",
+    )
+
+def build_neuroimaging_tab():
+    ctx = _get_domain_context()
+    leaf = _find_leaf_node(ctx["name"] if ctx else "")
+    tools = _load_tool_registry()
+    tool_list = [t for t in tools.get("tools", []) if t.get("container") == "neuroimaging"] if tools else []
+
+    header = f"### Neuroimaging Dashboard"
+    if leaf:
+        header += f"\n- **Leaf node**: {leaf.get('name', 'N/A')}"
+        header += f"\n- **Reporting standard**: {leaf.get('reporting_standard', 'N/A')}"
+        header += f"\n- **Primary tools**: {', '.join(leaf.get('primary_tools', []))}"
+        header += f"\n- **File formats**: {', '.join(leaf.get('file_formats', []))}"
+
+    nifti_files = []
+    for d in [PROJECT_ROOT / "inputs" / "data" / "raw", PROJECT_ROOT / "data" / "01_ingested"]:
+        if d.exists():
+            for f in d.rglob("*"):
+                if f.is_file() and f.suffix.lower() in (".nii", ".nii.gz", ".edf", ".fif", ".bdf"):
+                    nifti_files.append({"name": f.name, "path": str(f.relative_to(PROJECT_ROOT)), "format": f.suffix.upper(), "size": format_size(f.stat().st_size)})
+
+    nifti_df = pn.widgets.Tabulator(
+        value=nifti_files,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "name", "title": "File", "width": 250},
+            {"field": "path", "title": "Path", "width": 350},
+            {"field": "format", "title": "Format", "width": 100},
+            {"field": "size", "title": "Size", "width": 100},
+        ],
+    )
+
+    tool_rows = [{"id": t.get("id"), "category": t.get("category"), "language": t.get("language")} for t in tool_list]
+    tool_df = pn.widgets.Tabulator(
+        value=tool_rows,
+        sizing_mode="stretch_width",
+        pagination="remote",
+        page_size=10,
+        columns=[
+            {"field": "id", "title": "Tool", "width": 150},
+            {"field": "category", "title": "Category", "width": 200},
+            {"field": "language", "title": "Language", "width": 100},
+        ],
+    )
+
+    return pn.Column(
+        pn.Tabs(
+            ("Overview", pn.Column(pn.pane.Markdown(header, margin=(0, 0, 10, 0)), sizing_mode="stretch_both")),
+            ("Imaging Files", pn.Column(pn.pane.Markdown("### Neuroimaging Files", margin=(0, 0, 5, 0)), nifti_df, sizing_mode="stretch_both")),
+            ("Tool Registry", pn.Column(pn.pane.Markdown(f"### Neuroimaging Tools ({len(tool_list)} registered)", margin=(0, 0, 5, 0)), tool_df, sizing_mode="stretch_both")),
+            dynamic=True,
+            sizing_mode="stretch_both",
+        ),
+        sizing_mode="stretch_both",
+    )
+
+def build_finance_tab():
+    ctx = _get_domain_context()
+    leaf = _find_leaf_node(ctx["name"] if ctx else "")
+
+    header = f"### Quantitative Finance Dashboard"
+    if leaf:
+        header += f"\n- **Leaf node**: {leaf.get('name', 'N/A')}"
+        header += f"\n- **Reporting standard**: {leaf.get('reporting_standard', 'N/A')}"
+        header += f"\n- **Primary tools**: {', '.join(leaf.get('primary_tools', []))}"
+
+    # Look for execution metadata with finance tools
+    exec_meta = load_json_safe(CACHE_DIR / "execution_metadata.json")
+    sm = exec_meta.get("summary", {}) if exec_meta else {}
+
+    summary_items = [
+        f"- **Total executions**: {sm.get('total_executions', 0)}",
+        f"- **Successful**: {sm.get('successful', 0)}",
+        f"- **Failed**: {sm.get('failed', 0)}",
+        f"- **Runtimes**: {', '.join(f'{k}: {v}' for k, v in sm.get('runtimes_used', {}).items())}",
+    ]
+
+    return pn.Column(
+        pn.Tabs(
+            ("Overview", pn.Column(pn.pane.Markdown(header, margin=(0, 0, 10, 0)), sizing_mode="stretch_both")),
+            ("Execution Summary", pn.Column(pn.pane.Markdown("### Execution Summary\n" + "\n".join(summary_items), margin=(0, 0, 5, 0)), sizing_mode="stretch_both")),
+            dynamic=True,
+            sizing_mode="stretch_both",
+        ),
+        sizing_mode="stretch_both",
+    )
+
+def build_domain_tabs():
+    """Build domain-specific tabs based on detected domain from research map."""
+    ctx = _get_domain_context()
+    if not ctx:
+        return []
+
+    domain_lower = ctx["name"].lower()
+    tabs = []
+
+    if any(kw in domain_lower for kw in ["genom", "rna", "transcript", "proteom", "metagenom", "single cell"]):
+        tabs.append(("Genomics", build_genomics_tab()))
+
+    if any(kw in domain_lower for kw in ["chem", "molecular", "qsar", "drug", "dock"]):
+        tabs.append(("Chemistry", build_chemistry_tab()))
+
+    if any(kw in domain_lower for kw in ["neuro", "fmri", "eeg", "meg", "imaging"]):
+        tabs.append(("Neuroimaging", build_neuroimaging_tab()))
+
+    if any(kw in domain_lower for kw in ["finance", "quant", "econ", "trading", "portfolio"]):
+        tabs.append(("Finance", build_finance_tab()))
+
+    return tabs
+
 # ── Build Dashboard ──────────────────────────────────────────────────────
 def build_dashboard():
     overview_tab = build_overview_tab()
@@ -804,7 +1064,7 @@ def build_dashboard():
     search_tab = build_search_tab()
     checkpoints_tab = build_checkpoints_tab()
 
-    tabs = pn.Tabs(
+    tab_list = [
         ("Overview", overview_tab),
         ("File Explorer", file_explorer_tab),
         ("Data Viewer", data_viewer_tab),
@@ -816,9 +1076,12 @@ def build_dashboard():
         ("Approval Gates", approval_gates_tab),
         ("Search", search_tab),
         ("Checkpoints", checkpoints_tab),
-        dynamic=True,
-        sizing_mode="stretch_both",
-    )
+    ]
+
+    domain_tabs = build_domain_tabs()
+    tab_list.extend(domain_tabs)
+
+    tabs = pn.Tabs(*tab_list, dynamic=True, sizing_mode="stretch_both")
 
     return tabs
 

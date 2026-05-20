@@ -52,6 +52,8 @@ Always use `python .research/research.py <command>`:
 | `scan` | Scan inputs/, build research map |
 | `map` | Show research map (grounding context) |
 | `intake` | Show intake form status |
+| `intake-interview --start` | Start conversational intake interview (auto-generates intake.md) |
+| `intake-interview --message "..."` | Reply to intake interview question |
 | `followups` | Questions the user needs to answer |
 | `iterations` | Show iteration history |
 | `skills` | List all skills by category |
@@ -61,18 +63,26 @@ Always use `python .research/research.py <command>`:
 | `workflow` | Show current workflow, pipeline, iteration support |
 | `budget` | Show token budget status and CTM history |
 | `dag` | Show execution DAG summary |
+| `dag-viewer` | Generate interactive DAG visualization HTML |
 | `data-scale` | Show data scale analysis and library constraints |
+| `preregistration` | Generate OSF-compatible pre-registration document |
+| `reviewer2` | Run adversarial 'Reviewer 2' critique on findings |
+| `dependency-check <script>` | Check for uninstalled imports in a script |
+| `dependency-check <script> --auto-install` | Auto-install missing dependencies |
+| `mcp` | Start MCP server for AI IDE integration |
 
 ## Workflow
 Run agents in this order:
 1. `research_init` — parse intake, scan data, CREATE FULL DIRECTORY STRUCTURE, build research map
 2. `literature_deep` — expand literature, build evidence matrix
 3. `method_route` — select analysis methods
-4. `data_scaffold` — build validated data pipeline
-5. `execute_analysis` — run analysis, compare to literature
-6. `replication_validator` — replicate similar studies from literature on project data
-7. `compile_outputs` — assemble manuscript
-8. `audit_validate` — multi-dimensional audit
+4. `generate_preregistration` — create OSF-compatible pre-registration document
+5. `data_scaffold` — build validated data pipeline
+6. `execute_analysis` — run analysis, compare to literature
+7. `replication_validator` — replicate similar studies from literature on project data
+8. `compile_outputs` — assemble manuscript
+9. `reviewer2_critic` — adversarial audit of findings
+10. `audit_validate` — multi-dimensional audit
 
 ## Research Iteration
 At ANY point, the user can request iteration. Use `research_iterate` agent:

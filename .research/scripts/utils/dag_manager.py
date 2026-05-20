@@ -100,6 +100,12 @@ class ExecutionDAGManager:
         depends_on: list = None,
         iteration_id: str = None,
         status: str = "complete",
+        runtime: str = None,
+        container: str = None,
+        tool_ids: list = None,
+        domain: str = None,
+        exit_code: int = None,
+        duration: float = None,
     ) -> dict:
         """Add an execution node to the DAG.
 
@@ -111,6 +117,12 @@ class ExecutionDAGManager:
             depends_on: List of node_ids this depends on
             iteration_id: Iteration ID (e.g., "001", "002")
             status: Execution status
+            runtime: Runtime used (python, r, bash, nextflow, snakemake, julia)
+            container: Container image used
+            tool_ids: Tool IDs from the tool registry
+            domain: Domain context (genomics, neuroimaging, etc.)
+            exit_code: Process exit code
+            duration: Execution duration in seconds
 
         Returns:
             The created node dict
@@ -135,6 +147,12 @@ class ExecutionDAGManager:
             "timestamp": now,
             "data_hash_in": input_hashes,
             "data_hash_out": {},
+            "runtime": runtime,
+            "container": container,
+            "tool_ids": tool_ids or [],
+            "domain": domain,
+            "exit_code": exit_code,
+            "duration_seconds": duration,
         }
 
         dag["nodes"][node_id] = node
@@ -301,9 +319,18 @@ class ExecutionDAGManager:
         ]
 
         iterations = {}
+        runtimes = {}
+        containers = {}
+        tools_used = set()
         for node_id, node in nodes.items():
             iter_id = node.get("iteration_id", "base")
             iterations.setdefault(iter_id, []).append(node)
+            rt = node.get("runtime", "unknown")
+            runtimes[rt] = runtimes.get(rt, 0) + 1
+            ct = node.get("container") or "none"
+            containers[ct] = containers.get(ct, 0) + 1
+            for tid in node.get("tool_ids", []):
+                tools_used.add(tid)
 
         if iterations:
             lines.append("  Iterations:")
@@ -311,8 +338,28 @@ class ExecutionDAGManager:
                 lines.append(f"    Iteration {iter_id}: {len(iter_nodes)} node(s)")
                 for n in iter_nodes:
                     status_marker = "+" if n["status"] == "complete" else "x"
+                    rt = n.get("runtime", "?")
+                    ct = n.get("container") or "local"
+                    tools = ", ".join(n.get("tool_ids", [])) or "-"
                     lines.append(f"      {status_marker} {n['script_path']}")
+                    lines.append(f"         runtime={rt} container={ct} tools=[{tools}]")
                 lines.append("")
+
+        if runtimes:
+            lines.append("  Runtimes:")
+            for rt, count in sorted(runtimes.items()):
+                lines.append(f"    {rt}: {count}")
+            lines.append("")
+
+        if containers:
+            lines.append("  Containers:")
+            for ct, count in sorted(containers.items()):
+                lines.append(f"    {ct}: {count}")
+            lines.append("")
+
+        if tools_used:
+            lines.append(f"  Tools used: {', '.join(sorted(tools_used))}")
+            lines.append("")
 
         return "\n".join(lines)
 

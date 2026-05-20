@@ -23,3 +23,11 @@ typical_effect_size_benchmarks:
   cost_effectiveness: "cost_per_outcome_unit_with_ci"
 outlier_handling: "winsorization_with_transparency"
 default_method: "difference_in_differences_or_regression_discontinuity"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

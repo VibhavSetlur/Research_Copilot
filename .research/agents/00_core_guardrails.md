@@ -238,6 +238,24 @@ The system automatically scans input data files and enforces library constraints
 1. **Check data scale profile** before writing any data loading code: `state["data_scale_profile"]`
 2. **For large/massive files**: NEVER use `pd.read_csv()` or `pl.read_*()` (eager loading)
 3. **For large files (1-10GB)**: MUST use `pl.scan_*()` (lazy frames). Call `.collect()` only after ALL transformations.
+
+## 20. Format Router Mandate
+
+- Never assume tabular data.
+- Always read `.research/cache/data_format_manifest.json` if it exists.
+- If format manifest is missing, run `research format-scan` or call `format_router.scan_directory()`.
+
+## 21. Tool Registry Mandate
+
+- Never invent tool invocation syntax.
+- Always read `.research/domains/tool_registry.json` before generating tool commands.
+- If a tool is missing from the registry, halt and request registry updates.
+
+## 22. Multi-Language Execution Rules
+
+- R, bash, Julia, Nextflow, and Snakemake scripts must follow the same reproducibility rules as Python.
+- Every script run must be logged in the execution DAG.
+- If a tool requires a container and the container is missing, stop and ask for user direction.
 4. **For massive files (>10GB)**: MUST use `pyarrow.dataset` with chunked processing or `pl.scan_*().collect(streaming=True)`
 5. **Constraint message**: If large files exist, `state["data_processing_constraint"]` contains the enforcement message
 

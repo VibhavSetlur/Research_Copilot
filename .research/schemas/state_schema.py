@@ -109,6 +109,21 @@ class ResearchState(BaseModel):
     active_hypotheses: List[dict] = Field(default=[], description="Active hypotheses being tested")
     dead_ends: List[str] = Field(default=[], description="Approaches tried and abandoned")
     loaded_data: List[str] = Field(default=[], description="Paths to loaded data files")
+    domain_classification: Optional[str] = Field(
+        default=None, description="Leaf-node domain classification from domain registry"
+    )
+    required_containers: List[str] = Field(
+        default=[], description="Containers required for this project"
+    )
+    tool_availability: Dict[str, str] = Field(
+        default={}, description="Tool availability map: tool_id -> AVAILABLE/INSTALLABLE/MISSING"
+    )
+    format_manifest_path: Optional[str] = Field(
+        default=None, description="Path to data format manifest JSON"
+    )
+    execution_runtimes: List[str] = Field(
+        default=[], description="Execution runtimes used (python, r, bash, etc.)"
+    )
     token_budget: TokenBudget = Field(...)
     last_checkpoint: str = Field(..., description="ISO 8601 timestamp of last checkpoint")
     errors: List[str] = Field(default=[], description="List of error messages")

@@ -9,3 +9,15 @@ quality_gates:
   - confounder_adjustment
   - missing_data_rationale
   - selection_bias_assessment
+leaf_nodes:
+  - survival_analysis
+  - clinical_trial
+primary_tools:
+  - survival
+  - lifelines
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

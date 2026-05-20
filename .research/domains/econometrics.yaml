@@ -9,3 +9,12 @@ quality_gates:
   - endogeneity_check
   -robust_standard_errors
   - pre_trend_test
+leaf_nodes:
+  - time_series_forecasting
+  - factor_modeling
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - PARQUET

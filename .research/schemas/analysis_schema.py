@@ -18,6 +18,9 @@ class StatisticalTest(BaseModel):
     )
     sample_size: int = Field(..., gt=0, description="Sample size used in test")
     assumptions_checked: List[str] = Field(default=[], description="List of assumptions verified")
+    runtime: Optional[str] = Field(default=None, description="Runtime used (python, r, bash, etc.)")
+    tool_id: Optional[str] = Field(default=None, description="Tool registry ID")
+    container: Optional[str] = Field(default=None, description="Container used for execution")
 
     @field_validator("confidence_interval")
     @classmethod
