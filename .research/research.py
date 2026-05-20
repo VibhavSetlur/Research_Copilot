@@ -18,6 +18,11 @@ try:
 except ImportError:
     yaml = None
 
+# Add .research/core to path for ledger and checkpoint modules
+_core_path = Path(__file__).parent / "core"
+if str(_core_path) not in sys.path:
+    sys.path.insert(0, str(_core_path))
+
 
 def find_project_root():
     """Find project root by looking for .research/ directory."""
@@ -121,6 +126,165 @@ def get_research_map(root, config):
     return load_json(root / config["cache_research_map"])
 
 
+def cmd_setup(args):
+    """First-run setup check. Verifies all system files are in place and environment is ready."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        print("This doesn't look like a Research Copilot project.")
+        print("Copy .research/, inputs/, environment/, and AGENTS.md from the template.")
+        sys.exit(1)
+
+    config = get_config(root)
+
+    print("=" * 60)
+    print("RESEARCH COPILOT — SETUP CHECK")
+    print("=" * 60)
+    print()
+
+    all_ok = True
+
+    # 1. System files
+    print("  System files:")
+    system_checks = [
+        (".research/research.py", "CLI tool"),
+        (".research/config.yaml", "Configuration"),
+        ("AGENTS.md", "AI agent instructions"),
+    ]
+    for path, desc in system_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path} — {desc}")
+        if not exists:
+            all_ok = False
+    print()
+
+    # 2. System directories
+    print("  System directories:")
+    dir_checks = [
+        (".research/agents", "Agent instructions"),
+        (".research/skills", "Methodology skills"),
+        (".research/workflows", "Workflow templates"),
+        (".research/domains", "Domain profiles"),
+        (".research/core", "Hook system & state ledger"),
+        (".research/schemas", "Pydantic validation models"),
+        (".research/scripts", "System scripts"),
+        (".research/scripts/utils", "System utility scripts"),
+    ]
+    for path, desc in dir_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path}/ — {desc}")
+        if not exists:
+            all_ok = False
+    print()
+
+    # 3. Environment
+    print("  Environment:")
+    env_checks = [
+        ("environment/requirements.txt", "Pinned dependencies"),
+        ("environment/setup.sh", "venv setup script"),
+        ("environment/setup_conda.sh", "Conda setup script"),
+    ]
+    for path, desc in env_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path} — {desc}")
+        if not exists:
+            all_ok = False
+
+    # Check if environment is active
+    venv_active = sys.prefix != sys.base_prefix
+    conda_active = "CONDA_DEFAULT_ENV" in os.environ
+    if venv_active or conda_active:
+        env_name = os.environ.get("CONDA_DEFAULT_ENV", sys.prefix.split("/")[-1])
+        print(f"    ✓ Active environment: {env_name}")
+    else:
+        print(f"    ○ No virtual environment active")
+        print(f"      Run: source environment/venv/bin/activate  (or conda activate research-copilot)")
+    print()
+
+    # 4. User inputs
+    print("  User inputs:")
+    input_checks = [
+        ("inputs/intake.md", "Intake form"),
+        ("inputs/data/raw", "Data directory"),
+        ("inputs/context", "Context directory"),
+        ("inputs/papers", "Papers directory"),
+    ]
+    for path, desc in input_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path}/ — {desc}")
+        if not exists:
+            all_ok = False
+
+    # Check for data files
+    data_dir = root / config["data_raw"]
+    if data_dir.exists():
+        data_files = [f for f in data_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
+        if data_files:
+            print(f"    ✓ {len(data_files)} data file(s) found")
+        else:
+            print(f"    ○ No data files yet — add files to inputs/data/raw/")
+    print()
+
+    # 5. Critical utility scripts
+    print("  Utility scripts:")
+    script_checks = [
+        (".research/scripts/00_environment_check.py", "Environment check"),
+        (".research/scripts/utils/cache_manager.py", "Cache manager"),
+        (".research/scripts/utils/citation_verifier.py", "Citation verifier"),
+        (".research/scripts/utils/claim_tracer.py", "Claim tracer"),
+        (".research/scripts/utils/parallel_runner.py", "Parallel runner"),
+        (".research/scripts/utils/figure_validator.py", "Figure validator"),
+        (".research/scripts/utils/auto_debug.py", "Auto debugger"),
+        (".research/scripts/research_dashboard.py", "Dashboard"),
+    ]
+    for path, desc in script_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path} — {desc}")
+        if not exists:
+            all_ok = False
+    print()
+
+    # 6. Core modules
+    print("  Core modules:")
+    core_checks = [
+        (".research/core/hooks.py", "Hook registry"),
+        (".research/core/interceptors.py", "Hook interceptors"),
+        (".research/core/state_ledger.py", "State ledger"),
+        (".research/core/checkpoint_manager.py", "Checkpoint manager"),
+    ]
+    for path, desc in core_checks:
+        exists = (root / path).exists()
+        marker = "✓" if exists else "✗"
+        print(f"    {marker} {path} — {desc}")
+        if not exists:
+            all_ok = False
+    print()
+
+    # Verdict
+    print("=" * 60)
+    if all_ok:
+        print("  STATUS: READY")
+        print()
+        print("  Next steps:")
+        print("    1. Fill out inputs/intake.md")
+        print("    2. Add data files to inputs/data/raw/")
+        print("    3. Open your AI agent and run: python .research/research.py scan")
+    else:
+        print("  STATUS: INCOMPLETE")
+        print()
+        print("  Some system files are missing. Re-copy from the template:")
+        print("    cp -r template/.research ./")
+        print("    cp -r template/inputs ./")
+        print("    cp -r template/environment ./")
+        print("    cp template/AGENTS.md ./")
+    print()
+
+
 def cmd_status(args):
     """Show project state, current phase, and next step."""
     root = find_project_root()
@@ -165,6 +329,7 @@ def cmd_status(args):
         "method_route": (root / "reports/analysis/analysis_plan.md").exists(),
         "data_scaffold": has_content(root / config.get("data_ingested", "data/01_ingested")),
         "execute_analysis": has_content(root / config["data_analytical"]),
+        "replication_validator": (root / "reports/analysis/replication_validation_report.md").exists(),
         "compile_outputs": (root / "reports/manuscript/research_findings.md").exists(),
         "audit_validate": (root / "reports/audit/full_audit_report.md").exists(),
     }
@@ -426,7 +591,88 @@ def cmd_skills(args):
         print("  Use: research skill <name> to view a skill")
 
 
+def cmd_skill_search(args):
+    """Search for skills using keyword matching against the generated index."""
+    import re
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    index_path = root / ".research" / "cache" / "skill_index.json"
+    if not index_path.exists():
+        sys.path.append(str(root))
+        try:
+            from scripts.utils.build_skill_index import build_index
+            build_index(root)
+        except Exception as e:
+            print(f"Index not found, and auto-build failed: {e}")
+            sys.exit(1)
+
+    try:
+        with open(index_path, "r") as f:
+            index_data = json.load(f)
+    except Exception as e:
+        print(f"ERROR: Failed to load skill index: {e}")
+        sys.exit(1)
+
+    query_text = args.query.lower()
+    query_words = re.findall(r'[a-zA-Z0-9\-]+', query_text)
+    if not query_words:
+        print("Please enter a valid search query.")
+        return
+
+    results = []
+    for skill in index_data.get("skills", []):
+        score = 0
+        skill_id = skill.get("id", "").lower()
+        title = skill.get("title", "").lower()
+        category = skill.get("category", "").lower()
+        description = skill.get("description", "").lower()
+        keywords = [k.lower() for k in skill.get("keywords", [])]
+
+        for word in query_words:
+            if word in title:
+                score += 10
+            if word in skill_id:
+                score += 5
+            if word in category:
+                score += 3
+            if word in keywords:
+                score += 3
+            if word in description:
+                score += 1
+
+        if score > 0:
+            results.append((score, skill))
+
+    results.sort(key=lambda x: x[0], reverse=True)
+
+    print("=" * 60)
+    print(f"SKILL SEARCH RESULTS FOR: '{args.query}'")
+    print("=" * 60)
+    print()
+
+    if not results:
+        print("  No matching skills found.")
+        print()
+        return
+
+    top_n = results[:3]
+    for idx, (score, skill) in enumerate(top_n, 1):
+        print(f"  {idx}. {skill['category']}/{skill['title']} (Score: {score})")
+        print(f"     ID:   {skill['id']}")
+        print(f"     Path: {skill['path']}")
+        
+        desc = skill.get("description", "")
+        if len(desc) > 120:
+            desc = desc[:117] + "..."
+        print(f"     Desc: {desc}")
+        print()
+
+
 def cmd_agents(args):
+
     """List agents or show a specific agent."""
     root = find_project_root()
     if not root:
@@ -438,8 +684,13 @@ def cmd_agents(args):
     if args.name:
         agent_file = agents_dir / f"{args.name}.md"
         if not agent_file.exists():
-            print(f"Agent '{args.name}' not found.")
-            return
+            # Try matching with numeric prefixes (e.g. 11_methodology_scout.md)
+            matches = list(agents_dir.glob(f"*_{args.name}.md"))
+            if matches:
+                agent_file = matches[0]
+            else:
+                print(f"Agent '{args.name}' not found.")
+                return
         print(f"--- {agent_file} ---")
         print(load_markdown(agent_file))
     else:
@@ -1088,10 +1339,6 @@ Reproducible code for the entire analysis pipeline.
 | 3 | `03_figures.py` | Generate figures | not started |
 | 4 | `04_tables.py` | Generate tables | not started |
 """,
-        "scripts/utils": f"""# Utility Functions — {project_title}
-
-Shared helper functions.
-""",
     }
 
     created = []
@@ -1226,6 +1473,153 @@ Methods will be selected based on question types during method_route phase.
     print()
 
 
+def cmd_state(args):
+    """Print current state.json ledger summary."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        from state_ledger import ResearchLedger
+    except ImportError:
+        print("ERROR: state_ledger module not found in .research/core/")
+        sys.exit(1)
+
+    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
+    print(ledger.summary())
+
+    if hasattr(args, 'json') and args.json:
+        print(json.dumps(ledger.get(), indent=2))
+
+
+def cmd_resume(args):
+    """Resume from a checkpoint at the specified phase."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        from state_ledger import ResearchLedger
+        from checkpoint_manager import CheckpointManager
+    except ImportError:
+        print("ERROR: core modules not found in .research/core/")
+        sys.exit(1)
+
+    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
+    cp_manager = CheckpointManager(root / ".research" / "cache" / "checkpoints")
+
+    phase = args.phase if args.phase else None
+
+    if phase:
+        checkpoint = cp_manager.load(phase)
+        if checkpoint is None:
+            print(f"No checkpoint found for phase: {phase}")
+            available = cp_manager.list_all()
+            if available:
+                print("Available checkpoints:")
+                for cp in available:
+                    print(f"  - {cp['phase']} [{cp['timestamp'][:19]}]")
+            return
+
+        state = ledger.get()
+        state["phase"] = phase
+        state["resumable_from"] = phase
+        state["checkpoints"][phase] = "restored"
+        ledger.update(**{
+            "phase": phase,
+            "resumable_from": phase,
+        })
+        ledger.complete_phase(phase)
+
+        print("=" * 60)
+        print("CHECKPOINT RESTORED")
+        print("=" * 60)
+        print()
+        print(f"  Phase: {phase}")
+        print(f"  Checkpoint time: {checkpoint.get('timestamp', 'N/A')}")
+        print(f"  Run ID: {state.get('run_id', 'N/A')}")
+        print()
+
+        metadata = checkpoint.get("metadata", {})
+        if metadata:
+            print("  Metadata:")
+            for k, v in metadata.items():
+                print(f"    {k}: {v}")
+            print()
+
+        file_hashes = checkpoint.get("file_hashes", {})
+        if file_hashes:
+            print("  File hashes at checkpoint:")
+            for fp, h in file_hashes.items():
+                print(f"    {fp}: {h}")
+            print()
+
+        print("  State updated. Continue with the next phase in the pipeline.")
+        print()
+    else:
+        print(cp_manager.summary())
+        print()
+        state = ledger.get()
+        print(f"  Current phase: {state.get('phase', 'N/A')}")
+        print(f"  Resumable from: {state.get('resumable_from', 'none')}")
+        print()
+        print("  Usage: research resume --from <phase>")
+        print()
+
+
+def cmd_budget(args):
+    """Show token budget usage by phase."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        from state_ledger import ResearchLedger
+    except ImportError:
+        print("ERROR: state_ledger module not found in .research/core/")
+        sys.exit(1)
+
+    ledger = ResearchLedger(root / ".research" / "cache" / "state.json")
+    state = ledger.get()
+    budget = state.get("token_budget", {"used": 0, "remaining": 200000, "limit": 200000})
+
+    used = budget.get("used", 0)
+    remaining = budget.get("remaining", 0)
+    limit = budget.get("limit", 200000)
+    pct = round(used / limit * 100, 1) if limit > 0 else 0
+
+    print("=" * 60)
+    print("TOKEN BUDGET")
+    print("=" * 60)
+    print()
+    print(f"  Model context limit: {limit:,} tokens")
+    print(f"  Used:                {used:,} tokens ({pct}%)")
+    print(f"  Remaining:           {remaining:,} tokens")
+    print()
+
+    if pct < 60:
+        print("  Status: OK — full context available")
+    elif pct < 80:
+        print("  Status: WARNING — consider summarizing completed phases")
+    elif pct < 90:
+        print("  Status: CRITICAL — flush non-essential context now")
+    else:
+        print("  Status: EMERGENCY — force checkpoint and split session")
+
+    print()
+
+    checkpoints = state.get("checkpoints", {})
+    if checkpoints:
+        print("  Phase checkpoints:")
+        for phase, status in checkpoints.items():
+            marker = "✓" if status == "complete" else "○"
+            print(f"    {marker} {phase}: {status}")
+        print()
+
+
 def cmd_validate(args):
     """Run quality gate check for a specific phase."""
     root = find_project_root()
@@ -1286,6 +1680,12 @@ def cmd_validate(args):
                 ("Results exist for all questions", lambda: _has_analysis_results(root)),
                 ("Figures generated", lambda: bool(list((root / "reports/figures").glob("*.png"))) if (root / "reports/figures").exists() else False),
                 ("Tables generated", lambda: bool(list((root / "reports/tables").glob("*"))) if (root / "reports/tables").exists() else False),
+            ]
+        },
+        "replication_validator": {
+            "name": "Replication Validator",
+            "checks": [
+                ("Replication report exists", lambda: (root / "reports/analysis/replication_validation_report.md").exists()),
             ]
         },
         "compile_outputs": {
@@ -1365,6 +1765,530 @@ def _has_analysis_results(root):
     return len(q_dirs) > 0
 
 
+def cmd_approve(args):
+    """Approve a pending phase gate request."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    cache_dir = root / ".research" / "cache"
+    pending_path = cache_dir / "pending_approval.json"
+    response_path = cache_dir / "approval_response.json"
+
+    if not pending_path.exists():
+        print("ERROR: No pending approval request found.")
+        sys.exit(1)
+
+    pending = load_json(pending_path)
+    pending_phase = pending.get("phase")
+    if pending_phase != args.phase:
+        print(f"ERROR: Pending approval is for phase '{pending_phase}', not '{args.phase}'.")
+        sys.exit(1)
+
+    # Trigger pre_ledger_commit hook to process approval
+    try:
+        sys.path.insert(0, str(root / ".research" / "core"))
+        from hooks import hook_engine
+        import interceptors  # noqa: F401
+
+        state = {
+            "phase": args.phase,
+            "approval_status": "approved",
+        }
+        state = hook_engine.trigger_sync(
+            "pre_ledger_commit", state, action="complete_phase", phase=args.phase
+        )
+    except ImportError:
+        pass
+
+    # Write approval response
+    from datetime import timezone
+    response = {
+        "phase": args.phase,
+        "status": "approved",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    save_json(response_path, response)
+
+    # Remove pending request
+    try:
+        pending_path.unlink()
+    except Exception as e:
+        print(f"WARNING: Could not delete pending approval file: {e}")
+
+    print(f"SUCCESS: Phase '{args.phase}' has been approved.")
+
+
+def cmd_reject(args):
+    """Reject a pending phase gate request with a reason."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    cache_dir = root / ".research" / "cache"
+    pending_path = cache_dir / "pending_approval.json"
+    response_path = cache_dir / "approval_response.json"
+
+    if not pending_path.exists():
+        print("ERROR: No pending approval request found.")
+        sys.exit(1)
+
+    pending = load_json(pending_path)
+    pending_phase = pending.get("phase")
+    if pending_phase != args.phase:
+        print(f"ERROR: Pending approval is for phase '{pending_phase}', not '{args.phase}'.")
+        sys.exit(1)
+
+    # Write rejection response
+    from datetime import timezone
+    response = {
+        "phase": args.phase,
+        "status": "rejected",
+        "reason": args.reason,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    save_json(response_path, response)
+
+    # Remove pending request
+    try:
+        pending_path.unlink()
+    except Exception as e:
+        print(f"WARNING: Could not delete pending approval file: {e}")
+
+    print(f"SUCCESS: Phase '{args.phase}' has been rejected. Reason: {args.reason}")
+
+
+def cmd_debug(args):
+    """Auto-debug a failing script."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    script_path = Path(args.script) if Path(args.script).is_absolute() else root / args.script
+    if not script_path.exists():
+        print(f"ERROR: Script not found: {script_path}")
+        sys.exit(1)
+
+    sys.path.insert(0, str(root / ".research" / "scripts" / "utils"))
+    from auto_debug import run_auto_debug
+
+    fix_code = None
+    if args.apply_fix:
+        fix_path = Path(args.apply_fix) if Path(args.apply_fix).is_absolute() else root / args.apply_fix
+        fix_code = fix_path.read_text()
+
+    result = run_auto_debug(script_path, max_attempts=args.max_attempts, fix_code=fix_code, fix_func=args.fix_func)
+    sys.exit(0 if result["success"] else 1)
+
+
+def cmd_cache(args):
+    """Manage the research cache: show stats or clear old entries."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    cache_dir = root / ".research" / "cache"
+    db_path = cache_dir / "research_cache.db"
+
+    if args.action == "stats":
+        print("=" * 60)
+        print("CACHE STATISTICS")
+        print("=" * 60)
+        print()
+
+        # Cache directory size
+        total_size = 0
+        file_count = 0
+        for f in cache_dir.rglob("*"):
+            if f.is_file():
+                total_size += f.stat().st_size
+                file_count += 1
+
+        print(f"  Cache directory: {cache_dir}")
+        print(f"  Total size: {total_size / 1024:.1f} KB")
+        print(f"  Files: {file_count}")
+        print()
+
+        # Database stats
+        if db_path.exists():
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cursor.fetchall()]
+
+                print(f"  Database: {db_path.name}")
+                print(f"  Tables: {', '.join(tables)}")
+                print()
+
+                for table in tables:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    count = cursor.fetchone()[0]
+                    try:
+                        cursor.execute(f"SELECT MAX(timestamp) FROM {table}")
+                        latest = cursor.fetchone()[0]
+                    except Exception:
+                        latest = None
+                    print(f"    {table}: {count} entries (latest: {latest or 'N/A'})")
+
+                conn.close()
+            except Exception as e:
+                print(f"  ERROR reading database: {e}")
+        else:
+            print("  Database not found.")
+
+        print()
+
+        # Skill index
+        index_path = cache_dir / "skill_index.json"
+        if index_path.exists():
+            index_data = load_json(index_path)
+            skill_count = len(index_data.get("skills", []))
+            index_size = index_path.stat().st_size
+            print(f"  Skill index: {skill_count} skills ({index_size / 1024:.1f} KB)")
+        print()
+
+    elif args.action == "clear":
+        older_than = args.older_than or "7d"
+        print(f"Clearing cache entries older than {older_than}...")
+
+        if db_path.exists():
+            try:
+                import sqlite3
+                from datetime import timedelta
+
+                # Parse time period
+                days = 7
+                if older_than.endswith("d"):
+                    days = int(older_than[:-1])
+                elif older_than.endswith("h"):
+                    days = int(older_than[:-1]) / 24
+
+                cutoff = datetime.now() - timedelta(days=days)
+                cutoff_str = cutoff.isoformat()
+
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cursor.fetchall()]
+
+                total_deleted = 0
+                for table in tables:
+                    cursor.execute(f"DELETE FROM {table} WHERE timestamp < ?", (cutoff_str,))
+                    deleted = cursor.rowcount
+                    total_deleted += deleted
+                    if deleted > 0:
+                        print(f"  Deleted {deleted} entries from {table}")
+
+                conn.commit()
+                conn.close()
+
+                # Vacuum to reclaim space
+                conn = sqlite3.connect(str(db_path))
+                conn.execute("VACUUM")
+                conn.close()
+
+                print(f"  Total deleted: {total_deleted} entries")
+            except Exception as e:
+                print(f"  ERROR clearing cache: {e}")
+        else:
+            print("  No cache database found.")
+
+        print()
+
+
+def cmd_verify_citations(args):
+    """Run citation verification on current bibliography."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    verifier_path = root / ".research" / "scripts" / "utils" / "citation_verifier.py"
+    if not verifier_path.exists():
+        print(f"ERROR: Citation verifier not found at {verifier_path}")
+        sys.exit(1)
+
+    bibliography = root / "reports" / "literature" / "bibliography.bib"
+    corpus = root / "reports" / "literature" / "literature_corpus.json"
+    manuscript = root / "reports" / "manuscript" / "research_findings.md"
+
+    cmd = [sys.executable, str(verifier_path)]
+
+    if bibliography.exists():
+        cmd.extend(["--bibliography", str(bibliography)])
+    elif manuscript.exists():
+        cmd.extend(["--manuscript", str(manuscript)])
+    else:
+        print("ERROR: No bibliography or manuscript found to extract citations from.")
+        sys.exit(1)
+
+    if corpus.exists():
+        cmd.extend(["--corpus", str(corpus)])
+
+    print("Running citation verification...")
+    import subprocess
+    try:
+        result = subprocess.run(cmd, check=True, cwd=str(root))
+        print()
+        report_path = root / "reports" / "literature" / "citation_verification_report.json"
+        if report_path.exists():
+            report = load_json(report_path)
+            summary = report.get("summary", {})
+            print("CITATION VERIFICATION SUMMARY")
+            print(f"  Total citations: {report.get('total_citations', 0)}")
+            print(f"  Verified: {summary.get('all_pass', 0)}")
+            print(f"  Unverified: {summary.get('existence_fail', 0) + summary.get('content_fail', 0)}")
+            print(f"  Retracted: {summary.get('retracted', 0)}")
+    except subprocess.CalledProcessError as e:
+        print(f"Citation verification failed with exit code {e.returncode}")
+        sys.exit(1)
+
+
+def cmd_trace_claims(args):
+    """Run claim tracer on current manuscript."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    tracer_path = root / ".research" / "scripts" / "utils" / "claim_tracer.py"
+    if not tracer_path.exists():
+        print(f"ERROR: Claim tracer not found at {tracer_path}")
+        sys.exit(1)
+
+    manuscript = root / "reports" / "manuscript" / "research_findings.md"
+    if not manuscript.exists():
+        print("ERROR: No manuscript found at reports/manuscript/research_findings.md")
+        sys.exit(1)
+
+    cmd = [sys.executable, str(tracer_path), "--manuscript", str(manuscript)]
+
+    data_lineage = root / "docs" / "data_lineage.json"
+    if data_lineage.exists():
+        cmd.extend(["--data-lineage", str(data_lineage)])
+
+    citation_report = root / "reports" / "literature" / "citation_verification_report.json"
+    if citation_report.exists():
+        cmd.extend(["--citation-report", str(citation_report)])
+
+    print("Running claim tracer...")
+    import subprocess
+    try:
+        result = subprocess.run(cmd, check=True, cwd=str(root))
+        print()
+        report_path = root / "reports" / "audit" / "claim_trace_report.json"
+        if report_path.exists():
+            report = load_json(report_path)
+            summary = report.get("summary", {})
+            print("CLAIM TRACE SUMMARY")
+            print(f"  Total claims: {report.get('total_claims', 0)}")
+            print(f"  Fully traced: {summary.get('fully_traced', 0)}")
+            print(f"  Partially traced: {summary.get('partially_traced', 0)}")
+            print(f"  Unsupported: {summary.get('unsupported', 0)}")
+    except subprocess.CalledProcessError as e:
+        print(f"Claim tracing failed with exit code {e.returncode}")
+        sys.exit(1)
+
+
+def cmd_parallel(args):
+    """Run multiple research questions in parallel."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    runner_path = root / ".research" / "scripts" / "utils" / "parallel_runner.py"
+    if not runner_path.exists():
+        print(f"ERROR: Parallel runner not found at {runner_path}")
+        sys.exit(1)
+
+    questions = args.questions or ""
+    question_list = [q.strip() for q in questions.split(",") if q.strip()]
+
+    if not question_list:
+        print("ERROR: No questions specified. Use --questions q1,q2,q3")
+        sys.exit(1)
+
+    workers = args.workers or 4
+
+    # Trigger pre_routing hook for parallel execution
+    try:
+        sys.path.insert(0, str(root / ".research" / "core"))
+        from hooks import hook_engine
+        import interceptors  # noqa: F401
+
+        state = {
+            "task": f"parallel_execution:{','.join(question_list)}",
+            "phase": "execute_analysis",
+            "token_budget": {"used": 0, "remaining": 200000, "limit": 200000},
+        }
+        state = hook_engine.trigger_sync("pre_routing", state)
+        if state.get("loaded_skills"):
+            print(f"  Loaded {state['skill_count']} relevant skills")
+    except ImportError:
+        pass
+
+    print(f"Running {len(question_list)} questions in parallel with {workers} workers...")
+    print(f"  Questions: {', '.join(question_list)}")
+    print()
+
+    import subprocess
+    cmd = [
+        sys.executable, str(runner_path),
+        "--questions", ",".join(question_list),
+        "--max-workers", str(workers),
+        "--state-ledger", str(root / ".research" / "cache" / "state.json"),
+    ]
+
+    try:
+        result = subprocess.run(cmd, check=True, cwd=str(root))
+        print()
+        print("Parallel execution complete.")
+    except subprocess.CalledProcessError as e:
+        print(f"Parallel execution failed with exit code {e.returncode}")
+        sys.exit(1)
+
+
+def cmd_export(args):
+    """Export manuscript in a specific format."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    fmt = args.format or "markdown"
+    journal = args.journal
+
+    manuscript = root / "reports" / "manuscript" / "research_findings.md"
+    if not manuscript.exists():
+        print("ERROR: No manuscript found at reports/manuscript/research_findings.md")
+        sys.exit(1)
+
+    if fmt == "latex":
+        print("Exporting to LaTeX...")
+        try:
+            import pypandoc
+            output_path = root / "reports" / "manuscript" / "manuscript.tex"
+            pypandoc.convert_file(
+                str(manuscript),
+                "latex",
+                outputfile=str(output_path),
+                extra_args=["--standalone", "--template=article"],
+            )
+            print(f"  LaTeX file: {output_path}")
+        except ImportError:
+            print("ERROR: pypandoc not installed. Run: pip install pypandoc")
+            sys.exit(1)
+        except Exception as e:
+            print(f"ERROR: LaTeX export failed: {e}")
+            sys.exit(1)
+
+    elif fmt == "journal" and journal:
+        print(f"Exporting to {journal} format...")
+        print("  NOTE: Use the journal_formatter skill for full journal formatting.")
+        print(f"  research skill journal_formatter")
+
+    elif fmt == "pdf":
+        print("Exporting to PDF...")
+        try:
+            import pypandoc
+            output_path = root / "reports" / "manuscript" / "manuscript.pdf"
+            pypandoc.convert_file(
+                str(manuscript),
+                "pdf",
+                outputfile=str(output_path),
+            )
+            print(f"  PDF file: {output_path}")
+        except ImportError:
+            print("ERROR: pypandoc not installed. Run: pip install pypandoc")
+            sys.exit(1)
+        except Exception as e:
+            print(f"ERROR: PDF export failed: {e}")
+            sys.exit(1)
+
+    else:
+        print(f"Unknown format: {fmt}")
+        print("Supported formats: latex, journal, pdf")
+        sys.exit(1)
+
+    print()
+
+
+def cmd_hooks(args):
+    """Show registered hooks and execution log."""
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    try:
+        sys.path.insert(0, str(root / ".research" / "core"))
+        from hooks import hook_engine
+        import interceptors  # noqa: F401
+    except ImportError:
+        print("ERROR: Hook system not available.")
+        sys.exit(1)
+
+    print("=" * 60)
+    print("HOOK REGISTRY")
+    print("=" * 60)
+    print()
+
+    hooks = hook_engine.list_hooks()
+    for hook_name, interceptors_list in hooks.items():
+        status = "ACTIVE" if interceptors_list else "empty"
+        print(f"  {hook_name}: {status}")
+        for fn_name in interceptors_list:
+            print(f"    → {fn_name}")
+        print()
+
+    log = hook_engine.get_execution_log()
+    if log:
+        print(f"  Execution log: {len(log)} entries")
+        for entry in log[-10:]:
+            marker = "✓" if entry["status"] == "success" else "✗"
+            print(f"    {marker} {entry['hook']} → {entry['interceptor']} ({entry['status']})")
+        if len(log) > 10:
+            print(f"    ... and {len(log) - 10} more")
+    else:
+        print("  Execution log: empty (no hooks triggered yet)")
+    print()
+
+
+def cmd_dashboard(args):
+    """Launch the Panel dashboard."""
+    import subprocess
+    root = find_project_root()
+    if not root:
+        print("ERROR: No .research/ directory found.")
+        sys.exit(1)
+
+    dashboard_path = root / ".research" / "scripts" / "research_dashboard.py"
+    if not dashboard_path.exists():
+        print(f"ERROR: Dashboard script not found at {dashboard_path}")
+        sys.exit(1)
+
+    print("Launching Panel dashboard on http://localhost:5006...")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "panel", "serve", str(dashboard_path), "--port", "5006", "--show"],
+            check=True
+        )
+    except KeyboardInterrupt:
+        print("\nDashboard stopped.")
+    except Exception as e:
+        print(f"ERROR launching dashboard: {e}")
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Research Copilot CLI — context retrieval for AI agents",
@@ -1377,6 +2301,16 @@ Commands:
   scan            Scan inputs/, save research map to .research/cache/
   init-dirs       Create full output directory structure (AI does this)
   validate [phase]  Run quality gate check (all phases or specific)
+  state           Print current state.json ledger
+  resume --from <phase>  Resume from checkpoint
+  budget          Show token budget usage
+  cache stats     Show cache hit rates, size
+  cache clear --older-than 7d  Prune old cache entries
+  verify-citations  Run citation verification on current bibliography
+  trace-claims    Run claim tracer on current manuscript
+  parallel --questions q1,q2,q3  Run multiple questions in parallel
+  export --format latex --journal nature  Export manuscript
+  dashboard       Launch the Panel dashboard on port 5006
   skills          List all skills
   skill <name>    Show a specific skill
   agents          List all agents
@@ -1384,6 +2318,8 @@ Commands:
   workflow        Show current workflow + iteration support
   followups       Show follow-up questions
   iterations      Show iteration history
+  approve         Approve a pending phase gate request
+  reject          Reject a pending phase gate request with feedback
 
 Design:
   - CLI stores working data in .research/cache/ (no new top-level dirs)
@@ -1407,6 +2343,7 @@ Examples:
 
     sub = parser.add_subparsers(dest="command")
 
+    sub.add_parser("setup", help="First-run setup check — verify system is ready")
     sub.add_parser("status", help="Show project state and next step")
     sub.add_parser("map", help="Show research map")
     sub.add_parser("intake", help="Show intake form status")
@@ -1416,6 +2353,8 @@ Examples:
     p_skill = sub.add_parser("skill", help="Show a specific skill")
     p_skill.add_argument("name", help="Skill name")
     sub.add_parser("skills", help="List all skills by category")
+    p_skill_search = sub.add_parser("skill-search", help="Search for matching skills by query")
+    p_skill_search.add_argument("query", help="Search query string")
 
     p_agent = sub.add_parser("agent", help="Show a specific agent")
     p_agent.add_argument("name", help="Agent name")
@@ -1428,6 +2367,52 @@ Examples:
     p_validate = sub.add_parser("validate", help="Run quality gate check")
     p_validate.add_argument("phase", nargs="?", help="Phase to validate (or all if omitted)")
 
+    sub.add_parser("state", help="Print current state.json ledger")
+
+    p_resume = sub.add_parser("resume", help="Resume from checkpoint")
+    p_resume.add_argument("--from", dest="phase", help="Phase to resume from")
+
+    sub.add_parser("budget", help="Show token budget usage")
+
+    p_approve = sub.add_parser("approve", help="Approve a pending phase gate request")
+    p_approve.add_argument("phase", help="Phase to approve")
+
+    p_reject = sub.add_parser("reject", help="Reject a pending phase gate request with feedback")
+    p_reject.add_argument("phase", help="Phase to reject")
+    p_reject.add_argument("--reason", required=True, help="Reason for rejection")
+
+    sub.add_parser("dashboard", help="Launch the Panel dashboard on port 5006")
+
+    p_debug = sub.add_parser("debug", help="Auto-debug a failing script")
+    p_debug.add_argument("script", help="Path to the failing script")
+    p_debug.add_argument("--max-attempts", type=int, default=3, help="Max debug attempts")
+    p_debug.add_argument("--apply-fix", help="Path to file with fixed function code")
+    p_debug.add_argument("--fix-func", help="Name of function to replace")
+
+    # Cache management
+    p_cache = sub.add_parser("cache", help="Manage research cache")
+    p_cache.add_argument("action", choices=["stats", "clear"], help="Cache action")
+    p_cache.add_argument("--older-than", help="Clear entries older than this (e.g., 7d, 30d)")
+
+    # Citation verification
+    sub.add_parser("verify-citations", help="Run citation verification on bibliography")
+
+    # Claim tracing
+    sub.add_parser("trace-claims", help="Run claim tracer on manuscript")
+
+    # Parallel execution
+    p_parallel = sub.add_parser("parallel", help="Run multiple questions in parallel")
+    p_parallel.add_argument("--questions", help="Comma-separated question IDs (q1,q2,q3)")
+    p_parallel.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
+
+    # Export
+    p_export = sub.add_parser("export", help="Export manuscript in specific format")
+    p_export.add_argument("--format", choices=["latex", "journal", "pdf"], default="markdown", help="Export format")
+    p_export.add_argument("--journal", help="Target journal name (for journal format)")
+
+    # Hooks
+    sub.add_parser("hooks", help="Show registered hooks and execution log")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1438,12 +2423,15 @@ Examples:
         cmd_skills(argparse.Namespace(name=args.name))
     elif args.command == "skills":
         cmd_skills(argparse.Namespace(name=None))
+    elif args.command == "skill-search":
+        cmd_skill_search(args)
     elif args.command == "agent":
         cmd_agents(argparse.Namespace(name=args.name))
     elif args.command == "agents":
         cmd_agents(argparse.Namespace(name=None))
     else:
         commands = {
+            "setup": cmd_setup,
             "status": cmd_status,
             "map": cmd_map,
             "intake": cmd_intake,
@@ -1453,6 +2441,19 @@ Examples:
             "followups": cmd_followups,
             "iterations": cmd_iterations,
             "validate": cmd_validate,
+            "state": cmd_state,
+            "resume": cmd_resume,
+            "budget": cmd_budget,
+            "approve": cmd_approve,
+            "reject": cmd_reject,
+            "dashboard": cmd_dashboard,
+            "debug": cmd_debug,
+            "cache": cmd_cache,
+            "verify-citations": cmd_verify_citations,
+            "trace-claims": cmd_trace_claims,
+            "parallel": cmd_parallel,
+            "export": cmd_export,
+            "hooks": cmd_hooks,
         }
         commands[args.command](args)
 
