@@ -95,6 +95,25 @@ def _detect_data_info() -> dict:
     return {"files": files, "total_size_mb": round(total_size / 1024 / 1024, 2)}
 
 
+def _auto_trigger_init() -> bool:
+    """Auto-trigger research_init: scan data and create directory structure.
+    
+    Returns True if initialization succeeded, False otherwise.
+    """
+    try:
+        # Run scan to build research map
+        from cli.commands.scan import cmd_scan
+        cmd_scan(type("Args", (), {})())
+        
+        # Create directory structure
+        from cli.commands.init import cmd_init_dirs
+        cmd_init_dirs(type("Args", (), {})())
+        
+        return True
+    except Exception:
+        return False
+
+
 def _generate_intake_md(answers: dict) -> str:
     """Generate intake.md from collected answers."""
     data_info = _detect_data_info()
@@ -200,12 +219,28 @@ def run_intake_interview(start: bool = False, message: str = "") -> str:
         # Clean up session
         session_file.unlink(missing_ok=True)
 
-        return (
+        # Auto-trigger research_init: scan data and create directory structure
+        init_triggered = _auto_trigger_init()
+
+        completion_msg = (
             f"✅ **Intake interview complete!**\n\n"
-            f"Generated `inputs/intake.md` with your responses.\n\n"
-            f"You can now run `research status` to see the next step, "
-            f"or review and edit `inputs/intake.md` if needed."
+            f"Generated `inputs/intake.md` with your responses.\n"
         )
+        
+        if init_triggered:
+            completion_msg += (
+                f"\n🚀 **Auto-initialized project structure!**\n\n"
+                f"Created docs/, reports/, data/, scripts/ directories.\n"
+                f"Research map built and feasibility assessed.\n\n"
+                f"Next: Review `research status` and begin the pipeline."
+            )
+        else:
+            completion_msg += (
+                f"\nYou can now run `research status` to see the next step, "
+                f"or review and edit `inputs/intake.md` if needed."
+            )
+
+        return completion_msg
 
     # Save updated session
     save_json(session_file, session)

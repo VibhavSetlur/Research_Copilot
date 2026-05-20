@@ -1,0 +1,15 @@
+{
+  "files": [
+    {
+      "format": "UNKNOWN",
+      "pandera_applicable": false,
+      "domain_hint": null,
+      "parser": null,
+      "parser_available": false,
+      "path": "/home/vibhav/Downloads/Work/Research/Research_Copilot_Architecture _Template/inputs/data/raw/.gitkeep",
+      "requires_container": false
+    }
+  ],
+  "tabular_count": 0,
+  "non_tabular_count": 1
+}

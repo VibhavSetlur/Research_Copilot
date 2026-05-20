@@ -26,15 +26,21 @@ Configuration:
 
 import argparse
 import json
-import subprocess
+import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
 
 # Add parent to path for imports
-_core_path = Path(__file__).parent / "core"
+_research_path = Path(__file__).parent
+_core_path = _research_path / "core"
+_cli_path = _research_path
 if str(_core_path) not in sys.path:
     sys.path.insert(0, str(_core_path))
+if str(_cli_path) not in sys.path:
+    sys.path.insert(0, str(_cli_path))
+if str(_research_path / "scripts" / "utils") not in sys.path:
+    sys.path.insert(0, str(_research_path / "scripts" / "utils"))
 
 # Try to import mcp, fall back to stdio protocol if not available
 try:
@@ -356,39 +362,130 @@ TOOL_DEFINITIONS = {
 }
 
 
-def _run_cli_command(command: str, args: Optional[dict] = None) -> str:
-    """Run a research.py CLI command and return stdout."""
-    cli_path = Path(__file__).parent / "research.py"
-    cmd = [sys.executable, str(cli_path), command]
-
-    if args:
-        for key, value in args.items():
-            if isinstance(value, bool):
-                if value:
-                    cmd.append(f"--{key}")
-            else:
-                cmd.append(f"--{key}")
-                cmd.append(str(value))
-
+def _capture_output(func, *args, **kwargs) -> str:
+    """Capture stdout from a CLI command function and return as string."""
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = captured = io.StringIO()
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode != 0:
-            return f"Error: {result.stderr}"
-        return result.stdout
-    except subprocess.TimeoutExpired:
-        return "Error: Command timed out after 120 seconds"
+        func(*args, **kwargs)
+    except SystemExit:
+        pass
     except Exception as e:
+        sys.stdout = old_stdout
         return f"Error: {str(e)}"
+    finally:
+        sys.stdout = old_stdout
+    return captured.getvalue()
+
+
+def _run_cli_command(command: str, args: Optional[dict] = None) -> str:
+    """Run a research.py CLI command via direct function invocation (no subprocess)."""
+    args = args or {}
+
+    command_handlers = {
+        "status": lambda: _capture_output(
+            _import_cmd("project").cmd_status, _make_namespace(args)
+        ),
+        "scan": lambda: _capture_output(
+            _import_cmd("scan").cmd_scan, _make_namespace(args)
+        ),
+        "map": lambda: _capture_output(
+            _import_cmd("project").cmd_map, _make_namespace(args)
+        ),
+        "intake": lambda: _capture_output(
+            _import_cmd("project").cmd_intake, _make_namespace(args)
+        ),
+        "followups": lambda: _capture_output(
+            _import_cmd("info").cmd_followups, _make_namespace(args)
+        ),
+        "iterations": lambda: _capture_output(
+            _import_cmd("info").cmd_iterations, _make_namespace(args)
+        ),
+        "budget": lambda: _capture_output(
+            _import_cmd("tracking").cmd_budget, _make_namespace(args)
+        ),
+        "dag": lambda: _capture_output(
+            _import_cmd("tracking").cmd_dag, _make_namespace(args)
+        ),
+        "data-scale": lambda: _capture_output(
+            _import_cmd("tracking").cmd_data_scale, _make_namespace(args)
+        ),
+        "hooks": lambda: _capture_output(
+            _import_cmd("tracking").cmd_hooks, _make_namespace(args)
+        ),
+        "agents": lambda: _capture_output(
+            _import_cmd("info").cmd_agents, _make_namespace(args, name=None)
+        ),
+        "skills": lambda: _capture_output(
+            _import_cmd("info").cmd_skills, _make_namespace(args, name=None)
+        ),
+        "workflow": lambda: _capture_output(
+            _import_cmd("info").cmd_workflow, _make_namespace(args)
+        ),
+        "validate": lambda: _capture_output(
+            _import_cmd("analysis").cmd_validate, _make_namespace(args)
+        ),
+        "approve": lambda: _capture_output(
+            _import_cmd("approval").cmd_approve, _make_namespace(args)
+        ),
+        "reject": lambda: _capture_output(
+            _import_cmd("approval").cmd_reject, _make_namespace(args)
+        ),
+        "agent": lambda: _capture_output(
+            _import_cmd("info").cmd_agents, _make_namespace(args)
+        ),
+        "skill": lambda: _capture_output(
+            _import_cmd("info").cmd_skills, _make_namespace(args)
+        ),
+        "skill-search": lambda: _capture_output(
+            _import_cmd("info").cmd_skill_search, _make_namespace(args)
+        ),
+        "verify-citations": lambda: _capture_output(
+            _import_cmd("citations").cmd_verify_citations, _make_namespace(args)
+        ),
+        "trace-claims": lambda: _capture_output(
+            _import_cmd("citations").cmd_trace_claims, _make_namespace(args)
+        ),
+        "debug": lambda: _capture_output(
+            _import_cmd("analysis").cmd_debug, _make_namespace(args)
+        ),
+        "cache": lambda: _capture_output(
+            _import_cmd("cache").cmd_cache, _make_namespace(args)
+        ),
+    }
+
+    handler = command_handlers.get(command)
+    if handler:
+        try:
+            return handler()
+        except Exception as e:
+            return f"Error executing '{command}': {str(e)}"
+    return f"Error: Unknown command '{command}'"
+
+
+def _import_cmd(module_name: str):
+    """Lazily import a CLI command module."""
+    from cli.commands import __dict__ as cmd_modules
+    if module_name not in cmd_modules:
+        import importlib
+        importlib.import_module(f"cli.commands.{module_name}")
+        from cli.commands import __dict__ as cmd_modules
+    return __import__("cli.commands", fromlist=[module_name])
+
+
+def _make_namespace(args: dict, **defaults) -> Any:
+    """Convert dict to argparse.Namespace for CLI command compatibility."""
+    class NS:
+        pass
+    ns = NS()
+    for k, v in {**defaults, **args}.items():
+        setattr(ns, k.replace("-", "_"), v)
+    return ns
 
 
 def _handle_tool_call(name: str, arguments: dict) -> list:
     """Handle a tool call and return MCP-compatible content."""
-    # Map tool names to CLI commands
     command_map = {
         "research_status": ("status", {}),
         "research_scan": ("scan", {}),
@@ -414,7 +511,6 @@ def _handle_tool_call(name: str, arguments: dict) -> list:
         output = _run_cli_command(cmd, args)
         return [TextContent(type="text", text=output)]
 
-    # Tools with required/optional args
     if name == "research_validate":
         phase = arguments.get("phase", "")
         output = _run_cli_command("validate", {"phase": phase} if phase else {})
@@ -458,7 +554,6 @@ def _handle_tool_call(name: str, arguments: dict) -> list:
         return [TextContent(type="text", text=output)]
 
     if name == "research_intake_interview":
-        # Run the intake interviewer agent
         from cli.commands.intake_interview import run_intake_interview
         result = run_intake_interview(
             start=arguments.get("start", False),

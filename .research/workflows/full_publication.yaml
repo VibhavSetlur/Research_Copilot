@@ -56,6 +56,35 @@ quality_gates:
     gate: "audit_validate"
     on_fail: "remediate audit failures and re-run"
 
+remediation:
+  reviewer2_fatal_flaws:
+    enabled: true
+    max_remediation_attempts: 2
+    actions:
+      - trigger: "data_leakage_detected"
+        iteration_type: "method_switch"
+        description: "Re-run analysis with strict train/test separation"
+        on_success: "re-run reviewer2_critic"
+        on_failure: "append to manuscript limitations section"
+      
+      - trigger: "severe_confounding"
+        iteration_type: "variable_change"
+        description: "Add identified confounders as control variables"
+        on_success: "re-run execute_analysis → reviewer2_critic"
+        on_failure: "append to manuscript limitations section"
+      
+      - trigger: "causal_overclaim"
+        iteration_type: "investigate"
+        description: "Downgrade causal language to correlational"
+        on_success: "update manuscript → re-run reviewer2_critic"
+        on_failure: "append to manuscript limitations section"
+      
+      - trigger: "missing_uncertainty"
+        iteration_type: "validate"
+        description: "Compute confidence intervals and effect sizes"
+        on_success: "update statistical reporting → re-run reviewer2_critic"
+        on_failure: "append to manuscript limitations section"
+
 iteration_support:
   enabled: true
   agent: research_iterate

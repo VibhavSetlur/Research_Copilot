@@ -5,6 +5,7 @@ Reads research findings and explicitly tries to destroy the conclusions by
 finding unaddressed confounders, alternative explanations, and methodological flaws.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -44,6 +45,52 @@ def _load_methodology() -> str:
     return ""
 
 
+def _generate_remediation_actions(critique: dict) -> list:
+    """Generate specific remediation actions based on identified flaws."""
+    actions = []
+    
+    for flaw in critique.get("fatal_flaws", []):
+        if "DATA LEAKAGE" in flaw:
+            actions.append({
+                "type": "method_switch",
+                "action": "Re-run analysis with strict train/test separation",
+                "target": "data_pipeline",
+                "priority": "critical",
+            })
+        elif "SEVERE CONFOUNDING" in flaw:
+            actions.append({
+                "type": "variable_change",
+                "action": "Add control variables and re-run regression",
+                "target": "model_specification",
+                "priority": "critical",
+            })
+        elif "CAUSAL OVERCLAIM" in flaw:
+            actions.append({
+                "type": "investigate",
+                "action": "Downgrade causal language to correlational",
+                "target": "manuscript_language",
+                "priority": "critical",
+            })
+    
+    for concern in critique.get("statistical_concerns", []):
+        if "confidence interval" in concern.lower():
+            actions.append({
+                "type": "validate",
+                "action": "Compute confidence intervals for all estimates",
+                "target": "statistical_reporting",
+                "priority": "high",
+            })
+        if "effect size" in concern.lower():
+            actions.append({
+                "type": "validate",
+                "action": "Compute effect sizes for all statistical tests",
+                "target": "statistical_reporting",
+                "priority": "high",
+            })
+    
+    return actions
+
+
 def _analyze_findings(findings: str, methodology: str) -> dict:
     """Analyze findings for weaknesses — the Reviewer 2 critique."""
     critique = {
@@ -54,18 +101,47 @@ def _analyze_findings(findings: str, methodology: str) -> dict:
         "missing_robustness_checks": [],
         "statistical_concerns": [],
         "limitations_to_add": [],
+        "fatal_flaws": [],
     }
 
     findings_lower = findings.lower()
 
-    # Check for causal language without causal design
-    causal_words = ["causes", "caused", "causal", "leads to", "results in", "drives", "determines"]
-    if methodology and "randomized" not in methodology.lower() and "instrumental" not in methodology.lower():
-        for word in causal_words:
-            if word in findings_lower:
-                critique["overclaiming_instances"].append(
-                    f"Uses causal language ('{word}') without RCT or valid identification strategy"
+    # FATAL FLAW: Data leakage detection
+    leakage_indicators = [
+        ("test data", "train", "leak", "target leakage"),
+        ("future information", "look-ahead bias", "survivorship bias"),
+    ]
+    for indicators in leakage_indicators:
+        if any(ind in findings_lower for ind in indicators):
+            if "leakage" not in findings_lower and "addressed" not in findings_lower:
+                critique["fatal_flaws"].append(
+                    "POTENTIAL DATA LEAKAGE: Indicators suggest information from the test set "
+                    "may have influenced training or feature selection. This invalidates all results."
                 )
+
+    # FATAL FLAW: Severe confounding without any controls
+    if "control" not in findings_lower and "adjust" not in findings_lower:
+        severe_confounders = ["socioeconomic", "demographic", "selection bias", "confounding"]
+        for conf in severe_confounders:
+            if conf in findings_lower:
+                critique["fatal_flaws"].append(
+                    f"SEVERE CONFOUNDING: '{conf}' is present but no control variables or adjustment "
+                    f"method is mentioned. Results may be entirely driven by this confounder."
+                )
+                break
+
+    # FATAL FLAW: Causal claims from purely correlational design
+    causal_words = ["causes", "caused", "causal", "leads to", "results in", "drives", "determines"]
+    causal_design_words = ["randomized", "instrumental", "regression discontinuity", "difference-in-differences",
+                          "matching", "propensity score", "natural experiment"]
+    has_causal_design = any(word in methodology.lower() for word in causal_design_words) if methodology else False
+    has_causal_claim = any(word in findings_lower for word in causal_words)
+    
+    if has_causal_claim and not has_causal_design:
+        critique["fatal_flaws"].append(
+            "CAUSAL OVERCLAIM: Strong causal language used without a valid causal identification strategy. "
+            "Must either downgrade to correlational language or provide causal identification."
+        )
 
     # Check for missing uncertainty
     if "confidence interval" not in findings_lower and "ci" not in findings_lower:
@@ -183,22 +259,33 @@ def run_reviewer2(findings_path: str = "") -> str:
     json_path = audit_dir / f"reviewer2_critique_{timestamp}.json"
 
     total_issues = sum(len(v) for v in critique.values())
+    fatal_count = len(critique.get("fatal_flaws", []))
 
     report_lines = [
         "# Reviewer 2 — Adversarial Critique Report",
         f"\n**Generated**: {now_iso()}",
         f"**Findings File**: {findings_path or 'reports/manuscript/research_findings.md'}",
         f"**Total Issues Found**: {total_issues}",
+        f"**Fatal Flaws**: {fatal_count}",
         "",
         "---",
         "",
-        "## Summary",
-        "",
-        f"This adversarial review identified **{total_issues} potential issues** across "
-        f"{len(critique)} categories. Each issue represents a vulnerability that a "
-        f"real reviewer could exploit to undermine the findings.",
-        "",
     ]
+
+    if fatal_count > 0:
+        report_lines.extend([
+            "## ⚠️ FATAL FLAWS DETECTED",
+            "",
+            "The following issues **must be addressed** before findings can be considered valid:",
+            "",
+        ])
+        for i, flaw in enumerate(critique.get("fatal_flaws", []), 1):
+            report_lines.append(f"{i}. **{flaw}**")
+        report_lines.extend([
+            "",
+            "---",
+            "",
+        ])
 
     category_names = {
         "unaddressed_confounders": "## 1. Unaddressed Confounders",
@@ -243,6 +330,27 @@ def run_reviewer2(findings_path: str = "") -> str:
             report_lines.append("- **investigate**: Review causal claims against study design")
         if critique.get("statistical_concerns"):
             report_lines.append("- **validate**: Re-compute statistics with proper uncertainty quantification")
+
+        # Fatal flaw remediation
+        if critique.get("fatal_flaws"):
+            report_lines.extend([
+                "",
+                "### Fatal Flaw Remediation (Auto-Triggered)",
+                "",
+                "The following remediation actions will be attempted automatically:",
+                "",
+            ])
+            for flaw in critique.get("fatal_flaws", []):
+                if "DATA LEAKAGE" in flaw:
+                    report_lines.append("- **method_switch**: Re-run analysis with strict train/test separation")
+                elif "SEVERE CONFOUNDING" in flaw:
+                    report_lines.append("- **variable_change**: Add control variables and re-run regression")
+                elif "CAUSAL OVERCLAIM" in flaw:
+                    report_lines.append("- **investigate**: Downgrade causal language to correlational")
+            report_lines.extend([
+                "",
+                "If remediation fails, these flaws will be appended to the manuscript's Limitations section.",
+            ])
     else:
         report_lines.append("No critical issues found. The findings appear robust.")
 
@@ -263,8 +371,13 @@ def run_reviewer2(findings_path: str = "") -> str:
         "generated_at": now_iso(),
         "findings_file": findings_path or "reports/manuscript/research_findings.md",
         "total_issues": total_issues,
+        "has_fatal_flaws": fatal_count > 0,
+        "has_critical_issues": fatal_count > 0 or len(critique.get("methodological_flaws", [])) > 2,
+        "has_major_issues": total_issues > 10,
+        "fatal_flaw_count": fatal_count,
         "categories": {k: len(v) for k, v in critique.items()},
         "critique": critique,
+        "remediation_actions": _generate_remediation_actions(critique),
     }
 
     with open(json_path, "w") as f:
@@ -275,8 +388,15 @@ def run_reviewer2(findings_path: str = "") -> str:
         f"🔍 **Reviewer 2 Adversarial Critique Complete**",
         f"",
         f"Total issues found: {total_issues}",
-        f"",
     ]
+    
+    if fatal_count > 0:
+        output.append(f"⚠️  FATAL FLAWS: {fatal_count}")
+        output.append("")
+        for flaw in critique.get("fatal_flaws", []):
+            output.append(f"  ✗ {flaw[:100]}...")
+        output.append("")
+        output.append("Remediation actions will be auto-triggered.")
 
     for key, issues in critique.items():
         if issues:
