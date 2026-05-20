@@ -48,6 +48,11 @@ Run `extract_claims` → build evidence matrix (papers × research question). Ru
 ### Step 6: Update Research Map
 Append: literature sufficiency, updated gap analysis, relevance scores.
 
+### Step 7: Critic Review
+- Trigger the `critic` agent to perform adversarial review of the literature corpus, evidence matrix, and gap analysis outputs.
+- Verify that the synthesis is logically consistent and properly structured.
+- If the critic verdict is FAIL, execute remediation steps via `research_iterate`.
+
 ---
 
 ## Validation
@@ -56,3 +61,5 @@ Append: literature sufficiency, updated gap analysis, relevance scores.
 - [ ] Evidence matrix covers the research question
 - [ ] Gap analysis updated
 - [ ] BibTeX generated
+- [ ] Critic agent report generated with PASS verdict
+

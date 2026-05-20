@@ -47,6 +47,11 @@ Plain-language version.
 ### Step 7: Final Assembly
 Run `write_imrad`. Cross-check: every citation has a reference, every claim is grounded.
 
+### Step 8: Critic Review
+- Trigger the `critic` agent to perform adversarial review of the compiled manuscript, executive summary, and tables.
+- Verify that there is no scope creep or causal overclaiming, that references match citations, and that data claims are aligned.
+- If the critic verdict is FAIL, execute remediation steps via `research_iterate`.
+
 ---
 
 ## Validation
@@ -56,3 +61,5 @@ Run `write_imrad`. Cross-check: every citation has a reference, every claim is g
 - [ ] Effect sizes interpreted
 - [ ] Limitations stated
 - [ ] No causal overclaiming
+- [ ] Critic agent report generated with PASS verdict
+

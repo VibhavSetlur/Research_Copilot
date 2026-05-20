@@ -106,3 +106,55 @@ Reason: [why it failed]
 Date: [when]
 Alternatives to try: [what to try instead]
 ```
+
+## 12. State Ledger & Checkpoint System
+
+The global research ledger (`.research/cache/state.json`) is the single source of truth.
+
+- **Read state** before starting any phase: `research state`
+- **Update state** after completing any phase using `ResearchLedger.complete_phase()`
+- **Save checkpoints** at phase boundaries using `CheckpointManager.save()`
+- **Resume** from failures: `research resume --from <phase>`
+- **Never** skip state updates — every phase transition must be recorded
+
+## 13. Token Budget Management
+
+Monitor context window usage via the token budget in state.json.
+
+- At 60%: summarize completed phases into 3-sentence abstracts
+- At 80%: flush non-essential skill docs, keep only active skill
+- At 90%: force checkpoint, split into new conversation with state transfer
+- Check budget: `research budget`
+
+## 14. Atomic Instruction Format
+
+Every agent instruction must follow this format so any LLM can execute it without ambiguity:
+
+1. EXACTLY ONE action per numbered step
+2. Each step specifies: what to DO, what FILE to read, what FILE to write
+3. No compound instructions ("do X and also Y and then Z")
+4. Decision branches are IF/ELIF/ELSE, never ambiguous prose
+5. Every output file has exact path and schema specified
+6. Every input file has exact path specified
+7. Verification: every step ends with a checkable condition
+
+## 15. Anti-Hallucination Rules (non-negotiable)
+
+1. Never invent a citation. If you cannot find a real DOI, write [CITATION NEEDED].
+2. Never invent a p-value, effect size, or sample size. Compute or mark [COMPUTED NEEDED].
+3. Never assume a file exists without checking via ls or Path.exists().
+4. Never assume a variable name exists in data without checking schema_cache.json.
+5. If unsure about a library API, invoke Context7 before writing code.
+   CODE GENERATION RULE: For ANY library function call, first verify the 
+   current API signature via Context7. Training knowledge of library APIs 
+   may be outdated. This is non-negotiable and prevents broken code.
+6. If a number in your output cannot be traced to a file in the project, flag it.
+7. When uncertain: understate, not overstate. Use "may" not "demonstrates".
+
+## 16. Skill Loading Efficiency
+
+Before executing any task:
+1. Query the skill index (`.research/cache/skill_index.json` if available)
+2. Load ONLY skills directly relevant to the current step
+3. If unsure which skill applies, match by keyword
+4. Never load more than 4 skills simultaneously unless explicitly required

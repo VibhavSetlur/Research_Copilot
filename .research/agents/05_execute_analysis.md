@@ -56,6 +56,11 @@ Did the user's minimum success criteria get met? Report honestly.
 ### Step 7: Generate Outputs
 Figures, tables, methods log. Organize results by research question, not by method.
 
+### Step 8: Critic Review
+- Trigger the `critic` agent to perform adversarial review of the statistical outputs, figures, and tables.
+- Verify logical consistency, data grounding, and that limitations or statistical uncertainty (CIs, p-values) are reported correctly.
+- If the critic verdict is FAIL, execute remediation steps via `research_iterate`.
+
 ---
 
 ## Validation
@@ -65,3 +70,5 @@ Figures, tables, methods log. Organize results by research question, not by meth
 - [ ] Sensitivity tests run (if finding significant)
 - [ ] Finding compared to ≥ 2 literature sources
 - [ ] Results organized by research question
+- [ ] Critic agent report generated with PASS verdict
+
