@@ -2,7 +2,7 @@
 """Environment check — verify all dependencies are installed and versions are compatible.
 
 Run this BEFORE any analysis to ensure reproducibility.
-Usage: python scripts/00_environment_check.py
+Usage: python .research/scripts/00_environment_check.py
 """
 
 import sys
