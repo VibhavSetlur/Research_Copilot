@@ -1,0 +1,26 @@
+# Research Copilot — Project Configuration
+project_id: "examples/01_sleep_quality_analysis"
+schema_version: "9.0.0"
+default_workflow: "quick_exploratory"
+intent_routing:
+  enabled: true
+  default_depth: "academic"
+branching:
+  enabled: true
+knowledge_graph:
+  enabled: true
+semantic_filesystem:
+  enabled: true
+interpretative_coupling:
+  enabled: true
+data_scale_thresholds:
+  medium_mb: 100
+  large_gb: 1
+  massive_gb: 10
+execution:
+  supported_runtimes: [python, r, bash]
+dependency_management:
+  auto_detect: true
+  requirements_file: "environment/requirements.txt"
+quality_gates_enabled: true
+pin_dependency_versions: true

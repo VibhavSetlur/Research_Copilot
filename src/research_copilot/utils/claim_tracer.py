@@ -4,9 +4,9 @@
 Every factual claim must be traceable to computed data or a verified citation.
 
 Usage:
-    python .research/scripts/utils/claim_tracer.py --manuscript reports/manuscript/research_findings.md
+    python .research/scripts/utils/claim_tracer.py --manuscript 03_synthesis/manuscript/research_findings.md
     python .research/scripts/utils/claim_tracer.py --manuscript ... --data-lineage docs/data_lineage.json
-    python .research/scripts/utils/claim_tracer.py --manuscript ... --citation-report reports/literature/citation_verification_report.json
+    python .research/scripts/utils/claim_tracer.py --manuscript ... --citation-report 00_inputs/literature/citation_verification_report.json
 """
 
 import argparse
@@ -150,7 +150,7 @@ def trace_statistical_claim(claim: dict, data_lineage: Optional[dict], root: Pat
     }
 
     # Look for analysis result files
-    analysis_dir = root / "reports" / "analysis"
+    analysis_dir = root / "03_synthesis" / "analysis"
     if analysis_dir.exists():
         for q_dir in analysis_dir.iterdir():
             if q_dir.is_dir():
@@ -184,7 +184,7 @@ def trace_statistical_claim(claim: dict, data_lineage: Optional[dict], root: Pat
                         break
 
     # Check for raw data files
-    raw_dir = root / "inputs" / "data" / "raw"
+    raw_dir = root / "00_inputs" / "raw_data"
     if raw_dir.exists():
         raw_files = list(raw_dir.glob("*"))
         if raw_files:
@@ -370,7 +370,7 @@ def main():
     parser.add_argument("--manuscript", type=str, required=True, help="Path to manuscript markdown file")
     parser.add_argument("--data-lineage", type=str, help="Path to data lineage JSON")
     parser.add_argument("--citation-report", type=str, help="Path to citation verification report JSON")
-    parser.add_argument("--output", type=str, help="Output report path (default: reports/audit/claim_trace_report.json)")
+    parser.add_argument("--output", type=str, help="Output report path (default: 03_synthesis/audit/claim_trace_report.json)")
     args = parser.parse_args()
 
     root = find_project_root()
@@ -387,7 +387,7 @@ def main():
         cr_path = Path(args.citation_report) if Path(args.citation_report).is_absolute() else root / args.citation_report
         citation_report = load_json(cr_path)
 
-    output_path = Path(args.output) if args.output else root / "reports" / "audit" / "claim_trace_report.json"
+    output_path = Path(args.output) if args.output else root / "03_synthesis" / "audit" / "claim_trace_report.json"
     if not output_path.is_absolute():
         output_path = root / output_path
 

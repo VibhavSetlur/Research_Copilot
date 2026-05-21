@@ -26,7 +26,7 @@ class ManuscriptCompiler:
     def __init__(self, root: Optional[Path] = None):
         self.root = root or find_project_root()
         self.sections_dir = self.root / "03_synthesis" / "sections"
-        self.output_dir = self.root / "reports" / "manuscript"
+        self.output_dir = self.root / "03_synthesis" / "manuscript"
 
     def discover_sections(self) -> List[ManuscriptSection]:
         if not self.sections_dir.exists():

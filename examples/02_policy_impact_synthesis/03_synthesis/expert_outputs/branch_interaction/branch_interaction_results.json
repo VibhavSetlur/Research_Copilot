@@ -1,0 +1,14 @@
+{
+  "model_formula": "outcome ~ treatment * baseline + age",
+  "r_squared": 0.7168778970822461,
+  "aic": 420.9516668494716,
+  "findings": [
+    {
+      "variable": "treatment",
+      "outcome": "outcome",
+      "effect_size": 1.3801253866858034,
+      "p_value": 1.211585104211246e-14
+    }
+  ],
+  "winning_artifacts_data_path": "/home/vibhav/Downloads/Work/Research/Research_Copilot_Architecture _Template/examples/02_policy_impact_synthesis/03_synthesis/expert_outputs/branch_interaction/branch_interaction_artifact.csv"
+}

@@ -7,7 +7,7 @@ Provides validation tests for:
 3. OLS Regression (linearity, homoscedasticity, normality of residuals, multicollinearity, independence)
 4. ARIMA/Time Series (stationarity)
 
-Writes reports to reports/analysis/assumption_validation_{question_id}.json
+Writes reports to 03_synthesis/analysis/assumption_validation_{question_id}.json
 """
 
 import argparse
@@ -530,7 +530,7 @@ def main():
     # Output to JSON
     output_path = args.output
     if not output_path:
-        reports_dir = root / "reports" / "analysis"
+        reports_dir = root / "03_synthesis" / "analysis"
         reports_dir.mkdir(parents=True, exist_ok=True)
         output_path = reports_dir / f"assumption_validation_{args.question_id}.json"
     else:

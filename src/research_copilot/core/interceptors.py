@@ -91,7 +91,7 @@ def detect_data_scale_constraints(state: dict, *args, **kwargs) -> dict:
     that must be injected into the system prompt.
     """
     project_root = find_project_root()
-    data_raw = project_root / "inputs" / "data" / "raw"
+    data_raw = project_root / "00_inputs" / "raw_data"
 
     if not data_raw.exists():
         return state
@@ -481,7 +481,7 @@ def run_critic_review(state: dict, *args, **kwargs) -> dict:
 
     # Write critic brief so the AI agent picks it up
     project_root = find_project_root()
-    audit_dir = project_root / "reports" / "audit"
+    audit_dir = project_root / "03_synthesis" / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
 
     critic_brief = {
@@ -526,7 +526,7 @@ def run_reviewer2(state: dict, *args, **kwargs) -> dict:
 
     # Write reviewer2 brief so the AI agent picks it up
     project_root = find_project_root()
-    audit_dir = project_root / "reports" / "audit"
+    audit_dir = project_root / "03_synthesis" / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
 
     reviewer2_brief = {

@@ -1,0 +1,72 @@
+{
+  "classification": {
+    "primary_intent": "robustness",
+    "all_scores": {
+      "robustness": 6,
+      "predictive": 4,
+      "hypothesis_test": 2,
+      "iteration": 2
+    },
+    "matched_keywords": {
+      "robustness": [
+        "robust",
+        "alternative",
+        "specification"
+      ],
+      "predictive": [
+        "predict",
+        "model"
+      ],
+      "hypothesis_test": [
+        "predict"
+      ],
+      "iteration": [
+        "alternative"
+      ]
+    },
+    "query": "Run predictive and robustness analyses across alternative model specifications.",
+    "timestamp": "2026-05-21T15:56:39.476960+00:00"
+  },
+  "depth": "publication",
+  "depth_profile": {
+    "description": "Full rigor workflow for publication-ready outputs.",
+    "quality_gates": true,
+    "prompt_constraint": "Run full validation, adversarial critique, provenance checks, and publication-grade reporting."
+  },
+  "null_space": [
+    "manuscript",
+    "visualization",
+    "literature"
+  ],
+  "context": {
+    "skills": [
+      "robustness_checks",
+      "sensitivity_analysis",
+      "replication"
+    ],
+    "agents": [
+      "execute_analysis",
+      "replication_validator",
+      "audit_validate",
+      "reviewer2_critic"
+    ],
+    "workflow_steps": [
+      "re_analyze",
+      "robustness",
+      "compare",
+      "report",
+      "reviewer2",
+      "audit"
+    ]
+  },
+  "excluded": {
+    "skill_categories": [
+      "manuscript",
+      "visualization",
+      "literature"
+    ],
+    "depth_exclusions": [],
+    "estimated_token_savings": 4500
+  },
+  "transient_workflow": "transient: true\nintent: robustness\ndepth: publication\nnull_space_excluded: ['manuscript', 'visualization', 'literature']\nprompt_constraints:\n  - \"Run full validation, adversarial critique, provenance checks, and publication-grade reporting.\"\nsteps:\n  - step: 1\n    name: re_analyze\n    type: re_analyze\n  - step: 2\n    name: robustness\n    type: robustness\n  - step: 3\n    name: compare\n    type: compare\n  - step: 4\n    name: report\n    type: report\n  - step: 5\n    name: reviewer2\n    type: reviewer2\n  - step: 6\n    name: audit\n    type: audit\nskills_to_load:\n    - robustness_checks\n    - sensitivity_analysis\n    - replication\nagents_to_invoke:\n    - execute_analysis\n    - replication_validator\n    - audit_validate\n    - reviewer2_critic\nquality_gates:\n  - enabled: true\n    checks: [data_grounding, method_appropriateness]"
+}

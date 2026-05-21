@@ -66,7 +66,7 @@ def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[st
     """Build task list from question IDs by reading the research map."""
     research_map_path = root / ".research" / "cache" / "research_map.json"
     if not research_map_path.exists():
-        research_map_path = root / "reports" / "baseline" / "research_map.json"
+        research_map_path = root / "03_synthesis" / "research_map.json"
 
     if not research_map_path.exists():
         print(f"ERROR: Research map not found. Run 'research scan' first.")
@@ -105,8 +105,8 @@ def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[st
             task = {
                 "id": f"q{q_idx}",
                 "command": f"{sys.executable} .research/scripts/utils/run_analysis.py --question q{q_idx}",
-                "output_dir": str(root / "reports" / "analysis" / f"q{q_idx}"),
-                "log_file": str(root / "reports" / "analysis" / f"q{q_idx}" / "task.log"),
+                "output_dir": str(root / "03_synthesis" / "analysis" / f"q{q_idx}"),
+                "log_file": str(root / "03_synthesis" / "analysis" / f"q{q_idx}" / "task.log"),
             }
             tasks.append(task)
         else:
@@ -298,7 +298,7 @@ def main():
                 lock.release()
 
     # Save results for synthesizer pick up
-    results_path = root / "reports" / "analysis" / "parallel_results.json"
+    results_path = root / "03_synthesis" / "analysis" / "parallel_results.json"
     results_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(results_path, "w") as f:

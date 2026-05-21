@@ -6,9 +6,9 @@ Pass 2: Content verification (Semantic Scholar abstract vs claim)
 Pass 3: Retraction check (CrossRef retraction notices)
 
 Usage:
-    python .research/scripts/utils/citation_verifier.py --bibliography reports/literature/bibliography.bib
-    python .research/scripts/utils/citation_verifier.py --corpus reports/literature/literature_corpus.json
-    python .research/scripts/utils/citation_verifier.py --manuscript reports/manuscript/research_findings.md
+    python .research/scripts/utils/citation_verifier.py --bibliography 00_inputs/literature/bibliography.bib
+    python .research/scripts/utils/citation_verifier.py --corpus 00_inputs/literature/literature_corpus.json
+    python .research/scripts/utils/citation_verifier.py --manuscript 03_synthesis/manuscript/research_findings.md
 """
 
 import argparse
@@ -673,7 +673,7 @@ def main():
     parser.add_argument("--bibliography", type=str, help="Path to BibTeX bibliography file")
     parser.add_argument("--corpus", type=str, help="Path to literature corpus JSON")
     parser.add_argument("--manuscript", type=str, help="Path to manuscript markdown file")
-    parser.add_argument("--output", type=str, help="Output report path (default: reports/literature/citation_verification_report.json)")
+    parser.add_argument("--output", type=str, help="Output report path (default: 00_inputs/literature/citation_verification_report.json)")
     parser.add_argument("--delay", type=float, default=0.5, help="Delay between API calls in seconds")
     args = parser.parse_args()
 
@@ -701,7 +701,7 @@ def main():
         print("ERROR: No citations found. Provide --bibliography, --corpus, or --manuscript")
         sys.exit(1)
 
-    output_path = Path(args.output) if args.output else root / "reports" / "literature" / "citation_verification_report.json"
+    output_path = Path(args.output) if args.output else root / "00_inputs" / "literature" / "citation_verification_report.json"
     if not output_path.is_absolute():
         output_path = root / output_path
 

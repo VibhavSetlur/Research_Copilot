@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0",
+  "created_at": "2026-05-21T15:56:00.812986+00:00",
+  "updated_at": "2026-05-21T15:56:41.904643+00:00",
+  "current_branch": "branch_site_adjusted",
+  "branches": {
+    "exp_001_baseline": {
+      "branch_id": "exp_001_baseline",
+      "parent_branch": null,
+      "status": "active",
+      "hypothesis": "Baseline research workflow",
+      "experiment_dir": "02_experiments/exp_001_baseline",
+      "created_at": "2026-05-21T15:56:00.812990+00:00",
+      "input_data_hashes": {}
+    },
+    "exp_002_branch_linear": {
+      "branch_id": "exp_002_branch_linear",
+      "parent_branch": "exp_001_baseline",
+      "status": "active",
+      "hypothesis": "Test branch_linear specification",
+      "experiment_dir": "02_experiments/exp_002_branch_linear",
+      "created_at": "2026-05-21T15:56:39.518868+00:00",
+      "input_data_hashes": {
+        "00_inputs/raw_data/policy_panel.csv": "72bd1c4b74d935d82ef9ac13c1dcd685d4ae08d7fa1639ad6f3255ddc99a89ac"
+      }
+    },
+    "main": {
+      "branch_id": "main",
+      "parent_branch": "",
+      "created_at": "2026-05-21T15:56:39.519142+00:00",
+      "status": "active",
+      "hypothesis": "Primary research workflow",
+      "merge_commit": null,
+      "merged_at": null,
+      "evaluation": null,
+      "workspace_prefix": "",
+      "experiment_dir": "02_experiments/exp_001_baseline",
+      "data_hashes": {}
+    },
+    "branch_linear": {
+      "branch_id": "branch_linear",
+      "parent_branch": "main",
+      "created_at": "2026-05-21T15:56:39.519146+00:00",
+      "status": "active",
+      "hypothesis": "",
+      "merge_commit": null,
+      "merged_at": null,
+      "evaluation": null,
+      "workspace_prefix": "branch_linear/",
+      "experiment_dir": "02_experiments/branch_linear",
+      "data_hashes": {}
+    },
+    "exp_003_branch_interaction": {
+      "branch_id": "exp_003_branch_interaction",
+      "parent_branch": "branch_linear",
+      "status": "active",
+      "hypothesis": "Test branch_interaction specification",
+      "experiment_dir": "02_experiments/exp_003_branch_interaction",
+      "created_at": "2026-05-21T15:56:40.264202+00:00",
+      "input_data_hashes": {
+        "00_inputs/raw_data/policy_panel.csv": "72bd1c4b74d935d82ef9ac13c1dcd685d4ae08d7fa1639ad6f3255ddc99a89ac"
+      }
+    },
+    "branch_interaction": {
+      "branch_id": "branch_interaction",
+      "parent_branch": "exp_003_branch_interaction",
+      "created_at": "2026-05-21T15:56:40.264489+00:00",
+      "status": "active",
+      "hypothesis": "",
+      "merge_commit": null,
+      "merged_at": null,
+      "evaluation": null,
+      "workspace_prefix": "branch_interaction/",
+      "experiment_dir": "02_experiments/branch_interaction",
+      "data_hashes": {}
+    },
+    "exp_004_branch_site_adjusted": {
+      "branch_id": "exp_004_branch_site_adjusted",
+      "parent_branch": "branch_interaction",
+      "status": "active",
+      "hypothesis": "Test branch_site_adjusted specification",
+      "experiment_dir": "02_experiments/exp_004_branch_site_adjusted",
+      "created_at": "2026-05-21T15:56:41.035979+00:00",
+      "input_data_hashes": {
+        "00_inputs/raw_data/policy_panel.csv": "72bd1c4b74d935d82ef9ac13c1dcd685d4ae08d7fa1639ad6f3255ddc99a89ac"
+      }
+    },
+    "branch_site_adjusted": {
+      "branch_id": "branch_site_adjusted",
+      "parent_branch": "exp_004_branch_site_adjusted",
+      "created_at": "2026-05-21T15:56:41.036390+00:00",
+      "status": "active",
+      "hypothesis": "",
+      "merge_commit": null,
+      "merged_at": null,
+      "evaluation": null,
+      "workspace_prefix": "branch_site_adjusted/",
+      "experiment_dir": "02_experiments/branch_site_adjusted",
+      "data_hashes": {}
+    }
+  },
+  "active_branch": "branch_site_adjusted",
+  "winning_branch_name": "branch_site_adjusted",
+  "winning_artifacts_data_path": "/home/vibhav/Downloads/Work/Research/Research_Copilot_Architecture _Template/examples/02_policy_impact_synthesis/03_synthesis/expert_outputs/branch_site_adjusted/branch_site_adjusted_artifact.csv",
+  "main_trunk_artifacts_data_path": "/home/vibhav/Downloads/Work/Research/Research_Copilot_Architecture _Template/examples/02_policy_impact_synthesis/03_synthesis/expert_outputs/branch_site_adjusted/branch_site_adjusted_artifact.csv",
+  "approval_status": "none"
+}

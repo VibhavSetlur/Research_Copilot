@@ -758,9 +758,9 @@ class ResearchLedger:
 
         Returns dict with branch-specific directory paths:
         {
-            "figures": "reports/figures/<branch>/",
-            "scripts": "scripts/models/<branch>/",
-            "analysis": "reports/analysis/<branch>/",
+            "figures": "02_experiments/<branch>/outputs/figures/",
+            "scripts": "02_experiments/<branch>/scripts/",
+            "analysis": "02_experiments/<branch>/outputs/analysis/",
             ...
         }
         """
@@ -771,18 +771,16 @@ class ResearchLedger:
         if bid not in branches:
             raise ValueError(f"Branch '{bid}' does not exist.")
 
-        prefix = branches[bid].get("workspace_prefix", "")
-        if bid == "main":
-            prefix = ""
+        prefix = branches[bid].get("workspace_prefix", "") or bid
 
         return {
             "branch_id": bid,
             "prefix": prefix,
-            "figures": f"reports/figures/{prefix}" if prefix else "reports/figures/",
-            "scripts": f"scripts/models/{prefix}" if prefix else "scripts/",
-            "analysis": f"reports/analysis/{prefix}" if prefix else "reports/analysis/",
-            "tables": f"reports/tables/{prefix}" if prefix else "reports/tables/",
-            "manuscript": f"reports/manuscript/{prefix}" if prefix else "reports/manuscript/",
+            "figures": f"02_experiments/{prefix}/outputs/figures/",
+            "scripts": f"02_experiments/{prefix}/scripts/",
+            "analysis": f"02_experiments/{prefix}/outputs/analysis/",
+            "tables": f"02_experiments/{prefix}/outputs/tables/",
+            "manuscript": f"02_experiments/{prefix}/outputs/manuscript/",
         }
 
     def compress_ledger(self, model: str = "ollama/llama3", dry_run: bool = False) -> dict:

@@ -2,7 +2,7 @@
 """Data Scale Detector — analyzes input data files and recommends processing libraries.
 
 Prevents Out-Of-Memory (OOM) errors by:
-1. Scanning all files in inputs/data/raw/
+1. Scanning all files in 00_inputs/raw_data/
 2. Classifying each file by size (small/medium/large/massive)
 3. Recommending appropriate processing libraries (pandas vs polars vs pyarrow)
 4. Generating code templates for large file processing
@@ -71,7 +71,7 @@ class DataScaleDetector:
         if project_root is None:
             project_root = find_project_root()
         self.root = project_root
-        self.data_dir = project_root / "inputs" / "data" / "raw"
+        self.data_dir = project_root / "00_inputs" / "raw_data"
         self.thresholds = self._load_thresholds()
 
     def _load_thresholds(self) -> dict:
@@ -223,13 +223,13 @@ class DataScaleDetector:
             "small": '''# Small file (<100MB) — pandas is fine
 import pandas as pd
 
-df = pd.read_csv("inputs/data/raw/data.csv")
+df = pd.read_csv("00_inputs/raw_data/data.csv")
 # ... your analysis ...
 ''',
             "medium": '''# Medium file (100MB-1GB) — polars recommended
 import polars as pl
 
-df = pl.read_csv("inputs/data/raw/data.csv")
+df = pl.read_csv("00_inputs/raw_data/data.csv")
 # ... your analysis ...
 # df.collect() not needed for eager mode
 ''',
@@ -237,7 +237,7 @@ df = pl.read_csv("inputs/data/raw/data.csv")
 import polars as pl
 
 # Use scan_* for lazy evaluation — NO data loaded yet
-lf = pl.scan_csv("inputs/data/raw/data.csv")
+lf = pl.scan_csv("00_inputs/raw_data/data.csv")
 
 # Chain all transformations lazily
 result = (
@@ -256,7 +256,7 @@ import pyarrow.dataset as ds
 import pyarrow.compute as pc
 
 # Create dataset — NO data loaded yet
-dataset = ds.dataset("inputs/data/raw/data.csv", format="csv")
+dataset = ds.dataset("00_inputs/raw_data/data.csv", format="csv")
 
 # Filter at the dataset level (pushed down to disk)
 filtered = dataset.filter(ds.field("value") > 0)

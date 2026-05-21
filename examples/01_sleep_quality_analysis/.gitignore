@@ -1,0 +1,25 @@
+# Research Copilot — Git Ignore Rules
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+environment/venv/
+
+# System
+.DS_Store
+
+# Research Copilot Runtime Cache
+.research/cache/
+.research/state/
+.research/workflow_dag.json
+.research/workflow_dag.mermaid
+
+# Raw Data (Do not commit massive datasets)
+00_inputs/raw_data/*
+!00_inputs/raw_data/.gitkeep
