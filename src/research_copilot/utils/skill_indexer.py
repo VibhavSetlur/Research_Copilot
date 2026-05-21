@@ -165,6 +165,101 @@ def build_index(project_root: Path) -> Path:
     print(f"Successfully generated skill index: {index_path} ({len(skills_index['skills'])} skills indexed)")
     return index_path
 
+import hashlib
+
+MAX_DOC_CHARS = 2_000
+
+def _tokenize(text: str) -> List[str]:
+    """Lowercase, strip punctuation, split on whitespace."""
+    return re.sub(r"[^a-z0-9\s]", " ", text.lower()).split()
+
+def _corpus_fingerprint(skills_dir: Path) -> str:
+    md5 = hashlib.md5()
+    for md_file in sorted(skills_dir.rglob("*.md")):
+        md5.update(str(md_file.stat().st_mtime).encode())
+    return md5.hexdigest()
+
+def _build_bm25_index(skills_dir: Path) -> tuple[List[Dict], Any]:
+    try:
+        from rank_bm25 import BM25Okapi
+    except ImportError as exc:
+        raise RuntimeError("rank-bm25 is required: pip install rank-bm25") from exc
+
+    corpus_meta = []
+    tokenized_corpus = []
+
+    for md_file in sorted(skills_dir.rglob("*.md")):
+        if md_file.name in ("SKILL_TEMPLATE.md",):
+            continue
+        text = md_file.read_text(errors="replace")
+        tokens = _tokenize(text)
+        corpus_meta.append({"path": str(md_file), "title": md_file.stem})
+        tokenized_corpus.append(tokens)
+
+    if not tokenized_corpus:
+        raise RuntimeError(f"No skill files found under {skills_dir}")
+
+    return corpus_meta, BM25Okapi(tokenized_corpus)
+
+_INDEX_META: Optional[List[Dict]] = None
+_BM25: Optional[Any] = None
+_INDEX_FINGERPRINT: Optional[str] = None
+
+def _get_index(skills_dir: Path):
+    global _INDEX_META, _BM25, _INDEX_FINGERPRINT
+    fp = _corpus_fingerprint(skills_dir)
+    if _BM25 is None or fp != _INDEX_FINGERPRINT:
+        _INDEX_META, _BM25 = _build_bm25_index(skills_dir)
+        _INDEX_FINGERPRINT = fp
+    return _INDEX_META, _BM25
+
+def search_skills(query: str, top_k: int = 1) -> List[Dict]:
+    current = Path.cwd()
+    root = None
+    for p in [current] + list(current.parents):
+        if (p / ".research").exists():
+            root = p
+            break
+    if not root:
+        skills_dirs = [Path(__file__).parent.parent / "assets" / "skills"]
+    else:
+        skills_dirs = _find_skills_dirs(root)
+        
+    skills_dir = skills_dirs[0] if skills_dirs else Path(__file__).parent.parent / "assets" / "skills"
+    
+    corpus_meta, bm25 = _get_index(skills_dir)
+    tokens = _tokenize(query)
+    scores = bm25.get_scores(tokens)
+
+    ranked = sorted(zip(scores, corpus_meta), key=lambda t: t[0], reverse=True)
+
+    results = []
+    for score, meta in ranked[:top_k]:
+        path = Path(meta["path"])
+        try:
+            content = path.read_text(errors="replace")[:MAX_DOC_CHARS]
+        except OSError:
+            content = ""
+        results.append({
+            "path": str(path),
+            "title": meta["title"],
+            "score": float(score),
+            "content": content,
+        })
+    return results
+
+def resolve_library_id(library_name: str, cache=None) -> str:
+    results = search_skills(library_name, top_k=1)
+    if results and results[0]["score"] > 0:
+        return f"skill:{results[0]['title']}"
+    return f"lib_{library_name.strip().lower()}_generic"
+
+def get_library_docs(library_id: str, topic: str, cache=None) -> str:
+    query = f"{library_id} {topic}"
+    results = search_skills(query, top_k=1)
+    if results and results[0]["score"] > 0:
+        return results[0]["content"]
+    return f"No local skill documentation found for '{topic}' in '{library_id}'.\nRefer to the official library documentation online."
 
 if __name__ == "__main__":
     # Find project root

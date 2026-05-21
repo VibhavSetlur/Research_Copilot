@@ -83,6 +83,8 @@ def validate_with_retry(
             attempt += 1
 
             error_str = str(exc)
+            if len(error_str) > 1000:
+                error_str = error_str[:500] + "\n...[TRUNCATED]...\n" + error_str[-500:]
             logger.warning(
                 "%sValidation attempt %d/%d failed:\n%s",
                 prefix, attempt, max_retries + 1, error_str,

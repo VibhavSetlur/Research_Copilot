@@ -78,9 +78,18 @@ def compress_state_hook(state: dict, **kwargs) -> dict:
     conn.commit()
     conn.close()
 
-    # Append compressed summary to global context roll-up.
-    current_summary = state.get("global_context_summary", "")
-    state["global_context_summary"] = current_summary + f"\nNode {node_id}: {summary}"
+    # Implement sliding context window: keep only the last 5 nodes
+    nodes_list = state.get("_context_nodes_list", [])
+    if "global_context_summary" in state and not nodes_list:
+        # For backwards compatibility if we have an existing string but no list
+        nodes_list = [n for n in state["global_context_summary"].split("\nNode ") if n.strip()]
+        nodes_list = [n if n.startswith("Node ") else f"Node {n}" for n in nodes_list]
+        
+    nodes_list.append(f"Node {node_id}: {summary}")
+    nodes_list = nodes_list[-5:]
+    
+    state["_context_nodes_list"] = nodes_list
+    state["global_context_summary"] = "\n".join(nodes_list)
 
     # Flush raw output; keep only compressed version in live state.
     if "last_output" in state:

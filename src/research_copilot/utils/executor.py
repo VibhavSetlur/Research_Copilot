@@ -94,6 +94,8 @@ class ResearchExecutor:
 
     def _run(self, cmd: List[str], timeout: Optional[int] = None,
              tool_ids: Optional[List[str]] = None, domain: Optional[str] = None) -> ExecutionResult:
+        if timeout is None:
+            timeout = 300
         start = time.time()
         try:
             p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
@@ -499,13 +501,9 @@ class TemplateExecutor:
                 f"Template '{template_name}' requires variables not provided: {missing}"
             )
 
-        # Substitute all placeholders.
-        def _sub(match: _re.Match) -> str:
-            key = match.group(1)
-            val = variables.get(key) or variables.get(key.lower(), "")
-            return str(val)
-
-        return self.PLACEHOLDER_RE.sub(_sub, source)
+        import jinja2
+        upper_vars = {k.upper(): v for k, v in variables.items()}
+        return jinja2.Template(source).render(**upper_vars)
 
     # ------------------------------------------------------------------
     # Execute

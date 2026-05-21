@@ -261,11 +261,27 @@ def main():
         prompt = (
             "Analyze the following synthesized parallel execution results and any detected conflicts. "
             "Determine the 'Winning Branch' (task_id) that produced the most robust, well-supported findings. "
-            "Explain your reasoning and state the winning branch.\n\n"
+            "Explain your reasoning and state the winning branch.\n"
+            "You MUST output a raw JSON object containing exactly two keys: 'winning_branch_name' (string) and 'winning_artifacts_path' (string). "
+            "Do NOT wrap the output in markdown code blocks. Just the raw JSON.\n\n"
             f"Results: {json.dumps(combined_payload, indent=2)}"
         )
-        synthesis_decision = cascade_resolve(prompt, model="google/gemini-pro", temperature=0.2)
-        print("Synthesis Decision:\n", synthesis_decision)
+        synthesis_decision_raw = cascade_resolve(prompt, model="google/gemini-pro", temperature=0.2)
+        try:
+            synthesis_decision = json.loads(synthesis_decision_raw)
+            winning_branch = synthesis_decision.get("winning_branch_name")
+            print("Synthesis Decision JSON:\n", json.dumps(synthesis_decision, indent=2))
+            
+            from research_copilot.utils.dag_manager import ExecutionDAGManager
+            from research_copilot.project_ops import find_project_root
+            root = find_project_root()
+            if root and winning_branch:
+                dag = ExecutionDAGManager(root)
+                dag.merge_branch_lineage(winning_branch)
+                print(f"Successfully merged data lineage for branch: {winning_branch}")
+        except json.JSONDecodeError:
+            print("WARNING: Synthesis LLM did not return valid JSON.")
+            synthesis_decision = {"raw_output": synthesis_decision_raw}
         
         # Output to ledger via log_decision
         from research_copilot.project_ops import log_decision, current_branch, find_project_root

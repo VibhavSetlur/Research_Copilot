@@ -381,6 +381,24 @@ class ExecutionDAGManager:
 
         return "\n".join(lines)
 
+    def merge_branch_lineage(self, branch_id: str, target_branch: str = "main") -> None:
+        """Merge a branch's nodes into another branch (typically main trunk)."""
+        dag = self._load()
+        if branch_id not in dag.get("branches", {}):
+            return
+
+        branch_nodes = dag["branches"][branch_id].get("nodes", [])
+        dag.setdefault("branches", {}).setdefault(target_branch, {"nodes": []})
+        
+        for nid in branch_nodes:
+            if nid not in dag["branches"][target_branch]["nodes"]:
+                dag["branches"][target_branch]["nodes"].append(nid)
+                if nid in dag["nodes"]:
+                    dag["nodes"][nid]["branch_id"] = target_branch
+
+        dag["last_updated"] = datetime.now(timezone.utc).isoformat()
+        self._save(dag)
+
 
 if __name__ == "__main__":
     dag = ExecutionDAGManager()

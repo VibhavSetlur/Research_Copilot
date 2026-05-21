@@ -69,6 +69,7 @@ def main() -> int:
         "julia": _check_binary("julia"),
         "nextflow": _check_binary("nextflow"),
         "snakemake": _check_binary("snakemake"),
+        "pandoc": _check_binary("pandoc"),
     }
 
     connectivity = {

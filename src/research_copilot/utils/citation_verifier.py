@@ -45,6 +45,7 @@ def add_core_path():
 
 def url_get(url: str, timeout: int = 15) -> Optional[str]:
     """Fetch URL content with error handling."""
+    time.sleep(1.5)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "ResearchCopilot/1.0 (mailto:research@copilot.local)"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -536,23 +537,23 @@ def replace_with_verified(citation: dict) -> dict:
     
     if status == "retracted":
         raise CitationRetractedError(f"Citation retracted: {res['pass_3'].get('retraction_reason')}", identifier)
-    if status in ("unverified", "not_found"):
-        raise CitationNotFoundError("Citation could not be verified", identifier)
     
     id_type = citation.get("identifier_type")
     bibtex = ""
-    if id_type == "doi":
+    if id_type == "doi" and status not in ("unverified", "not_found"):
         bibtex = url_get(f"https://api.crossref.org/works/{identifier}/transform/application/x-bibtex")
     
     if not bibtex:
         title = res["pass_1"].get("title", citation.get("title", "Unknown Title"))
+        if status in ("unverified", "not_found"):
+            title = f"[UNVERIFIED] {title}"
         year = res["pass_1"].get("year", citation.get("year", "Unknown Year"))
         authors = " and ".join(res["pass_1"].get("authors", [citation.get("author", "Unknown Author")]))
         key = f"ref_{str(identifier).replace('/', '_').replace('.', '_')}" if identifier else "ref_unknown"
         bibtex = f"@article{{{key},\n  title={{{title}}},\n  author={{{authors}}},\n  year={{{year}}},\n  url={{{identifier}}}\n}}"
 
     return {
-        "status": "replaced",
+        "status": "replaced" if status not in ("unverified", "not_found") else "fallback",
         "bibtex": bibtex,
         "doi": identifier if id_type == "doi" else None,
         "verified_title": res["pass_1"].get("title"),

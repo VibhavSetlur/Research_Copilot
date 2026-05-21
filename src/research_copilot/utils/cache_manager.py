@@ -439,40 +439,72 @@ def setup_vss_db(db_path: Path):
 
 def ingest_file(filepath: Path, db_path: Path):
     print(f"Ingesting {filepath}...")
-    content = ""
+    chunks = []
+    
     if filepath.suffix == '.csv':
         try:
-            content = filepath.read_text()
-        except UnicodeDecodeError:
-            pass
+            import pandas as pd
+            df = pd.read_csv(filepath)
+            profile = f"File: {filepath.name}\nColumns: {list(df.columns)}\nData Types: {df.dtypes.to_dict()}\nFirst 5 rows:\n{df.head().to_string()}"
+            chunks.append(profile)
+        except Exception as e:
+            chunks.append(f"Error profiling CSV: {e}")
     elif filepath.suffix == '.pdf':
         try:
             import PyPDF2
             with open(filepath, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
-                content = " ".join([p.extract_text() for p in reader.pages if p.extract_text()])
+                text = "\n\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+            paragraphs = text.split("\n\n")
+            current_chunk = ""
+            for p in paragraphs:
+                if len(current_chunk) + len(p) > 1000:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = p
+                else:
+                    current_chunk += "\n\n" + p if current_chunk else p
+            if current_chunk:
+                chunks.append(current_chunk)
         except ImportError:
-            content = "PyPDF2 not installed"
+            chunks.append("PyPDF2 not installed")
     else:
         try:
-            content = filepath.read_text()
+            text = filepath.read_text()
+            paragraphs = text.split("\n\n")
+            current_chunk = ""
+            for p in paragraphs:
+                if len(current_chunk) + len(p) > 1000:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = p
+                else:
+                    current_chunk += "\n\n" + p if current_chunk else p
+            if current_chunk:
+                chunks.append(current_chunk)
         except UnicodeDecodeError:
-            content = "Binary file"
+            chunks.append("Binary file")
 
     print("Generating embeddings...")
     try:
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer('all-MiniLM-L6-v2')
-        embedding = model.encode(content[:5000]).tolist()
     except Exception:
         print("SentenceTransformer not found, using dummy embeddings")
-        embedding = [0.0] * 384
+        model = None
     
     conn = setup_vss_db(db_path)
-    conn.execute('INSERT INTO documents (filename, content, embedding) VALUES (?, ?, ?)',
-                 (filepath.name, content[:5000], json.dumps(embedding)))
+    for i, chunk in enumerate(chunks):
+        if not chunk.strip(): continue
+        if model:
+            embedding = model.encode(chunk).tolist()
+        else:
+            embedding = [0.0] * 384
+        
+        conn.execute('INSERT INTO documents (filename, content, embedding) VALUES (?, ?, ?)',
+                     (f"{filepath.name}_chunk_{i}", chunk, json.dumps(embedding)))
     conn.commit()
-    print(f"Successfully ingested {filepath.name} into vector database.")
+    print(f"Successfully ingested {filepath.name} into vector database ({len(chunks)} chunks).")
 
 def cmd_ingest(args):
     filepath = Path(args.file)

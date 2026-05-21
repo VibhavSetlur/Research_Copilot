@@ -120,23 +120,9 @@ class ResearchEngine:
         print("Proposed plan:")
         for i, step in enumerate(proposed_plan, 1):
             print(f"  {i}. {step}")
-        print()
-
-        try:
-            answer = input("Approve this plan? [Y/n]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            answer = "n"
-
-        approved = answer in ("", "y", "yes")
-
-        self.ledger.update(
-            phase="running" if approved else "user_rejected",
-            hitl_pending=None,
-        )
-
-        if not approved:
-            print("Plan rejected. Workflow halted.")
-        return approved
+        print("\nRun `rcp continue --approve` to execute, or `rcp continue --reject` to abort.\n")
+        
+        return False
 
     # ------------------------------------------------------------------
     # Item 12 — Dead-End Auto-Recovery
@@ -497,11 +483,12 @@ class ResearchEngine:
             proposed_plan = workflow.get("context", {}).get("workflow_steps", [])
             approved = self._hitl_gate(intent, proposed_plan, query)
             if not approved:
+                phase = self.ledger.get().get("phase")
                 return {
                     "workflow": workflow,
                     "results": [],
-                    "status": "user_rejected",
-                    "message": "User rejected the proposed plan.",
+                    "status": phase,
+                    "message": "Workflow paused for approval." if phase == "WAITING_ON_USER" else "User rejected the proposed plan.",
                 }
 
         if target_depth == "exploratory":

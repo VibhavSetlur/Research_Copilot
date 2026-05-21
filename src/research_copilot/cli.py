@@ -298,6 +298,30 @@ def cmd_trace(args: argparse.Namespace) -> None:
     from research_copilot.utils.auto_debug import trace_node
     trace_node(args.node_id, _project_root())
 
+def cmd_continue(args: argparse.Namespace) -> None:
+    root = _project_root()
+    from research_copilot.core.state_ledger import ResearchLedger
+    ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+    state = ledger.get()
+    
+    if state.get("phase") != "WAITING_ON_USER":
+        print("No plan pending approval.")
+        return
+        
+    pending = state.get("hitl_pending", {})
+    if args.reject:
+        ledger.update(phase="user_rejected", hitl_pending=None)
+        print("Plan rejected.")
+        return
+        
+    if args.approve:
+        ledger.update(phase="running", hitl_pending=None)
+        print("Plan approved. Resuming workflow...")
+        from research_copilot.engine import ResearchEngine
+        engine = ResearchEngine(root, hitl_enabled=False)
+        query = pending.get("query", "")
+        engine.route_and_execute(query)
+
 def cmd_ingest(args: argparse.Namespace) -> None:
     from research_copilot.utils.cache_manager import cmd_ingest as _ingest
     _ingest(args)
@@ -369,6 +393,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_trace = sub.add_parser("trace", help="Trace node execution sequence")
     p_trace.add_argument("node_id", help="Node ID to trace")
 
+    p_continue = sub.add_parser("continue", help="Continue a paused workflow")
+    p_continue.add_argument("--approve", action="store_true", help="Approve the workflow")
+    p_continue.add_argument("--reject", action="store_true", help="Reject the workflow")
+
     p_ingest = sub.add_parser("ingest", help="Ingest a file into local vector database")
     p_ingest.add_argument("file", help="File to ingest (pdf/csv/txt)")
 
@@ -432,6 +460,7 @@ def main() -> None:
         "skills": lambda a: cmd_skills(argparse.Namespace(name=None)),
         "workflow": cmd_workflow,
         "intent": cmd_intent,
+        "continue": cmd_continue,
         "trace": cmd_trace,
         "compile": cmd_compile,
         "trace": cmd_trace,

@@ -1,10 +1,10 @@
 ---
 agent_id: "methodology_scout"
 version: "1.0.0"
-description: "Scout and rank state-of-the-art analytical methods using literature search, Semantic Scholar, and Context7."
+description: "Scout and rank state-of-the-art analytical methods using literature search, Semantic Scholar, and skill index."
 domain_compatibility: ["all"]
 depends_on: ["literature_deep"]
-composes: ["web_search_grounding", "context7_lookup"]
+composes: ["web_search_grounding", "skill_indexer"]
 produces:
   - "reports/analysis/methodology_scout_report.md"
 max_iterations: 1
@@ -34,7 +34,7 @@ Identify and document:
 ### Step 3: Validate and Resolve API Signatures
 * For each candidate methodology:
   * Identify Python/R libraries that implement it (e.g., `statsmodels`, `scipy`, `sklearn`).
-  * Verify the library ID and retrieve the API signature using Context7 (`resolve` + `docs`).
+  * Verify the library ID and retrieve the API signature using skill_indexer (`resolve` + `docs`).
   * Confirm that the method is actively maintained and can handle the data characteristics extracted in Step 1.
 
 ### Step 4: Compile and Rank Recommendations
@@ -42,12 +42,12 @@ Generate `reports/analysis/methodology_scout_report.md` containing:
 1. **Ranked Recommendations:** Top 3 methodology choices ranked by robustness, scalability, and domain compatibility.
 2. **Citations:** Link each recommendation to peer-reviewed methodology papers (with DOI).
 3. **Assumptions & Diagnostics:** Define core assumptions of each method and their diagnostic tests.
-4. **Code Signatures:** Include the Context7 verified function signatures for implementation.
+4. **Code Signatures:** Include the skill_indexer verified function signatures for implementation.
 
 ---
 
 ## Validation
 * [ ] Minimum of 3 candidate methods compared and ranked.
 * [ ] Every recommended method has at least 1 peer-reviewed methodology paper citation with a valid DOI.
-* [ ] Context7 API signatures verified for all recommended methods.
+* [ ] skill_indexer API signatures verified for all recommended methods.
 * [ ] Diagnostics and assumptions specified for the top-ranked choice.
