@@ -719,3 +719,165 @@ def freeze_state_on_failure(state: dict, *args, **kwargs) -> dict:
 
     logger.error("Failure logged for phase %s: %s", phase, error)
     return state
+
+
+# =============================================================================
+# post_generation: Knowledge graph + semantic filesystem + interpretative coupling
+# =============================================================================
+
+@hook_engine.register("post_generation")
+def extract_knowledge_triplets(state: dict, *args, **kwargs) -> dict:
+    """Extract knowledge triplets from literature analysis and add to graph.
+
+    When the literature agent processes papers, this interceptor extracts
+    (subject, relation, object) triplets and writes them to the knowledge graph.
+
+    Expects state["extracted_claims"] to be a list of dicts with:
+      - subject, relation, object, confidence, source
+    """
+    claims = state.get("extracted_claims", [])
+    if not claims:
+        return state
+
+    project_root = find_project_root()
+
+    try:
+        import sys
+        sys.path.insert(0, str(project_root / ".research" / "scripts" / "utils"))
+        from knowledge_graph import ResearchKnowledgeGraph
+
+        kg = ResearchKnowledgeGraph()
+
+        for claim in claims:
+            kg.add_triplet(
+                subject=claim.get("subject", ""),
+                relation=claim.get("relation", ""),
+                obj=claim.get("object", ""),
+                source=claim.get("source", ""),
+                confidence=claim.get("confidence", "unknown"),
+            )
+
+        kg.save()
+        state["knowledge_graph_updated"] = True
+        state["triplets_added"] = len(claims)
+        logger.info("Added %d triplets to knowledge graph", len(claims))
+    except ImportError:
+        logger.debug("Knowledge graph not available, skipping triplet extraction")
+    except Exception as e:
+        logger.debug("Knowledge graph update failed: %s", e)
+
+    return state
+
+
+@hook_engine.register("post_generation")
+def enforce_semantic_filesystem(state: dict, *args, **kwargs) -> dict:
+    """Enforce semantic file system taxonomy on generated artifacts.
+
+    Checks state["generated_file"] and validates it belongs in the correct
+    taxonomy directory. Sets violation flags if AI tries to write to
+    restricted directories.
+    """
+    generated_file = state.get("generated_file", "")
+    if not generated_file:
+        return state
+
+    project_root = find_project_root()
+
+    try:
+        import sys
+        sys.path.insert(0, str(project_root / ".research" / "scripts" / "utils"))
+        from semantic_filesystem import SemanticFilesystemEnforcer
+
+        enforcer = SemanticFilesystemEnforcer(project_root)
+        category, destination = enforcer.classify_file(generated_file)
+
+        state["file_taxonomy_category"] = category
+        state["file_taxonomy_destination"] = destination
+
+        taxonomy = {
+            "raw_data": False, "derived_data": True, "metadata": True,
+            "decision_doc": True, "method_doc": True, "assumption_doc": True,
+            "ingest_script": True, "eda_script": True, "model_script": True,
+            "output_script": True, "figure": True, "table": True,
+            "manuscript": True, "rebuttal": True, "interpretation": True,
+        }
+
+        if not taxonomy.get(category, True):
+            state["taxonomy_violation"] = True
+            state["taxonomy_violation_reason"] = (
+                f"Cannot write '{generated_file}' to '{destination}' — "
+                f"AI cannot modify {category}"
+            )
+        else:
+            state["taxonomy_violation"] = False
+    except ImportError:
+        logger.debug("Semantic filesystem not available, skipping enforcement")
+    except Exception as e:
+        logger.debug("Semantic filesystem enforcement failed: %s", e)
+
+    return state
+
+
+@hook_engine.register("post_generation")
+def generate_figure_interpretation(state: dict, *args, **kwargs) -> dict:
+    """Auto-generate .interpret.md file for newly created figures.
+
+    Ensures every figure is accompanied by explicit statistical interpretation.
+    Expects state["generated_figure"] to be the path to the figure file.
+    """
+    figure_path = state.get("generated_figure", "")
+    if not figure_path:
+        return state
+
+    project_root = find_project_root()
+
+    try:
+        import sys
+        sys.path.insert(0, str(project_root / ".research" / "scripts" / "utils"))
+        from interpretative_coupling import InterpretativeCoupler
+
+        coupler = InterpretativeCoupler(project_root)
+        fig_path = Path(figure_path)
+
+        if fig_path.exists():
+            figure_type = state.get("figure_type", "")
+            if not figure_type:
+                figure_type = _infer_figure_type_from_stem(fig_path.stem)
+
+            stat_results = state.get("statistical_results", {})
+            research_question = state.get("research_question", "")
+            hypothesis = state.get("hypothesis", "")
+            branch_id = state.get("active_branch", "main")
+
+            interp_path = coupler.generate_interpretation(
+                fig_path, figure_type, stat_results,
+                research_question, hypothesis, branch_id,
+            )
+            state["interpretation_generated"] = str(interp_path)
+            logger.info("Generated interpretation for: %s", figure_path)
+    except ImportError:
+        logger.debug("Interpretative coupling not available, skipping")
+    except Exception as e:
+        logger.debug("Interpretation generation failed: %s", e)
+
+    return state
+
+
+def _infer_figure_type_from_stem(stem: str) -> str:
+    """Infer figure type from filename stem."""
+    stem_lower = stem.lower()
+    type_map = {
+        "scatter": "scatter", "correlation": "scatter",
+        "bar": "bar", "comparison": "bar",
+        "line": "line", "trend": "line", "time_series": "line",
+        "histogram": "histogram", "distribution": "histogram",
+        "boxplot": "boxplot", "box": "boxplot",
+        "heatmap": "heatmap", "matrix": "heatmap",
+        "forest": "forest", "effect": "forest",
+        "violin": "violin",
+        "residual": "residual", "diagnostic": "residual",
+    }
+    for key, fig_type in type_map.items():
+        if key in stem_lower:
+            return fig_type
+    return "unknown"

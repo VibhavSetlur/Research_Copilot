@@ -1,6 +1,6 @@
 ---
 skill_id: "viz_design_system"
-version: "1.0.0"
+version: "2.0.0"
 category: "visualization"
 domain_compatibility: ["all"]
 required_tools: ["python", "matplotlib", "seaborn", "plotly"]
@@ -23,6 +23,59 @@ Define a unified visual language for ALL figures and dashboards. Every plot, cha
 3. **Consistency**: Same fonts, colors, spacing across ALL outputs
 4. **Reproducibility**: Theme is code, not manual adjustments
 5. **Publication-ready**: Meets journal requirements out of the box
+6. **Minimalist clarity**: Strip all non-data ink; let the data speak
+
+---
+
+## Minimalist Design Manifesto
+
+### The Data-Ink Ratio (Tufte, 1983)
+Every pixel on a figure must serve the data. If removing an element doesn't change the message, remove it.
+
+### Rules of Minimalist Figures
+1. **No redundant grid lines**: Use only horizontal grid lines at meaningful intervals. Remove vertical grid lines entirely unless they encode specific values.
+2. **Intentional whitespace**: Whitespace is not empty — it is breathing room. Use generous margins to separate panels. Never crowd subplots.
+3. **Muted, accessible palettes**: Never use saturated default colors. Use Okabe-Ito for categorical, viridis for sequential. Saturation should be 70-85% of maximum.
+4. **No decorative borders**: Remove top and right spines. Keep bottom and left spines thin (0.8pt).
+5. **Sparse tick marks**: 5-8 ticks per axis. Never more. Round to meaningful values.
+6. **Direct labeling over legends**: When possible, label data directly on the figure instead of using a separate legend box.
+7. **No 3D, no shadows, no gradients on bars**: These distort perception and add zero information.
+8. **Single focal point per figure**: Each figure should communicate ONE primary insight. Secondary insights go in subpanels.
+
+### Implementation: Minimalist Theme
+```python
+def apply_minimalist_theme():
+    """Apply minimalist design principles to matplotlib."""
+    plt.rcParams.update({
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.spines.left": True,
+        "axes.spines.bottom": True,
+        "axes.linewidth": 0.8,
+        "axes.grid": True,
+        "grid.alpha": 0.15,       # Subtle, not distracting
+        "grid.color": "#E5E5E5",
+        "xtick.bottom": True,
+        "xtick.top": False,       # No top ticks
+        "ytick.left": True,
+        "ytick.right": False,     # No right ticks
+        "figure.facecolor": "white",
+        "axes.facecolor": "#FAFAFA",
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.1,  # Minimal padding
+    })
+```
+
+### Anti-Patterns (NEVER do these)
+- Default matplotlib blue/orange/green/red palette
+- Dense grid lines on both axes
+- Thick spines (≥1.5pt)
+- Legends that obscure data
+- Titles that repeat axis labels
+- Pie charts (use stacked bars or dot plots)
+- 3D anything
+- Rainbow/jet colormaps
+- Chartjunk: drop shadows, beveled edges, decorative backgrounds
 
 ---
 
@@ -326,3 +379,9 @@ Every figure and dashboard MUST pass:
 - [ ] Figure size matches journal format
 - [ ] DPI meets publication standard (300 for print)
 - [ ] Theme module applied (not manual styling)
+- [ ] Top and right spines removed
+- [ ] Grid lines are subtle (alpha ≤ 0.2)
+- [ ] No redundant vertical grid lines
+- [ ] Direct labeling used instead of legend when possible
+- [ ] Single focal point per figure
+- [ ] Accompanying .interpret.md file generated in docs/decisions/

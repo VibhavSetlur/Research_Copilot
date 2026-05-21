@@ -8,12 +8,15 @@ Location: .research/cache/state.json
 """
 
 import json
+import logging
 import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger("research.state_ledger")
 
 
 class ResearchLedger:
@@ -78,6 +81,21 @@ class ResearchLedger:
             "context_transfer_memos": [],
             "execution_dag_path": None,
             "data_scale_profile": None,
+            "active_branch": "main",
+            "branches": {
+                "main": {
+                    "branch_id": "main",
+                    "parent_branch": "",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "active",
+                    "hypothesis": "Primary research workflow",
+                    "merge_commit": None,
+                    "merged_at": None,
+                    "evaluation": None,
+                    "workspace_prefix": "",
+                }
+            },
+            "knowledge_graph_path": None,
         }
 
     def _run_pre_commit_hooks(self, state: dict, action: str, **kwargs) -> dict:
@@ -442,5 +460,246 @@ class ResearchLedger:
 
         lines.append("")
         lines.append(f"  Resumable from: {state.get('resumable_from', 'none')}")
+
+        branches = state.get("branches", {})
+        lines.append("")
+        lines.append(f"  Branches: {len(branches)}")
+        active = state.get("active_branch", "main")
+        for bid, b in branches.items():
+            marker = "▶" if bid == active else " "
+            status_icon = "✓" if b.get("status") == "merged" else ("✗" if b.get("status") == "abandoned" else "○")
+            parent = f" (from: {b.get('parent_branch', 'main')})" if b.get("parent_branch") and b.get("parent_branch") != "main" else ""
+            lines.append(f"    {marker} {status_icon} {bid}{parent}")
+            if b.get("hypothesis"):
+                lines.append(f"      Hypothesis: {b['hypothesis']}")
+
         lines.append("")
         return "\n".join(lines)
+
+    def branch_state(self, branch_id: str, hypothesis: str = "", parent: str = None) -> dict:
+        """Create a new research branch (Git-like branching model).
+
+        Args:
+            branch_id: Unique branch identifier (e.g., 'hypothesis_B', 'bayesian_approach')
+            hypothesis: Research hypothesis or exploration goal for this branch
+            parent: Parent branch to fork from (default: current active branch)
+
+        Returns:
+            Updated state dict with new branch
+
+        Raises:
+            ValueError: If branch_id already exists
+        """
+        state = self._load()
+        branches = state.get("branches", {})
+
+        # Initialize main branch if it doesn't exist
+        if "main" not in branches:
+            branches["main"] = {
+                "branch_id": "main",
+                "parent_branch": "",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "status": "active",
+                "hypothesis": "Primary research workflow",
+                "merge_commit": None,
+                "merged_at": None,
+                "evaluation": None,
+                "workspace_prefix": "",
+            }
+            state["branches"] = branches
+            state["active_branch"] = "main"
+
+        if branch_id in branches:
+            raise ValueError(f"Branch '{branch_id}' already exists. Use a unique name.")
+
+        parent_branch = parent or state.get("active_branch", "main")
+        if parent_branch not in branches:
+            raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        workspace_prefix = f"{branch_id}/"
+
+        branches[branch_id] = {
+            "branch_id": branch_id,
+            "parent_branch": parent_branch,
+            "created_at": now,
+            "status": "active",
+            "hypothesis": hypothesis,
+            "merge_commit": None,
+            "merged_at": None,
+            "evaluation": None,
+            "workspace_prefix": workspace_prefix,
+        }
+
+        state["branches"] = branches
+        state["active_branch"] = branch_id
+        state["updated_at"] = now
+        self._save(state)
+
+        logger.info("Created branch '%s' from '%s'", branch_id, parent_branch)
+        return state
+
+    def switch_branch(self, branch_id: str) -> dict:
+        """Switch the active branch.
+
+        Args:
+            branch_id: Branch to switch to
+
+        Returns:
+            Updated state dict
+
+        Raises:
+            ValueError: If branch doesn't exist
+        """
+        state = self._load()
+        branches = state.get("branches", {})
+
+        if branch_id not in branches:
+            raise ValueError(f"Branch '{branch_id}' does not exist. Available: {list(branches.keys())}")
+
+        if branches[branch_id].get("status") == "abandoned":
+            raise ValueError(f"Branch '{branch_id}' has been abandoned.")
+
+        old_branch = state.get("active_branch", "main")
+        state["active_branch"] = branch_id
+        state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        self._save(state)
+
+        logger.info("Switched branch from '%s' to '%s'", old_branch, branch_id)
+        return state
+
+    def merge_branch(self, branch_id: str, target: str = "main", commit_msg: str = "") -> dict:
+        """Merge a branch into the target branch.
+
+        Args:
+            branch_id: Branch to merge
+            target: Target branch (default: 'main')
+            commit_msg: Description of what is being merged
+
+        Returns:
+            Updated state dict
+
+        Raises:
+            ValueError: If branch doesn't exist or is already merged
+        """
+        state = self._load()
+        branches = state.get("branches", {})
+
+        if branch_id not in branches:
+            raise ValueError(f"Branch '{branch_id}' does not exist.")
+
+        if target not in branches:
+            raise ValueError(f"Target branch '{target}' does not exist.")
+
+        branch = branches[branch_id]
+        if branch.get("status") == "merged":
+            raise ValueError(f"Branch '{branch_id}' is already merged.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        commit_id = f"merge_{branch_id}_{now.replace(':', '').replace('-', '')[:15]}"
+
+        branches[branch_id]["status"] = "merged"
+        branches[branch_id]["merge_commit"] = commit_id
+        branches[branch_id]["merged_at"] = now
+        branches[branch_id]["evaluation"] = {
+            "decision": "merge",
+            "rationale": commit_msg or f"Merged into {target}",
+        }
+
+        state["branches"] = branches
+        state["active_branch"] = target
+        state["updated_at"] = now
+        self._save(state)
+
+        logger.info("Merged branch '%s' into '%s': %s", branch_id, target, commit_msg)
+        return state
+
+    def abandon_branch(self, branch_id: str, reason: str = "") -> dict:
+        """Abandon a research branch.
+
+        Args:
+            branch_id: Branch to abandon
+            reason: Reason for abandonment
+
+        Returns:
+            Updated state dict
+        """
+        state = self._load()
+        branches = state.get("branches", {})
+
+        if branch_id not in branches:
+            raise ValueError(f"Branch '{branch_id}' does not exist.")
+
+        if branch_id == "main":
+            raise ValueError("Cannot abandon the main branch.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        branches[branch_id]["status"] = "abandoned"
+        branches[branch_id]["evaluation"] = {
+            "decision": "abandon",
+            "rationale": reason or "Branch abandoned",
+        }
+
+        state["branches"] = branches
+        if state.get("active_branch") == branch_id:
+            state["active_branch"] = "main"
+        state["updated_at"] = now
+        self._save(state)
+
+        logger.info("Abandoned branch '%s': %s", branch_id, reason)
+        return state
+
+    def list_branches(self) -> list:
+        """List all branches with their status.
+
+        Returns:
+            List of branch info dicts
+        """
+        state = self._load()
+        branches = state.get("branches", {})
+        active = state.get("active_branch", "main")
+
+        result = []
+        for bid, b in branches.items():
+            result.append({
+                "branch_id": bid,
+                "parent": b.get("parent_branch", "main"),
+                "status": b.get("status", "unknown"),
+                "hypothesis": b.get("hypothesis", ""),
+                "active": bid == active,
+                "created_at": b.get("created_at", ""),
+                "workspace_prefix": b.get("workspace_prefix", ""),
+            })
+        return result
+
+    def get_branch_workspace(self, branch_id: str = None) -> dict:
+        """Get the workspace prefix for a branch.
+
+        Returns dict with branch-specific directory paths:
+        {
+            "figures": "reports/figures/<branch>/",
+            "scripts": "scripts/models/<branch>/",
+            "analysis": "reports/analysis/<branch>/",
+            ...
+        }
+        """
+        state = self._load()
+        bid = branch_id or state.get("active_branch", "main")
+        branches = state.get("branches", {})
+
+        if bid not in branches:
+            raise ValueError(f"Branch '{bid}' does not exist.")
+
+        prefix = branches[bid].get("workspace_prefix", "")
+        if bid == "main":
+            prefix = ""
+
+        return {
+            "branch_id": bid,
+            "prefix": prefix,
+            "figures": f"reports/figures/{prefix}" if prefix else "reports/figures/",
+            "scripts": f"scripts/models/{prefix}" if prefix else "scripts/",
+            "analysis": f"reports/analysis/{prefix}" if prefix else "reports/analysis/",
+            "tables": f"reports/tables/{prefix}" if prefix else "reports/tables/",
+            "manuscript": f"reports/manuscript/{prefix}" if prefix else "reports/manuscript/",
+        }

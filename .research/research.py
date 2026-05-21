@@ -81,6 +81,25 @@ Commands:
     reviewer2       Run adversarial 'Reviewer 2' critique
     dependency-check <script>  Check for uninstalled imports
     dependency-check <script> --auto-install  Auto-install missing deps
+
+    Branching:
+    branch <name>   Create a new research branch
+    branches        List all research branches
+    switch <name>   Switch to a different branch
+    merge <name>    Merge a branch into target
+    abandon <name>  Abandon a research branch
+
+    Intent Routing:
+    intent <query>  Route a query through the intent router
+
+    Knowledge Graph:
+    graph           Show knowledge graph summary
+    graph-stats     Show knowledge graph statistics
+    graph-query     Query the knowledge graph
+
+    Semantic File System:
+    taxonomy        Show semantic file system taxonomy
+
     mcp             Start MCP server for AI IDE integration
 
 Design:
@@ -198,6 +217,43 @@ Examples:
     p_dag_viewer = sub.add_parser("dag-viewer", help="Generate interactive DAG visualization HTML")
     p_dag_viewer.add_argument("--output", default="reports/dashboards/dag_viewer.html", help="Output HTML path")
 
+    # Branching commands
+    p_branch = sub.add_parser("branch", help="Create a new research branch")
+    p_branch.add_argument("name", help="Branch name (e.g., hypothesis_B, bayesian_approach)")
+    p_branch.add_argument("--hypothesis", default="", help="Research hypothesis for this branch")
+    p_branch.add_argument("--from", dest="parent", default=None, help="Parent branch to fork from")
+
+    sub.add_parser("branches", help="List all research branches")
+
+    p_switch = sub.add_parser("switch", help="Switch to a different branch")
+    p_switch.add_argument("name", help="Branch to switch to")
+
+    p_merge = sub.add_parser("merge", help="Merge a branch into target")
+    p_merge.add_argument("name", help="Branch to merge")
+    p_merge.add_argument("--into", default="main", help="Target branch (default: main)")
+    p_merge.add_argument("--message", default="", help="Merge commit message")
+
+    p_abandon = sub.add_parser("abandon", help="Abandon a research branch")
+    p_abandon.add_argument("name", help="Branch to abandon")
+    p_abandon.add_argument("--reason", default="", help="Reason for abandonment")
+
+    # Intent routing command
+    p_intent = sub.add_parser("intent", help="Route a query through the intent router")
+    p_intent.add_argument("query", help="Natural language query to route")
+
+    # Knowledge graph commands
+    sub.add_parser("graph", help="Show knowledge graph summary")
+    sub.add_parser("graph-stats", help="Show knowledge graph statistics")
+
+    p_graph_query = sub.add_parser("graph-query", help="Query the knowledge graph")
+    p_graph_query.add_argument("--relation", default=None, help="Filter by relation type")
+    p_graph_query.add_argument("--subject", default=None, help="Filter by subject")
+    p_graph_query.add_argument("--object", default=None, help="Filter by object")
+    p_graph_query.add_argument("--confounders", default=None, help="Get confounders for a variable")
+
+    # Semantic filesystem command
+    sub.add_parser("taxonomy", help="Show semantic file system taxonomy")
+
     sub.add_parser("mcp", help="Start the MCP server for AI IDE integration")
 
     args = parser.parse_args()
@@ -269,6 +325,134 @@ Examples:
         mcp_path = Path(__file__).parent / "mcp_server.py"
         subprocess.run([sys.executable, str(mcp_path)])
 
+    def cmd_branch_handler(args):
+        from core.state_ledger import ResearchLedger
+        from scripts.utils.branch_scaffold import BranchScaffold
+        ledger = ResearchLedger()
+        scaffold = BranchScaffold()
+        try:
+            ledger.branch_state(args.name, hypothesis=args.hypothesis, parent=args.parent)
+            scaffold.create_branch_workspace(args.name, hypothesis=args.hypothesis)
+            print(f"Branch '{args.name}' created and scaffolded successfully.")
+            if args.hypothesis:
+                print(f"  Hypothesis: {args.hypothesis}")
+        except ValueError as e:
+            print(f"Error: {e}")
+
+    def cmd_branches_handler(args):
+        from core.state_ledger import ResearchLedger
+        ledger = ResearchLedger()
+        branches = ledger.list_branches()
+        print(f"{'Branch':<25} {'Parent':<15} {'Status':<12} {'Active':<8} Hypothesis")
+        print("-" * 80)
+        for b in branches:
+            active = "▶" if b["active"] else " "
+            print(f"{active} {b['branch_id']:<23} {b['parent']:<15} {b['status']:<12} {'Yes' if b['active'] else 'No':<8} {b['hypothesis']}")
+
+    def cmd_switch_handler(args):
+        from core.state_ledger import ResearchLedger
+        ledger = ResearchLedger()
+        try:
+            ledger.switch_branch(args.name)
+            print(f"Switched to branch '{args.name}'.")
+        except ValueError as e:
+            print(f"Error: {e}")
+
+    def cmd_merge_handler(args):
+        from core.state_ledger import ResearchLedger
+        ledger = ResearchLedger()
+        try:
+            ledger.merge_branch(args.name, target=args.into, commit_msg=args.message)
+            print(f"Branch '{args.name}' merged into '{args.into}'.")
+        except ValueError as e:
+            print(f"Error: {e}")
+
+    def cmd_abandon_handler(args):
+        from core.state_ledger import ResearchLedger
+        ledger = ResearchLedger()
+        try:
+            ledger.abandon_branch(args.name, reason=args.reason)
+            print(f"Branch '{args.name}' abandoned.")
+            if args.reason:
+                print(f"  Reason: {args.reason}")
+        except ValueError as e:
+            print(f"Error: {e}")
+
+    def cmd_intent_handler(args):
+        from scripts.utils.intent_router import IntentRouter
+        router = IntentRouter()
+        result = router.route(args.query)
+        print(f"Intent: {result['classification']['primary_intent']}")
+        print(f"Null space excluded: {', '.join(result['null_space'])}")
+        print(f"Estimated token savings: ~{result['excluded']['estimated_token_savings']} tokens")
+        print(f"\nSkills to load:")
+        for s in result['context']['skills']:
+            print(f"  - {s}")
+        print(f"\nAgents to invoke:")
+        for a in result['context']['agents']:
+            print(f"  - {a}")
+
+    def cmd_graph_handler(args):
+        from scripts.utils.knowledge_graph import ResearchKnowledgeGraph
+        try:
+            kg = ResearchKnowledgeGraph()
+            print(kg.summary())
+        except ImportError:
+            print("Error: networkx is required. Install with: pip install networkx")
+        except FileNotFoundError:
+            print("Knowledge graph not found. Run literature analysis first to populate it.")
+
+    def cmd_graph_stats_handler(args):
+        from scripts.utils.knowledge_graph import ResearchKnowledgeGraph
+        try:
+            kg = ResearchKnowledgeGraph()
+            stats = kg.get_statistics()
+            print("Knowledge Graph Statistics:")
+            print(f"  Total nodes: {stats['total_nodes']}")
+            print(f"    Papers: {stats['paper_nodes']}")
+            print(f"    Entities: {stats['entity_nodes']}")
+            print(f"  Total edges: {stats['total_edges']}")
+            print(f"  Relation types:")
+            for rel, count in sorted(stats['relation_types'].items(), key=lambda x: -x[1]):
+                print(f"    - {rel}: {count}")
+        except ImportError:
+            print("Error: networkx is required. Install with: pip install networkx")
+        except FileNotFoundError:
+            print("Knowledge graph not found.")
+
+    def cmd_graph_query_handler(args):
+        from scripts.utils.knowledge_graph import ResearchKnowledgeGraph
+        try:
+            kg = ResearchKnowledgeGraph()
+            if args.confounders:
+                results = kg.get_confounders(args.confounders)
+                print(f"Confounders for '{args.confounders}':")
+            else:
+                results = kg.query(
+                    relation=args.relation,
+                    subject=args.subject,
+                    obj=args.object,
+                )
+                print(f"Query results:")
+            if not results:
+                print("  No matching triplets found.")
+            else:
+                for r in results:
+                    print(f"  {r['subject']} --[{r['relation']}]--> {r['object']}")
+                    if r.get('source'):
+                        print(f"    Source: {r['source']}")
+                    if r.get('confidence'):
+                        print(f"    Confidence: {r['confidence']}")
+        except ImportError:
+            print("Error: networkx is required. Install with: pip install networkx")
+        except FileNotFoundError:
+            print("Knowledge graph not found.")
+
+    def cmd_taxonomy_handler(args):
+        from scripts.utils.semantic_filesystem import SemanticFilesystemEnforcer
+        enforcer = SemanticFilesystemEnforcer()
+        print(enforcer.summary())
+
     if args.command == "skill":
         cmd_skills(argparse.Namespace(name=args.name))
     elif args.command == "skills":
@@ -291,6 +475,26 @@ Examples:
         cmd_dag_viewer_handler(args)
     elif args.command == "mcp":
         cmd_mcp_handler(args)
+    elif args.command == "branch":
+        cmd_branch_handler(args)
+    elif args.command == "branches":
+        cmd_branches_handler(args)
+    elif args.command == "switch":
+        cmd_switch_handler(args)
+    elif args.command == "merge":
+        cmd_merge_handler(args)
+    elif args.command == "abandon":
+        cmd_abandon_handler(args)
+    elif args.command == "intent":
+        cmd_intent_handler(args)
+    elif args.command == "graph":
+        cmd_graph_handler(args)
+    elif args.command == "graph-stats":
+        cmd_graph_stats_handler(args)
+    elif args.command == "graph-query":
+        cmd_graph_query_handler(args)
+    elif args.command == "taxonomy":
+        cmd_taxonomy_handler(args)
     else:
         handler = commands.get(args.command)
         if handler:

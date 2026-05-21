@@ -96,6 +96,30 @@ class ExecutionDAG(BaseModel):
     last_updated: str = Field(..., description="ISO 8601 timestamp of last update")
 
 
+class BranchState(BaseModel):
+    """Git-like branch state for non-linear, branched research execution.
+
+    Each branch represents a divergent hypothesis or methodological exploration
+    that can be executed in parallel without overwriting core findings.
+    """
+
+    branch_id: str = Field(..., description="Unique branch identifier (e.g., 'hypothesis_B', 'bayesian_approach')")
+    parent_branch: str = Field(default="main", description="Parent branch this was created from")
+    created_at: str = Field(..., description="ISO 8601 timestamp of branch creation")
+    status: str = Field(default="active", description="Branch status: active, merged, abandoned")
+    hypothesis: str = Field(default="", description="Research hypothesis or exploration goal")
+    merge_commit: Optional[str] = Field(default=None, description="Merge commit ID if branch was merged")
+    merged_at: Optional[str] = Field(default=None, description="ISO 8601 timestamp of merge")
+    evaluation: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Branch evaluation results: {decision: 'merge|abandon', rationale: '...'}"
+    )
+    workspace_prefix: str = Field(
+        default="",
+        description="Directory prefix for branch-specific outputs (e.g., 'hypothesis_B/')"
+    )
+
+
 class ResearchState(BaseModel):
     """Global research state ledger — single source of truth."""
 
@@ -136,4 +160,17 @@ class ResearchState(BaseModel):
     )
     data_scale_profile: Optional[Dict[str, str]] = Field(
         default=None, description="Data scale profile: {file_path: 'small'|'medium'|'large'|'massive'}"
+    )
+    active_branch: str = Field(
+        default="main", description="Currently active branch (default: 'main')"
+    )
+    branches: Dict[str, BranchState] = Field(
+        default={"main": BranchState(
+            branch_id="main", parent_branch="", created_at="", status="active",
+            hypothesis="Primary research workflow", workspace_prefix=""
+        )},
+        description="All research branches keyed by branch_id"
+    )
+    knowledge_graph_path: Optional[str] = Field(
+        default=None, description="Path to the local knowledge graph (NetworkX pickle)"
     )

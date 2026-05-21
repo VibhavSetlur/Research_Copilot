@@ -1,5 +1,51 @@
 project_id: "research-copilot"
-schema_version: "8.0.0"
+schema_version: "9.0.0"
+
+default_workflow: "quick_exploratory"
+
+# Branching engine (Git-like state branching)
+branching:
+  enabled: true
+  auto_scaffold: true
+  branch_dirs:
+    - reports/figures
+    - reports/tables
+    - reports/analysis
+    - reports/manuscript
+    - reports/audit
+    - scripts/models
+    - scripts/analysis
+    - data/02_processed
+    - data/03_analytical
+    - docs/decisions
+    - docs/iterations
+
+# Intent routing (token optimization)
+intent_routing:
+  enabled: true
+  auto_classify: true
+  save_decisions: true
+  null_space_optimization: true
+
+# Knowledge graph (context management)
+knowledge_graph:
+  enabled: true
+  storage: ".research/cache/knowledge_graph.pkl"
+  json_export: ".research/cache/knowledge_graph.json"
+  auto_extract_triplets: true
+  max_depth: 3
+
+# Semantic file system
+semantic_filesystem:
+  enabled: true
+  enforce_on_generation: true
+  taxonomy_strict: true
+
+# Interpretative coupling
+interpretative_coupling:
+  enabled: true
+  auto_generate: true
+  output_dir: "docs/decisions/"
 
 default_workflow: "quick_exploratory"
 

@@ -70,6 +70,16 @@ Always use `python .research/research.py <command>`:
 | `dependency-check <script>` | Check for uninstalled imports in a script |
 | `dependency-check <script> --auto-install` | Auto-install missing dependencies |
 | `mcp` | Start MCP server for AI IDE integration |
+| `branch <name>` | Create a new research branch (Git-like branching) |
+| `branches` | List all research branches |
+| `switch <name>` | Switch to a different branch |
+| `merge <name>` | Merge a branch into target |
+| `abandon <name>` | Abandon a research branch |
+| `intent <query>` | Route a query through the intent router |
+| `graph` | Show knowledge graph summary |
+| `graph-stats` | Show knowledge graph statistics |
+| `graph-query` | Query the knowledge graph |
+| `taxonomy` | Show semantic file system taxonomy |
 
 ## Workflow
 Run agents in this order:
@@ -164,6 +174,8 @@ Each iteration:
 10. NEVER use pie charts or 3D charts
 11. Dashboard main app ≤200 lines — all logic in component files
 12. ALWAYS apply theme module (viz_theme.py) — no manual styling
+13. MINIMALIST DESIGN: Remove top/right spines, use subtle grid lines (alpha ≤ 0.2), no decorative elements
+14. INTERPRETATIVE COUPLING: Every figure MUST have an accompanying `.interpret.md` file in docs/decisions/
 
 ## First Steps
 1. Run `research setup` — verify all system files are in place
@@ -173,3 +185,81 @@ Each iteration:
 5. Read `research agent research_init`
 6. Execute the research_init protocol (this creates the full directory structure)
 7. Continue through the pipeline, using `research_iterate` when the user wants to explore
+
+## Branching Engine (Non-Linear Execution)
+The system supports Git-like branching for divergent hypotheses:
+
+### Creating a Branch
+```bash
+research branch hypothesis_B --hypothesis "Bayesian approach to the primary model"
+```
+This creates:
+- A new branch in the state ledger
+- Scaffolded directories: `reports/figures/hypothesis_B/`, `scripts/models/hypothesis_B/`, etc.
+- Branch-specific README.md files in each directory
+
+### Branch Workflow
+1. `research branch <name>` — Create and switch to new branch
+2. Run analysis on the branch (isolated from main)
+3. `research branches` — List all branches and status
+4. `research merge <name>` — Merge findings back to main
+5. `research abandon <name>` — Abandon exploratory branch
+
+### Parallel Execution
+Branches enable the `parallel` command to execute across different hypotheses simultaneously without overwriting core findings.
+
+## Intent Router (Token Optimization)
+Before DAG initialization, the intent router maps user queries to minimal required context:
+
+### How It Works
+1. User provides natural language query
+2. Router classifies intent (exploratory, hypothesis_test, causal, etc.)
+3. Computes null space — skills/agents NOT needed
+4. Compiles transient workflow YAML with only necessary steps
+5. Excludes ~6,000+ tokens of unnecessary context
+
+### Usage
+```bash
+research intent "find out what's driving the variance in this dataset"
+```
+
+## Knowledge Graph (Context Management)
+Replaces dense text CTMs with graph-based retrieval:
+
+### How It Works
+1. Literature agent extracts triplets: `[Variable X] -> [confounded_by] -> [Variable Y]`
+2. Triplets stored in NetworkX graph (`.research/cache/knowledge_graph.pkl`)
+3. Analysis agents query graph instead of reading 10,000-token summaries
+
+### Usage
+```bash
+research graph                    # Summary
+research graph-stats              # Statistics
+research graph-query --confounders "income"  # Get confounders
+research graph-query --relation "mediates"   # Query by relation
+```
+
+## Semantic File System
+Every AI-generated artifact is forced into a rigorous taxonomy:
+
+| Category | Pattern | Destination |
+|----------|---------|-------------|
+| raw_data | *.csv, *.parquet | inputs/data/raw/ (immutable) |
+| decision_doc | *decision*.md | docs/decisions/ |
+| ingest_script | 01_*.py | scripts/01_ingest/ |
+| eda_script | 02_*.py | scripts/02_eda/ |
+| model_script | 03_*.py | scripts/03_models/ |
+| figure | *.png, *.pdf | reports/figures/ |
+| manuscript | *manuscript*.md | reports/manuscript/ |
+
+### Usage
+```bash
+research taxonomy  # Show full taxonomy
+```
+
+## Interpretative Coupling
+Every figure MUST have an accompanying `.interpret.md` file:
+- Auto-generated in `docs/decisions/`
+- Contains visual description, statistical interpretation, key takeaways, caveats
+- Ensures users receive curated visual evidence, not just charts
+

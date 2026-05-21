@@ -68,6 +68,7 @@ class HookRegistry:
         "pre_routing",
         "pre_execution",
         "post_execution",
+        "post_generation",
         "pre_ledger_commit",
         "on_failure",
     )
