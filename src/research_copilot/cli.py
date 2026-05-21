@@ -368,6 +368,25 @@ def cmd_compress(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_audit(args: argparse.Namespace) -> None:
+    try:
+        from research_copilot.core.state_ledger import ResearchLedger
+        from research_copilot.utils.provenance_mapper import ProvenanceMapper
+
+        root = _project_root()
+        ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+        mapper = ProvenanceMapper(ledger)
+
+        lineage = mapper.build_lineage(args.result_file)
+        print("=" * 60)
+        print("PROVENANCE AUDIT TRAIL")
+        print("=" * 60)
+        print(mapper.format_human_readable(lineage))
+    except Exception as e:
+        print(f"Audit error: {e}")
+        sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rcp",
@@ -405,6 +424,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Preview compressed outputs without saving changes",
     )
+
+    p_audit = sub.add_parser("audit", help="Trace the provenance of a result file back to its inputs")
+    p_audit.add_argument("result_file", help="Path to the output result file to audit")
 
     p_compile = sub.add_parser("compile", help="Map-reduce manuscript sections into PDF/HTML via Pandoc")
     p_compile.add_argument("--formats", default="pdf,html", help="Comma-separated formats (e.g., pdf,html)")
@@ -473,6 +495,7 @@ def main() -> None:
         "setup": cmd_setup,
         "status": cmd_status,
         "compress": cmd_compress,
+        "audit": cmd_audit,
         "agent": cmd_agents,
         "agents": lambda a: cmd_agents(argparse.Namespace(name=None)),
         "skill": cmd_skills,
