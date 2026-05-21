@@ -309,7 +309,7 @@ def _copy_ai_rules_to_project(root: Path) -> None:
     except ImportError:
         import importlib_resources  # type: ignore[no-redef]
 
-    assets = ["AGENTS.md", ".cursorrules", ".clinerules"]
+    assets = ["AGENTS.md", ".cursorrules", ".clinerules", ".windsurfrules", "copilot-instructions.md"]
     for asset_name in assets:
         try:
             asset_path = importlib_resources.files("research_copilot.assets") / asset_name
