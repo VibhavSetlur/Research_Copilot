@@ -36,6 +36,17 @@ Extract: research question, hypothesis, domain, user's stated literature finding
 ### Step 2: Ingest User's Papers
 Scan `inputs/papers/`. For each: extract title, abstract, key findings. Map to the research question.
 
+### Step 2.5: Semantic Clustering of Papers
+After ingesting papers, cluster them by topic using TF-IDF cosine similarity on abstracts:
+1. Vectorize all abstracts with `TfidfVectorizer(max_features=5000, stop_words='english')`
+2. Compute pairwise cosine similarity matrix
+3. Apply agglomerative clustering with threshold 0.7 (papers with similarity > 0.7 form a cluster)
+4. Name each cluster by extracting top-3 TF-IDF terms (e.g., "RCT studies on X", "Observational studies on Y")
+5. Save cluster assignments to `reports/literature/paper_clusters.json` with keys: cluster_id, cluster_name, paper_ids, top_terms
+6. Update evidence matrix to include `cluster_id` per paper
+
+This gives the evidence matrix a thematic structure instead of a flat list, enabling the `related_work_writer` skill to generate organized literature review sections.
+
 ### Step 3: Search (only if < 20 relevant papers)
 Build queries from the research question. Run Semantic Scholar, PubMed (if biomedical), arXiv (if CS/math). Deduplicate against user's papers.
 

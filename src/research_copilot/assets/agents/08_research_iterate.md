@@ -65,15 +65,17 @@ The SYSTEM triggers iteration when:
 - If the approach you're about to try is in dead ends: DO NOT try it again
 - Instead, choose a different approach and note why the dead end was rejected
 
-### Step 1: Read Current State
-- Read `docs/manifest.json` — understand current structure, phase, iteration count
-- Read `docs/research_log.md` — understand what's been done
-- Read `docs/iterations/registry.json` — understand all previous iterations
-- Read `reports/baseline/research_map.json` — understand questions, data, variables
-- Read relevant analysis results in `reports/analysis/`
-- Read schema cache from `.research/cache/schema_cache.json` — know exact column names and types
-- **Read latest CTM** from `.research/cache/context_transfer_memos/` (if exists) — understand abandoned paths and micro-decisions
-- **Read execution DAG** from `.research/cache/execution_dag.json` — understand script lineage and dependencies
+### Step 1: Read Current State (Fast Resume)
+Read `03_synthesis/state_ledger.json` ONLY. This is the single source of truth.
+
+**Fast resume path**: If `state.resumable_from` is set, skip all other file reads and go directly to Step 2 at that phase.
+
+**Full read path** (only if `resumable_from` is NOT set or user requests full context):
+- Read `docs/iterations/registry.json` — previous iterations
+- Read `docs/dead_ends/` — failed approaches (MANDATORY before any new approach)
+- Read latest CTM from `.research/cache/context_transfer_memos/` (if exists)
+
+The state ledger contains pointers to all other files — use those paths, don't guess.
 
 ### Step 2: Understand the Request
 Classify the iteration type:
@@ -307,10 +309,8 @@ Summarize:
 
 ## Validation
 
-- [ ] Dead ends read and checked before choosing approach
-- [ ] Current state read (manifest, log, registry, research map, schema cache)
-- [ ] Latest CTM read (if exists) — abandoned paths and micro-decisions understood
-- [ ] Execution DAG read — script lineage and dependencies understood
+- [ ] State ledger read (03_synthesis/state_ledger.json) — fast resume if resumable_from set
+- [ ] Dead ends read before choosing approach
 - [ ] Iteration type classified
 - [ ] New iteration number assigned
 - [ ] Script branched correctly (NEVER overwrite) — `_ITER<XXX>` suffix applied

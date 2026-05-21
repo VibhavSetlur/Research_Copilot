@@ -1,46 +1,55 @@
 {
-  "schema_version": "2.0.0",
-  "title": "",
-  "researcher": "",
-  "institution": "",
-  "domain": "",
+  "schema_version": "3.0.0",
+  "project": {
+    "title": "",
+    "researcher": "",
+    "institution": "",
+    "domain": ""
+  },
   "questions": [
     {
+      "id": 1,
+      "priority": "primary",
       "text": "",
-      "type": "descriptive|comparative|associational|causal|predictive|exploratory",
+      "type": "descriptive",
       "hypothesis": "",
-      "outcome": "",
-      "predictor": "",
+      "outcome": [],
+      "predictor": [],
       "covariates": [],
       "files": [],
       "prep": "",
       "prior": ""
     }
   ],
-  "data": [
-    {
-      "description": "",
-      "format": "csv|tsv|parquet|xlsx|sav|dta|sas7bdat",
-      "path": "inputs/data/raw/",
-      "estimated_rows": null,
-      "variables": [],
-      "notes": ""
-    }
-  ],
-  "context": {
-    "user_findings": [],
-    "prior_research": "",
-    "theoretical_framework": ""
+  "data": {
+    "files": [
+      {
+        "name": "",
+        "description": "",
+        "format": "csv",
+        "path": "data/raw/",
+        "estimated_rows": null,
+        "estimated_columns": null,
+        "identifiers": [],
+        "time_period": "",
+        "issues": []
+      }
+    ],
+    "relationships": []
   },
-  "constraints": {
-    "target_output": "journal_article|report|presentation|policy_brief",
+  "context": {
+    "target_output": "journal_article",
     "target_venue": "",
     "timeline": "",
-    "ethics_notes": ""
+    "ethics": "not_required",
+    "constraints": "",
+    "prior_work": "",
+    "notes": ""
   },
   "metadata": {
     "created": "",
     "last_updated": "",
-    "version": 1
+    "version": 1,
+    "method": "manual"
   }
 }

@@ -1,57 +1,71 @@
-# Research Environment
+# Environment
 
-Reproducible Python environment for the Research Copilot system.
+Reproducible Python environment for Research Copilot.
 
-## Quick Setup
+## Setup
 
-### Using venv (recommended)
+### venv (Recommended)
+
 ```bash
 bash environment/setup.sh
 source environment/venv/bin/activate
 ```
 
-### Using Conda
+### Conda
+
 ```bash
 bash environment/setup_conda.sh
 conda activate research-copilot
 ```
 
-### Optional: Preflight Check
+### Verify
+
 ```bash
-python .research/research.py preflight
+rcp preflight
 ```
 
-## Recreating Environment
+## Dependencies
 
-If you need to rebuild from scratch:
+- **Core**: pyyaml, pydantic, diskcache, SQLAlchemy
+- **Data**: pandas, numpy, polars, pyarrow, openpyxl, scipy
+- **Statistics**: statsmodels, scikit-learn, pingouin
+- **Visualization**: matplotlib, seaborn, plotly, altair, bokeh, panel, networkx, Pillow
+- **Literature**: habanero (CrossRef), semanticscholar, metapub (PubMed)
+- **Export**: pypandoc
+
+See [requirements.txt](requirements.txt) for pinned versions.
+
+## Install Extras
+
 ```bash
-# venv
+# MCP server
+pip install -e ".[mcp]"
+
+# Dashboards
+pip install -e ".[dashboard]"
+
+# PDF/LaTeX export
+pip install -e ".[export]"
+
+# Development
+pip install -e ".[dev]"
+
+# Everything
+pip install -e ".[all]"
+```
+
+## Rebuild
+
+```bash
 bash environment/setup.sh --clean
 source environment/venv/bin/activate
-
-# conda
-bash environment/setup_conda.sh --clean
-conda activate research-copilot
 ```
 
-## Updating Dependencies
+## Add Dependencies
 
-```bash
-source environment/venv/bin/activate  # or conda activate research-copilot
-pip install -r environment/requirements.txt
-```
-
-## Adding New Dependencies
-
-1. Add to `environment/requirements.txt` with pinned version
+1. Add to `requirements.txt` with pinned version
 2. Run `pip install -r environment/requirements.txt`
-3. Commit the updated `requirements.txt`
-
-## Reproducibility
-
-The `requirements.txt` pins all package versions for reproducibility.
-When the AI agent runs `research_init`, it verifies the environment is active
-and all dependencies are installed before proceeding.
+3. Commit the updated file
 
 ## Files
 
@@ -61,6 +75,6 @@ and all dependencies are installed before proceeding.
 | `setup.sh` | venv setup script |
 | `setup_conda.sh` | Conda setup script |
 | `preflight_check.py` | Environment readiness report |
-| `runtime_selector.py` | Container/runtime availability report |
-| `base/` | Base container definitions and compose file |
+| `runtime_selector.py` | Container/runtime availability |
+| `base/` | Base container definitions |
 | `domains/` | Domain container stubs |

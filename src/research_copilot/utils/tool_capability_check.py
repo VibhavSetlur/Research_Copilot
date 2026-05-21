@@ -18,39 +18,7 @@ except ImportError:
     yaml = None
 
 
-def load_yaml(path: Path) -> Dict[str, Any]:
-    if yaml is None:
-        return {}
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
-
-
-def load_json(path: Path) -> Dict[str, Any]:
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_json(path: Path, data: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
+from research_copilot.utils.common import find_project_root, load_yaml, load_json, save_json
 
 
 def get_config(root: Path) -> Dict[str, Any]:

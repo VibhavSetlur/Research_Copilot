@@ -147,8 +147,8 @@ def _find_any_available_model() -> Optional[dict]:
 
 
 def _find_project_root() -> Path:
-    from research_copilot.utils.asset_manager import AssetManager
-    return AssetManager.find_project_root()
+    from research_copilot.utils.common import find_project_root
+    return find_project_root()
 
 
 def _active_experiment(root: Path) -> str:

@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from research_copilot.utils.common import find_project_root
+
 logger = logging.getLogger("research.interpretative_coupling")
 
 
@@ -26,13 +28,8 @@ class InterpretativeCoupler:
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
-            project_root = self._find_project_root()
+            project_root = find_project_root()
         self.root = Path(project_root)
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        from research_copilot.utils.asset_manager import AssetManager
-        return AssetManager.find_project_root()
 
     def generate_interpretation(
         self,
@@ -345,14 +342,3 @@ def _infer_figure_type(stem: str) -> str:
         if key in stem_lower:
             return fig_type
     return "unknown"
-
-
-def _find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()

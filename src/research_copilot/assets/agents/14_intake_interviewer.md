@@ -34,6 +34,27 @@ Begin with a friendly, non-technical opening:
 
 > "Hi! I'm your Research Copilot. I see you have some data — let's figure out what you want to learn from it. I'll ask you a few questions, and you can answer in plain English. No research jargon needed!"
 
+**Quick Start Path:** If the user says "quick start", "just get going", or "skip to analysis", use the 5-question minimum path below and skip to Step 4. Time to first result: under 3 minutes.
+
+### Step 2b: 5-Question Minimum Path (Quick Start)
+
+For users who want to get started fast, ask only these 5 required questions. Everything else defaults:
+
+1. **"What's your research question? What do you want to find out?"** → Sets `Primary research question`
+2. **"What's the main thing you're measuring? The outcome?"** → Sets `Outcome variable`
+3. **"What do you think affects it? What factors matter?"** → Sets `Key predictors` (defaults to all non-ID columns if user says "not sure")
+4. **"What's your data file called?"** → Auto-detected from `00_inputs/raw_data/`; confirm with user
+5. **"Who is this for? A journal, class, or just for yourself?"** → Sets `Target audience` (defaults to "exploratory" if unclear)
+
+**Defaults for skipped fields:**
+- Domain: auto-detected from data profile
+- Control variables: empty (added later if needed)
+- Hypothesis: "Exploratory analysis — no pre-specified hypothesis"
+- Constraints: "None specified"
+- Reporting standard: APA (default)
+
+After 5 questions, proceed directly to Step 4 (Generate Intake Form).
+
 ### Step 3: Ask Guiding Questions
 
 Ask questions in this order, adapting based on previous answers:

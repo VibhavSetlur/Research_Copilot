@@ -18,22 +18,18 @@ from typing import Any, Optional
 
 logger = logging.getLogger("research.state_ledger")
 
+from research_copilot.utils.common import find_project_root
 
-from research_copilot.utils.asset_manager import AssetManager
 
 class ResearchLedger:
     """Thread-safe, atomic research state ledger."""
 
     def __init__(self, state_path: Optional[Path] = None):
         if state_path is None:
-            root = self._find_project_root()
+            root = find_project_root()
             state_path = root / "03_synthesis" / "state_ledger.json"
         self._path = Path(state_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        return AssetManager.find_project_root()
 
     def _load(self) -> dict:
         if self._path.exists():
@@ -477,6 +473,69 @@ class ResearchLedger:
 
         lines.append("")
         return "\n".join(lines)
+
+    def get_project_summary(self, max_tokens: int = 500) -> str:
+        """Return a compact project summary for new conversation injection.
+
+        Covers: project title, current phase, last 3 decisions, active hypotheses,
+        dead ends, next action. Target: under 500 tokens.
+
+        Args:
+            max_tokens: Approximate token limit for the output
+
+        Returns:
+            Compact summary string
+        """
+        state = self._load()
+        lines = [
+            f"Project: {state.get('project', 'unnamed')}",
+            f"Phase: {state.get('phase', 'unknown')} (step {state.get('step', 0)})",
+            f"Branch: {state.get('current_branch', state.get('active_branch', 'main'))}",
+        ]
+
+        # Last 3 decisions
+        decisions = state.get("decisions", [])
+        if decisions:
+            last = decisions[-3:]
+            lines.append("Recent decisions:")
+            for i, d in enumerate(last, 1):
+                desc = d.get("decision", d.get("description", str(d)))[:80]
+                lines.append(f"  {i}. {desc}")
+
+        # Active hypotheses
+        hypotheses = state.get("active_hypotheses", [])
+        if hypotheses:
+            lines.append(f"Hypotheses ({len(hypotheses)}):")
+            for h in hypotheses[:3]:
+                eff = f" (effect={h['effect']})" if h.get("effect") is not None else ""
+                lines.append(f"  - {h['id']}: {h['status']}{eff}")
+
+        # Dead ends
+        dead_ends = state.get("dead_ends", [])
+        if dead_ends:
+            lines.append(f"Dead ends to avoid ({len(dead_ends)}):")
+            for d in dead_ends[-3:]:
+                lines.append(f"  - {d[:80]}")
+
+        # Next action
+        checkpoints = state.get("checkpoints", {})
+        pipeline = ["research_init", "literature_deep", "method_route", "data_scaffold",
+                    "execute_analysis", "compile_outputs", "audit_validate"]
+        completed = {p for p, s in checkpoints.items() if s == "complete"}
+        next_action = next((p for p in pipeline if p not in completed), "research_iterate")
+        lines.append(f"Next action: {next_action}")
+
+        summary = "\n".join(lines)
+        # Truncate at sentence boundary if over limit
+        words = summary.split()
+        if len(words) > max_tokens:
+            truncated = " ".join(words[:max_tokens])
+            for sep in (". ", "\n"):
+                idx = truncated.rfind(sep)
+                if idx > 0:
+                    return truncated[:idx + 1]
+            return truncated + "..."
+        return summary
 
     def branch_state(
         self,

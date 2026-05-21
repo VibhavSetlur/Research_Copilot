@@ -14,22 +14,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from research_copilot.utils.common import find_project_root
 
-from research_copilot.utils.asset_manager import AssetManager
 
 class CheckpointManager:
     """Manages phase-level checkpoints for the research pipeline."""
 
     def __init__(self, checkpoint_dir: Optional[Path] = None):
         if checkpoint_dir is None:
-            root = self._find_project_root()
+            root = find_project_root()
             checkpoint_dir = root / "03_synthesis" / "checkpoints"
         self._dir = Path(checkpoint_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        return AssetManager.find_project_root()
 
     def save(
         self,
@@ -138,3 +134,60 @@ class CheckpointManager:
                 lines.append(f"    - {cp['phase']} [{ts}]{extra}")
         lines.append("")
         return "\n".join(lines)
+
+    def get_latest_checkpoint_summary(self) -> dict:
+        """Return a summary of the latest checkpoint.
+
+        Returns dict with: phase, timestamp, key results (effect sizes,
+        significant findings), and pending actions. Feeds into session_restorer.py.
+        """
+        all_checkpoints = sorted(self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
+        if not all_checkpoints:
+            return {"phase": "none", "timestamp": None, "key_results": [], "pending_actions": []}
+
+        latest_path = all_checkpoints[-1]
+        with open(latest_path) as f:
+            cp = json.load(f)
+
+        data = cp.get("data", {})
+        key_results = []
+
+        # Extract effect sizes and significant findings
+        for finding in data.get("findings", []):
+            if isinstance(finding, dict):
+                result = {
+                    "variable": finding.get("variable", finding.get("predictor", "unknown")),
+                    "effect_size": finding.get("effect_size", finding.get("coef", finding.get("estimate"))),
+                    "significant": finding.get("p_value", 1) < 0.05,
+                }
+                key_results.append(result)
+
+        # Extract from analysis results if present
+        for analysis in data.get("analysis_results", []):
+            if isinstance(analysis, dict):
+                result = {
+                    "method": analysis.get("method", "unknown"),
+                    "effect_size": analysis.get("effect_size"),
+                    "significant": analysis.get("p_value", 1) < 0.05,
+                }
+                key_results.append(result)
+
+        # Determine pending actions based on phase
+        phase = cp.get("phase", "unknown")
+        phase_next = {
+            "research_init": "literature_deep",
+            "literature_deep": "method_route",
+            "method_route": "data_scaffold",
+            "data_scaffold": "execute_analysis",
+            "execute_analysis": "compile_outputs",
+            "compile_outputs": "audit_validate",
+            "audit_validate": "complete",
+        }
+        pending = [phase_next.get(phase, "complete")]
+
+        return {
+            "phase": phase,
+            "timestamp": cp.get("timestamp"),
+            "key_results": key_results,
+            "pending_actions": pending,
+        }

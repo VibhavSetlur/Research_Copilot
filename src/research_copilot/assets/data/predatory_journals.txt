@@ -1,0 +1,70 @@
+# Predatory Journal List
+# One journal name per line (case-insensitive matching)
+# Sources: Beall's List, Cabell's, community-maintained lists
+# Last updated: 2026-05-20
+# NOTE: This list is not exhaustive. Manual review is always recommended.
+
+American Journal of Engineering Research
+American Journal of Scientific and Industrial Research
+Asian Online Journal Publishing Group
+British Journal of Economics, Management and Trade
+European Academic Research
+Global Journal of Arts, Humanities and Social Sciences
+Indian Journal of Scientific Research
+International Journal of Advanced Research
+International Journal of Current Research
+International Journal of Engineering Research and Applications
+International Journal of Innovative Research in Science, Engineering and Technology
+International Journal of Latest Trends in Engineering and Technology
+International Journal of Modern Engineering Research
+International Journal of Scientific and Engineering Research
+International Journal of Scientific and Research Publications
+International Journal of Scientific Research
+IOSR Journal of Engineering
+Journal of Information Systems and Operations Management
+Mediterranean Journal of Social Sciences
+Pacific Business Review International
+Research Journal of Recent Sciences
+Scholars Journal of Applied Medical Sciences
+Scholars Research Library
+Scientific Research Publishing (SCIRP)
+World Journal of Science, Technology and Sustainable Development
+International Journal of Advanced Scientific Research and Management
+American Journal of Research Communication
+Annals of Biological Research
+British Journal of Applied Science & Technology
+European International Journal of Science and Technology
+International Journal of Academic Research in Business and Social Sciences
+International Journal of Humanities and Social Science
+International Journal of Management Sciences and Business Research
+International Journal of Novel Trends in Pharmaceutical Sciences
+International Journal of Recent Technology and Engineering
+Journal of Global Business Management
+Journal of Novel Applied Sciences
+Journal of Science and Its Applications
+Life Science Journal
+Middle-East Journal of Scientific Research
+OALib (Open Access Library)
+Prime Journals
+Research Inventy: International Journal of Engineering and Science
+Science Park Research Organization
+The International Journal of Engineering and Science
+Universal Journal of Management and Social Sciences
+WIT Transactions on Ecology and the Environment
+Journal of Emerging Trends in Economics and Management Sciences
+International Journal of Advanced Research in Computer Science and Software Engineering
+International Journal of Computer Applications
+International Journal of Computer Science and Information Technologies
+International Journal of Electrical and Electronics Research
+International Journal of Mechanical and Production Engineering
+International Journal of Pharmaceutical and Biological Sciences
+International Journal of Physics and Mathematical Sciences
+International Journal of Social Science and Humanity
+International Journal of Software and Hardware Research Engineering
+International Journal of Web & Semantic Technology
+Journal of Global Research in Computer Science
+Journal of Information Engineering and Applications
+Journal of Network and Innovative Computing
+Journal of Selected Areas in Microelectronics
+Journal of Signal and Image Processing
+Research & Reviews: Journal of Material Science

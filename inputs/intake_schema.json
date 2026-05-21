@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Research Copilot Intake Form",
+  "description": "Schema for validating intake.json submissions",
+  "type": "object",
+  "required": ["schema_version", "project", "questions"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "project": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "researcher": { "type": "string" },
+        "institution": { "type": "string" },
+        "domain": { "type": "string" }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "outcome"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "priority": {
+            "type": "string",
+            "enum": ["primary", "secondary", "exploratory"]
+          },
+          "text": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["descriptive", "comparative", "associational", "causal", "predictive", "exploratory"]
+          },
+          "hypothesis": { "type": "string" },
+          "outcome": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "predictor": { "type": "array", "items": { "type": "string" } },
+          "covariates": { "type": "array", "items": { "type": "string" } },
+          "files": { "type": "array", "items": { "type": "string" } },
+          "prep": { "type": "string" },
+          "prior": { "type": "string" }
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "format": {
+                "type": "string",
+                "enum": ["csv", "tsv", "parquet", "xlsx", "sav", "dta", "sas7bdat"]
+              },
+              "path": { "type": "string" },
+              "estimated_rows": { "type": ["integer", "null"] },
+              "estimated_columns": { "type": ["integer", "null"] },
+              "identifiers": { "type": "array", "items": { "type": "string" } },
+              "time_period": { "type": "string" },
+              "issues": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "on": { "type": "string" },
+              "type": { "type": "string", "enum": ["inner", "left", "right", "outer"] }
+            }
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "target_output": {
+          "type": "string",
+          "enum": ["journal_article", "report", "presentation", "policy_brief"]
+        },
+        "target_venue": { "type": "string" },
+        "timeline": { "type": "string" },
+        "ethics": {
+          "type": "string",
+          "enum": ["approved", "pending", "not_required"]
+        },
+        "constraints": { "type": "string" },
+        "prior_work": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created": { "type": "string", "format": "date-time" },
+        "last_updated": { "type": "string", "format": "date-time" },
+        "version": { "type": "integer", "minimum": 1 },
+        "method": {
+          "type": "string",
+          "enum": ["manual", "interview", "api"]
+        }
+      }
+    }
+  }
+}

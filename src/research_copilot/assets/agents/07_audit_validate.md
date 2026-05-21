@@ -56,6 +56,16 @@ Execute the three-pass citation verification pipeline:
 5. **CONDITIONAL if:** some citations are partial_match
 6. Remove any retracted citations from the manuscript immediately
 
+### Step 2.5: Check for Predatory Journal Citations
+After Pass 1 existence check, scan all cited journals against a bundled predatory journal list:
+1. Load `src/research_copilot/assets/data/predatory_journals.txt` (one journal name per line, case-insensitive matching)
+2. For each citation in the bibliography, extract the journal name
+3. Compare against the predatory list using fuzzy matching (Levenshtein distance ≤ 2 for typos)
+4. Flag any matches with: journal name, citation key, suggested action
+5. **WARN if:** any citation matches a predatory journal — flag for manual review
+6. Log flagged citations to `reports/literature/predatory_journal_flags.json`
+7. If the list file is missing or outdated, note: "Predatory journal list not available — manual review recommended"
+
 ### Step 3: Run Claim Tracer (Audit #7)
 Execute the claim-to-evidence graph builder:
 1. Run `python .research/scripts/utils/claim_tracer.py --manuscript reports/manuscript/research_findings.md --data-lineage docs/data_lineage.json --citation-report reports/literature/citation_verification_report.json`

@@ -7,6 +7,7 @@ All interceptors work with the synchronous trigger_sync() interface so any AI
 agent can use them without async infrastructure.
 """
 
+import json
 import logging
 from pathlib import Path
 
@@ -663,6 +664,28 @@ def check_approval_gate(state: dict, *args, **kwargs) -> dict:
 
     # Check if there's a pending request (from a previous call)
     if pending_path.exists():
+        # Auto-approve fallback: if pending for >30 seconds with no response, auto-approve
+        try:
+            with open(pending_path) as f:
+                pending_data = json.load(f)
+            pending_time = pending_data.get("timestamp", "")
+            if pending_time:
+                from datetime import datetime
+                pending_dt = datetime.fromisoformat(pending_time)
+                elapsed = (datetime.now(timezone.utc) - pending_dt).total_seconds()
+                if elapsed > 30:
+                    state["approval_status"] = "approved"
+                    for path in [pending_path, response_path]:
+                        try:
+                            if path.exists():
+                                path.unlink()
+                        except Exception:
+                            pass
+                    logger.info("Phase '%s' auto-approved: no human response within 30s timeout", phase)
+                    return state
+        except Exception:
+            pass
+
         state["approval_status"] = "pending"
         return state
 

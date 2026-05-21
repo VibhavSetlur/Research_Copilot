@@ -178,14 +178,8 @@ class IntentRouter:
 
     @staticmethod
     def _find_project_root() -> Path:
-        p = Path.cwd()
-        for _ in range(10):
-            if (p / ".research").exists():
-                return p
-            if p.parent == p:
-                break
-            p = p.parent
-        return Path.cwd()
+        from research_copilot.utils.common import find_project_root
+        return find_project_root()
 
     def _load_skill_index(self) -> dict:
         """Load the skill index for enhanced matching."""
@@ -375,60 +369,38 @@ class IntentRouter:
         tokens_per_category = 1500
         return len(null_space) * tokens_per_category
 
-    def compile_transient_workflow(self, query: str, depth: str = "academic") -> str:
+    def compile_transient_workflow(self, query: str, depth: str = "academic", compact_yaml: bool = False) -> str:
         """Compile a transient workflow YAML for the query.
 
         Args:
             query: User's natural language query
+            depth: exploratory, academic, or publication
+            compact_yaml: if True, strip comments and reduce to minimal lines
 
         Returns:
             YAML string for the transient workflow
         """
         context = self.get_minimal_context(query, depth=depth)
-        classification = context["classification"]
-        primary = classification["primary_intent"]
+        primary = context["classification"]["primary_intent"]
+        ctx = context["context"]
 
-        steps = []
-        for i, step in enumerate(context["context"]["workflow_steps"]):
-            steps.append(f"  - step: {i + 1}\n    name: {step}\n    type: {step}")
+        if compact_yaml or depth == "exploratory":
+            steps_str = "\n".join(f"  - {i+1}. {s}" for i, s in enumerate(ctx["workflow_steps"][:3]))
+            return (f"transient: true\nintent: {primary}\ndepth: {context['depth']}\n"
+                    f"skills: {ctx['skills'][:2]}\nagents: {ctx['agents'][:2]}\n"
+                    f"steps:\n{steps_str}\nquality_gates: false")
 
-        skills_yaml = "\n".join(
-            f"    - {s}" for s in context["context"]["skills"]
-        )
-        agents_yaml = "\n".join(
-            f"    - {a}" for a in context["context"]["agents"]
-        )
+        steps_str = "\n".join(f"  - step: {i+1}\n    name: {s}\n    type: {s}" for i, s in enumerate(ctx["workflow_steps"]))
+        skills_str = "\n".join(f"    - {s}" for s in ctx["skills"])
+        agents_str = "\n".join(f"    - {a}" for a in ctx["agents"])
 
-        yaml_content = f"""# Transient Workflow — Auto-generated
-# Query: {query}
-# Intent: {primary}
-# Depth: {context['depth']}
-# Generated: {datetime.now(timezone.utc).isoformat()}
-# Token savings: ~{context['excluded']['estimated_token_savings']} tokens excluded
-
-transient: true
-intent: {primary}
-depth: {context['depth']}
-null_space_excluded: {context['null_space']}
-depth_exclusions: {context['excluded']['depth_exclusions']}
-
-prompt_constraints:
-  - "{context['depth_profile']['prompt_constraint']}"
-
-steps:
-{chr(10).join(steps)}
-
-skills_to_load:
-{skills_yaml}
-
-agents_to_invoke:
-{agents_yaml}
-
-quality_gates:
-  - enabled: {str(context['depth_profile']['quality_gates']).lower()}
-    checks: [data_grounding, method_appropriateness]
-"""
-        return yaml_content
+        return (f"transient: true\nintent: {primary}\ndepth: {context['depth']}\n"
+                f"null_space_excluded: {context['null_space']}\n"
+                f"prompt_constraints:\n  - \"{context['depth_profile']['prompt_constraint']}\"\n"
+                f"steps:\n{steps_str}\nskills_to_load:\n{skills_str}\n"
+                f"agents_to_invoke:\n{agents_str}\nquality_gates:\n"
+                f"  - enabled: {str(context['depth_profile']['quality_gates']).lower()}\n"
+                f"    checks: [data_grounding, method_appropriateness]")
 
     def route(self, query: str, save: bool = True, depth: str = "academic") -> Dict[str, Any]:
         """Full routing pipeline: classify, compute null space, get minimal context.

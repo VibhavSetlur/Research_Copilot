@@ -73,6 +73,44 @@ The validator generates `reports/analysis/assumption_validation_{question_id}.js
 
 ---
 
+## Sample-Size-Adaptive Normality Testing
+
+The choice of normality test depends on sample size. Use this decision table before running any parametric test:
+
+| Sample Size (N) | Normality Test | Rationale |
+|-----------------|---------------|-----------|
+| N < 30 | Exact tests (permutation / bootstrap) | Shapiro-Wilk unreliable at very small N; exact tests have correct Type I error |
+| 30 ≤ N < 5000 | Shapiro-Wilk | Most powerful omnibus test for normality in this range |
+| N ≥ 5000 | Kolmogorov-Smirnov (with Lilliefors correction) | Shapiro-Wilk becomes oversensitive at large N; KS is more stable |
+
+### Implementation Note
+
+For N ≥ 5000, supplement with visual diagnostics (Q-Q plot, histogram) because ANY formal test will reject trivial deviations. Use effect-size-based normality assessment: skewness |< 2| and kurtosis |< 7| as practical thresholds.
+
+---
+
+## Fallback Chain: OLS → Robust → Nonparametric
+
+When OLS assumptions fail, follow this cascade. Each step has a 1-line rationale:
+
+| Step | Method | Trigger | Rationale |
+|------|--------|---------|-----------|
+| 1 | **OLS** (baseline) | All assumptions pass | Most efficient estimator under Gauss-Markov conditions |
+| 2 | **OLS + Robust SE** (HC3) | Heteroscedasticity only | Preserves coefficient estimates; corrects standard errors for unequal variance |
+| 3 | **RLM** (Huber/bisquare) | Outliers or non-normal residuals | Down-weights influential observations; resistant to heavy-tailed errors |
+| 4 | **Bootstrap** (percentile or BCa) | Non-normal residuals + small N | Distribution-free inference; valid for any sample size with 1000+ resamples |
+| 5 | **Nonparametric** (rank-based / permutation) | Multiple assumption failures | Makes no distributional assumptions; valid under minimal conditions |
+
+### Decision Rules
+
+- If ONLY heteroscedasticity fails → Step 2 (Robust SE). Do NOT abandon OLS coefficients.
+- If heteroscedasticity + non-normality → Step 3 (RLM).
+- If multicollinearity (VIF > 10) → Ridge/Lasso BEFORE applying fallback chain.
+- If N < 30 AND assumptions fail → Step 4 (Bootstrap) or Step 5 (Nonparametric).
+- Document which step was used and why in the experiment `decisions.yaml`.
+
+---
+
 ## Integration
 
 - Run automatically prior to script execution.

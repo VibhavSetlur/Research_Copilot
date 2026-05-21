@@ -29,27 +29,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from research_copilot.utils.common import find_project_root
+
 
 class ExecutionDAGManager:
     """Manages the execution DAG for script lineage tracking."""
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
-            project_root = self._find_project_root()
+            project_root = find_project_root()
         self.root = project_root
         self.dag_path = project_root / ".research" / "cache" / "execution_dag.json"
         self._ensure_dag_exists()
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        p = Path.cwd()
-        for _ in range(10):
-            if (p / ".research").exists():
-                return p
-            if p.parent == p:
-                break
-            p = p.parent
-        return Path.cwd()
 
     def _ensure_dag_exists(self) -> None:
         if not self.dag_path.exists():

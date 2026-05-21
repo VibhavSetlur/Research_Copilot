@@ -1,7 +1,8 @@
 # Research Intake Form — YAML Format
 # Alternative to intake.md for cleaner complex project specifications
+# Schema version: 3.0.0
 
-schema_version: "2.0.0"
+schema_version: "3.0.0"
 
 project:
   title: ""
@@ -10,43 +11,60 @@ project:
   domain: ""  # Match with .research/domains/*.yaml
 
 questions:
-  - text: ""
-    type: descriptive  # descriptive|comparative|associational|causal|predictive|exploratory
+  - id: 1
+    priority: primary  # primary | secondary | exploratory
+    text: ""
+    type: descriptive  # descriptive | comparative | associational | causal | predictive | exploratory
     hypothesis: ""
-    outcome: ""
-    predictor: ""
+    outcome: []
+    predictor: []
     covariates: []
     files: []
     prep: ""
     prior: ""
 
-  # Add more questions as needed:
-  # - text: ""
+  # Add more questions:
+  # - id: 2
+  #   priority: secondary
+  #   text: ""
   #   type: ""
   #   hypothesis: ""
-  #   outcome: ""
-  #   predictor: ""
+  #   outcome: []
+  #   predictor: []
+  #   covariates: []
+  #   files: []
+  #   prep: ""
+  #   prior: ""
 
 data:
-  - description: ""
-    format: csv  # csv|tsv|parquet|xlsx|sav|dta|sas7bdat
-    path: "inputs/data/raw/"
-    estimated_rows: null
-    variables: []
-    notes: ""
+  files:
+    - name: ""
+      description: ""
+      format: csv  # csv | tsv | parquet | xlsx | sav | dta | sas7bdat
+      path: "data/raw/"
+      estimated_rows: null
+      estimated_columns: null
+      identifiers: []
+      time_period: ""
+      issues: []
+  relationships: []
+  # Example:
+  # relationships:
+  #   - from: survey_data.csv
+  #     to: clinical_data.parquet
+  #     on: patient_id
 
 context:
-  user_findings: []
-  prior_research: ""
-  theoretical_framework: ""
-
-constraints:
-  target_output: journal_article  # journal_article|report|presentation|policy_brief
+  target_output: journal_article  # journal_article | report | presentation | policy_brief
   target_venue: ""
   timeline: ""
-  ethics_notes: ""
+  ethics: not_required  # approved | pending | not_required
+  constraints: ""
+  prior_work: ""
+  notes: ""
 
 metadata:
   created: ""
   last_updated: ""
   version: 1
+  method: manual  # manual | interview | api

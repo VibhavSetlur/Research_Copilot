@@ -41,23 +41,23 @@ This scans inputs/ and saves the research map to `.research/cache/research_map.j
 Read the output to understand what was found.
 
 ### Step 3: Read Intake
-Parse `inputs/intake.md`. Extract:
-- **Project info**: title, researcher, institution
-- **Research questions**: all questions listed, each with type, hypothesis, variables, data files needed, data prep needed, prior research
-- **Data overview**: file descriptions, relationships between files, data preparation needed
-- **Domain & conventions**: field, target output, target venue
-- **Constraints**: timeline, IRB, limitations
-- **Prior work**: previous analyses
+
+Parse `inputs/intake.md`, `inputs/intake.yaml`, or `inputs/intake.json` (in that priority order). Extract:
+- **Project info**: title, researcher, institution, domain
+- **Research questions**: all questions with id, priority, type, hypothesis, variables, files, prep, prior
+- **Data overview**: file descriptions, relationships, preparation needed
+- **Context**: target output, venue, timeline, ethics, constraints, prior work
+- **Metadata**: creation date, method (manual/interview/api)
 
 If intake is empty or has no questions: generate follow-up questions and stop. Do NOT create directory structure yet.
 
 ### Step 4: Scan Inputs
 - **Data**: profile every file in `inputs/data/raw/` using `profile_tabular`, `classify_domain`, `detect_missingness`, `detect_outliers`
-- **Data Scale**: run `data_scale_detector.py` to classify files by size and set library constraints
-- **Context**: read all files in `inputs/context/` (abstracts, notes, links)
-- **Papers**: count PDFs in `inputs/papers/`
-- **Hashes**: run `compute_hashes` on all data files
-- **Format routing**: use `format_router` output from scan to detect non-tabular formats
+- **Data Scale**: classify files by size — <100MB full profiling, 100MB-1GB sampled (10k rows), >1GB polars lazy required
+- **Context**: read all files in `inputs/context/` (abstracts, notes, links, codebooks)
+- **Papers**: scan PDFs, BibTeX, and RIS files in `inputs/papers/`
+- **Hashes**: run `compute_hashes` on all data files, record SHA-256 before use
+- **Format routing**: detect non-tabular formats and route appropriately
 - **Leaf-node domain**: select the most specific leaf-node from `domain_registry.json`
 - **License audit**: if a leaf-node implies proprietary tools (e.g., MATLAB, SAS, VASP), confirm availability
 - **HPC flag**: if total data > 50GB or non-tabular requires HPC tools, pause for user confirmation
@@ -107,7 +107,7 @@ If critical info is missing, write `01_workspace/scratchpad/follow_up_questions.
 ## Validation
 
 - [ ] CLI scan executed
-- [ ] Intake parsed (or flagged)
+- [ ] Intake parsed from .md, .yaml, or .json (or flagged as empty)
 - [ ] All data files profiled
 - [ ] Full directory structure created via init-dirs (`00_inputs/`, `01_workspace/`, `02_experiments/`, `03_synthesis/`)
 - [ ] README.md in EVERY subdirectory with project-specific content

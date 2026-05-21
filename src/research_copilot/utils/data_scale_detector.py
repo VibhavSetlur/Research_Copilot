@@ -25,6 +25,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from research_copilot.utils.common import find_project_root
+
 
 SIZE_THRESHOLDS = {
     "small_max_mb": 100,
@@ -67,21 +69,10 @@ class DataScaleDetector:
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
-            project_root = self._find_project_root()
+            project_root = find_project_root()
         self.root = project_root
         self.data_dir = project_root / "inputs" / "data" / "raw"
         self.thresholds = self._load_thresholds()
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        p = Path.cwd()
-        for _ in range(10):
-            if (p / ".research").exists():
-                return p
-            if p.parent == p:
-                break
-            p = p.parent
-        return Path.cwd()
 
     def _load_thresholds(self) -> dict:
         config_path = self.root / ".research" / "config.yaml"

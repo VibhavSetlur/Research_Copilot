@@ -38,6 +38,8 @@ try:
 except ImportError:
     yaml = None
 
+from research_copilot.utils.common import find_project_root
+
 logger = logging.getLogger("research.semantic_filesystem")
 
 SEMANTIC_TAXONOMY = {
@@ -141,19 +143,8 @@ class SemanticFilesystemEnforcer:
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
-            project_root = self._find_project_root()
+            project_root = find_project_root()
         self.root = Path(project_root)
-
-    @staticmethod
-    def _find_project_root() -> Path:
-        p = Path.cwd()
-        for _ in range(10):
-            if (p / ".research").exists():
-                return p
-            if p.parent == p:
-                break
-            p = p.parent
-        return Path.cwd()
 
     def classify_file(self, filename: str, content_type: str = "") -> Tuple[str, str]:
         """Classify a file and determine its correct destination.
@@ -512,14 +503,3 @@ def enforce_semantic_taxonomy(state: dict, *args, **kwargs) -> dict:
         state["taxonomy_error"] = str(e)
 
     return state
-
-
-def _find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()

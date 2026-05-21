@@ -102,6 +102,57 @@ Route data profiles to appropriate analysis skills based on data characteristics
 - **Routing suggests causal method but data is cross-sectional**: warn about causal limitations
 - **Domain-specific method not available**: use general method with domain-appropriate reporting
 
+## Complexity Budget
+
+Every method is tagged with a runtime complexity tier. The intent router uses these tags to enforce depth constraints — exploratory queries MUST NOT invoke `intensive` methods.
+
+### Complexity Tiers
+
+| Tier | Runtime | When to Use | Examples |
+|------|---------|-------------|----------|
+| **quick** | <2 min | Exploratory queries, "show me the data", quick look, sanity checks | descriptive_stats, profile_tabular, correlation_matrix, histogram, scatter_plot, chi-square, t-test |
+| **standard** | 5–15 min | Planned analysis, hypothesis testing, publication methods | multiple_regression, logistic_regression, ANOVA, factor_analysis, mediation_analysis, bootstrap CI |
+| **intensive** | >15 min | Publication-only, final validation, complex models | MCMC/Bayesian, mixed_effects, structural_equation_model, permutation_tests (10k+), cross-validated ML, survival_analysis, time_series_ARIMA |
+
+### Depth Enforcement Rules
+
+- `depth: exploratory` → ONLY `quick` methods allowed. Block any `standard` or `intensive` method.
+- `depth: standard` → `quick` + `standard` allowed. `intensive` requires explicit user approval.
+- `depth: publication` → all tiers allowed. No restrictions.
+
+### Intent Router Integration
+
+When the intent router classifies a query as `exploratory`:
+1. Filter out all methods tagged `intensive`
+2. Filter out all methods tagged `standard` unless explicitly requested
+3. Select the simplest `quick` method that answers the question
+4. If no `quick` method is appropriate, ask: "This requires a more complex analysis. Proceed?"
+
+### Method Complexity Tags
+
+```
+descriptive_stats          → quick
+profile_tabular            → quick
+correlation_matrix         → quick
+t_test                     → quick
+chi_square                 → quick
+histogram                  → quick
+scatter_plot               → quick
+multiple_regression        → standard
+logistic_regression        → standard
+ANOVA                      → standard
+factor_analysis            → standard
+mediation_analysis         → standard
+bootstrap_ci               → standard
+mixed_effects              → intensive
+bayesian_mcmc              → intensive
+structural_equation_model  → intensive
+survival_analysis          → intensive
+time_series_arima          → intensive
+permutation_test           → intensive
+cross_validated_ml         → intensive
+```
+
 ## Output Specification
 - `analysis/methods_routing.json`: ordered skill list, variable role assignments, assumption checks, fallback methods, execution dependencies
 

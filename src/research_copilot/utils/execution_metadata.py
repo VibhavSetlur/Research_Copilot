@@ -14,29 +14,11 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 
-def _find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
-
-
-def load_json_safe(path: Path) -> Dict[str, Any]:
-    try:
-        if path.exists():
-            with open(path) as f:
-                return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        pass
-    return {}
+from research_copilot.utils.common import find_project_root, load_json_safe
 
 
 def load_execution_log(root: Optional[Path] = None) -> List[Dict[str, Any]]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     log_path = root / ".research" / "cache" / "execution_log.jsonl"
     entries = []
     if log_path.exists():

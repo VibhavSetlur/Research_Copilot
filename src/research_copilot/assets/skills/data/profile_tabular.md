@@ -30,6 +30,7 @@ Perform structural and statistical profiling of raw tabular data to understand v
 - Detect encoding: try UTF-8 → Latin-1 → CP-1252
 - For CSV: auto-detect delimiter via `csv.Sniffer`
 - For files >1GB: use chunked reading (`chunksize=100000`)
+- **Quick Mode for files >100MB**: sample 10,000 rows, profile the sample, note in output that results are based on a sample. Use `pd.read_csv(path, nrows=10000)` or `df.sample(n=10000)` for non-CSV formats. Include warning: "Profile based on 10,000-row sample of {total_rows} rows. Full profile may differ."
 - Downcast numerics: float64→float32, int64→int32 where safe
 - Record SHA-256 hash of source file
 

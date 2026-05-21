@@ -7,7 +7,7 @@ preferred_visualizations: ["coefficient_plot", "time_series", "event_study"]
 citation_style: "aea"
 quality_gates:
   - endogeneity_check
-  -robust_standard_errors
+  - robust_standard_errors
   - pre_trend_test
 leaf_nodes:
   - time_series_forecasting

@@ -34,14 +34,9 @@ class ExecutionResult:
 
 
 def _find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
+    """Find project root by looking for .research directory."""
+    from research_copilot.utils.common import find_project_root
+    return find_project_root()
 
 
 def _load_config(root: Path) -> Dict[str, Any]:
@@ -103,6 +98,7 @@ class ResearchExecutor:
             f.write(json.dumps(entry) + "\n")
 
     def _update_dag(self, result: ExecutionResult, metadata: Dict[str, Any]) -> None:
+        try:
             from research_copilot.utils.dag_manager import ExecutionDAGManager
         except ImportError:
             return

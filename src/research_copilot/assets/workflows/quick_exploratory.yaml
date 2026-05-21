@@ -9,6 +9,30 @@ agents:
   - execute_analysis
   - compile_outputs
 
+zero_shot_path:
+  enabled: true
+  agent: zero_shot_analyst
+  trigger_phrases:
+    - "show me the data"
+    - "quick look"
+    - "what's in this"
+    - "explore this dataset"
+    - "summary of"
+    - "describe the data"
+    - "data overview"
+    - "quick summary"
+  depth: exploratory
+  steps:
+    - profile_tabular
+    - descriptive_stats
+    - auto_visualization
+  max_runtime: "2 min"
+  bypass_agents:
+    - method_route
+    - data_scaffold
+    - execute_analysis
+  notes: "Zero-shot path runs ONLY when user query matches trigger phrases. Skips the full pipeline and delivers immediate descriptive results with one auto-selected visualization. Does NOT generate a manuscript."
+
 quality_gates:
   - after: research_init
     gate: "research_init"

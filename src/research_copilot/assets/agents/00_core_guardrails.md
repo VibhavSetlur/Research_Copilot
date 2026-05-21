@@ -254,29 +254,21 @@ The system automatically scans input data files and enforces library constraints
 - Always read `.research/domains/tool_registry.json` before generating tool commands.
 - If a tool is missing from the registry, halt and request registry updates.
 
-## 22. Multi-Language Execution Rules
+## 23. Compact Mode Protocol
+
+When the user says "compact mode on" or when system prompt exceeds ~50k tokens, switch to compact responses:
+
+- **Decisions**: 1 line, no explanation unless asked
+- **Code**: no docstrings, minimal comments (only WHY, never WHAT)
+- **No meta-commentary**: skip "Here's what I'll do", "Let me analyze", "As you can see"
+- **Results**: bullet points, numbers only, no narrative
+- **Figures**: generate silently, report path + key stat
+- **Errors**: 1 line: "Failed: [reason]. Fix: [action]."
+
+Resume normal mode when user says "compact mode off" or when context drops below 30k tokens. All agents must respect this.
+
+## 24. Multi-Language Execution Rules
 
 - R, bash, Julia, Nextflow, and Snakemake scripts must follow the same reproducibility rules as Python.
 - Every script run must be logged in the execution DAG.
 - If a tool requires a container and the container is missing, stop and ask for user direction.
-4. **For massive files (>10GB)**: MUST use `pyarrow.dataset` with chunked processing or `pl.scan_*().collect(streaming=True)`
-5. **Constraint message**: If large files exist, `state["data_processing_constraint"]` contains the enforcement message
-
-### Code Templates
-Use `data_scale_detector.py` for code templates:
-```bash
-python .research/scripts/utils/data_scale_detector.py
-```
-
-### Detection Utility
-```python
-from data_scale_detector import DataScaleDetector
-detector = DataScaleDetector()
-profile = detector.scan()
-constraint = detector.get_constraint_message()
-```
-
-### Profile Location
-- Runtime: `state.json > data_scale_profile`
-- Cached: `.research/cache/data_scale_profile.json`
-- Thresholds: `.research/config.yaml > data_scale_thresholds`

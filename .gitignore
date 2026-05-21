@@ -21,7 +21,11 @@ environment/venv/
 # Generated outputs (AI-created during research)
 /reports/
 /data/
-/docs/
+/01_workspace/
+/02_experiments/
+/03_synthesis/
+/00_inputs/
+
 
 # User's analysis scripts (numbered, created by AI during pipeline)
 /scripts/01_*.py
@@ -65,8 +69,10 @@ inputs/data/raw/*
 !inputs/data/raw/.gitkeep
 inputs/context/*
 !inputs/context/.gitkeep
+!inputs/context/README.md
 inputs/papers/*
 !inputs/papers/.gitkeep
+!inputs/papers/README.md
 
 # Large files (never commit)
 *.h5

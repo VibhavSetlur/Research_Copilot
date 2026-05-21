@@ -1,144 +1,97 @@
-# Research Intake
+# Research Intake Form
 
-> Answer what you can. The system will scan your data and ask follow-ups only when needed.
+> Fill in what you can. The system will scan your data and ask follow-ups only when needed.
+> **Only 3 fields are required:** Title, Research Question, Outcome Variable.
 
 ---
 
 ## Project
 
-**Title**: [Your project name]
-
-**Researcher(s)**: [Names]
-
-**Institution**: [Affiliation]
+| Field | Value |
+|-------|-------|
+| **Title** | |
+| **Researcher(s)** | |
+| **Institution** | |
+| **Domain** | *(e.g., psychology, epidemiology, economics)* |
 
 ---
 
 ## Research Questions
 
 > List every question you want to investigate. Mark one as primary.
+> Copy this block and increment the number for additional questions.
 
-### Question 1 (Primary)
-**Question**: [What do you want to find out?]
+### Question 1 *(Primary)*
 
-**Type**: [descriptive | comparative | associational | causal | predictive | exploratory]
-
-**Hypothesis**: [What do you expect? "None" is fine.]
-
-**Outcome variable(s)**: [Which column(s) in your data?]
-
-**Predictor variable(s)**: [Which column(s)?]
-
-**Covariates to control for**: [Which columns?]
-
-**Data files needed**: [Which files in inputs/data/raw/? "All" is fine.]
-
-**Data prep needed**: [Any merging, filtering, transformations? "None" is fine.]
-
-**Prior research**: [What do you already know? "None" is fine.]
+| Field | Value |
+|-------|-------|
+| **Question** | |
+| **Type** | `descriptive` / `comparative` / `associational` / `causal` / `predictive` / `exploratory` |
+| **Hypothesis** | *(or "None — exploratory")* |
+| **Outcome variable(s)** | *(column name(s) in your data)* |
+| **Predictor variable(s)** | *(column name(s))* |
+| **Covariates** | *(variables to control for)* |
+| **Data files needed** | *(filename(s) in data/raw/, or "All")* |
+| **Data prep needed** | *(merging, filtering, transformations, or "None")* |
+| **Prior research** | *(what you already know, or "None")* |
 
 ---
 
-### Question 2 (Secondary)
-**Question**: [What do you want to find out?]
+### Question 2 *(Secondary)*
 
-**Type**: [descriptive | comparative | associational | causal | predictive | exploratory]
-
-**Hypothesis**: [What do you expect?]
-
-**Outcome variable(s)**: [Which column(s)?]
-
-**Predictor variable(s)**: [Which column(s)?]
-
-**Covariates to control for**: [Which columns?]
-
-**Data files needed**: [Which files?]
-
-**Data prep needed**: [Any merging, filtering, transformations?]
-
-**Prior research**: [What do you already know?]
-
----
-
-### Question 3 (Exploratory)
-**Question**: [What do you want to find out?]
-
-**Type**: [descriptive | comparative | associational | causal | predictive | exploratory]
-
-**Hypothesis**: [What do you expect?]
-
-**Outcome variable(s)**: [Which column(s)?]
-
-**Predictor variable(s)**: [Which column(s)?]
-
-**Covariates to control for**: [Which columns?]
-
-**Data files needed**: [Which files?]
-
-**Data prep needed**: [Any merging, filtering, transformations?]
-
-**Prior research**: [What do you already know?]
-
----
-
-> Add more questions by copying the block above and incrementing the number.
+| Field | Value |
+|-------|-------|
+| **Question** | |
+| **Type** | |
+| **Hypothesis** | |
+| **Outcome variable(s)** | |
+| **Predictor variable(s)** | |
+| **Covariates** | |
+| **Data files needed** | |
+| **Data prep needed** | |
+| **Prior research** | |
 
 ---
 
 ## Data Overview
 
-> Describe your data files. The system will scan `inputs/data/raw/` automatically.
+> Describe your data files. The system scans `data/raw/` automatically.
 
-### File 1: [filename]
-- **What it contains**: [description]
-- **Approximate size**: [rows × columns]
-- **Known issues**: [missing values, inconsistencies, etc.]
+### File 1: `[filename]`
 
-### File 2: [filename]
-- **What it contains**: [description]
-- **Approximate size**: [rows × columns]
-- **Known issues**: [any problems]
+- **Contains**: 
+- **Size**: *(rows × columns)*
+- **Key identifiers**: *(e.g., patient_id, survey_id)*
+- **Time period**: *(if applicable)*
+- **Known issues**: *(missing values, inconsistencies)*
+
+### File 2: `[filename]`
+
+- **Contains**: 
+- **Size**: 
+- **Key identifiers**: 
+- **Time period**: 
+- **Known issues**: 
 
 ### Relationships Between Files
-> If files need to be joined, describe how.
-- [File A] and [File B] join on [column name]
 
-### Data Preparation Needed
-> What cleaning or transformation does the data need?
-- [e.g., "Merge survey and clinical data on patient_id"]
-- [e.g., "Filter to participants age 18-65"]
-- [e.g., "Standardize date formats"]
+- `[File A]` and `[File B]` join on `[column]`
 
 ---
 
-## Domain & Conventions
+## Context
 
-**Field**: [epidemiology, psychology, economics, etc.]
-
-**Target output**: [journal article, thesis, report, etc.]
-
-**Target venue**: [journal name, if known]
-
----
-
-## Constraints
-
-**Timeline**: [deadline]
-
-**IRB/Ethics**: [approved/pending/not required]
-
-**Anything limiting the analysis**: [compute, budget, data access, etc.]
-
----
-
-## Prior Work
-
-> Have you analyzed this data before? What did you find?
-
-[Your answer, or "none"]
+| Field | Value |
+|-------|-------|
+| **Target output** | `journal_article` / `report` / `presentation` / `policy_brief` |
+| **Target venue** | *(journal name, if known)* |
+| **Timeline** | *(deadline)* |
+| **IRB/Ethics** | `approved` / `pending` / `not_required` |
+| **Constraints** | *(compute, budget, data access)* |
+| **Prior work** | *(previous analyses of this data)* |
 
 ---
 
 ## Anything Else
 
-[Free text]
+> Free text — anything the system should know.

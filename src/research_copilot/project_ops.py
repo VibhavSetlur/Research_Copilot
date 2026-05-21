@@ -14,7 +14,7 @@ try:
 except ImportError:  # pragma: no cover - PyYAML is a package dependency.
     yaml = None
 
-from research_copilot.utils.asset_manager import AssetManager
+from research_copilot.utils.common import find_project_root, now_iso
 
 
 EXPERIMENT_SUBDIRS = [
@@ -27,17 +27,9 @@ EXPERIMENT_SUBDIRS = [
 ]
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def slugify(value: str, fallback: str = "branch") -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", value.strip().lower()).strip("_")
     return slug or fallback
-
-
-def find_project_root(root: Optional[Path] = None) -> Path:
-    return Path(root) if root else AssetManager.find_project_root()
 
 
 def state_path(root: Path) -> Path:

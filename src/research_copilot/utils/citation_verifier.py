@@ -24,19 +24,10 @@ from pathlib import Path
 from typing import Optional
 
 
-def find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
+from research_copilot.utils.common import find_project_root, save_json_atomic, now_iso
 
 
 def add_core_path():
-    from research_copilot.utils.common import find_project_root, save_json_atomic, now_iso
     core = find_project_root() / ".research" / "core"
     if str(core) not in sys.path:
         sys.path.insert(0, str(core))

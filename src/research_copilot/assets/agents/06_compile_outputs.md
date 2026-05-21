@@ -57,7 +57,14 @@ Plain-language version.
 Run `write_imrad`. Cross-check: every citation has a reference, every claim is
 grounded, and every included artifact has sidecar provenance.
 
-### Step 8: Critic Review
+### Step 8: Generate Output Format Variants
+After manuscript is compiled, auto-generate lightweight outputs (no critic cycle):
+- (a) `03_synthesis/manuscript/abstract.md` — run `abstract_generator` skill
+- (b) `03_synthesis/key_findings.json` — machine-readable findings from results
+- (c) `03_synthesis/figure_captions.json` — run `captions_and_legends` skill
+- (d) One-page summary PDF — run `report_compiler` with summary-only mode
+
+### Step 9: Critic Review
 - Trigger the `critic` agent to perform adversarial review of the compiled manuscript, executive summary, and tables.
 - Verify that there is no scope creep or causal overclaiming, that references match citations, and that data claims are aligned.
 - If the critic verdict is FAIL, execute remediation steps via `research_iterate`.
@@ -74,4 +81,8 @@ grounded, and every included artifact has sidecar provenance.
 - [ ] Effect sizes interpreted
 - [ ] Limitations stated
 - [ ] No causal overclaiming
+- [ ] Abstract generated (abstract.md)
+- [ ] key_findings.json is machine-readable
+- [ ] figure_captions.json generated
+- [ ] One-page summary PDF generated
 - [ ] Critic agent report generated with PASS verdict

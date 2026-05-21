@@ -59,15 +59,7 @@ class FileLock:
             pass
 
 
-def find_project_root() -> Path:
-    p = Path.cwd()
-    for _ in range(10):
-        if (p / ".research").exists():
-            return p
-        if p.parent == p:
-            break
-        p = p.parent
-    return Path.cwd()
+from research_copilot.utils.common import find_project_root
 
 
 def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[str, Any]]:
