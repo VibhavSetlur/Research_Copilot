@@ -7,14 +7,22 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 try:
-    import yaml
+    import yaml  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover - PyYAML is a package dependency.
     yaml = None
 
 from research_copilot.utils.common import find_project_root, now_iso
+
+
+def _resolve_root(root: Path | None = None) -> Path:
+    r = find_project_root(root)
+    if not r:
+        raise ValueError("Could not find project root containing .research/")
+    return r
+
 
 EXPERIMENT_SUBDIRS = [
     "scripts",
@@ -73,11 +81,11 @@ def default_state() -> dict:
 
 
 def load_state(root: Path | None = None) -> dict:
-    root = find_project_root(root)
+    root = _resolve_root(root)
     state = read_json(state_path(root), default_state())
     state.setdefault("current_branch", "exp_001_baseline")
     state.setdefault("branches", {})
-    return state
+    return cast(dict, state)
 
 
 def save_state(root: Path, state: dict) -> dict:
@@ -98,7 +106,7 @@ def compute_file_hash(path: Path) -> str:
 
 
 def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
-    root = find_project_root(root)
+    root = _resolve_root(root)
     hashes: dict[str, str] = {}
     for base in (root / "00_inputs" / "raw_data", root / "00_inputs" / "literature"):
         if not base.exists():
@@ -110,7 +118,7 @@ def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
 
 
 def next_experiment_id(root: Path | None, slug: str) -> str:
-    root = find_project_root(root)
+    root = _resolve_root(root)
     experiments = root / "02_experiments"
     max_seen = 1
     if experiments.exists():
@@ -161,12 +169,12 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
     if not config_path.exists():
         config_path.write_text(
             f"# Research Copilot — Project Configuration\n"
-            f"project_id: \"{project_name}\"\n"
-            f"schema_version: \"9.0.0\"\n"
-            f"default_workflow: \"quick_exploratory\"\n"
+            f'project_id: "{project_name}"\n'
+            f'schema_version: "9.0.0"\n'
+            f'default_workflow: "quick_exploratory"\n'
             f"intent_routing:\n"
             f"  enabled: true\n"
-            f"  default_depth: \"academic\"\n"
+            f'  default_depth: "academic"\n'
             f"branching:\n"
             f"  enabled: true\n"
             f"knowledge_graph:\n"
@@ -183,7 +191,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
             f"  supported_runtimes: [python, r, bash]\n"
             f"dependency_management:\n"
             f"  auto_detect: true\n"
-            f"  requirements_file: \"environment/requirements.txt\"\n"
+            f'  requirements_file: "environment/requirements.txt"\n'
             f"quality_gates_enabled: true\n"
             f"pin_dependency_versions: true\n"
         )
@@ -246,6 +254,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
     _setup_mcp_configs(root)
     _setup_gitignore(root)
 
+
 def _setup_gitignore(root: Path) -> None:
     """Generate default .gitignore for the research project."""
     gitignore_path = root / ".gitignore"
@@ -274,32 +283,23 @@ def _setup_gitignore(root: Path) -> None:
             "!00_inputs/raw_data/.gitkeep\n"
         )
 
+
 def _setup_mcp_configs(root: Path) -> None:
     """Generate default MCP configuration for popular AI IDEs."""
     cursor_dir = root / ".cursor"
     cursor_dir.mkdir(parents=True, exist_ok=True)
     cursor_mcp = cursor_dir / "mcp.json"
     if not cursor_mcp.exists():
-        cursor_mcp.write_text(json.dumps({
-            "mcpServers": {
-                "research-copilot": {
-                    "command": "research-copilot-mcp",
-                    "args": []
-                }
-            }
-        }, indent=2) + "\n")
+        cursor_mcp.write_text(
+            json.dumps({"mcpServers": {"research-copilot": {"command": "research-copilot-mcp", "args": []}}}, indent=2)
+            + "\n"
+        )
 
     opencode_json = root / "opencode.json"
     if not opencode_json.exists():
-        opencode_json.write_text(json.dumps({
-            "mcp": {
-                "research-copilot": {
-                    "command": "research-copilot-mcp",
-                    "args": []
-                }
-            }
-        }, indent=2) + "\n")
-
+        opencode_json.write_text(
+            json.dumps({"mcp": {"research-copilot": {"command": "research-copilot-mcp", "args": []}}}, indent=2) + "\n"
+        )
 
 
 def _copy_ai_rules_to_project(root: Path) -> None:
@@ -318,6 +318,7 @@ def _copy_ai_rules_to_project(root: Path) -> None:
                 dest.write_text(asset_path.read_text(encoding="utf-8"), encoding="utf-8")
         except Exception:
             pass
+
 
 def _copy_environment_to_project(root: Path) -> None:
     """Copy environment configuration files from package assets to the project."""
@@ -347,7 +348,7 @@ def create_experiment_branch(
     root: Path | None = None,
 ) -> dict:
     """Create an isolated experiment branch and update state/manifest."""
-    root = find_project_root(root)
+    root = _resolve_root(root)
     state = load_state(root)
     parent = parent or state.get("current_branch", "exp_001_baseline")
     branch_id = name if name.startswith("exp_") else next_experiment_id(root, name)
@@ -369,9 +370,7 @@ def create_experiment_branch(
         f"experiment_id: {branch_id}\n"
         f"parent_experiment: {parent}\n"
         f"created: {now_iso()}\n"
-        "input_data_hashes:\n"
-        + _yaml_mapping(data_hashes, indent=2)
-        + "decisions:\n"
+        "input_data_hashes:\n" + _yaml_mapping(data_hashes, indent=2) + "decisions:\n"
         "  decision_001:\n"
         f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
         "    context: Alternate hypothesis branch created.\n"
@@ -412,7 +411,7 @@ def create_experiment_branch(
 
 
 def current_branch(root: Path | None = None) -> str:
-    return load_state(root).get("current_branch", "exp_001_baseline")
+    return cast(str, load_state(root).get("current_branch", "exp_001_baseline"))
 
 
 def branch_decisions_path(root: Path, branch_id: str | None = None) -> Path:
@@ -431,7 +430,7 @@ def log_decision(
     root: Path | None = None,
 ) -> dict:
     """Append a methodological decision to the active experiment ledger."""
-    root = find_project_root(root)
+    root = _resolve_root(root)
     path = branch_decisions_path(root, branch_id)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -460,8 +459,7 @@ def log_decision(
     else:
         with open(path, "a") as f:
             f.write(
-                f"\n  {decision_id}:\n    context: {context}\n"
-                f"    selected: {selected}\n    rationale: {rationale}\n"
+                f"\n  {decision_id}:\n    context: {context}\n    selected: {selected}\n    rationale: {rationale}\n"
             )
 
     return {"decision_id": decision_id, "path": path.relative_to(root).as_posix()}
@@ -480,7 +478,7 @@ def save_artifact(
     root: Path | None = None,
 ) -> dict:
     """Save a text artifact with required sibling provenance metadata."""
-    root = find_project_root(root)
+    root = _resolve_root(root)
     branch_id = branch_id or current_branch(root)
     folder = {
         "figure": "figures",
@@ -532,4 +530,4 @@ def _yaml_mapping(values: dict, indent: int = 0) -> str:
     prefix = " " * indent
     if not values:
         return f"{prefix}{{}}\n"
-    return "".join(f"{prefix}\"{k}\": \"{v}\"\n" for k, v in values.items())
+    return "".join(f'{prefix}"{k}": "{v}"\n' for k, v in values.items())

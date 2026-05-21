@@ -8,7 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from research_copilot.intent_router import IntentRouter
 from research_copilot.project_ops import (
@@ -91,7 +91,8 @@ def cmd_preflight(args: argparse.Namespace) -> None:
 
 def cmd_scan(args: argparse.Namespace) -> None:
     try:
-        from research_copilot.utils.data_scale_detector import detect_data_scale
+        from research_copilot.utils.data_scale_detector import DataScaleDetector
+
         root = _project_root()
         inputs_dir = root / "00_inputs" / "raw_data"
         if not inputs_dir.exists():
@@ -101,7 +102,8 @@ def cmd_scan(args: argparse.Namespace) -> None:
         print("=" * 60)
         print("SCANNING INPUT DATA")
         print("=" * 60)
-        results = detect_data_scale(inputs_dir)
+        detector = DataScaleDetector(project_root=root)
+        results = detector.scan()
         print(yaml.safe_dump(results, sort_keys=False))
     except Exception as e:
         print(f"Scan error: {e}")
@@ -117,7 +119,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
         "workflows": len(list(manager.iter_files("workflows", "*.yaml"))),
         "domains": len(list(manager.iter_files("domains", "*"))),
     }
-    local_overrides = []
+    local_overrides: list = []
     if manager.override_root.exists():
         for root_name in ("agents", "skills", "schemas", "workflows", "domains"):
             local_overrides.extend(manager.iter_files(root_name, "*"))
