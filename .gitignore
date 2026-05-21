@@ -9,6 +9,18 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.benchmarks/
+.mypy_cache/
+.ruff_cache/
+
+# IDE configs
+.cursor/*
+!.cursor/mcp.json
+
+# Research Runtime (ignore all cache/states/runs, keep config)
+.research/*
+!.research/config.yaml
 
 # Virtual environments
 .venv/
@@ -22,11 +34,6 @@ environment/venv/
 /02_experiments/
 /03_synthesis/
 
-# Runtime cache (auto-created)
-.research/cache/
-.research/state/
-.research/workflow_dag.json
-.research/workflow_dag.mermaid
 
 # User data (keep directories, ignore contents)
 inputs/data/raw/*
