@@ -15,12 +15,16 @@ build/
 .ruff_cache/
 
 # IDE configs
-.cursor/*
-!.cursor/mcp.json
+.cursor/
+/.cursorrules
+/.clinerules
+/AGENTS.md
 
-# Research Runtime (ignore all cache/states/runs, keep config)
-.research/*
-!.research/config.yaml
+# Runtime cache (auto-created)
+.research/cache/
+.research/state/
+.research/workflow_dag.json
+.research/workflow_dag.mermaid
 
 # Virtual environments
 .venv/
