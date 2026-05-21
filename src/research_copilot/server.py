@@ -165,6 +165,14 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
             "required": ["question"],
         },
     },
+    "research_preflight": {
+        "description": "Run environment preflight checks to verify all dependencies are installed and ready",
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
+    "research_data_scale": {
+        "description": "Analyze input data files and report size classifications and library constraints",
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
 }
 
 
@@ -292,6 +300,31 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
             return _text(kg.query_research_context(arguments.get("question", "")))
         except Exception as e:
             return _text(f"Error querying research context: {e}")
+
+    if name == "research_preflight":
+        try:
+            from research_copilot.utils.common import find_project_root
+            root = find_project_root() or root
+            checks = {
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "workspace": str(root),
+                "assets_dir": str(root / ".research") if (root / ".research").exists() else "not_found",
+                "inputs_dir": str(root / "00_inputs") if (root / "00_inputs").exists() else "not_found",
+            }
+            return _text({"status": "ok", "checks": checks})
+        except Exception as e:
+            return _text(f"Preflight error: {e}")
+
+    if name == "research_data_scale":
+        try:
+            from research_copilot.utils.data_scale_detector import detect_data_scale
+            inputs_dir = root / "00_inputs" / "raw_data"
+            if not inputs_dir.exists():
+                return _text({"status": "no_data", "message": "No raw data directory found"})
+            results = detect_data_scale(inputs_dir)
+            return _text(results)
+        except Exception as e:
+            return _text(f"Data scale error: {e}")
 
     return _text(f"Unknown tool: {name}")
 

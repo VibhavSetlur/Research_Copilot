@@ -93,16 +93,16 @@ class ResearchEngine:
 
     def create_branch(self, name: str, hypothesis: str) -> Dict[str, Any]:
         """Create a new experimental branch."""
-        branch_dir = create_experiment_branch(self.root, name, hypothesis)
+        branch_result = create_experiment_branch(name, hypothesis, root=self.root)
         self.ledger.branch_state(name)
-        return {"status": "success", "branch": name, "directory": str(branch_dir)}
+        return {"status": "success", "branch": name, "directory": branch_result["experiment_dir"]}
 
     def log_decision(self, context: str, selected_option: str, rationale: str, branch: Optional[str] = None) -> Dict[str, Any]:
         """Log a methodological decision."""
-        log_decision(self.root, context, selected_option, rationale, branch)
+        log_decision(context=context, selected=selected_option, rationale=rationale, branch_id=branch, root=self.root)
         return {"status": "success", "message": "Decision logged successfully."}
 
     def save_artifact(self, filepath: str, content: str, artifact_type: str, branch: Optional[str] = None) -> Dict[str, Any]:
         """Save a generated artifact."""
-        path = save_artifact(self.root, filepath, content, artifact_type, branch)
-        return {"status": "success", "path": str(path)}
+        result = save_artifact(filename=filepath, content=content, artifact_type=artifact_type, branch_id=branch, root=self.root)
+        return {"status": "success", "path": result["artifact"]}

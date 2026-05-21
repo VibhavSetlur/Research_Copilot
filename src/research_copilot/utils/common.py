@@ -34,13 +34,16 @@ except ImportError:
 
 from research_copilot.utils.asset_manager import AssetManager
 
-def find_project_root() -> Optional[Path]:
+def find_project_root(start: Optional[Path] = None) -> Optional[Path]:
     """Find project root by looking for workspace directories.
+    
+    Args:
+        start: Optional starting directory. If None, uses cwd.
     
     Returns:
         Path to project root.
     """
-    return AssetManager.find_project_root()
+    return AssetManager.find_project_root(start)
 
 def require_project_root() -> Path:
     """Find project root or exit with error message."""
