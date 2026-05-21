@@ -42,6 +42,7 @@ dependencies = [
     "statsmodels>=0.14",
     "scikit-learn>=1.3",
     "pingouin>=0.5",
+    "networkx>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -58,6 +59,12 @@ dashboard = [
 ]
 export = [
     "pypandoc>=1.11",
+]
+watcher = [
+    "watchdog>=3.0",
+]
+hpc = [
+    "paramiko>=3.0",
 ]
 dev = [
     "pytest>=7.0",

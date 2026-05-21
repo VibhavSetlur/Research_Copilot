@@ -42,7 +42,7 @@ The template starts with ONLY `.research/`, `inputs/`, `environment/`, and `AGEN
 ```
 
 ## CLI Commands
-Always use `python .research/research.py <command>`:
+Always use `rcp <command>`:
 
 | Command | Purpose |
 |---------|---------|

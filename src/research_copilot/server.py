@@ -11,15 +11,8 @@ from typing import Any
 
 import yaml
 
-from research_copilot.intent_router import IntentRouter
-from research_copilot.project_ops import (
-    compute_input_hashes,
-    create_experiment_branch,
-    current_branch,
-    load_state,
-    log_decision,
-    save_artifact,
-)
+from research_copilot.engine import ResearchEngine
+from research_copilot.project_ops import compute_input_hashes, current_branch
 from research_copilot.utils.asset_manager import AssetManager
 
 try:
@@ -155,7 +148,8 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
     manager = AssetManager(root)
 
     if name == "research_status":
-        state = load_state(root)
+        engine = ResearchEngine(root)
+        state = engine.ledger._load()
         return _text(
             {
                 "workspace": str(root),
@@ -181,44 +175,32 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
         return _text(manager.read_text(rel) if manager.exists(rel) else f"Workflow '{workflow_id}' not found.")
 
     if name == "route_intent":
-        router = IntentRouter(root)
-        return _text(router.route(arguments["query"], depth=arguments.get("depth", "academic")))
+        engine = ResearchEngine(root)
+        return _text(engine.route_and_execute(arguments["query"], depth=arguments.get("depth", "academic")))
 
     if name == "create_experiment_branch":
-        return _text(
-            create_experiment_branch(
-                arguments["name"],
-                hypothesis=arguments.get("hypothesis", ""),
-                parent=arguments.get("parent"),
-                root=root,
-            )
-        )
+        engine = ResearchEngine(root)
+        return _text(engine.create_branch(arguments["name"], hypothesis=arguments.get("hypothesis", "")))
 
     if name == "log_decision":
+        engine = ResearchEngine(root)
         return _text(
-            log_decision(
+            engine.log_decision(
                 context=arguments["context"],
-                selected=arguments["selected"],
+                selected_option=arguments["selected"],
                 rationale=arguments["rationale"],
-                options_considered=arguments.get("options_considered", []),
-                linked_literature=arguments.get("linked_literature", []),
-                branch_id=arguments.get("branch_id"),
-                root=root,
+                branch=arguments.get("branch_id"),
             )
         )
 
     if name == "save_artifact":
+        engine = ResearchEngine(root)
         return _text(
-            save_artifact(
-                arguments["filename"],
-                arguments["content"],
+            engine.save_artifact(
+                filepath=arguments["filename"],
+                content=arguments["content"],
                 artifact_type=arguments.get("artifact_type", "artifact"),
-                generated_by=arguments.get("generated_by", "mcp"),
-                source_script=arguments.get("source_script", ""),
-                input_files=arguments.get("input_files", []),
-                decisions_applied=arguments.get("decisions_applied", []),
-                branch_id=arguments.get("branch_id"),
-                root=root,
+                branch=arguments.get("branch_id"),
             )
         )
 
