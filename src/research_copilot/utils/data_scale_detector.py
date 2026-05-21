@@ -191,6 +191,25 @@ class DataScaleDetector:
             "will be flagged. Use lazy evaluation or chunked processing."
         )
 
+    def get_library_instruction(self, threshold_mb: int = 500) -> Optional[str]:
+        """Return one concise instruction for model prompts based on input size.
+
+        If the largest discovered input file is <= threshold_mb, recommend
+        pandas. Otherwise enforce polars or dask to prevent memory overflow.
+        """
+        profile = self.scan()
+        files = profile.get("files", {})
+        if not files:
+            return None
+
+        max_size_mb = max(info.get("size_mb", 0) for info in files.values())
+        if max_size_mb <= threshold_mb:
+            return "Data handling instruction: Use Pandas for tabular processing."
+        return (
+            "Data handling instruction: Input size exceeds 500MB. "
+            "Use Polars or Dask to prevent memory overflow; avoid full eager Pandas loads."
+        )
+
     def get_code_template(self, classification: str) -> str:
         """Generate a code template for processing files of a given size class.
 

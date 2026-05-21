@@ -309,6 +309,23 @@ def cmd_continue(args: argparse.Namespace) -> None:
         return
         
     pending = state.get("hitl_pending", {})
+    if not args.approve and not args.reject:
+        print("=" * 60)
+        print("PENDING APPROVAL")
+        print("=" * 60)
+        print(f"Query : {pending.get('query', '')}")
+        print(f"Intent: {pending.get('intent', '')}")
+        steps = pending.get("proposed_plan", [])
+        if steps:
+            print("Proposed plan:")
+            for i, step in enumerate(steps, 1):
+                print(f"  {i}. {step}")
+        choice = input("Approve this workflow? [y/N]: ").strip().lower()
+        if choice in {"y", "yes"}:
+            args.approve = True
+        else:
+            args.reject = True
+
     if args.reject:
         ledger.update(phase="user_rejected", hitl_pending=None)
         print("Plan rejected.")
@@ -320,7 +337,9 @@ def cmd_continue(args: argparse.Namespace) -> None:
         from research_copilot.engine import ResearchEngine
         engine = ResearchEngine(root, hitl_enabled=False)
         query = pending.get("query", "")
-        engine.route_and_execute(query)
+        depth = pending.get("depth", "academic")
+        result = engine.route_and_execute(query, depth=depth)
+        print(f"Resume status: {result.get('status', 'completed')}")
 
 def cmd_ingest(args: argparse.Namespace) -> None:
     from research_copilot.utils.cache_manager import cmd_ingest as _ingest

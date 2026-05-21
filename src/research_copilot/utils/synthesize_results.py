@@ -14,6 +14,13 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+from pydantic import BaseModel, ValidationError
+
+
+class SynthesisDecision(BaseModel):
+    winning_branch_name: str
+    winning_artifacts_data_path: str
+
 
 def compute_sha256(file_path: Path) -> str:
     """Compute the SHA-256 hash of a file."""
@@ -259,17 +266,20 @@ def main():
     try:
         from research_copilot.core.model_resolver import cascade_resolve
         prompt = (
-            "Analyze the following synthesized parallel execution results and any detected conflicts. "
-            "Determine the 'Winning Branch' (task_id) that produced the most robust, well-supported findings. "
-            "Explain your reasoning and state the winning branch.\n"
-            "You MUST output a raw JSON object containing exactly two keys: 'winning_branch_name' (string) and 'winning_artifacts_path' (string). "
-            "Do NOT wrap the output in markdown code blocks. Just the raw JSON.\n\n"
+            "You are the synthesis selector for parallel branch outputs. "
+            "Choose the single strongest branch using methodological rigor, statistical support, and conflict review.\n"
+            "Return ONLY valid JSON with exactly these keys:\n"
+            "  - winning_branch_name (string)\n"
+            "  - winning_artifacts_data_path (string, path to the winning branch data artifacts for downstream nodes)\n"
+            "No markdown, no prose, no extra keys.\n\n"
             f"Results: {json.dumps(combined_payload, indent=2)}"
         )
         synthesis_decision_raw = cascade_resolve(prompt, model="google/gemini-pro", temperature=0.2)
         try:
-            synthesis_decision = json.loads(synthesis_decision_raw)
-            winning_branch = synthesis_decision.get("winning_branch_name")
+            decision = SynthesisDecision.model_validate_json(synthesis_decision_raw)
+            synthesis_decision = decision.model_dump()
+            winning_branch = decision.winning_branch_name
+            winning_data_path = decision.winning_artifacts_data_path
             print("Synthesis Decision JSON:\n", json.dumps(synthesis_decision, indent=2))
             
             from research_copilot.utils.dag_manager import ExecutionDAGManager
@@ -279,8 +289,16 @@ def main():
                 dag = ExecutionDAGManager(root)
                 dag.merge_branch_lineage(winning_branch)
                 print(f"Successfully merged data lineage for branch: {winning_branch}")
-        except json.JSONDecodeError:
-            print("WARNING: Synthesis LLM did not return valid JSON.")
+                from research_copilot.core.state_ledger import ResearchLedger
+                ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+                ledger.update(
+                    winning_branch_name=winning_branch,
+                    winning_artifacts_data_path=winning_data_path,
+                    main_trunk_artifacts_data_path=winning_data_path,
+                )
+                print(f"Updated main trunk data path in state ledger: {winning_data_path}")
+        except ValidationError:
+            print("WARNING: Synthesis LLM did not return valid schema-compliant JSON.")
             synthesis_decision = {"raw_output": synthesis_decision_raw}
         
         # Output to ledger via log_decision

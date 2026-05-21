@@ -66,12 +66,21 @@ class ResearchEngine:
         self.depth = depth
         self.default_timeout = default_timeout
         self.hitl_enabled = hitl_enabled
+        self._data_scale_instruction: Optional[str] = None
 
         import sys
         self._interactive = sys.stdin.isatty()
 
         from research_copilot.core.token_budget import TokenBudgetTracker
         self.token_tracker = TokenBudgetTracker(max_tokens=200_000)
+
+        try:
+            from research_copilot.utils.data_scale_detector import DataScaleDetector
+
+            detector = DataScaleDetector(self.root)
+            self._data_scale_instruction = detector.get_library_instruction(threshold_mb=500)
+        except Exception as exc:
+            logger.warning("Failed to initialize data-scale instruction: %s", exc)
 
     # ------------------------------------------------------------------
     # Item 9 — HITL "Explain-to-Proceed" Gate
@@ -82,6 +91,7 @@ class ResearchEngine:
         intent: str,
         proposed_plan: List[str],
         query: str,
+        depth: str,
     ) -> bool:
         """Pause and ask the user to approve the proposed plan.
 
@@ -109,18 +119,12 @@ class ResearchEngine:
                 "intent": intent,
                 "proposed_plan": proposed_plan,
                 "query": query,
+                "depth": depth,
+                "status": "WAITING_ON_USER",
             },
         )
 
-        print("\n" + "=" * 60)
-        print("  RESEARCH COPILOT — PLAN APPROVAL REQUIRED")
-        print("=" * 60)
-        print(f"\nQuery : {query}")
-        print(f"Intent: {intent}\n")
-        print("Proposed plan:")
-        for i, step in enumerate(proposed_plan, 1):
-            print(f"  {i}. {step}")
-        print("\nRun `rcp continue --approve` to execute, or `rcp continue --reject` to abort.\n")
+        logger.info("Workflow paused for HITL approval. Run 'rcp continue --approve' or '--reject'.")
         
         return False
 
@@ -320,6 +324,16 @@ class ResearchEngine:
         logger.info("Executing node %s (dead_end_retry=%d)", node_id, dead_end_retry)
         effective_script = script
 
+        if self._data_scale_instruction:
+            if effective_script:
+                effective_script = f"# {self._data_scale_instruction}\n\n" + effective_script
+            if base_prompt:
+                base_prompt = f"{base_prompt}\n\n{self._data_scale_instruction}"
+            elif dead_end_context:
+                dead_end_context = f"{dead_end_context}\n\n{self._data_scale_instruction}"
+            else:
+                dead_end_context = self._data_scale_instruction
+
         # ── Item 15: Data Scale Detector Prompt Injection ───────────────────────
         if "data_scaffold" in node_id or (task_name and "data" in task_name):
             try:
@@ -481,13 +495,15 @@ class ResearchEngine:
         # ── Item 9: HITL gate ────────────────────────────────────────────────
         if intent in _HITL_INTENTS:
             proposed_plan = workflow.get("context", {}).get("workflow_steps", [])
-            approved = self._hitl_gate(intent, proposed_plan, query)
+            approved = self._hitl_gate(intent, proposed_plan, query, target_depth)
             if not approved:
                 phase = self.ledger.get().get("phase")
                 return {
                     "workflow": workflow,
                     "results": [],
                     "status": phase,
+                    "requires_user_approval": True,
+                    "resume_command": "rcp continue --approve",
                     "message": "Workflow paused for approval." if phase == "WAITING_ON_USER" else "User rejected the proposed plan.",
                 }
 

@@ -437,19 +437,39 @@ def setup_vss_db(db_path: Path):
     conn.commit()
     return conn
 
+
+def _build_csv_profile(filepath: Path) -> str:
+    """Build a lightweight CSV profile for vector embedding.
+
+    This avoids embedding raw rows and avoids full-file reads for large CSVs.
+    """
+    import pandas as pd
+
+    columns_df = pd.read_csv(filepath, nrows=0)
+    sample_df = pd.read_csv(filepath, nrows=5, low_memory=False)
+
+    profile = (
+        f"File: {filepath.name}\n"
+        f"Columns: {list(columns_df.columns)}\n"
+        f"Data Types: {sample_df.dtypes.astype(str).to_dict()}\n"
+        "First 5 rows:\n"
+        f"{sample_df.to_string(index=False)}"
+    )
+    return profile
+
 def ingest_file(filepath: Path, db_path: Path):
     print(f"Ingesting {filepath}...")
     chunks = []
-    
-    if filepath.suffix == '.csv':
+
+    suffix = filepath.suffix.lower()
+
+    if suffix == '.csv':
         try:
-            import pandas as pd
-            df = pd.read_csv(filepath)
-            profile = f"File: {filepath.name}\nColumns: {list(df.columns)}\nData Types: {df.dtypes.to_dict()}\nFirst 5 rows:\n{df.head().to_string()}"
+            profile = _build_csv_profile(filepath)
             chunks.append(profile)
         except Exception as e:
             chunks.append(f"Error profiling CSV: {e}")
-    elif filepath.suffix == '.pdf':
+    elif suffix == '.pdf':
         try:
             import PyPDF2
             with open(filepath, "rb") as f:

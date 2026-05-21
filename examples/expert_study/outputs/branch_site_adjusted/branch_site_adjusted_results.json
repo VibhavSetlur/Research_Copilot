@@ -1,0 +1,14 @@
+{
+  "model_formula": "outcome ~ treatment + baseline + age + C(site)",
+  "r_squared": 0.5703331310570986,
+  "aic": 204.30301214218844,
+  "findings": [
+    {
+      "variable": "treatment",
+      "outcome": "outcome",
+      "effect_size": 1.0823668480624609,
+      "p_value": 2.169831376845104e-07
+    }
+  ],
+  "winning_artifacts_data_path": "/home/vibhav/Downloads/Work/Research/Research_Copilot_Architecture _Template/examples/expert_study/outputs/branch_site_adjusted/branch_site_adjusted_artifact.csv"
+}
