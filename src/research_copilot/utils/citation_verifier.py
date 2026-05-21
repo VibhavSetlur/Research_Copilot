@@ -14,6 +14,7 @@ Usage:
 import argparse
 import hashlib
 import json
+import logging
 import re
 import sys
 import time
@@ -22,6 +23,45 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+from tenacity import RetryError, retry, retry_if_exception, stop_after_attempt, wait_exponential
+
+
+logger = logging.getLogger("research.citation_verifier")
+
+
+class APITimeoutError(Exception):
+    pass
+
+
+def _is_retryable_api_error(exc: Exception) -> bool:
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code == 429 or 500 <= exc.code < 600
+    if isinstance(exc, urllib.error.URLError):
+        return True
+    return isinstance(exc, TimeoutError)
+
+
+@retry(
+    retry=retry_if_exception(_is_retryable_api_error),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    stop=stop_after_attempt(3),
+    reraise=False,
+)
+def _url_get_with_backoff(url: str, timeout: int = 15) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "ResearchCopilot/1.0 (mailto:research@copilot.local)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def _timeout_tagged_citation(citation: dict) -> str:
+    author = citation.get("author", "Unknown")
+    year = citation.get("year", "N/A")
+    return f"{author}, {year} [UNVERIFIED - API TIMEOUT]"
+
+
+def _api_timeout_result(source: str) -> dict:
+    return {"status": "api_timeout", "error": f"{source} API timed out after 3 retries"}
 
 class CitationNotFoundError(Exception):
     def __init__(self, message, identifier):
@@ -45,11 +85,19 @@ def add_core_path():
 
 def url_get(url: str, timeout: int = 15) -> Optional[str]:
     """Fetch URL content with error handling."""
-    time.sleep(1.5)
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ResearchCopilot/1.0 (mailto:research@copilot.local)"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+        return _url_get_with_backoff(url, timeout)
+    except RetryError as exc:
+        last_exc = None
+        if getattr(exc, "last_attempt", None) is not None:
+            last_exc = exc.last_attempt.exception()
+        if last_exc is not None and _is_retryable_api_error(last_exc):
+            raise APITimeoutError(f"API request failed after 3 retries: {url}") from last_exc
+        return None
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429:
+            raise APITimeoutError(f"API rate limited after 3 retries: {url}") from exc
+        return None
     except Exception:
         return None
 
@@ -70,7 +118,10 @@ def url_get_json(url: str, timeout: int = 15) -> Optional[dict]:
 def verify_crossref(doi: str) -> dict:
     """Verify a DOI via CrossRef API."""
     url = f"https://api.crossref.org/works/{doi}"
-    data = url_get_json(url)
+    try:
+        data = url_get_json(url)
+    except APITimeoutError as exc:
+        return {**_api_timeout_result("CrossRef"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
     if data is None:
         return {"status": "not_found", "error": "CrossRef API returned no data"}
 
@@ -94,7 +145,10 @@ def verify_crossref(doi: str) -> dict:
 def verify_arxiv(arxiv_id: str) -> dict:
     """Verify an arXiv ID via arXiv API."""
     url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
-    raw = url_get(url)
+    try:
+        raw = url_get(url)
+    except APITimeoutError as exc:
+        return {**_api_timeout_result("arXiv"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
     if raw is None:
         return {"status": "not_found", "error": "arXiv API returned no data"}
 
@@ -121,7 +175,10 @@ def verify_arxiv(arxiv_id: str) -> dict:
 def verify_pubmed(pmid: str) -> dict:
     """Verify a PubMed ID via NCBI E-utilities."""
     fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={pmid}&retmode=text&rettype=abstract"
-    raw = url_get(fetch_url)
+    try:
+        raw = url_get(fetch_url)
+    except APITimeoutError as exc:
+        return {**_api_timeout_result("PubMed"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
     if raw is None:
         return {"status": "not_found", "error": "PubMed API returned no data"}
 
@@ -371,10 +428,12 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
     """Run all three passes on a single citation."""
     identifier = citation.get("identifier", "")
     identifier_type = citation.get("identifier_type", "unknown")
+    citation_label = f"{citation.get('author', 'Unknown')}, {citation.get('year', 'N/A')}"
+    timeout_seen = False
 
     if not identifier or identifier_type == "unknown":
         return {
-            "citation": f"{citation.get('author', 'Unknown')}, {citation.get('year', 'N/A')}",
+            "citation": citation_label,
             "identifier": identifier,
             "identifier_type": identifier_type,
             "pass_1": {"status": "skipped", "error": "No valid identifier"},
@@ -386,7 +445,11 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
     time.sleep(delay)
 
     # Pass 1
-    pass1_result = pass1_existence(identifier, identifier_type)
+    try:
+        pass1_result = pass1_existence(identifier, identifier_type)
+    except APITimeoutError as exc:
+        timeout_seen = True
+        pass1_result = {**_api_timeout_result(identifier_type.title()), "error": str(exc)}
     pass1_result["claimed_title"] = citation.get("title", "")
     pass1_result["claimed_year"] = citation.get("year", "")
 
@@ -406,16 +469,24 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
     # Pass 2
     abstract = None
     if pass1_result["status"] == "verified":
-        abstract = fetch_semantic_scholar_abstract(identifier, identifier_type)
-        claims = citation.get("claims", [])
-        claim_text = " ".join(claims) if claims else citation.get("title", "")
-        pass2_result = pass2_content(abstract, claim_text)
+        try:
+            abstract = fetch_semantic_scholar_abstract(identifier, identifier_type)
+            claims = citation.get("claims", [])
+            claim_text = " ".join(claims) if claims else citation.get("title", "")
+            pass2_result = pass2_content(abstract, claim_text)
+        except APITimeoutError as exc:
+            timeout_seen = True
+            pass2_result = {**_api_timeout_result("Semantic Scholar"), "justification": str(exc)}
     else:
         pass2_result = {"status": "skipped", "justification": "Pass 1 failed, skipping content check"}
 
     # Pass 3
     if identifier_type == "doi":
-        pass3_result = pass3_retraction(identifier)
+        try:
+            pass3_result = pass3_retraction(identifier)
+        except APITimeoutError as exc:
+            timeout_seen = True
+            pass3_result = {**_api_timeout_result("CrossRef retraction"), "retraction_reason": str(exc)}
     else:
         pass3_result = {"status": "unknown", "source": "none", "retraction_date": None, "retraction_reason": None}
 
@@ -431,8 +502,11 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
     else:
         overall = "unverified"
 
+    if timeout_seen:
+        citation_label = _timeout_tagged_citation(citation)
+
     return {
-        "citation": f"{citation.get('author', 'Unknown')}, {citation.get('year', 'N/A')}",
+        "citation": citation_label,
         "identifier": identifier,
         "identifier_type": identifier_type,
         "pass_1": pass1_result,

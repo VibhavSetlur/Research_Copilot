@@ -7,6 +7,7 @@ environment/preflight_report.json.
 import json
 import os
 import platform
+import subprocess
 import shutil
 import socket
 import sys
@@ -58,6 +59,16 @@ def _load_models(root: Path) -> Dict[str, Any]:
 def main() -> int:
     root = find_project_root()
     report_path = root / "environment" / "preflight_report.json"
+
+    try:
+        pandoc_check = subprocess.run(["pandoc", "--version"], capture_output=True)
+    except FileNotFoundError:
+        print("WARNING: Pandoc is not installed or not on PATH. Install Pandoc before continuing.")
+        return 1
+
+    if pandoc_check.returncode != 0:
+        print("WARNING: Pandoc check failed. Install Pandoc before continuing.")
+        return 1
 
     runtimes = {
         "python": True,

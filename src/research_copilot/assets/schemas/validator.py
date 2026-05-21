@@ -20,6 +20,7 @@ Usage::
 
 import json
 import logging
+import traceback
 from pathlib import Path
 from typing import Any, Callable, Optional, Type, Union
 
@@ -28,6 +29,11 @@ from pydantic import BaseModel, ValidationError
 logger = logging.getLogger("research.validator")
 
 MAX_RETRIES = 3
+
+
+def _truncate_traceback(exc: Exception, limit: int = 500) -> str:
+    text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).strip()
+    return text[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -82,9 +88,7 @@ def validate_with_retry(
             last_error = exc
             attempt += 1
 
-            error_str = str(exc)
-            if len(error_str) > 1000:
-                error_str = error_str[:500] + "\n...[TRUNCATED]...\n" + error_str[-500:]
+            error_str = _truncate_traceback(exc)
             logger.warning(
                 "%sValidation attempt %d/%d failed:\n%s",
                 prefix, attempt, max_retries + 1, error_str,

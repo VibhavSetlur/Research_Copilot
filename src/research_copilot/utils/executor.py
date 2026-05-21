@@ -96,6 +96,8 @@ class ResearchExecutor:
              tool_ids: Optional[List[str]] = None, domain: Optional[str] = None) -> ExecutionResult:
         if timeout is None:
             timeout = 300
+        else:
+            timeout = min(timeout, 300)
         start = time.time()
         try:
             p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
