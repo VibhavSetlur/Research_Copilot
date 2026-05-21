@@ -16,7 +16,7 @@ Automated figure validation that checks DPI, colorblind safety, axis labels, fon
 4. Skip: `.gitkeep`, `README.md`
 
 ### Step 2: Run Figure Validator
-Execute `python .research/scripts/utils/figure_validator.py --directory reports/figures/`
+Execute `python -m research_copilot.utils.figure_validator --directory reports/figures/`
 
 For each figure, run checks:
 

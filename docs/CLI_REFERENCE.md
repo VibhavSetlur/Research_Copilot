@@ -104,7 +104,7 @@ All Research Copilot commands. The CLI is available as `rcp`.
 
 | Command | Description |
 |---------|-------------|
-| `rcp mcp` | Start MCP server for AI IDE integration |
+| `research-copilot-mcp` | Start MCP server for AI IDE integration |
 
 ## Session Management
 

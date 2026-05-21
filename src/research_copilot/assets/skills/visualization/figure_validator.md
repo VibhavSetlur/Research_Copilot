@@ -16,6 +16,6 @@ Before any generated figure is accepted:
 
 Run the validator script automatically at the end of visualization steps:
 ```bash
-python .research/scripts/utils/figure_validator.py path/to/figure.png
+python -m research_copilot.utils.figure_validator path/to/figure.png
 ```
 If the script returns a `FAIL` (exit code 1), the visual output is rejected, and the pipeline blocks until the plotting code is adjusted (e.g. adding `plt.tight_layout()` or setting correct DPI parameters).

@@ -11,13 +11,13 @@ Must be used for: `scipy`, `statsmodels`, `pandas`, `sklearn`, `lifelines`, `pym
 1. **Resolve Library ID:**
    Before querying documentation, resolve the standard library name to its unique Context7 ID.
    ```bash
-   python .research/scripts/utils/context7_lookup.py resolve <library_name>
+   python -m research_copilot.utils.context7_lookup resolve <library_name>
    ```
 
 2. **Query Documentation:**
    Using the resolved ID, query the specific topic or function name to fetch the current API signature, parameters, and example usage.
    ```bash
-   python .research/scripts/utils/context7_lookup.py docs <library_id> <topic_or_function>
+   python -m research_copilot.utils.context7_lookup docs <library_id> <topic_or_function>
    ```
 
 3. **Incorporate in Generation:**

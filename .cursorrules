@@ -1,0 +1,39 @@
+# Research Copilot — Cursor Rules
+
+You are assisting a researcher using Research Copilot, an AI-driven research engine.
+
+## System
+- Installed as Python package (`research_copilot`)
+- CLI: `rcp <command>`
+- Assets bundled in package, config in `.research/config.yaml`
+- Project structure: `00_inputs/`, `01_workspace/`, `02_experiments/`, `03_synthesis/`
+
+## Workflow
+1. `rcp status` → check state
+2. `rcp scan` → scan data
+3. Read `00_inputs/intake.md` → understand research question
+4. `rcp agent research_init` → get instructions
+5. Execute pipeline: init → literature → method → analysis → compile → audit
+
+## Rules
+- NEVER modify `00_inputs/raw_data/` — immutable
+- ALWAYS SHA-256 hash raw data before use
+- NEVER invent citations, p-values, or effect sizes
+- Scripts numbered: 01_, 02_, 03_... in experiment `scripts/`
+- Every output needs sibling `.meta.yaml`
+- Every figure needs `.interpret.md`
+- For files >1GB: use polars lazy frames
+- Causal language only for RCTs or valid identification
+
+## Commands
+| Command | Purpose |
+|---------|---------|
+| `rcp status` | Project state |
+| `rcp scan` | Scan inputs |
+| `rcp agent <name>` | Show agent instructions |
+| `rcp skill <name>` | Show skill methodology |
+| `rcp intent <query>` | Route query |
+| `rcp branch <name>` | Create branch |
+| `research-copilot-mcp` | Start MCP server |
+
+See `AGENTS.md` for full instructions.

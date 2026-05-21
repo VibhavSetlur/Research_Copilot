@@ -126,4 +126,4 @@ Output: `reports/literature/citation_verification_report.json`
 - `audit_validate` agent runs this as Audit #6
 - Any UNVERIFIED citation = gate FAIL
 - Retracted paper = immediate FAIL, remove from manuscript
-- Run via: `python .research/scripts/utils/citation_verifier.py --bibliography reports/literature/bibliography.bib`
+- Run via: `python -m research_copilot.utils.citation_verifier --bibliography reports/literature/bibliography.bib`

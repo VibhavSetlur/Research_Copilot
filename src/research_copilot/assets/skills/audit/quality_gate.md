@@ -183,7 +183,7 @@ Append gate result to `docs/research_log.md`:
 
 ## CLI Integration
 
-`python .research/research.py validate [phase]` — Run quality gate check for a specific phase.
+`rcp status` — Run state and quality gate check.
 
 ---
 

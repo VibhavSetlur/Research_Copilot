@@ -32,11 +32,11 @@ Read the user's intake, scan their raw data, create the COMPLETE experiment-driv
 ## Protocol
 
 ### Step 1: Preflight (if available)
-Run: `python .research/research.py preflight`
+Run: `rcp preflight` or use MCP tool `research_preflight`.
 If the command is unavailable, skip and proceed.
 
 ### Step 2: Run CLI Scan
-Run: `python .research/research.py scan`
+Run: `rcp scan` or use MCP tool `research_data_scale`.
 This scans inputs/ and saves the research map to `.research/cache/research_map.json`.
 Read the output to understand what was found.
 
@@ -62,9 +62,8 @@ If intake is empty or has no questions: generate follow-up questions and stop. D
 - **License audit**: if a leaf-node implies proprietary tools (e.g., MATLAB, SAS, VASP), confirm availability
 - **HPC flag**: if total data > 50GB or non-tabular requires HPC tools, pause for user confirmation
 
-### Step 5: Create Full Directory Structure
-Run: `python .research/research.py init-dirs`
-This creates ALL directories with README.md in each, plus `03_synthesis/manifest.json`, `01_workspace/lab_notebook.md`, `03_synthesis/global_methods.md`, `03_synthesis/iteration_registry.json`, and baseline `02_experiments/exp_001_baseline/decisions.yaml`.
+### Step 5: Verify Directory Structure
+Ensure directories are created. This was handled during `rcp init` (creating `00_inputs/`, `01_workspace/`, `02_experiments/exp_001_baseline/`, `03_synthesis/`). Verify the manifest and state ledger are present.
 
 ### Step 6: Customize Documentation
 After init-dirs creates the base structure, customize the files with project-specific content:
@@ -106,10 +105,10 @@ If critical info is missing, write `01_workspace/scratchpad/follow_up_questions.
 
 ## Validation
 
-- [ ] CLI scan executed
+- [ ] CLI scan or data scale check executed
 - [ ] Intake parsed from .md, .yaml, or .json (or flagged as empty)
 - [ ] All data files profiled
-- [ ] Full directory structure created via init-dirs (`00_inputs/`, `01_workspace/`, `02_experiments/`, `03_synthesis/`)
+- [ ] Directory structure verified (`00_inputs/`, `01_workspace/`, `02_experiments/`, `03_synthesis/`)
 - [ ] README.md in EVERY subdirectory with project-specific content
 - [ ] manifest.json created and customized
 - [ ] lab_notebook.md created with first entry

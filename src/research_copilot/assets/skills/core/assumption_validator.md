@@ -115,4 +115,4 @@ When OLS assumptions fail, follow this cascade. Each step has a 1-line rationale
 
 - Run automatically prior to script execution.
 - If a check fails, the orchestrator updates `.research/cache/state.json` with the fallback target and writes a dead end entry describing the violation to `docs/dead_ends/`.
-- CLI Command: `python .research/scripts/utils/assumption_validator.py --data <path> --config <config_path>`
+- CLI Command: `python -m research_copilot.utils.assumption_validator --data <path> --config <config_path>`

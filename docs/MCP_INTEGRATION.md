@@ -9,7 +9,7 @@ The MCP server exposes 28+ Research Copilot commands as native tools. This elimi
 ## Start the Server
 
 ```bash
-rcp mcp
+research-copilot-mcp
 ```
 
 The server runs on stdin/stdout by default (stdio transport).
@@ -24,8 +24,8 @@ Add to `.cursor/mcp.json`:
 {
   "mcpServers": {
     "research-copilot": {
-      "command": "python",
-      "args": ["/absolute/path/to/.research/mcp_server.py"]
+      "command": "research-copilot-mcp",
+      "args": []
     }
   }
 }
@@ -39,8 +39,8 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "research-copilot": {
-      "command": "python",
-      "args": ["/absolute/path/to/.research/mcp_server.py"]
+      "command": "research-copilot-mcp",
+      "args": []
     }
   }
 }
@@ -54,8 +54,8 @@ Add to `opencode.json`:
 {
   "mcp": {
     "research-copilot": {
-      "command": "python",
-      "args": [".research/mcp_server.py"]
+      "command": "research-copilot-mcp",
+      "args": []
     }
   }
 }
@@ -123,9 +123,8 @@ pip install mcp starlette uvicorn
 
 ### IDE can't connect
 
-- Use absolute paths in IDE configuration
-- Ensure the `.research/mcp_server.py` file exists
-- Check that no other process is using the MCP transport
+- Ensure you have run `rcp init` in the workspace directory.
+- Check that no other process is using the MCP transport.
 
 ### Tools not appearing
 

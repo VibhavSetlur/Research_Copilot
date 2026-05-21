@@ -27,6 +27,6 @@ All cached objects are stored in `.research/cache/research_cache.db`.
 
 ### CLI Reference
 ```bash
-python .research/scripts/utils/cache_manager.py --clear
-python .research/scripts/utils/cache_manager.py --stats
+python -m research_copilot.utils.cache_manager --clear
+python -m research_copilot.utils.cache_manager --stats
 ```

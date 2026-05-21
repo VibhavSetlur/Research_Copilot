@@ -30,5 +30,5 @@ Update `reports/baseline/research_map.json` or `docs/manifest.json`:
 
 ### CLI Reference
 ```bash
-python .research/scripts/utils/synthesize_results.py --results-file <results_json_path>
+python -m research_copilot.utils.synthesize_results --results-file <results_json_path>
 ```

@@ -1,4 +1,5 @@
 # Research Copilot — Git Ignore Rules
+TODO.md
 
 # Python
 __pycache__/
@@ -20,12 +21,6 @@ environment/venv/
 /01_workspace/
 /02_experiments/
 /03_synthesis/
-
-# Legacy output directories
-/reports/
-/data/
-TODO.md
-/scripts/
 
 # Runtime cache (auto-created)
 .research/cache/
@@ -62,7 +57,7 @@ desktop.ini
 
 # AI assistant caches
 .aider*
-.cursor*
+
 .antigravitycli/
 
 # IDE

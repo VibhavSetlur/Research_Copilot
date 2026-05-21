@@ -20,7 +20,7 @@ Each parallel worker must operate in an isolated subdirectory to avoid conflicts
 ### 3. Execution Setup
 Invoke the parallel runner script (`.research/scripts/utils/parallel_runner.py`):
 ```bash
-python .research/scripts/utils/parallel_runner.py --tasks <tasks_json_file> --max-workers <num>
+python -m research_copilot.utils.parallel_runner --tasks <tasks_json_file> --max-workers <num>
 ```
 Tasks must be defined in a JSON file listing the script paths, arguments, and target output directories.
 

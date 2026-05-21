@@ -86,9 +86,9 @@ New Error (if any): {new_traceback}
 
 ## Implementation
 
-### Python Helper: `.research/scripts/utils/auto_debug.py`
+### Python Helper: `research_copilot.utils.auto_debug`
 ```bash
-python .research/scripts/utils/auto_debug.py --script <path> --max-attempts 3
+python -m research_copilot.utils.auto_debug --script <path> --max-attempts 3
 ```
 
 The script:

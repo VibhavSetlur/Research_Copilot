@@ -14,14 +14,12 @@ from research_copilot.intent_router import IntentRouter
 from research_copilot.project_ops import (
     compute_input_hashes,
     create_experiment_branch,
-    current_branch,
     load_state,
     log_decision,
     save_artifact,
     scaffold_minimal_workspace,
 )
 from research_copilot.utils.asset_manager import AssetManager
-
 
 DEPTH_CHOICES = ("exploratory", "academic", "publication")
 
@@ -73,6 +71,41 @@ def cmd_init(args: argparse.Namespace) -> None:
     print()
     print("System assets are loaded from the installed Python package.")
     print("Project config is in .research/config.yaml.")
+
+
+def cmd_preflight(args: argparse.Namespace) -> None:
+    try:
+        root = _project_root()
+        print("=" * 60)
+        print("ENVIRONMENT PREFLIGHT CHECKS")
+        print("=" * 60)
+        print(f"Python Version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        print(f"Workspace:      {root}")
+        print(f"Config Folder:  {root / '.research' if (root / '.research').exists() else 'MISSING'}")
+        print(f"Inputs Folder:  {root / '00_inputs' if (root / '00_inputs').exists() else 'MISSING'}")
+        print("Status:         OK")
+    except Exception as e:
+        print(f"Preflight error: {e}")
+        sys.exit(1)
+
+
+def cmd_scan(args: argparse.Namespace) -> None:
+    try:
+        from research_copilot.utils.data_scale_detector import detect_data_scale
+        root = _project_root()
+        inputs_dir = root / "00_inputs" / "raw_data"
+        if not inputs_dir.exists():
+            print(f"Error: Raw data directory not found at {inputs_dir}")
+            sys.exit(1)
+
+        print("=" * 60)
+        print("SCANNING INPUT DATA")
+        print("=" * 60)
+        results = detect_data_scale(inputs_dir)
+        print(yaml.safe_dump(results, sort_keys=False))
+    except Exception as e:
+        print(f"Scan error: {e}")
+        sys.exit(1)
 
 
 def cmd_setup(args: argparse.Namespace) -> None:
@@ -273,6 +306,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("name", help="Project name or target directory")
     p_init.add_argument("--force", action="store_true", help="Overwrite existing directory")
 
+    sub.add_parser("preflight", help="Run environment preflight checks")
+    sub.add_parser("scan", help="Scan inputs and build research map")
     sub.add_parser("setup", help="Verify package assets and local overrides")
     sub.add_parser("status", help="Show clean workspace status")
 
@@ -325,6 +360,8 @@ def main() -> None:
 
     commands = {
         "init": cmd_init,
+        "preflight": cmd_preflight,
+        "scan": cmd_scan,
         "setup": cmd_setup,
         "status": cmd_status,
         "agent": cmd_agents,

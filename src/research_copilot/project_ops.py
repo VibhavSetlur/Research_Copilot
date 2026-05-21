@@ -7,7 +7,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     import yaml
@@ -15,7 +15,6 @@ except ImportError:  # pragma: no cover - PyYAML is a package dependency.
     yaml = None
 
 from research_copilot.utils.common import find_project_root, now_iso
-
 
 EXPERIMENT_SUBDIRS = [
     "scripts",
@@ -73,7 +72,7 @@ def default_state() -> dict:
     }
 
 
-def load_state(root: Optional[Path] = None) -> dict:
+def load_state(root: Path | None = None) -> dict:
     root = find_project_root(root)
     state = read_json(state_path(root), default_state())
     state.setdefault("current_branch", "exp_001_baseline")
@@ -98,7 +97,7 @@ def compute_file_hash(path: Path) -> str:
     return sha256.hexdigest()
 
 
-def compute_input_hashes(root: Optional[Path] = None) -> dict[str, str]:
+def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
     root = find_project_root(root)
     hashes: dict[str, str] = {}
     for base in (root / "00_inputs" / "raw_data", root / "00_inputs" / "literature"):
@@ -110,7 +109,7 @@ def compute_input_hashes(root: Optional[Path] = None) -> dict[str, str]:
     return hashes
 
 
-def next_experiment_id(root: Optional[Path], slug: str) -> str:
+def next_experiment_id(root: Path | None, slug: str) -> str:
     root = find_project_root(root)
     experiments = root / "02_experiments"
     max_seen = 1
@@ -243,6 +242,64 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
     save_state(root, state)
 
     _copy_ai_rules_to_project(root)
+    _copy_environment_to_project(root)
+    _setup_mcp_configs(root)
+    _setup_gitignore(root)
+
+def _setup_gitignore(root: Path) -> None:
+    """Generate default .gitignore for the research project."""
+    gitignore_path = root / ".gitignore"
+    if not gitignore_path.exists():
+        gitignore_path.write_text(
+            "# Research Copilot — Git Ignore Rules\n\n"
+            "# Python\n"
+            "__pycache__/\n"
+            "*.pyc\n"
+            "*.pyo\n"
+            "*.pyd\n"
+            "*.egg-info/\n"
+            ".venv/\n"
+            "venv/\n"
+            "env/\n"
+            "environment/venv/\n\n"
+            "# System\n"
+            ".DS_Store\n\n"
+            "# Research Copilot Runtime Cache\n"
+            ".research/cache/\n"
+            ".research/state/\n"
+            ".research/workflow_dag.json\n"
+            ".research/workflow_dag.mermaid\n\n"
+            "# Raw Data (Do not commit massive datasets)\n"
+            "00_inputs/raw_data/*\n"
+            "!00_inputs/raw_data/.gitkeep\n"
+        )
+
+def _setup_mcp_configs(root: Path) -> None:
+    """Generate default MCP configuration for popular AI IDEs."""
+    cursor_dir = root / ".cursor"
+    cursor_dir.mkdir(parents=True, exist_ok=True)
+    cursor_mcp = cursor_dir / "mcp.json"
+    if not cursor_mcp.exists():
+        cursor_mcp.write_text(json.dumps({
+            "mcpServers": {
+                "research-copilot": {
+                    "command": "research-copilot-mcp",
+                    "args": []
+                }
+            }
+        }, indent=2) + "\n")
+
+    opencode_json = root / "opencode.json"
+    if not opencode_json.exists():
+        opencode_json.write_text(json.dumps({
+            "mcp": {
+                "research-copilot": {
+                    "command": "research-copilot-mcp",
+                    "args": []
+                }
+            }
+        }, indent=2) + "\n")
+
 
 
 def _copy_ai_rules_to_project(root: Path) -> None:
@@ -262,12 +319,32 @@ def _copy_ai_rules_to_project(root: Path) -> None:
         except Exception:
             pass
 
+def _copy_environment_to_project(root: Path) -> None:
+    """Copy environment configuration files from package assets to the project."""
+    try:
+        import importlib.resources as importlib_resources
+    except ImportError:
+        import importlib_resources  # type: ignore[no-redef]
+
+    env_dir = root / "environment"
+    env_dir.mkdir(parents=True, exist_ok=True)
+
+    files = ["setup.sh", "setup_conda.sh", "requirements.txt", "README.md"]
+    for filename in files:
+        try:
+            asset_path = importlib_resources.files("research_copilot.assets.environment") / filename
+            dest = env_dir / filename
+            if not dest.exists():
+                dest.write_text(asset_path.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            pass
+
 
 def create_experiment_branch(
     name: str,
     hypothesis: str = "",
-    parent: Optional[str] = None,
-    root: Optional[Path] = None,
+    parent: str | None = None,
+    root: Path | None = None,
 ) -> dict:
     """Create an isolated experiment branch and update state/manifest."""
     root = find_project_root(root)
@@ -334,11 +411,11 @@ def create_experiment_branch(
     }
 
 
-def current_branch(root: Optional[Path] = None) -> str:
+def current_branch(root: Path | None = None) -> str:
     return load_state(root).get("current_branch", "exp_001_baseline")
 
 
-def branch_decisions_path(root: Path, branch_id: Optional[str] = None) -> Path:
+def branch_decisions_path(root: Path, branch_id: str | None = None) -> Path:
     branch_id = branch_id or current_branch(root)
     return root / "02_experiments" / branch_id / "decisions.yaml"
 
@@ -348,10 +425,10 @@ def log_decision(
     selected: str,
     rationale: str,
     *,
-    options_considered: Optional[list[str]] = None,
-    linked_literature: Optional[list[str]] = None,
-    branch_id: Optional[str] = None,
-    root: Optional[Path] = None,
+    options_considered: list[str] | None = None,
+    linked_literature: list[str] | None = None,
+    branch_id: str | None = None,
+    root: Path | None = None,
 ) -> dict:
     """Append a methodological decision to the active experiment ledger."""
     root = find_project_root(root)
@@ -382,7 +459,10 @@ def log_decision(
         path.write_text(yaml.safe_dump(data, sort_keys=False))
     else:
         with open(path, "a") as f:
-            f.write(f"\n  {decision_id}:\n    context: {context}\n    selected: {selected}\n    rationale: {rationale}\n")
+            f.write(
+                f"\n  {decision_id}:\n    context: {context}\n"
+                f"    selected: {selected}\n    rationale: {rationale}\n"
+            )
 
     return {"decision_id": decision_id, "path": path.relative_to(root).as_posix()}
 
@@ -394,10 +474,10 @@ def save_artifact(
     artifact_type: str = "artifact",
     generated_by: str = "mcp",
     source_script: str = "",
-    input_files: Optional[list[str]] = None,
-    decisions_applied: Optional[list[str]] = None,
-    branch_id: Optional[str] = None,
-    root: Optional[Path] = None,
+    input_files: list[str] | None = None,
+    decisions_applied: list[str] | None = None,
+    branch_id: str | None = None,
+    root: Path | None = None,
 ) -> dict:
     """Save a text artifact with required sibling provenance metadata."""
     root = find_project_root(root)
