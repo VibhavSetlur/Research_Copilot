@@ -32,7 +32,7 @@ For each numeric claim:
    Claim: "X is associated with Y (r=0.42)"
      └── Source: reports/analysis/q1/results.json (line 47)
          └── Input: data/03_analytical/analysis_q1.csv (hash: abc123)
-             └── Raw: inputs/data/raw/survey.csv (hash: def456)
+             └── Raw: 00_inputs/raw_data/survey.csv (hash: def456)
    ```
 
 ### Step 3: Trace Literature Claims to Verified Citations
@@ -70,7 +70,7 @@ Create `reports/audit/claim_trace_report.json`:
         "source_file": "reports/analysis/q1/results.json",
         "data_file": "data/03_analytical/analysis_q1.csv",
         "data_hash": "abc123",
-        "raw_file": "inputs/data/raw/survey.csv",
+        "raw_file": "00_inputs/raw_data/survey.csv",
         "raw_hash": "def456"
       }
     },

@@ -165,7 +165,7 @@ When the user introduces a mid-workflow thought, link, file, or question, do NOT
 1. Run `rcp setup` — verify all system files are in place
 2. Run `rcp scan` — scan inputs, build research map
 3. Run `rcp status` — check project state
-4. Read `inputs/intake.md`
+4. Read `00_inputs/intake.md`
 5. Read `rcp agent research_init`
 6. Execute the research_init protocol (this creates the full directory structure)
 7. Continue through the pipeline, using `rcp intent` when the user wants to explore

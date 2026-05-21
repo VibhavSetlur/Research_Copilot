@@ -31,7 +31,7 @@ Automated phase completion checks that prevent the pipeline from advancing until
 |---|-------|--------|-------|
 | 1 | Intake form is filled (no `[Your answer]` placeholders) | ☐ | |
 | 2 | At least one research question is defined | ☐ | |
-| 3 | Data files exist in inputs/data/raw/ | ☐ | |
+| 3 | Data files exist in 00_inputs/raw_data/ | ☐ | |
 | 4 | Data files are readable (correct format, not corrupted) | ☐ | |
 | 5 | Research map is created (reports/baseline/research_map.json) | ☐ | |
 | 6 | Feasibility verdict is assigned (go/caution/stop) | ☐ | |

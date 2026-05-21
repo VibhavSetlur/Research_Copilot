@@ -52,7 +52,7 @@ Parse `inputs/intake.md`, `inputs/intake.yaml`, or `inputs/intake.json` (in that
 If intake is empty or has no questions: generate follow-up questions and stop. Do NOT create directory structure yet.
 
 ### Step 4: Scan Inputs
-- **Data**: profile every file in `inputs/data/raw/` using `profile_tabular`, `classify_domain`, `detect_missingness`, `detect_outliers`
+- **Data**: profile every file in `00_inputs/raw_data/` using `profile_tabular`, `classify_domain`, `detect_missingness`, `detect_outliers`
 - **Data Scale**: classify files by size — <100MB full profiling, 100MB-1GB sampled (10k rows), >1GB polars lazy required
 - **Context**: read all files in `inputs/context/` (abstracts, notes, links, codebooks)
 - **Papers**: scan PDFs, BibTeX, and RIS files in `inputs/papers/`
@@ -90,7 +90,7 @@ After init-dirs creates the base structure, customize the files with project-spe
 ### Step 7: Cross-Reference Intake with Data
 For each research question:
 - Map stated variables to actual columns in the data files
-- Check if stated data files exist in `inputs/data/raw/`
+- Check if stated data files exist in `00_inputs/raw_data/`
 - Identify data preparation needed (merging, filtering, transformations)
 - Flag mismatches
 

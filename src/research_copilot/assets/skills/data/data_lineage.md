@@ -53,7 +53,7 @@ Each transformation is recorded as a **node** with:
   "last_updated": "[date]",
   "raw_files": [
     {
-      "path": "inputs/data/raw/survey.csv",
+      "path": "00_inputs/raw_data/survey.csv",
       "hash": "sha256:abc123...",
       "rows": 1500,
       "columns": 45,
@@ -65,7 +65,7 @@ Each transformation is recorded as a **node** with:
     {
       "id": "transform_001",
       "type": "clean",
-      "input_files": ["inputs/data/raw/survey.csv"],
+      "input_files": ["00_inputs/raw_data/survey.csv"],
       "output_file": "data/01_ingested/survey_clean.csv",
       "operation": "Standardized encoding, normalized column names, coded missing values",
       "parameters": {

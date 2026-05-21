@@ -18,7 +18,7 @@ Place files in `00_inputs/raw_data/`. Supports CSV, Parquet, Excel, Stata, SPSS,
 
 ## Fill Intake
 
-Edit `inputs/intake.md` — 3 fields: title, question, outcome variable.
+Edit `00_inputs/intake.md` — 3 fields: title, question, outcome variable.
 
 Or start a conversational interview: `rcp intake-interview --start`
 

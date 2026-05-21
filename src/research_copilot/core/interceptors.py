@@ -252,8 +252,8 @@ def _generate_context_transfer_memo(state: dict, token_pct: float) -> dict:
 
     state_file_refs = [
         ".research/cache/state.json",
-        "docs/manifest.json",
-        "docs/research_log.md",
+        "03_synthesis/manifest.json",
+        "01_workspace/lab_notebook.md",
     ]
     checkpoint_dir = project_root / ".research" / "cache" / "checkpoints"
     if checkpoint_dir.exists():

@@ -23,7 +23,7 @@ It asks guiding questions, examines the data files, and helps the user articulat
 ### Step 1: Scan Available Data
 
 Before starting the interview, examine the data:
-1. List all files in `inputs/data/raw/`
+1. List all files in `00_inputs/raw_data/`
 2. For each file, determine: format, size, encoding
 3. If CSV/Parquet: read column names and first 5 rows
 4. Compute basic statistics: row count, column count, missing values per column

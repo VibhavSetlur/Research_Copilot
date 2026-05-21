@@ -77,7 +77,7 @@ Files >100MB are automatically sampled for profiling. Files >1GB require polars 
 rcp intake-interview --start
 ```
 
-The AI asks 5 questions in plain English and generates `inputs/intake.md` automatically.
+The AI asks 5 questions in plain English and generates `00_inputs/intake.md` automatically.
 
 ### Option B: Manual
 
