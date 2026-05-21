@@ -154,10 +154,13 @@ Every agent instruction must follow this format so any LLM can execute it withou
 ## 16. Skill Loading Efficiency
 
 Before executing any task:
-1. Query the skill index (`.research/cache/skill_index.json` if available)
-2. Load ONLY skills directly relevant to the current step
-3. If unsure which skill applies, match by keyword
-4. Never load more than 4 skills simultaneously unless explicitly required
+1. Query the skill index using the `search_skills(query)` tool.
+2. Load ONLY the 2-3 specific skills directly relevant to the current step using the `load_skill_context(skill_name)` tool.
+3. If unsure which skill applies, match by keyword.
+4. Never load more than 4 skills simultaneously unless explicitly required.
+
+## 16b. The "Thinking" Scratchpad Tool
+Use the `write_to_scratchpad` MCP tool to dump all your step-by-step reasoning, calculations, and data shape analyses. Keep your reasoning out of the main conversational memory. Once you finish thinking, output a highly concise final action to the main thread.
 
 ## 17. Context Transfer Memorandum (CTM) Protocol
 

@@ -82,6 +82,9 @@ Create `reports/literature/evidence_matrix.md`:
 - Cells: what each paper found for each question
 - Summary: consensus, contradictions, gaps
 
+### Step 6b: RAG-Based Context Retrieval
+If you need specific details from past context or Context Transfer Memoranda (CTMs) when synthesizing findings, do not load the full texts. Use the `query_research_context(question)` MCP tool to surgically retrieve the specific context you need (e.g. "What were the covariates used in Smith 2023?").
+
 ### Step 7: Gap Analysis
 Create `reports/literature/gap_analysis.md`:
 - What questions have strong evidence?

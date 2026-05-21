@@ -256,8 +256,35 @@ class IntentRouter:
         depth = self._normalize_depth(depth)
         classification = self.classify_intent(query)
         primary = classification["primary_intent"]
-        null_space = self.compute_null_space(primary)
         profile = DEPTH_PROFILES[depth]
+
+        if depth == "exploratory":
+            # Zero-Shot Fast Path
+            null_space = set(INTENT_CATEGORIES.keys()) - {"exploratory"}
+            return {
+                "classification": classification,
+                "depth": depth,
+                "depth_profile": {
+                    "description": profile["description"],
+                    "quality_gates": profile["quality_gates"],
+                    "prompt_constraint": profile["prompt_constraint"],
+                },
+                "null_space": list(null_space),
+                "context": {
+                    "skills": ["viz_basic_charts", "descriptive_stats"],
+                    "agents": ["zero_shot_analyst"],
+                    "workflow_steps": ["zero_shot_analysis"],
+                },
+                "excluded": {
+                    "skill_categories": list(null_space),
+                    "depth_exclusions": sorted(
+                        set(profile["exclude_skills"]) | set(profile["exclude_agents"]) | set(profile["exclude_steps"])
+                    ),
+                    "estimated_token_savings": self._estimate_token_savings(null_space),
+                },
+            }
+
+        null_space = self.compute_null_space(primary)
 
         config = INTENT_CATEGORIES[primary]
 

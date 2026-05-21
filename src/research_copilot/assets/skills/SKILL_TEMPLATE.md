@@ -11,33 +11,17 @@ complexity: "basic|intermediate|advanced"
 
 # Skill: {Human-Readable Name}
 
-## Purpose
+<objective>
 One sentence: what this skill does and when it fires.
+</objective>
 
-## When to Use
-- Condition A
-- Condition B
-
-## When NOT to Use
-- Condition A
-- Condition B
-
-## Decision Protocol
-
-### Routing Logic
-```
+<routing_logic>
 IF condition_1 → use method_A
 ELIF condition_2 → use method_B
 ELSE → use method_C with caveat
-```
+</routing_logic>
 
-### Method Selection Criteria
-| Condition | Method | Rationale |
-|-----------|--------|-----------|
-| criterion | method_name | why this choice |
-
-## Execution Protocol
-
+<protocol>
 ### Step 1: Pre-checks
 - Validate inputs
 - Check assumptions
@@ -57,34 +41,17 @@ ELSE → use method_C with caveat
 - Sensitivity checks
 - Alternative specifications
 - Compare conclusions across methods
+</protocol>
 
-## Diagnostics & Interpretation
+<constraints>
+- Check assumption A before proceeding.
+- Do not use method B if condition C is met.
+</constraints>
 
-| Diagnostic | Pass | Fail → Interpret | Fail → Action |
-|------------|------|-------------------|---------------|
-| test_name | p > 0.05 | what failure means | what to do next |
-
-### Red Flags
-- **Flag 1**: symptom → likely cause → remediation
-- **Flag 2**: symptom → likely cause → remediation
-
-## Domain Conventions
-
-| Domain | Reporting Standard | Effect Size | Significance |
-|--------|-------------------|-------------|--------------|
-| Psychology | APA 7th | Cohen's d | p < .05 |
-| Epidemiology | STROBE | OR/RR | p < .05 |
-| Econometrics | AEA | β coefficients | p < .05, .01, .001 |
-
-## Reporting Template
-> "We [method] to [purpose]. [Key result with statistic, CI, p-value]. [Diagnostic result]. [Interpretation in domain terms]."
-
-## Output Specification
-- `path/to/output.json`: structure summary
-- `path/to/output.md`: human-readable summary
-
-## Validation Checks
-- [ ] Output contains required fields
-- [ ] Results within theoretical bounds
-- [ ] Diagnostics logged
-- [ ] No unhandled warnings
+<output_schema>
+{
+  "summary": "human-readable summary",
+  "diagnostics": {"pass": true},
+  "metrics": {}
+}
+</output_schema>

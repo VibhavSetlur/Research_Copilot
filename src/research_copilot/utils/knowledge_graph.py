@@ -60,6 +60,48 @@ class KnowledgeGraph:
                 results.append({"subject": u, "relation": relation, "object": v})
         return results
 
+    def add_ctm(self, text: str) -> None:
+        """Serialize a CTM into the local vector store."""
+        ctm_path = self.root / ".research" / "cache" / "ctm_store.pkl"
+        ctm_path.parent.mkdir(parents=True, exist_ok=True)
+        ctms = []
+        if ctm_path.exists():
+            try:
+                with open(ctm_path, "rb") as f:
+                    ctms = pickle.load(f)
+            except Exception:
+                pass
+        ctms.append(text)
+        with open(ctm_path, "wb") as f:
+            pickle.dump(ctms, f)
+
+    def query_research_context(self, question: str) -> str:
+        """Retrieve the most relevant ~200 tokens from the CTM store for a given question."""
+        ctm_path = self.root / ".research" / "cache" / "ctm_store.pkl"
+        if not ctm_path.exists():
+            return "No research context available."
+        try:
+            with open(ctm_path, "rb") as f:
+                ctms = pickle.load(f)
+        except Exception:
+            return "Error reading research context."
+
+        # Simple keyword-based chunk retrieval (mocking FAISS/ChromaDB for template)
+        keywords = set(question.lower().split())
+        best_chunk = "No highly relevant context found."
+        best_score = -1
+        
+        for ctm in ctms:
+            # Simulate chunking
+            chunks = [ctm[i:i+800] for i in range(0, len(ctm), 800)]
+            for chunk in chunks:
+                score = sum(1 for kw in keywords if kw in chunk.lower())
+                if score > best_score and score > 0:
+                    best_score = score
+                    best_chunk = chunk
+                    
+        return best_chunk
+
     def summary(self) -> Dict[str, Any]:
         """Get statistics about the knowledge graph."""
         return {

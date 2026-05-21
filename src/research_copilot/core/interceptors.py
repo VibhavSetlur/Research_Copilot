@@ -266,6 +266,14 @@ def _generate_context_transfer_memo(state: dict, token_pct: float) -> dict:
     ctm_path = ctm_dir / f"{ctm_id}.json"
     save_json_atomic(ctm_path, ctm)
 
+    try:
+        from research_copilot.utils.knowledge_graph import KnowledgeGraph
+        kg = KnowledgeGraph(project_root)
+        kg.add_ctm(json.dumps(ctm))
+        logger.info("CTM serialized to local vector store for querying.")
+    except Exception as e:
+        logger.warning(f"Failed to serialize CTM to knowledge graph: {e}")
+
     logger.info("CTM saved to: %s", ctm_path)
     return ctm
 

@@ -29,17 +29,45 @@ class ResearchEngine:
         self.router = IntentRouter(self.root)
         self.dag = ExecutionDAGManager(self.root)
         self.depth = depth
+        
+        from research_copilot.core.token_budget import TokenBudgetTracker
+        self.token_tracker = TokenBudgetTracker(max_tokens=200000)
 
     def execute_node(self, node_id: str, **kwargs) -> Dict[str, Any]:
         """Execute a single execution node directly."""
         logger.info(f"Executing node {node_id}")
-        self.hooks.trigger_sync("pre_execution", {"node_id": node_id, "kwargs": kwargs})
         
-        # In a full implementation, this would dynamically load and run the skill/agent.
-        # For now we simulate execution.
-        result = {"status": "success", "node": node_id, "output": "Execution completed"}
+        # Hash inputs for cache checking
+        import hashlib
+        import json
+        inputs_str = json.dumps(kwargs, sort_keys=True)
+        data_hash = hashlib.md5(inputs_str.encode("utf-8")).hexdigest()
+        
+        state = {"node_id": node_id, "operation": node_id, "data_hash": data_hash, "kwargs": kwargs}
+        state = self.hooks.trigger_sync("pre_execution", state) or state
+        
+        if state.get("skip_execution") and "cached_result" in state:
+            logger.info(f"Cache hit for {node_id}, skipping execution.")
+            result = {"status": "success", "node": node_id, "output": state["cached_result"], "cached": True}
+        else:
+            # In a full implementation, this would dynamically load and run the skill/agent.
+            # For now we simulate execution.
+            result = {"status": "success", "node": node_id, "output": "Execution completed"}
+            
+            # Cache the new result
+            try:
+                from research_copilot.utils.cache_manager import ResearchCache
+                cache = ResearchCache(self.root / ".research" / "cache" / "research_cache.db")
+                cache.set_computed_stats(data_hash, node_id, result)
+            except Exception:
+                pass
         
         self.hooks.trigger_sync("post_execution", {"node_id": node_id, "result": result})
+        
+        # Track simulated tokens
+        if hasattr(self, "token_tracker"):
+            self.token_tracker.add_usage(500, 200)
+            
         return result
 
     def route_and_execute(self, query: str, depth: Optional[str] = None) -> Dict[str, Any]:
@@ -47,11 +75,17 @@ class ResearchEngine:
         target_depth = depth or self.depth
         self.hooks.trigger_sync("pre_routing", {"query": query, "depth": target_depth})
         
-        workflow = self.router.route_intent(query, target_depth)
+        workflow = self.router.route(query, depth=target_depth)
         
+        # If exploratory, bypass DAG and run zero_shot_analyst directly
+        if target_depth == "exploratory":
+            logger.info("Bypassing DAG engine for exploratory intent. Routing to zero_shot_analyst.")
+            result = self.execute_node("zero_shot_analysis", agent="zero_shot_analyst", query=query)
+            return {"workflow": workflow, "results": [result]}
+            
         # Execute workflow steps...
         results = []
-        for step in workflow.get("steps", []):
+        for step in workflow.get("context", {}).get("workflow_steps", []):
             res = self.execute_node(step)
             results.append(res)
             

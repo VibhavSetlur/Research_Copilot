@@ -104,10 +104,12 @@ class ResearchLedger:
         try:
             from research_copilot.core.hooks import hook_engine
             import research_copilot.core.interceptors  # noqa: F401 — registers interceptors
+            import research_copilot.utils.state_compressor  # noqa: F401
         except ImportError:
             try:
                 from .hooks import hook_engine
                 from . import interceptors  # noqa: F401
+                from ..utils import state_compressor  # noqa: F401
             except ImportError:
                 return state
 

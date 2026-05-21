@@ -47,6 +47,9 @@ Generate scripts in the correct runtime (`.py`, `.R`, `.sh`, `.nf`, `.jl`) and e
 Never invent command syntax; pull it from `tool_registry.json`.
 Map result to the research question: supports or contradicts hypothesis? Compare effect size to literature expectations.
 
+### Step 3b: Code Modification
+If you need to fix a bug or modify an existing script, you MUST use the `patch_file(filepath, search_block, replace_block)` tool. Do NOT rewrite or output the entire file. Surgically edit specific functions or lines using exact block matching.
+
 ### Step 4: Sensitivity (only if primary finding is significant)
 Test robustness: different outlier treatment, different missing data handling, different model spec. Record which checks support vs weaken the finding.
 

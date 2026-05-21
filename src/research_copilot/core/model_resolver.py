@@ -19,7 +19,7 @@ import os
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from research_copilot.utils.common import load_yaml
 
 _MODELS_YAML = Path(__file__).resolve().parents[1] / "models.yaml"
@@ -264,6 +264,45 @@ def resolve_routing_matrix(config: Optional[dict] = None) -> dict:
     for task_name in config.get("models", {}):
         matrix[task_name] = resolve_model(task_name, config=config)
     return matrix
+
+
+def attach_schema(config: dict, schema: Any) -> dict:
+    """Attach a Pydantic schema to the model configuration for native Structured Outputs.
+    
+    Args:
+        config: The resolved model configuration
+        schema: A Pydantic V2 schema model class
+        
+    Returns:
+        Updated config with schema bindings
+    """
+    new_config = dict(config)
+    try:
+        # Check if it's a Pydantic V2 model
+        if hasattr(schema, "model_json_schema"):
+            json_schema = schema.model_json_schema()
+            new_config["structured_output_schema"] = json_schema
+            new_config["structured_output_name"] = schema.__name__
+            new_config["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__,
+                    "schema": json_schema,
+                    "strict": True
+                }
+            }
+        else:
+            # Fallback for dict or older versions
+            new_config["response_format"] = {"type": "json_object"}
+            if callable(getattr(schema, "schema", None)):
+                new_config["structured_output_schema"] = schema.schema()
+            else:
+                new_config["structured_output_schema"] = schema
+    except Exception as e:
+        new_config["response_format"] = {"type": "json_object"}
+        new_config["_schema_error"] = str(e)
+        
+    return new_config
 
 
 def print_availability_report(config: Optional[dict] = None) -> str:

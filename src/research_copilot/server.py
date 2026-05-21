@@ -117,6 +117,54 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
             "required": ["filename", "content"],
         },
     },
+    "search_skills": {
+        "description": "Search the skill index for a specific topic or keyword",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "Search keyword or phrase"}},
+            "required": ["query"],
+        },
+    },
+    "load_skill_context": {
+        "description": "Load the full context of a specific skill by its name/id",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"skill_name": {"type": "string", "description": "The id/name of the skill"}},
+            "required": ["skill_name"],
+        },
+    },
+    "patch_file": {
+        "description": "Surgically edit specific functions or lines in a file by replacing a search block with a new block.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string", "description": "Path to the file to edit"},
+                "search_block": {"type": "string", "description": "The exact block of code to search for and replace"},
+                "replace_block": {"type": "string", "description": "The new block of code to insert"},
+            },
+            "required": ["filepath", "search_block", "replace_block"],
+        },
+    },
+    "write_to_scratchpad": {
+        "description": "Dump step-by-step reasoning, calculations, and data shape analyses to avoid bloating context memory.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "thought": {"type": "string", "description": "The reasoning or calculation to record"}
+            },
+            "required": ["thought"],
+        },
+    },
+    "query_research_context": {
+        "description": "Query the serialized Context Transfer Memoranda (CTMs) to retrieve specific research context without loading the entire document.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "The question to ask against the CTMs"}
+            },
+            "required": ["question"],
+        },
+    },
 }
 
 
@@ -203,6 +251,47 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
                 branch=arguments.get("branch_id"),
             )
         )
+
+    if name == "search_skills":
+        query = arguments.get("query", "").lower()
+        index_path = root / ".research" / "cache" / "skill_index.json"
+        if not index_path.exists():
+            return _text("Skill index not found. Please run skill indexer.")
+        try:
+            with open(index_path, "r") as f:
+                index = json.load(f)
+            results = [s for s in index.get("skills", []) if query in s["title"].lower() or query in s["description"].lower() or any(query in kw for kw in s.get("keywords", []))]
+            return _text(results)
+        except Exception as e:
+            return _text(f"Error searching skills: {e}")
+
+    if name == "load_skill_context":
+        skill_name = arguments.get("skill_name")
+        rel = _asset_by_name(manager, "skills", skill_name)
+        return _text(manager.read_text(rel) if rel else f"Skill '{skill_name}' not found.")
+
+    if name == "patch_file":
+        try:
+            from research_copilot.utils.diff_editor import patch_file
+            return _text(patch_file(str(root), arguments["filepath"], arguments["search_block"], arguments["replace_block"]))
+        except Exception as e:
+            return _text(f"Error patching file: {e}")
+
+    if name == "write_to_scratchpad":
+        thought = arguments.get("thought", "")
+        scratchpad_path = root / ".research" / "cache" / "scratchpad.txt"
+        scratchpad_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(scratchpad_path, "a") as f:
+            f.write(f"{thought}\n---\n")
+        return _text("Thought recorded successfully.")
+
+    if name == "query_research_context":
+        try:
+            from research_copilot.utils.knowledge_graph import KnowledgeGraph
+            kg = KnowledgeGraph(root)
+            return _text(kg.query_research_context(arguments.get("question", "")))
+        except Exception as e:
+            return _text(f"Error querying research context: {e}")
 
     return _text(f"Unknown tool: {name}")
 
