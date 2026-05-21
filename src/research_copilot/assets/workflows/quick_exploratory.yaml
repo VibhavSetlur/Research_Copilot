@@ -1,0 +1,65 @@
+workflow_id: "quick_exploratory"
+name: "Quick Exploratory"
+description: "Intake → route → data → analysis → report. Skips deep literature and audit."
+
+agents:
+  - research_init
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - compile_outputs
+
+quality_gates:
+  - after: research_init
+    gate: "research_init"
+    on_fail: "halt — fix failed checks before proceeding"
+
+  - after: method_route
+    gate: "method_route"
+    on_fail: "revise analysis plan"
+
+  - after: data_scaffold
+    gate: "data_scaffold"
+    on_fail: "fix data pipeline"
+
+  - after: execute_analysis
+    gate: "execute_analysis"
+    on_fail: "complete analysis for all questions"
+
+  - after: compile_outputs
+    gate: "compile_outputs"
+    on_fail: "complete all manuscript sections"
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: execute_analysis
+      trigger: "user requests investigation, method change, or exploration"
+      options:
+        - investigate: "why did we get this result?"
+        - method_switch: "try a different method"
+        - variable_change: "add/remove variables"
+        - explore: "what else is in the data?"
+        - optimize: "find a better approach"
+      after_iteration:
+        - "return to execute_analysis with new method"
+        - "proceed to compile_outputs if satisfied"
+
+branching:
+  - after: research_init
+    if: "feasibility == stop"
+    then: "halt — see follow_up_questions.md"
+
+  - after: execute_analysis
+    if: "finding == inconclusive"
+    then: "label as exploratory only"
+
+  - after: execute_analysis
+    if: "user requests iteration"
+    then: "run research_iterate → return to execute_analysis or compile_outputs"
+
+notes:
+  - "Results are preliminary. Run audit_validate before formal use."
+  - "Use research_iterate at any point to explore, pivot, or investigate."
+  - "Quality gates checked between phases — run 'research validate <phase>'"

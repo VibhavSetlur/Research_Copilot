@@ -1,0 +1,58 @@
+workflow_id: "causal_investigation"
+name: "Causal Investigation"
+description: "Intake → literature → route → data → causal analysis → audit with causal language check"
+
+agents:
+  - research_init
+  - literature_deep
+  - methodology_scout
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - replication_validator
+  - compile_outputs
+  - audit_validate
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: method_route
+      trigger: "no valid identification strategy found"
+      options:
+        - method_switch: "try different identification strategy (IV, DiD, RDD, matching)"
+        - variable_change: "add/remove confounders"
+      after_iteration:
+        - "return to method_route with new strategy"
+        - "downgrade to associational if no strategy works"
+
+    - after: execute_analysis
+      trigger: "refutation tests failed or results unexpected"
+      options:
+        - investigate: "why did refutation fail?"
+        - method_switch: "try different causal method"
+        - variable_change: "adjust confounder set"
+        - robustness: "test sensitivity to unobserved confounding"
+        - validate: "replicate with alternative approach"
+      after_iteration:
+        - "return to execute_analysis with new method"
+        - "downgrade to associational if causal claim unsupported"
+        - "proceed to replication_validator"
+
+branching:
+  - after: method_route
+    if: "no_identification_strategy"
+    then: "halt — causal inference not possible with this data"
+
+  - after: execute_analysis
+    if: "refutation_tests == failed"
+    then: "report as associational, not causal"
+
+  - after: execute_analysis
+    if: "user requests iteration"
+    then: "run research_iterate → return to execute_analysis or compile_outputs"
+
+notes:
+  - "Causal language audit is mandatory."
+  - "Use research_iterate to explore alternative identification strategies."
+  - "If causal claim fails, document why in docs/dead_ends/."

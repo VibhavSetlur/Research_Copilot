@@ -1,0 +1,18 @@
+domain_id: "nlp_computational"
+name: "NLP & Computational Linguistics"
+reporting_standard: "ACL"
+significance_threshold: 0.05
+default_effect_size_metric: "f1_score"
+preferred_visualizations: ["confusion_matrix", "learning_curve", "embedding_plot"]
+citation_style: "acl"
+quality_gates:
+  - inter_annotator_agreement
+  - train_test_split
+  - baseline_comparison
+leaf_nodes: []
+primary_tools:
+  - scikit-learn
+container: "general"
+file_formats:
+  - CSV
+  - JSON

@@ -61,6 +61,7 @@ class ExecutionDAGManager:
             "project": "",
             "nodes": {},
             "edges": [],
+            "branches": {},
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
         self._save(dag)
@@ -91,6 +92,15 @@ class ExecutionDAGManager:
         except (FileNotFoundError, PermissionError):
             return "error"
 
+    def _current_branch(self) -> str:
+        state_path = self.root / ".research" / "cache" / "state.json"
+        try:
+            with open(state_path) as f:
+                state = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return "main"
+        return state.get("current_branch", state.get("active_branch", "main"))
+
     def add_node(
         self,
         node_id: str,
@@ -104,6 +114,7 @@ class ExecutionDAGManager:
         container: str = None,
         tool_ids: list = None,
         domain: str = None,
+        branch_id: str = None,
         exit_code: int = None,
         duration: float = None,
     ) -> dict:
@@ -121,6 +132,7 @@ class ExecutionDAGManager:
             container: Container image used
             tool_ids: Tool IDs from the tool registry
             domain: Domain context (genomics, neuroimaging, etc.)
+            branch_id: Experiment branch that owns this execution
             exit_code: Process exit code
             duration: Execution duration in seconds
 
@@ -129,6 +141,7 @@ class ExecutionDAGManager:
         """
         dag = self._load()
         now = datetime.now(timezone.utc).isoformat()
+        branch_id = branch_id or self._current_branch()
 
         input_hashes = {}
         for fp in input_files:
@@ -140,6 +153,7 @@ class ExecutionDAGManager:
             "node_id": node_id,
             "script_path": script_path,
             "iteration_id": iteration_id,
+            "branch_id": branch_id,
             "depends_on": depends_on or [],
             "input_files": input_files,
             "output_files": output_files,
@@ -156,6 +170,9 @@ class ExecutionDAGManager:
         }
 
         dag["nodes"][node_id] = node
+        dag.setdefault("branches", {}).setdefault(branch_id, {"nodes": []})
+        if node_id not in dag["branches"][branch_id]["nodes"]:
+            dag["branches"][branch_id]["nodes"].append(node_id)
 
         for dep in (depends_on or []):
             if dep in dag["nodes"]:
@@ -344,6 +361,16 @@ class ExecutionDAGManager:
                     lines.append(f"      {status_marker} {n['script_path']}")
                     lines.append(f"         runtime={rt} container={ct} tools=[{tools}]")
                 lines.append("")
+
+        branches = {}
+        for node in nodes.values():
+            branches.setdefault(node.get("branch_id", "main"), 0)
+            branches[node.get("branch_id", "main")] += 1
+        if branches:
+            lines.append("  Branches:")
+            for branch_id, count in sorted(branches.items()):
+                lines.append(f"    {branch_id}: {count} node(s)")
+            lines.append("")
 
         if runtimes:
             lines.append("  Runtimes:")

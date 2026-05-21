@@ -1,0 +1,19 @@
+domain_id: "education"
+name: "Education Research"
+reporting_standard: "AERA"
+significance_threshold: 0.05
+default_effect_size_metric: "cohens_d"
+preferred_visualizations: ["forest_plot", "box_plot", "growth_curve"]
+citation_style: "apa"
+quality_gates:
+  - sampling_frame
+  - response_rate
+  - hierarchical_structure
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

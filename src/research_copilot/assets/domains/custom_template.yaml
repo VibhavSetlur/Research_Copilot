@@ -1,0 +1,15 @@
+domain_id: "custom"
+name: "Custom / Multidisciplinary"
+reporting_standard: "APA 7th"
+significance_threshold: 0.05
+default_effect_size_metric: "cohens_d"
+preferred_visualizations: ["box_plot", "scatter", "forest_plot"]
+citation_style: "apa"
+quality_gates:
+  - assumption_checks
+  - effect_size_reporting
+  - multiple_testing_correction
+leaf_nodes: []
+primary_tools: []
+container: "general"
+file_formats: []

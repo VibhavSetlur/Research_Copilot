@@ -1,0 +1,42 @@
+workflow_id: "predictive_modeling"
+name: "Predictive Modeling"
+description: "Intake → route → data → ML pipeline → report → audit"
+
+agents:
+  - research_init
+  - method_route
+  - data_scaffold
+  - execute_analysis
+  - compile_outputs
+  - audit_validate
+
+iteration_support:
+  enabled: true
+  agent: research_iterate
+  loop_points:
+    - after: execute_analysis
+      trigger: "model performance needs improvement or user wants to explore alternatives"
+      options:
+        - method_switch: "try different model architecture"
+        - variable_change: "add/remove features"
+        - optimize: "hyperparameter tuning, feature engineering"
+        - investigate: "analyze error patterns, feature importance"
+        - robustness: "cross-validation, different train/test splits"
+      after_iteration:
+        - "return to execute_analysis with new model"
+        - "proceed to compile_outputs if performance adequate"
+
+branching:
+  - after: execute_analysis
+    if: "model_generalization == poor"
+    then: "report train vs test performance honestly"
+
+  - after: execute_analysis
+    if: "user requests iteration"
+    then: "run research_iterate → return to execute_analysis or compile_outputs"
+
+notes:
+  - "Always use train/test split or cross-validation."
+  - "Compare to simple baseline."
+  - "Use research_iterate to explore models, features, and hyperparameters."
+  - "Document all model attempts in docs/iterations/ — including failed ones."

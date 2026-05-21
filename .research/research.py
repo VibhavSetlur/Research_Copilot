@@ -240,6 +240,12 @@ Examples:
     # Intent routing command
     p_intent = sub.add_parser("intent", help="Route a query through the intent router")
     p_intent.add_argument("query", help="Natural language query to route")
+    p_intent.add_argument(
+        "--depth",
+        choices=["exploratory", "academic", "publication"],
+        default="academic",
+        help="Routing depth and rigor profile",
+    )
 
     # Knowledge graph commands
     sub.add_parser("graph", help="Show knowledge graph summary")
@@ -321,9 +327,11 @@ Examples:
         _dag_viewer(args)
 
     def cmd_mcp_handler(args):
-        import subprocess
-        mcp_path = Path(__file__).parent / "mcp_server.py"
-        subprocess.run([sys.executable, str(mcp_path)])
+        src_path = Path(__file__).resolve().parents[1] / "src"
+        if src_path.exists() and str(src_path) not in sys.path:
+            sys.path.insert(0, str(src_path))
+        from research_copilot.server import main as server_main
+        server_main()
 
     def cmd_branch_handler(args):
         from core.state_ledger import ResearchLedger
@@ -331,9 +339,23 @@ Examples:
         ledger = ResearchLedger()
         scaffold = BranchScaffold()
         try:
-            ledger.branch_state(args.name, hypothesis=args.hypothesis, parent=args.parent)
-            scaffold.create_branch_workspace(args.name, hypothesis=args.hypothesis)
+            data_hashes = scaffold.compute_input_hashes()
+            parent = args.parent or ledger.get().get("current_branch", ledger.get().get("active_branch", "main"))
+            ledger.branch_state(
+                args.name,
+                hypothesis=args.hypothesis,
+                parent=args.parent,
+                experiment_dir=f"02_experiments/{args.name}",
+                data_hashes=data_hashes,
+            )
+            scaffold.create_branch_workspace(
+                args.name,
+                hypothesis=args.hypothesis,
+                parent=parent,
+                data_hashes=data_hashes,
+            )
             print(f"Branch '{args.name}' created and scaffolded successfully.")
+            print(f"  Input hashes inherited: {len(data_hashes)}")
             if args.hypothesis:
                 print(f"  Hypothesis: {args.hypothesis}")
         except ValueError as e:
@@ -381,8 +403,10 @@ Examples:
     def cmd_intent_handler(args):
         from scripts.utils.intent_router import IntentRouter
         router = IntentRouter()
-        result = router.route(args.query)
+        result = router.route(args.query, depth=args.depth)
         print(f"Intent: {result['classification']['primary_intent']}")
+        print(f"Depth: {result['depth']}")
+        print(f"Constraint: {result['depth_profile']['prompt_constraint']}")
         print(f"Null space excluded: {', '.join(result['null_space'])}")
         print(f"Estimated token savings: ~{result['excluded']['estimated_token_savings']} tokens")
         print(f"\nSkills to load:")

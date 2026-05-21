@@ -71,6 +71,7 @@ all = [
 
 [project.scripts]
 rcp = "research_copilot.cli:main"
+research-copilot-mcp = "research_copilot.server:main"
 
 [project.urls]
 Homepage = "https://github.com/your-org/research-copilot"
@@ -84,10 +85,7 @@ include = ["research_copilot*"]
 
 [tool.setuptools.package-data]
 "research_copilot" = [
-    ".research/**/*",
-    "inputs/**/*",
-    "environment/**/*",
-    "AGENTS.md",
+    "assets/**/*",
 ]
 
 [tool.ruff]

@@ -5,6 +5,7 @@ Checks runtime availability and basic connectivity. Writes a report to
 environment/preflight_report.json.
 """
 import json
+import os
 import platform
 import shutil
 import socket
@@ -13,6 +14,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 
 def find_project_root() -> Path:
@@ -46,6 +52,17 @@ def _load_json(path: Path) -> Dict[str, Any]:
         return {}
 
 
+def _load_models(root: Path) -> Dict[str, Any]:
+    models_path = root / ".research" / "models.yaml"
+    if not models_path.exists() or yaml is None:
+        return {}
+    try:
+        with open(models_path) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
 def main() -> int:
     root = find_project_root()
     report_path = root / "environment" / "preflight_report.json"
@@ -67,6 +84,20 @@ def main() -> int:
         "conda_forge": _check_url("https://conda.anaconda.org/conda-forge"),
         "bioconductor": _check_url("https://bioconductor.org"),
     }
+
+    models = _load_models(root)
+    api_keys = {}
+    for task, model in models.get("models", {}).items():
+        env_var = model.get("api_key_env")
+        if env_var:
+            api_keys[task] = {
+                "provider": model.get("provider"),
+                "model": model.get("model"),
+                "api_key_env": env_var,
+                "available": bool(os.environ.get(env_var)),
+            }
+    fallback = models.get("fallback", {})
+    fallback_env = fallback.get("api_key_env", "")
 
     format_manifest = root / ".research" / "cache" / "data_format_manifest.json"
     manifest = _load_json(format_manifest) if format_manifest.exists() else {}
@@ -94,6 +125,15 @@ def main() -> int:
         "hostname": socket.gethostname(),
         "runtimes": runtimes,
         "connectivity": connectivity,
+        "models": {
+            "tasks": api_keys,
+            "fallback": {
+                "provider": fallback.get("provider"),
+                "model": fallback.get("model"),
+                "api_key_env": fallback_env,
+                "available": bool(os.environ.get(fallback_env)) if fallback_env else False,
+            },
+        },
         "data": {
             "total_size_gb": round(total_size / (1024 ** 3), 3),
             "domain_hint": domain_hint,
@@ -114,6 +154,11 @@ def main() -> int:
     print("Connectivity:")
     for k, v in connectivity.items():
         print(f"  {k}: {'ok' if v else 'fail'}")
+    if api_keys:
+        available = sum(1 for item in api_keys.values() if item["available"])
+        print("LLM API keys:")
+        print(f"  task routes available: {available}/{len(api_keys)}")
+        print(f"  fallback: {'available' if report['models']['fallback']['available'] else 'missing'} ({fallback_env or 'not configured'})")
     print(f"Data size (GB): {report['data']['total_size_gb']}")
     if domain_hint:
         print(f"Domain hint: {domain_hint}")

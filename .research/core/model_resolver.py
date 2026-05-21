@@ -17,13 +17,14 @@ Usage:
 
 import os
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from core.utils import load_yaml
 
 
-_MODELS_YAML = Path(__file__).parent / "models.yaml"
+_MODELS_YAML = Path(__file__).resolve().parents[1] / "models.yaml"
 _RESOLVED_CACHE = {}
 _WARNINGS_SHOWN = set()
 
@@ -31,7 +32,13 @@ _WARNINGS_SHOWN = set()
 def _load_models_config() -> dict:
     """Load the models.yaml configuration."""
     if not _MODELS_YAML.exists():
-        return {"models": {}, "fallback": {}}
+        try:
+            from research_copilot.utils.asset_manager import AssetManager
+            import yaml
+
+            return yaml.safe_load(AssetManager().read_text("models.yaml")) or {"models": {}, "fallback": {}}
+        except Exception:
+            return {"models": {}, "fallback": {}}
     return load_yaml(_MODELS_YAML)
 
 
@@ -79,6 +86,7 @@ def resolve_model(task_name: str, config: Optional[dict] = None) -> dict:
     )
     
     resolved = _resolve_with_fallback(fallback, warning_msg, task_config)
+    _log_model_fallback(task_name, task_config, resolved, warning_msg)
     _RESOLVED_CACHE[cache_key] = resolved
     return resolved
 
@@ -143,6 +151,73 @@ def _find_any_available_model() -> Optional[dict]:
     return None
 
 
+def _find_project_root() -> Path:
+    p = Path.cwd()
+    for _ in range(10):
+        if (p / "02_experiments").exists() or (p / ".research").exists():
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+    return Path.cwd()
+
+
+def _active_experiment(root: Path) -> str:
+    package_state = root / "03_synthesis" / "state_ledger.json"
+    legacy_state = root / ".research" / "cache" / "state.json"
+    for path in (package_state, legacy_state):
+        try:
+            import json
+
+            with open(path) as f:
+                state = json.load(f)
+            branch = state.get("current_branch") or state.get("active_branch")
+            if branch and branch != "main":
+                return branch
+        except Exception:
+            pass
+    return "exp_001_baseline"
+
+
+def _log_model_fallback(task_name: str, original: dict, resolved: dict, warning_msg: str) -> None:
+    """Record model fallback in the active experiment decisions ledger."""
+    root = _find_project_root()
+    experiment = _active_experiment(root)
+    decisions = root / "02_experiments" / experiment / "decisions.yaml"
+    if not decisions.parent.exists():
+        return
+    decisions.parent.mkdir(parents=True, exist_ok=True)
+
+    original_model = f"{original.get('provider', 'unknown')}/{original.get('model', 'unknown')}"
+    resolved_model = f"{resolved.get('provider', 'unknown')}/{resolved.get('model', 'unknown')}"
+    now = datetime.now(timezone.utc)
+    entry_id = f"model_fallback_{now.strftime('%Y%m%d_%H%M%S')}"
+    entry = (
+        f"\n  {entry_id}:\n"
+        f"    date: {now.date().isoformat()}\n"
+        f"    context: Model resolver fallback for task '{task_name}'.\n"
+        f"    selected: {resolved_model}\n"
+        f"    rationale: {warning_msg}\n"
+        f"    original_model: {original_model}\n"
+        f"    fallback_used: {str(resolved.get('_fallback_used', False)).lower()}\n"
+        "    linked_literature: []\n"
+    )
+
+    if decisions.exists():
+        text = decisions.read_text()
+        if "decisions:" not in text:
+            text += "\ndecisions:\n"
+        decisions.write_text(text.rstrip() + entry)
+    else:
+        decisions.write_text(
+            "schema_version: '1.0'\n"
+            f"experiment_id: {experiment}\n"
+            f"created: {now.isoformat()}\n"
+            "decisions:\n"
+            + entry
+        )
+
+
 def get_available_models(config: Optional[dict] = None) -> dict:
     """Get a summary of which models are available based on API keys.
     
@@ -185,6 +260,21 @@ def get_available_models(config: Optional[dict] = None) -> dict:
         "total_available": len(available),
         "total_unavailable": len(unavailable),
     }
+
+
+def resolve_routing_matrix(config: Optional[dict] = None) -> dict:
+    """Resolve every configured task to an available model in memory.
+
+    Callers can use the returned matrix instead of raw models.yaml routes. Missing
+    provider keys are degraded to the highest-context available model and cached
+    for the current process.
+    """
+    if config is None:
+        config = _load_models_config()
+    matrix = {}
+    for task_name in config.get("models", {}):
+        matrix[task_name] = resolve_model(task_name, config=config)
+    return matrix
 
 
 def print_availability_report(config: Optional[dict] = None) -> str:

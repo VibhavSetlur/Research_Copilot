@@ -82,6 +82,7 @@ class ResearchLedger:
             "execution_dag_path": None,
             "data_scale_profile": None,
             "active_branch": "main",
+            "current_branch": "main",
             "branches": {
                 "main": {
                     "branch_id": "main",
@@ -93,6 +94,8 @@ class ResearchLedger:
                     "merged_at": None,
                     "evaluation": None,
                     "workspace_prefix": "",
+                    "experiment_dir": "02_experiments/exp_001_baseline",
+                    "data_hashes": {},
                 }
             },
             "knowledge_graph_path": None,
@@ -324,6 +327,8 @@ class ResearchLedger:
             dag = json.load(f)
 
         now = datetime.now(timezone.utc).isoformat()
+        state = self._load()
+        current_branch = state.get("current_branch", state.get("active_branch", "main"))
 
         input_hashes = {}
         for fp in input_files:
@@ -335,6 +340,7 @@ class ResearchLedger:
             "node_id": node_id,
             "script_path": script_path,
             "iteration_id": iteration_id,
+            "branch_id": current_branch,
             "depends_on": depends_on or [],
             "input_files": input_files,
             "output_files": output_files,
@@ -353,7 +359,6 @@ class ResearchLedger:
         dag["last_updated"] = now
         self._save_to_path(dag_path, dag)
 
-        state = self._load()
         state["execution_dag_path"] = str(dag_path)
         state["updated_at"] = now
         self._save(state)
@@ -464,7 +469,7 @@ class ResearchLedger:
         branches = state.get("branches", {})
         lines.append("")
         lines.append(f"  Branches: {len(branches)}")
-        active = state.get("active_branch", "main")
+        active = state.get("current_branch", state.get("active_branch", "main"))
         for bid, b in branches.items():
             marker = "▶" if bid == active else " "
             status_icon = "✓" if b.get("status") == "merged" else ("✗" if b.get("status") == "abandoned" else "○")
@@ -476,7 +481,14 @@ class ResearchLedger:
         lines.append("")
         return "\n".join(lines)
 
-    def branch_state(self, branch_id: str, hypothesis: str = "", parent: str = None) -> dict:
+    def branch_state(
+        self,
+        branch_id: str,
+        hypothesis: str = "",
+        parent: str = None,
+        experiment_dir: str = None,
+        data_hashes: dict = None,
+    ) -> dict:
         """Create a new research branch (Git-like branching model).
 
         Args:
@@ -505,18 +517,22 @@ class ResearchLedger:
                 "merged_at": None,
                 "evaluation": None,
                 "workspace_prefix": "",
+                "experiment_dir": "02_experiments/exp_001_baseline",
+                "data_hashes": {},
             }
             state["branches"] = branches
             state["active_branch"] = "main"
+            state["current_branch"] = "main"
 
         if branch_id in branches:
             raise ValueError(f"Branch '{branch_id}' already exists. Use a unique name.")
 
-        parent_branch = parent or state.get("active_branch", "main")
+        parent_branch = parent or state.get("current_branch", state.get("active_branch", "main"))
         if parent_branch not in branches:
             raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
 
         now = datetime.now(timezone.utc).isoformat()
+        experiment_dir = experiment_dir or f"02_experiments/{branch_id}"
         workspace_prefix = f"{branch_id}/"
 
         branches[branch_id] = {
@@ -529,10 +545,13 @@ class ResearchLedger:
             "merged_at": None,
             "evaluation": None,
             "workspace_prefix": workspace_prefix,
+            "experiment_dir": experiment_dir,
+            "data_hashes": data_hashes or {},
         }
 
         state["branches"] = branches
         state["active_branch"] = branch_id
+        state["current_branch"] = branch_id
         state["updated_at"] = now
         self._save(state)
 
@@ -562,6 +581,7 @@ class ResearchLedger:
 
         old_branch = state.get("active_branch", "main")
         state["active_branch"] = branch_id
+        state["current_branch"] = branch_id
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save(state)
 
@@ -608,6 +628,7 @@ class ResearchLedger:
 
         state["branches"] = branches
         state["active_branch"] = target
+        state["current_branch"] = target
         state["updated_at"] = now
         self._save(state)
 
@@ -643,6 +664,8 @@ class ResearchLedger:
         state["branches"] = branches
         if state.get("active_branch") == branch_id:
             state["active_branch"] = "main"
+        if state.get("current_branch") == branch_id:
+            state["current_branch"] = "main"
         state["updated_at"] = now
         self._save(state)
 
@@ -657,7 +680,7 @@ class ResearchLedger:
         """
         state = self._load()
         branches = state.get("branches", {})
-        active = state.get("active_branch", "main")
+        active = state.get("current_branch", state.get("active_branch", "main"))
 
         result = []
         for bid, b in branches.items():
@@ -669,6 +692,8 @@ class ResearchLedger:
                 "active": bid == active,
                 "created_at": b.get("created_at", ""),
                 "workspace_prefix": b.get("workspace_prefix", ""),
+                "experiment_dir": b.get("experiment_dir", ""),
+                "data_hashes": b.get("data_hashes", {}),
             })
         return result
 
@@ -684,7 +709,7 @@ class ResearchLedger:
         }
         """
         state = self._load()
-        bid = branch_id or state.get("active_branch", "main")
+        bid = branch_id or state.get("current_branch", state.get("active_branch", "main"))
         branches = state.get("branches", {})
 
         if bid not in branches:

@@ -1,0 +1,37 @@
+domain_id: "bayesian_default"
+name: "Bayesian-First Analysis"
+reporting_standard: "HDI_not_CI"
+significance_threshold: null
+default_effect_size_metric: "posterior_mean_and_hdi"
+preferred_visualizations: ["posterior_distribution", "forest_plot_with_hdi", "trace_plot", "ppc_plot"]
+citation_style: "apa"
+quality_gates:
+  - prior_sensitivity_analysis
+  - mcmc_convergence_check_r_hat_less_than_1.01
+  - effective_sample_size_minimum_400_per_chain
+  - posterior_predictive_check
+  - loo_cross_validation_for_model_comparison
+confounders_to_check:
+  - prior_influence_on_posterior
+  - chain_convergence_diagnostics
+  - model_misspecification
+  - influential_observations_pareto_k
+typical_effect_size_benchmarks:
+  small_effect: "posterior_mean_0.2_with_95_percent_hdi_excluding_zero"
+  medium_effect: "posterior_mean_0.5_with_95_percent_hdi_excluding_zero"
+  large_effect: "posterior_mean_0.8_with_95_percent_hdi_excluding_zero"
+outlier_handling: "robust_likelihood_student_t_distribution"
+default_method: "bayesian_modeling"
+bayesian_defaults:
+  prior_type: "weakly_informative"
+  chains: 4
+  iterations: 4000
+  warmup: 1000
+  hdi_level: 0.95
+  decision_rule: "hdi_excludes_zero_or_rope"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV

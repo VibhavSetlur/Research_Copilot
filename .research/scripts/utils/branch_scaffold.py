@@ -14,6 +14,7 @@ Usage:
 import json
 import logging
 import shutil
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -49,18 +50,27 @@ class BranchScaffold:
             p = p.parent
         return Path.cwd()
 
-    def create_branch_workspace(self, branch_id: str, hypothesis: str = "") -> dict:
+    def create_branch_workspace(
+        self,
+        branch_id: str,
+        hypothesis: str = "",
+        parent: str = "main",
+        data_hashes: Optional[dict] = None,
+    ) -> dict:
         """Create full directory structure for a new branch.
 
         Args:
             branch_id: Unique branch identifier
             hypothesis: Research hypothesis for this branch
+            parent: Parent branch or experiment name
+            data_hashes: Optional precomputed immutable input hashes
 
         Returns:
             Dict of created directories
         """
         created = {}
         exp_root = self.root / "02_experiments" / branch_id
+        data_hashes = data_hashes or self.compute_input_hashes()
 
         for subdir in EXPERIMENT_SUBDIRS:
             dir_path = exp_root / subdir
@@ -69,16 +79,18 @@ class BranchScaffold:
 
             readme = dir_path / "README.md"
             if not readme.exists():
-                self._write_readme(readme, branch_id, hypothesis, subdir)
+                self._write_readme(readme, branch_id, hypothesis, subdir, parent)
 
         decisions = exp_root / "decisions.yaml"
         if not decisions.exists():
-            decisions.write_text(
+            decision_text = (
                 "schema_version: '1.0'\n"
                 f"experiment_id: {branch_id}\n"
-                "parent_experiment: main\n"
+                f"parent_experiment: {parent}\n"
                 f"created: {datetime.now(timezone.utc).isoformat()}\n"
-                "decisions:\n"
+                "input_data_hashes:\n"
+                + self._yaml_mapping(data_hashes, indent=2)
+                + "decisions:\n"
                 "  decision_001:\n"
                 f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
                 "    context: Experiment branch created.\n"
@@ -89,21 +101,22 @@ class BranchScaffold:
                 f"    rationale: {hypothesis or 'Exploratory branch'}\n"
                 "    linked_literature: []\n"
             )
+            decisions.write_text(decision_text)
             created[f"02_experiments/{branch_id}/decisions.yaml"] = str(decisions)
 
-        self._write_branch_manifest(branch_id, hypothesis, created)
+        self._write_branch_manifest(branch_id, hypothesis, created, parent, data_hashes)
         self._update_root_manifests(branch_id)
 
         logger.info("Scaffolded workspace for branch '%s': %d directories", branch_id, len(created))
         return created
 
-    def _write_readme(self, path: Path, branch_id: str, hypothesis: str, category: str):
+    def _write_readme(self, path: Path, branch_id: str, hypothesis: str, category: str, parent: str):
         """Write a README.md for a branch-specific directory."""
         content = f"""# Branch: {branch_id} — {category}
 
 **Hypothesis**: {hypothesis or "Exploratory branch"}
 **Created**: {datetime.now(timezone.utc).isoformat()}
-**Parent**: main
+**Parent**: {parent}
 
 This directory contains `{category}` files specific to the `{branch_id}` experiment.
 The experiment is isolated so divergent hypotheses never overwrite each other.
@@ -117,13 +130,15 @@ When this branch is merged into main:
 """
         path.write_text(content)
 
-    def _write_branch_manifest(self, branch_id: str, hypothesis: str, created: dict):
+    def _write_branch_manifest(self, branch_id: str, hypothesis: str, created: dict, parent: str, data_hashes: dict):
         """Write a branch-specific manifest.json."""
         manifest = {
             "branch_id": branch_id,
+            "parent_branch": parent,
             "hypothesis": hypothesis,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "active",
+            "input_data_hashes": data_hashes,
             "directories": created,
             "files": {},
             "merge_status": None,
@@ -135,6 +150,42 @@ When this branch is merged into main:
         manifest_path = branch_manifest_dir / f"{branch_id}_manifest.json"
         with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=2)
+
+    def compute_input_hashes(self) -> dict:
+        """Compute SHA-256 hashes for canonical immutable inputs."""
+        roots = [
+            self.root / "00_inputs" / "raw_data",
+            self.root / "00_inputs" / "literature",
+            self.root / "inputs" / "data" / "raw",
+            self.root / "inputs" / "papers",
+        ]
+        hashes = {}
+        for base in roots:
+            if not base.exists():
+                continue
+            for path in sorted(base.rglob("*")):
+                if path.is_file() and not path.name.startswith(".") and path.name not in {"README.md", ".gitkeep"}:
+                    rel = path.relative_to(self.root).as_posix()
+                    hashes[rel] = self._hash_file(path)
+        return hashes
+
+    @staticmethod
+    def _hash_file(path: Path) -> str:
+        sha256 = hashlib.sha256()
+        try:
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256.update(chunk)
+        except (FileNotFoundError, PermissionError, OSError):
+            return "error"
+        return sha256.hexdigest()
+
+    @staticmethod
+    def _yaml_mapping(values: dict, indent: int = 0) -> str:
+        prefix = " " * indent
+        if not values:
+            return f"{prefix}{{}}\n"
+        return "".join(f"{prefix}\"{k}\": \"{v}\"\n" for k, v in values.items())
 
     def _update_root_manifests(self, branch_id: str):
         """Update the root 03_synthesis/manifest.json with branch information."""

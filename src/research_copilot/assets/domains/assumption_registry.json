@@ -1,0 +1,92 @@
+{
+  "parametric_regression": {
+    "checks": ["shapiro_wilk", "breusch_pagan", "vif", "durbin_watson"],
+    "pivot_if_fail": "robust_regression_or_nonparametric",
+    "diagnostic_scripts": ["python"]
+  },
+  "t_test": {
+    "checks": ["shapiro_wilk", "levene"],
+    "pivot_if_fail": "mann_whitney_u",
+    "diagnostic_scripts": ["python"]
+  },
+  "anova": {
+    "checks": ["shapiro_wilk", "levene"],
+    "pivot_if_fail": "kruskal_wallis",
+    "diagnostic_scripts": ["python"]
+  },
+  "ols_regression": {
+    "checks": ["shapiro_wilk", "breusch_pagan", "vif", "durbin_watson"],
+    "pivot_if_fail": "robust_regression",
+    "diagnostic_scripts": ["python"]
+  },
+  "arima": {
+    "checks": ["adf_stationarity", "ljung_box"],
+    "pivot_if_fail": "seasonal_decomposition_or_ets",
+    "diagnostic_scripts": ["python"]
+  },
+  "differential_expression_rna": {
+    "checks": ["count_integer_check", "library_size_distribution", "dispersion_estimate"],
+    "pivot_if_fail": "edgeR_if_DESeq2_fails",
+    "diagnostic_scripts": ["R"]
+  },
+  "variant_calling": {
+    "checks": ["coverage_depth_histogram", "ts_tv_ratio", "het_hom_ratio"],
+    "pivot_if_fail": "adjust_filters_or_flag_low_coverage",
+    "diagnostic_scripts": ["bash", "python"]
+  },
+  "fmri_glm": {
+    "checks": ["motion_outliers", "high_pass_filter", "cluster_extent"],
+    "pivot_if_fail": "revise_design_or_qc_filtering",
+    "diagnostic_scripts": ["bash", "python"]
+  },
+  "eeg_meg_qc": {
+    "checks": ["line_noise", "bad_channel_rate", "epoch_rejection"],
+    "pivot_if_fail": "adjust_filter_or_reject",
+    "diagnostic_scripts": ["python"]
+  },
+  "survival_analysis": {
+    "checks": ["ph_assumption", "influential_points"],
+    "pivot_if_fail": "stratified_or_time_varying_effects",
+    "diagnostic_scripts": ["R", "python"]
+  },
+  "sem_lavaan": {
+    "checks": ["model_identification", "fit_indices", "residuals"],
+    "pivot_if_fail": "respecify_model",
+    "diagnostic_scripts": ["R"]
+  },
+  "time_series_forecasting": {
+    "checks": ["stationarity", "autocorrelation", "seasonality"],
+    "pivot_if_fail": "transform_or_alternate_model",
+    "diagnostic_scripts": ["python"]
+  },
+  "molecular_dynamics": {
+    "checks": ["energy_drift", "temperature_stability", "pressure_stability"],
+    "pivot_if_fail": "adjust_equilibration",
+    "diagnostic_scripts": ["bash", "python"]
+  },
+  "single_cell_qc": {
+    "checks": ["mito_fraction", "library_size", "doublet_rate"],
+    "pivot_if_fail": "adjust_filters",
+    "diagnostic_scripts": ["R", "python"]
+  },
+  "nonparametric_multivariate": {
+    "checks": ["permutation_stability", "dispersion_homogeneity"],
+    "pivot_if_fail": "alternate_distance_metric",
+    "diagnostic_scripts": ["R"]
+  },
+  "materials_qc": {
+    "checks": ["structure_relaxation", "energy_convergence"],
+    "pivot_if_fail": "adjust_cutoffs",
+    "diagnostic_scripts": ["python"]
+  },
+  "proteomics_qc": {
+    "checks": ["peptide_id_rate", "fdr_threshold"],
+    "pivot_if_fail": "adjust_search_params",
+    "diagnostic_scripts": ["bash"]
+  },
+  "metagenomics_qc": {
+    "checks": ["contamination_check", "alpha_diversity"],
+    "pivot_if_fail": "adjust_filters",
+    "diagnostic_scripts": ["bash", "python"]
+  }
+}

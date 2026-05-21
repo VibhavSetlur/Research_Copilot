@@ -1,0 +1,33 @@
+domain_id: "law_empirical"
+name: "Empirical Legal Studies"
+reporting_standard: "Law Review (Bluebook citation)"
+significance_threshold: 0.05
+default_effect_size_metric: "odds_ratio_and_marginal_effect"
+preferred_visualizations: ["coefficient_plot", "time_series", "bar_chart", "survival_curve"]
+citation_style: "bluebook"
+quality_gates:
+  - legal_doctrine_accuracy_check
+  - case_selection_bias_assessment
+  - temporal_validity_of_precedent
+  - jurisdiction_specific_controls
+  - coding_reliability_for_legal_variables
+confounders_to_check:
+  - judge_court_fixed_effects
+  - temporal_trends_in_law
+  - case_complexity_measures
+  - representation_quality
+  - settlement_selection_bias
+typical_effect_size_benchmarks:
+  judicial_behavior: "odds_ratio_1.2-2.0_for_ideology_effects"
+  litigation_outcomes: "marginal_effect_5-15_percentage_points"
+  policy_impact_studies: "interrupted_time_series_slope_change"
+outlier_handling: "robust_regression_with_legal_justification"
+default_method: "logistic_regression_with_fixed_effects"
+leaf_nodes: []
+primary_tools:
+  - statsmodels
+container: "general"
+file_formats:
+  - CSV
+  - SAV
+  - DTA

@@ -33,6 +33,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 logger = logging.getLogger("research.semantic_filesystem")
 
 SEMANTIC_TAXONOMY = {
@@ -233,11 +238,18 @@ class SemanticFilesystemEnforcer:
             if path.exists() and path.is_file():
                 data_hashes[item] = hashlib.sha256(path.read_bytes()).hexdigest()
 
+        script_hash = ""
+        if source_script:
+            script_path = self.root / source_script if not Path(source_script).is_absolute() else Path(source_script)
+            if script_path.exists() and script_path.is_file():
+                script_hash = hashlib.sha256(script_path.read_bytes()).hexdigest()
+
         meta_path = file_path.with_name(f"{file_path.stem}.meta.yaml")
         lines = [
             f"generated_by: \"{generated_by}\"",
             f"timestamp: \"{datetime.now(timezone.utc).isoformat()}\"",
             f"source_script: \"{source_script}\"",
+            f"script_hash: \"{script_hash}\"",
             "input_files:",
         ]
         lines.extend(f"  - \"{item}\"" for item in input_files)
@@ -252,6 +264,95 @@ class SemanticFilesystemEnforcer:
             lines.append(f"{key}: {json.dumps(value)}")
         meta_path.write_text("\n".join(lines) + "\n")
         return meta_path
+
+    def save_artifact(
+        self,
+        filename: str,
+        content: str,
+        *,
+        branch_id: str = "exp_001_baseline",
+        artifact_type: str = "artifact",
+        generated_by: str = "semantic_filesystem",
+        source_script: str = "",
+        input_files: Optional[list[str]] = None,
+        decisions_applied: Optional[list[str]] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        """Strict artifact write API with required sibling provenance sidecar."""
+        folder = {
+            "figure": "figures",
+            "table": "tables",
+            "analysis": "analysis",
+            "artifact": "artifacts",
+        }.get(artifact_type)
+        if folder:
+            artifact_path = (
+                self.root
+                / "02_experiments"
+                / branch_id
+                / "outputs"
+                / folder
+                / Path(filename).name
+            )
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            artifact_path = self.resolve_path(Path(filename).name, branch_id=branch_id)
+        artifact_path.write_text(content)
+        meta_path = self.write_sidecar_metadata(
+            artifact_path,
+            generated_by=generated_by,
+            source_script=source_script,
+            input_files=input_files or [],
+            decisions_applied=decisions_applied or [],
+            extra=extra_metadata or {},
+        )
+        return {
+            "artifact": artifact_path.relative_to(self.root).as_posix(),
+            "metadata": meta_path.relative_to(self.root).as_posix(),
+        }
+
+    def log_decision(
+        self,
+        *,
+        context: str,
+        selected: str,
+        rationale: str,
+        branch_id: str = "exp_001_baseline",
+        options_considered: Optional[list[str]] = None,
+        linked_literature: Optional[list[str]] = None,
+    ) -> Dict[str, str]:
+        """Append a decision to an experiment-local decisions.yaml ledger."""
+        decisions_path = self.root / "02_experiments" / branch_id / "decisions.yaml"
+        decisions_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if yaml is not None and decisions_path.exists():
+            data = yaml.safe_load(decisions_path.read_text()) or {}
+        else:
+            data = {}
+
+        decisions = data.setdefault("decisions", {})
+        decision_id = f"decision_{len(decisions) + 1:03d}"
+        decisions[decision_id] = {
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "context": context,
+            "options_considered": options_considered or [],
+            "selected": selected,
+            "rationale": rationale,
+            "linked_literature": linked_literature or [],
+        }
+        data.setdefault("schema_version", "1.0")
+        data.setdefault("experiment_id", branch_id)
+        data.setdefault("created", datetime.now(timezone.utc).isoformat())
+
+        if yaml is not None:
+            decisions_path.write_text(yaml.safe_dump(data, sort_keys=False))
+        else:
+            decisions_path.write_text(json.dumps(data, indent=2))
+
+        return {
+            "decision_id": decision_id,
+            "path": decisions_path.relative_to(self.root).as_posix(),
+        }
 
     def validate_artifact(
         self,
