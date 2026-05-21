@@ -46,20 +46,8 @@ task_*.log
 # Scratch directory (temporary work)
 scratch/
 
-# CLI cache (inside .research/, runtime data)
-.research/cache/research_cache.db
-.research/cache/research_map.json
-.research/cache/schema_cache.json
-.research/cache/skill_index.json
-.research/cache/state.json
-.research/cache/pending_approval.json
-.research/cache/approval_response.json
-.research/cache/checkpoints/
-.research/cache/execution_dag.json
-.research/cache/execution_metadata.json
-.research/cache/intake_session.json
-.research/cache/context_transfer_memos/
-.research/cache/cost_log.jsonl
+# .research/ — system configuration (keep config.yaml, ignore cache)
+.research/cache/
 .research/state/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid

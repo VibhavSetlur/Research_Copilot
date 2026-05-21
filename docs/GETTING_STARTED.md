@@ -22,11 +22,16 @@ pip install research-copilot[all]
 ## 2. Create a Project
 
 ```bash
+# Option A: Create in current directory
 rcp init my-project
 cd my-project
+
+# Option B: Create in a specific location
+rcp init /path/to/my-project
+cd /path/to/my-project
 ```
 
-This creates the project structure with `.research/` (system files), `00_inputs/` (raw data), and `environment/` (dependencies).
+This creates the project structure with `.research/config.yaml` (system config), `00_inputs/` (raw data), and `environment/` (dependencies).
 
 ## 3. Set Up the Environment
 
@@ -76,7 +81,7 @@ The AI asks 5 questions in plain English and generates `inputs/intake.md` automa
 
 ### Option B: Manual
 
-Edit `inputs/intake.md` directly. Only 3 fields are required:
+Edit `00_inputs/intake.md` directly. Only 3 fields are required:
 
 ```markdown
 - **Project title**: Your project name

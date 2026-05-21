@@ -60,12 +60,19 @@ def cmd_init(args: argparse.Namespace) -> None:
     print("Research Copilot workspace created")
     print("=" * 60)
     print(f"Project: {project_name}")
+    print(f"Location: {target_dir.resolve()}")
+    print()
     print("Top-level directories:")
     for dirname in ("00_inputs", "01_workspace", "02_experiments", "03_synthesis"):
         print(f"  - {dirname}/")
     print()
-    print("Packaged assets are read from the installed Python package.")
-    print("Advanced overrides can be placed under .research/<asset-path> if needed.")
+    print("Next steps:")
+    print(f"  cd {project_name}")
+    print("  rcp setup          # Verify assets")
+    print("  rcp status         # Check project state")
+    print()
+    print("System assets are loaded from the installed Python package.")
+    print("Project config is in .research/config.yaml.")
 
 
 def cmd_setup(args: argparse.Namespace) -> None:

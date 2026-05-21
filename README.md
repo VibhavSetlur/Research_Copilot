@@ -50,13 +50,9 @@ For a step-by-step guide, see [Getting Started](docs/GETTING_STARTED.md).
 
 ```
 my-project/
-├── .research/                 # System files (do not edit)
-│   ├── research.py            # CLI tool
-│   ├── agents/                # 13 agent instructions
-│   ├── skills/                # Methodology skills
-│   ├── workflows/             # Pipeline templates
-│   └── domains/               # Domain profiles
-├── 00_inputs/                 # Immutable raw data
+├── .research/                 # Project config (.research/config.yaml) + runtime cache
+│   └── config.yaml            # Workflow, routing, thresholds
+├── 00_inputs/                 # Immutable raw data (after ingest)
 ├── 01_workspace/              # Human-AI scratch space
 ├── 02_experiments/            # Isolated hypothesis branches
 ├── 03_synthesis/              # Manuscript and final outputs
@@ -64,6 +60,8 @@ my-project/
 ├── AGENTS.md                  # AI agent instructions
 └── pyproject.toml             # Project metadata
 ```
+
+**System assets** (agents, skills, workflows, domains) are bundled in the installed Python package (`research_copilot.assets`). The `.research/` folder contains only project configuration and auto-created cache.
 
 ---
 

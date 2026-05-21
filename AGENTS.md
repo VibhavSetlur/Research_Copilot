@@ -2,44 +2,22 @@
 
 You are a research assistant using the Research Copilot system.
 
-## System Location
-- All system files are in `.research/` — user never edits this
-- CLI tool: `.research/research.py`
-- Agents: `.research/agents/`
-- Skills: `.research/skills/`
-- Workflows: `.research/workflows/`
-- Config: `.research/config.yaml`
-- System scripts: `.research/scripts/` and `.research/scripts/utils/`
-- Environment: `environment/` — requirements.txt, setup scripts
-- Legacy user intake: `inputs/` — user provides; during ingest, canonical immutable copies are registered in `00_inputs/`
-- User intake: `inputs/intake.md`
+## System Architecture
 
-## Output Structure (created by AI during research_init)
-The template starts with ONLY `.research/`, `inputs/`, `environment/`, and `AGENTS.md`. The `research_init` agent creates an experiment-driven structure:
+Research Copilot is a Python package (`research_copilot`) with bundled assets. The system loads agents, skills, workflows, and domains from the installed package, with optional overrides in `.research/`.
 
-```
-00_inputs/                # IMMUTABLE canonical inputs after ingest
-  raw_data/               # Raw data hashes are recorded before use
-  literature/             # Original PDFs plus extracted literature indexes
-  intake_manifest.yaml
-01_workspace/             # Human-AI messy zone
-  scratchpad/             # Random notes, links, queued ideas, half-baked drops
-  lab_notebook.md         # Append-only chronological log of thoughts and AI actions
-02_experiments/           # Core engine: isolated hypothesis branches
-  exp_001_baseline/
-    scripts/              # Numbered scripts scoped to this experiment
-    outputs/
-      figures/
-      tables/
-      artifacts/          # Serialized models, clean data chunks, diagnostics
-      analysis/
-    decisions.yaml        # Local assumption and decision ledger
-03_synthesis/             # Final destination
-  manuscript/
-  final_figures/
-  global_methods.md       # Generated from experiment decisions.yaml files
-  manifest.json
-```
+| Location | Purpose |
+|----------|---------|
+| `src/research_copilot/` | Python package — CLI, engine, MCP server, core modules |
+| `src/research_copilot/assets/` | Bundled assets — agents, skills, workflows, domains, schemas |
+| `.research/config.yaml` | Project configuration (workflow, routing, thresholds) |
+| `.research/cache/` | Runtime cache (state, DAG, CTMs) — auto-created |
+| `environment/` | Python dependencies and setup scripts |
+| `inputs/` | Legacy user intake (deprecated, use `00_inputs/`) |
+| `00_inputs/` | Immutable canonical inputs after ingest |
+| `01_workspace/` | Human-AI working notes and scratch material |
+| `02_experiments/` | Isolated hypothesis branches with scripts and outputs |
+| `03_synthesis/` | Final synthesis, manuscript, and audit outputs |
 
 ## CLI Commands
 Always use `rcp <command>`:
@@ -126,8 +104,7 @@ When the user introduces a mid-workflow thought, link, file, or question, do NOT
 7. Scripts are numbered in execution order (01_, 02_, 03_...) inside the active experiment `scripts/`
 8. Processed/analytical data products live as artifacts under the active experiment unless promoted to synthesis
 9. Figures/tables are organized inside the experiment that generated them
-10. System scripts are in `.research/scripts/` — do NOT modify these
-11. Iteration scripts use new experiment branches or `_ITER<XXX>` suffixes — NEVER overwrite prior scripts
+10. Iteration scripts use new experiment branches or `_ITER<XXX>` suffixes — NEVER overwrite prior scripts
 12. Execution DAG (`.research/cache/execution_dag.json`) tracks all script runs
 13. Context Transfer Memoranda (CTMs) are generated at 90% token budget — read them when resuming
 14. Every generated output in `02_experiments/*/outputs/` MUST have a sibling `.meta.yaml`
@@ -148,7 +125,7 @@ When the user introduces a mid-workflow thought, link, file, or question, do NOT
 
 ## Reproducibility Rules
 1. ALWAYS check environment is active before running any code
-2. ALWAYS run `.research/scripts/00_environment_check.py` to verify environment
+2. ALWAYS verify environment with `rcp preflight` before running analysis
 3. ALWAYS record data lineage in `03_synthesis/data_lineage.json` after every transformation
 4. ALWAYS compute SHA-256 hashes for raw data files
 5. NEVER modify raw data files — only create new processed versions
@@ -185,20 +162,20 @@ When the user introduces a mid-workflow thought, link, file, or question, do NOT
 15. SIDECAR PROVENANCE: Every output file MUST have `<stem>.meta.yaml` next to it with `generated_by`, `timestamp`, `source_script`, `data_hashes`, and `decisions_applied`
 
 ## First Steps
-1. Run `research setup` — verify all system files are in place
-2. Run `research scan` — scan inputs, build research map
-3. Run `research status` — check project state
+1. Run `rcp setup` — verify all system files are in place
+2. Run `rcp scan` — scan inputs, build research map
+3. Run `rcp status` — check project state
 4. Read `inputs/intake.md`
-5. Read `research agent research_init`
+5. Read `rcp agent research_init`
 6. Execute the research_init protocol (this creates the full directory structure)
-7. Continue through the pipeline, using `research_iterate` when the user wants to explore
+7. Continue through the pipeline, using `rcp intent` when the user wants to explore
 
 ## Branching Engine (Non-Linear Execution)
 The system supports Git-like branching for divergent hypotheses:
 
 ### Creating a Branch
 ```bash
-research branch hypothesis_B --hypothesis "Bayesian approach to the primary model"
+rcp branch hypothesis_B --hypothesis "Bayesian approach to the primary model"
 ```
 This creates:
 - A new branch in the state ledger
@@ -206,11 +183,11 @@ This creates:
 - Experiment-specific `scripts/`, `outputs/`, `outputs/artifacts/`, and `decisions.yaml`
 
 ### Branch Workflow
-1. `research branch <name>` — Create and switch to new branch
+1. `rcp branch <name>` — Create and switch to new branch
 2. Run analysis on the branch (isolated from main)
-3. `research branches` — List all branches and status
-4. `research merge <name>` — Merge findings back to main
-5. `research abandon <name>` — Abandon exploratory branch
+3. `rcp branches` — List all branches and status
+4. `rcp merge <name>` — Merge findings back to main
+5. `rcp abandon <name>` — Abandon exploratory branch
 
 ### Parallel Execution
 Branches enable the `parallel` command to execute across different hypotheses simultaneously without overwriting core findings.
@@ -227,7 +204,7 @@ Before DAG initialization, the intent router maps user queries to minimal requir
 
 ### Usage
 ```bash
-research intent "find out what's driving the variance in this dataset"
+rcp intent "find out what's driving the variance in this dataset"
 ```
 
 ## Knowledge Graph (Context Management)
@@ -240,10 +217,10 @@ Replaces dense text CTMs with graph-based retrieval:
 
 ### Usage
 ```bash
-research graph                    # Summary
-research graph-stats              # Statistics
-research graph-query --confounders "income"  # Get confounders
-research graph-query --relation "mediates"   # Query by relation
+rcp graph                    # Summary
+rcp graph-stats              # Statistics
+rcp graph-query --confounders "income"  # Get confounders
+rcp graph-query --relation "mediates"   # Query by relation
 ```
 
 ## Semantic File System
@@ -261,7 +238,7 @@ Every AI-generated artifact is forced into a rigorous taxonomy:
 
 ### Usage
 ```bash
-research taxonomy  # Show full taxonomy
+rcp taxonomy  # Show full taxonomy
 ```
 
 ## Interpretative Coupling

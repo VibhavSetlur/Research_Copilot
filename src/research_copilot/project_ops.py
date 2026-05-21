@@ -130,7 +130,7 @@ def write_readme(path: Path, title: str, body: str) -> None:
 
 
 def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
-    """Create the four top-level clean workspace directories."""
+    """Create the four top-level clean workspace directories and .research/config.yaml."""
     root.mkdir(parents=True, exist_ok=True)
     directories = {
         "00_inputs": "Immutable canonical inputs after ingest.",
@@ -154,6 +154,40 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
     }
     for rel, body in directories.items():
         write_readme(root / rel, Path(rel).name.replace("_", " ").title(), body)
+
+    # Create .research/config.yaml
+    research_dir = root / ".research"
+    research_dir.mkdir(parents=True, exist_ok=True)
+    config_path = research_dir / "config.yaml"
+    if not config_path.exists():
+        config_path.write_text(
+            f"# Research Copilot — Project Configuration\n"
+            f"project_id: \"{project_name}\"\n"
+            f"schema_version: \"9.0.0\"\n"
+            f"default_workflow: \"quick_exploratory\"\n"
+            f"intent_routing:\n"
+            f"  enabled: true\n"
+            f"  default_depth: \"academic\"\n"
+            f"branching:\n"
+            f"  enabled: true\n"
+            f"knowledge_graph:\n"
+            f"  enabled: true\n"
+            f"semantic_filesystem:\n"
+            f"  enabled: true\n"
+            f"interpretative_coupling:\n"
+            f"  enabled: true\n"
+            f"data_scale_thresholds:\n"
+            f"  medium_mb: 100\n"
+            f"  large_gb: 1\n"
+            f"  massive_gb: 10\n"
+            f"execution:\n"
+            f"  supported_runtimes: [python, r, bash]\n"
+            f"dependency_management:\n"
+            f"  auto_detect: true\n"
+            f"  requirements_file: \"environment/requirements.txt\"\n"
+            f"quality_gates_enabled: true\n"
+            f"pin_dependency_versions: true\n"
+        )
 
     intake = root / "00_inputs" / "intake.md"
     if not intake.exists():

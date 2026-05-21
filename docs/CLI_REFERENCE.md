@@ -1,12 +1,13 @@
 # CLI Reference
 
-All Research Copilot commands. The CLI is available as both `rcp` and `research`.
+All Research Copilot commands. The CLI is available as `rcp`.
 
 ## Core Commands
 
 | Command | Description |
 |---------|-------------|
 | `rcp init <name>` | Create a new Research Copilot project |
+| `rcp setup` | Verify package assets and local overrides |
 | `rcp status` | Project state, token budget, pipeline status, next step |
 | `rcp scan` | Scan inputs, build research map |
 | `rcp map` | Show research map (grounding context) |
@@ -25,7 +26,7 @@ All Research Copilot commands. The CLI is available as both `rcp` and `research`
 
 | Command | Description |
 |---------|-------------|
-| `rcp agents` | List all 13 agents with descriptions |
+| `rcp agents` | List all 13+ agents with descriptions |
 | `rcp agent <name>` | Show a specific agent's full instructions |
 | `rcp skills` | List all skills by category |
 | `rcp skill <name>` | Show a specific skill's methodology |
@@ -112,6 +113,13 @@ All Research Copilot commands. The CLI is available as both `rcp` and `research`
 | `rcp restore` | Print restoration prompt for new chat session |
 | `rcp snapshot` | Generate compact state snapshot |
 | `rcp budget` | Show token budget status and CTM history |
+
+## Project Operations
+
+| Command | Description |
+|---------|-------------|
+| `rcp log-decision` | Append to the active experiment decisions.yaml |
+| `rcp save-artifact` | Save artifact with sibling .meta.yaml |
 
 ## Exit Codes
 

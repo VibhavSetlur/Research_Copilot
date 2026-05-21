@@ -9,15 +9,16 @@ User/AI Agent
     │
     ▼
 ┌─────────────────────────────────────────────┐
-│  CLI (research.py / rcp)                    │
-│  28 commands, MCP server, approval gates    │
+│  CLI (rcp / research_copilot.cli)           │
+│  14 commands, MCP server, approval gates    │
 └──────────────┬──────────────────────────────┘
                │
     ┌──────────┼──────────┐
     ▼          ▼          ▼
 ┌────────┐ ┌────────┐ ┌────────┐
 │ Agents │ │ Skills │ │Domains │
-│  13    │ │  92+   │ │  19    │
+│  13+   │ │  90+   │ │  19+   │
+│ (pkg)  │ │ (pkg)  │ │ (pkg)  │
 └────────┘ └────────┘ └────────┘
                │
     ┌──────────┼──────────┐
@@ -28,6 +29,8 @@ User/AI Agent
 │        │ │        │ │ +Disk) │
 └────────┘ └────────┘ └────────┘
 ```
+
+**System Location:** All agents, skills, workflows, and domains are bundled in the installed Python package (`research_copilot.assets`). The `.research/` folder contains only `config.yaml` (project configuration) and runtime cache (auto-created).
 
 ## Lifecycle Hook System
 
