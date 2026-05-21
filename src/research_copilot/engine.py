@@ -83,52 +83,6 @@ class ResearchEngine:
             logger.warning("Failed to initialize data-scale instruction: %s", exc)
 
     # ------------------------------------------------------------------
-    # Item 9 — HITL "Explain-to-Proceed" Gate
-    # ------------------------------------------------------------------
-
-    def _hitl_gate(
-        self,
-        intent: str,
-        proposed_plan: List[str],
-        query: str,
-        depth: str,
-    ) -> bool:
-        """Pause and ask the user to approve the proposed plan.
-
-        Sets ledger state to ``WAITING_ON_USER`` while waiting.  On approval
-        it transitions back to ``running``.  When not running interactively
-        (e.g. MCP server, tests) the gate is skipped and returns True.
-
-        Args:
-            intent:        Classified intent string (e.g. 'hypothesis_test').
-            proposed_plan: List of proposed workflow steps.
-            query:         Original user query.
-
-        Returns:
-            True if the user approves (or HITL is disabled / non-interactive).
-            False if the user rejects.
-        """
-        if not self.hitl_enabled or not self._interactive:
-            logger.info("HITL gate skipped (non-interactive or disabled).")
-            return True
-
-        # Record the waiting state.
-        self.ledger.update(
-            phase="WAITING_ON_USER",
-            hitl_pending={
-                "intent": intent,
-                "proposed_plan": proposed_plan,
-                "query": query,
-                "depth": depth,
-                "status": "WAITING_ON_USER",
-            },
-        )
-
-        logger.info("Workflow paused for HITL approval. Run 'rcp continue --approve' or '--reject'.")
-        
-        return False
-
-    # ------------------------------------------------------------------
     # Item 12 — Dead-End Auto-Recovery
     # ------------------------------------------------------------------
 
@@ -477,71 +431,6 @@ class ResearchEngine:
             self.token_tracker.add_usage(500, 200)
 
         return result
-
-    def route_and_execute(
-        self,
-        query: str,
-        depth: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Route a query and execute the workflow, with HITL gate for
-        method-routing or exploratory intents that need human approval.
-        """
-        target_depth = depth or self.depth
-        self.hooks.trigger_sync("pre_routing", {"query": query, "depth": target_depth})
-
-        workflow = self.router.route(query, depth=target_depth)
-        intent = workflow.get("classification", {}).get("primary_intent", "exploratory")
-
-        # ── Item 9: HITL gate ────────────────────────────────────────────────
-        if intent in _HITL_INTENTS:
-            proposed_plan = workflow.get("context", {}).get("workflow_steps", [])
-            approved = self._hitl_gate(intent, proposed_plan, query, target_depth)
-            if not approved:
-                phase = self.ledger.get().get("phase")
-                return {
-                    "workflow": workflow,
-                    "results": [],
-                    "status": phase,
-                    "requires_user_approval": True,
-                    "resume_command": "rcp continue --approve",
-                    "message": "Workflow paused for approval." if phase == "WAITING_ON_USER" else "User rejected the proposed plan.",
-                }
-
-        if target_depth == "exploratory":
-            logger.info("Bypassing DAG for exploratory intent → zero_shot_analyst.")
-            result = self.execute_node(
-                "zero_shot_analysis", agent="zero_shot_analyst", query=query
-            )
-            return {"workflow": workflow, "results": [result]}
-
-        results: List[Dict[str, Any]] = []
-        dead_end_context: Optional[str] = None
-        dead_end_retry = 0
-
-        for step in workflow.get("context", {}).get("workflow_steps", []):
-            res = self.execute_node(
-                step,
-                dead_end_context=dead_end_context,
-                dead_end_retry=dead_end_retry,
-            )
-            results.append(res)
-
-            # ── Item 12: propagate dead-end context to next node ─────────────
-            if res.get("dead_end_recorded"):
-                if not res.get("retry_allowed", False):
-                    logger.error(
-                        "Maximum dead-end retries (%d) reached. Halting workflow.",
-                        _MAX_DEAD_END_RETRIES,
-                    )
-                    break
-                dead_end_context = res.get("error_context")
-                dead_end_retry += 1
-            else:
-                dead_end_context = None
-                dead_end_retry = 0
-
-        return {"workflow": workflow, "results": results}
-
     def create_branch(self, name: str, hypothesis: str) -> Dict[str, Any]:
         branch_result = create_experiment_branch(name, hypothesis, root=self.root)
         self.ledger.branch_state(name)

@@ -280,49 +280,24 @@ class IntentRouter:
         """
         return set(NULL_SPACE_KEYWORDS.get(primary_intent, []))
 
-    def get_minimal_context(self, query: str, depth: str = "academic") -> Dict[str, Any]:
+    def get_minimal_context(self, query: str, project_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get the minimal context payload for a query.
 
         Args:
             query: User's natural language query
-            depth: exploratory, academic, or publication
+            project_state: Current state of the project
 
         Returns:
-            Dict with skills, agents, and workflow steps to load
+            Dict matching SkillPlannerOutput format
         """
-        depth = self._normalize_depth(depth)
         classification = self.classify_intent(query)
         primary = classification["primary_intent"]
-        profile = DEPTH_PROFILES[depth]
-
-        if depth in ("quick", "exploratory"):
-            # Zero-Shot Fast Path — bypass DAG entirely
-            null_space = set(INTENT_CATEGORIES.keys()) - {"exploratory"}
-            return {
-                "classification": classification,
-                "depth": depth,
-                "depth_profile": {
-                    "description": profile["description"],
-                    "quality_gates": profile["quality_gates"],
-                    "prompt_constraint": profile["prompt_constraint"],
-                },
-                "null_space": list(null_space),
-                "context": {
-                    "skills": ["viz_basic_charts", "descriptive_stats"],
-                    "agents": ["zero_shot_analyst"],
-                    "workflow_steps": ["zero_shot_analysis"],
-                },
-                "excluded": {
-                    "skill_categories": list(null_space),
-                    "depth_exclusions": sorted(
-                        set(profile["exclude_skills"]) | set(profile["exclude_agents"]) | set(profile["exclude_steps"])
-                    ),
-                    "estimated_token_savings": self._estimate_token_savings(null_space),
-                },
-            }
-
+        
+        # Estimate depth dynamically (replacing manual depth selection)
+        # For a full implementation, we rely on PlannerAgent for this, but router
+        # will provide all possible relevant skills for the intent.
+        
         null_space = self.compute_null_space(primary)
-
         config = INTENT_CATEGORIES[primary]
 
         skills = list(config["skills"])
@@ -330,45 +305,15 @@ class IntentRouter:
         workflow_steps = list(config["workflow_steps"])
 
         enhanced_skills = self._enhance_skills_from_index(skills, query)
-        enhanced_skills = [
-            s for s in enhanced_skills
-            if s not in profile["exclude_skills"] and not self._is_excluded_by_depth(s, profile["exclude_skills"])
-        ]
-        agents = [
-            a for a in agents
-            if a not in profile["exclude_agents"] and not self._is_excluded_by_depth(a, profile["exclude_agents"])
-        ]
-        workflow_steps = [s for s in workflow_steps if s not in profile["exclude_steps"]]
-
-        if depth in ("publication", "deep"):
-            for agent in ("replication_validator", "reviewer2_critic", "audit_validate"):
-                if agent not in agents:
-                    agents.append(agent)
-            for step in ("robustness", "reviewer2", "audit"):
-                if step not in workflow_steps:
-                    workflow_steps.append(step)
 
         return {
-            "classification": classification,
-            "depth": depth,
-            "depth_profile": {
-                "description": profile["description"],
-                "quality_gates": profile["quality_gates"],
-                "prompt_constraint": profile["prompt_constraint"],
-            },
-            "null_space": list(null_space),
-            "context": {
-                "skills": enhanced_skills,
-                "agents": agents,
-                "workflow_steps": workflow_steps,
-            },
-            "excluded": {
-                "skill_categories": list(null_space),
-                "depth_exclusions": sorted(
-                    set(profile["exclude_skills"]) | set(profile["exclude_agents"]) | set(profile["exclude_steps"])
-                ),
-                "estimated_token_savings": self._estimate_token_savings(null_space),
-            },
+            "relevant_skills": enhanced_skills,
+            "excluded_skills": list(null_space),
+            "required_agents": agents,
+            "workflow_steps": workflow_steps,
+            "expected_outputs": [],
+            "confidence_score": 0.9, # Placeholder, can be dynamically calculated based on classification score
+            "classification": classification # Kept for backward compatibility if needed
         }
 
     @staticmethod
@@ -413,52 +358,48 @@ class IntentRouter:
         tokens_per_category = 1500
         return len(null_space) * tokens_per_category
 
-    def compile_transient_workflow(self, query: str, depth: str = "academic", compact_yaml: bool = False) -> str:
+    def compile_transient_workflow(self, query: str, compact_yaml: bool = False) -> str:
         """Compile a transient workflow YAML for the query.
 
         Args:
             query: User's natural language query
-            depth: exploratory, academic, or publication
             compact_yaml: if True, strip comments and reduce to minimal lines
 
         Returns:
             YAML string for the transient workflow
         """
-        context = self.get_minimal_context(query, depth=depth)
+        context = self.get_minimal_context(query)
         primary = context["classification"]["primary_intent"]
-        ctx = context["context"]
 
-        if compact_yaml or depth == "exploratory":
-            steps_str = "\n".join(f"  - {i+1}. {s}" for i, s in enumerate(ctx["workflow_steps"][:3]))
-            return (f"transient: true\nintent: {primary}\ndepth: {context['depth']}\n"
-                    f"skills: {ctx['skills'][:2]}\nagents: {ctx['agents'][:2]}\n"
+        if compact_yaml:
+            steps_str = "\n".join(f"  - {i+1}. {s}" for i, s in enumerate(context["workflow_steps"][:3]))
+            return (f"transient: true\nintent: {primary}\n"
+                    f"skills: {context['relevant_skills'][:2]}\nagents: {context['required_agents'][:2]}\n"
                     f"steps:\n{steps_str}\nquality_gates: false")
 
-        steps_str = "\n".join(f"  - step: {i+1}\n    name: {s}\n    type: {s}" for i, s in enumerate(ctx["workflow_steps"]))
-        skills_str = "\n".join(f"    - {s}" for s in ctx["skills"])
-        agents_str = "\n".join(f"    - {a}" for a in ctx["agents"])
+        steps_str = "\n".join(f"  - step: {i+1}\n    name: {s}\n    type: {s}" for i, s in enumerate(context["workflow_steps"]))
+        skills_str = "\n".join(f"    - {s}" for s in context["relevant_skills"])
+        agents_str = "\n".join(f"    - {a}" for a in context["required_agents"])
 
-        return (f"transient: true\nintent: {primary}\ndepth: {context['depth']}\n"
-                f"null_space_excluded: {context['null_space']}\n"
-                f"prompt_constraints:\n  - \"{context['depth_profile']['prompt_constraint']}\"\n"
+        return (f"transient: true\nintent: {primary}\n"
+                f"null_space_excluded: {context['excluded_skills']}\n"
                 f"steps:\n{steps_str}\nskills_to_load:\n{skills_str}\n"
                 f"agents_to_invoke:\n{agents_str}\nquality_gates:\n"
-                f"  - enabled: {str(context['depth_profile']['quality_gates']).lower()}\n"
+                f"  - enabled: true\n"
                 f"    checks: [data_grounding, method_appropriateness]")
 
-    def route(self, query: str, save: bool = True, depth: str = "academic") -> Dict[str, Any]:
+    def route(self, query: str, save: bool = True) -> Dict[str, Any]:
         """Full routing pipeline: classify, compute null space, get minimal context.
 
         Args:
             query: User's natural language query
             save: Whether to save the routing decision
-            depth: exploratory, academic, or publication
 
         Returns:
             Full routing result dict
         """
-        result = self.get_minimal_context(query, depth=depth)
-        result["transient_workflow"] = self.compile_transient_workflow(query, depth=depth)
+        result = self.get_minimal_context(query)
+        result["transient_workflow"] = self.compile_transient_workflow(query)
 
         if save:
             self._save_routing_decision(result)

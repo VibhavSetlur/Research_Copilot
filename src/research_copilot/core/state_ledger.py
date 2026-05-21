@@ -537,6 +537,51 @@ class ResearchLedger:
             return truncated + "..."
         return summary
 
+    def add_conversation_turn(self, role: str, content: str) -> dict:
+        """Add a conversation turn to the ledger."""
+        state = self._load()
+        turns = state.setdefault("conversation_turns", [])
+        timestamp = datetime.now(timezone.utc).isoformat()
+        turns.append({"role": role, "content": content, "timestamp": timestamp})
+        self._save(state)
+        return state
+
+    def push_interrupt(self, task_state: dict) -> dict:
+        """Push current task to the interrupt stack."""
+        state = self._load()
+        stack = state.setdefault("interrupt_stack", [])
+        stack.append(task_state)
+        self._save(state)
+        return state
+
+    def pop_interrupt(self) -> Optional[dict]:
+        """Pop the last task from the interrupt stack."""
+        state = self._load()
+        stack = state.setdefault("interrupt_stack", [])
+        if stack:
+            task = stack.pop()
+            self._save(state)
+            return task
+        return None
+
+    def get_conversation_summary(self) -> str:
+        """Get a summary of recent conversation turns."""
+        state = self._load()
+        turns = state.get("conversation_turns", [])[-5:]
+        return "\n".join(f"{t['role'].capitalize()}: {t['content']}" for t in turns)
+
+    def get_active_task_summary(self) -> str:
+        """Get a summary of the current active task and plan."""
+        state = self._load()
+        intent = state.get("active_user_intent", "none")
+        plan = state.get("current_plan", {})
+        if not plan:
+            return f"Active Intent: {intent}\nNo plan active."
+        
+        workflow = plan.get("workflow_name", "unknown")
+        steps = plan.get("workflow_steps", [])
+        return f"Active Intent: {intent}\nWorkflow: {workflow}\nSteps: {', '.join(steps)}"
+
     def branch_state(
         self,
         branch_id: str,

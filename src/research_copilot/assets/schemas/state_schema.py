@@ -1,7 +1,7 @@
 """Schema definitions for the global research state ledger."""
 
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 
 class TokenBudget(BaseModel):
@@ -173,4 +173,27 @@ class ResearchState(BaseModel):
     )
     knowledge_graph_path: Optional[str] = Field(
         default=None, description="Path to the local knowledge graph (NetworkX pickle)"
+    )
+    
+    # Conversational Memory Additions (Tasks 5, 7)
+    conversation_turns: List[Dict[str, str]] = Field(
+        default=[], description="List of conversation turns: {role, content, timestamp}"
+    )
+    active_user_intent: str = Field(
+        default="none", description="The currently tracked user intent"
+    )
+    current_plan: Optional[Dict[str, Any]] = Field(
+        default=None, description="The currently active execution plan"
+    )
+    interrupt_stack: List[Dict[str, Any]] = Field(
+        default=[], description="Stack of paused tasks awaiting resumption"
+    )
+    hitl_pending: Dict[str, Any] = Field(
+        default={}, description="Pending Human-in-the-Loop approvals"
+    )
+    unanswered_questions: List[str] = Field(
+        default=[], description="Questions asked to the user that remain pending"
+    )
+    artifact_inventory: List[str] = Field(
+        default=[], description="List of artifacts generated during the conversation"
     )

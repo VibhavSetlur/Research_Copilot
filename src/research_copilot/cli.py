@@ -483,12 +483,12 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     if not args.command:
-        parser.print_help()
-        return
+        args.command = "chat"
 
     args.depth = getattr(args, "depth", None) or args.global_depth
 
     commands = {
+        "chat": lambda a: __import__('research_copilot.chat').chat.start_chat_loop(),
         "init": cmd_init,
         "preflight": cmd_preflight,
         "scan": cmd_scan,
