@@ -1,0 +1,16 @@
+workflow_id: "genomics_pipeline"
+name: "Genomics Analysis Pipeline"
+description: "Intake FASTQ → QC → Alignment → Differential Expression → Audit"
+
+agents:
+  - research_init
+  - bioinformatics_scout
+  - data_scaffold
+  - execute_analysis
+  - genomics_auditor
+  - compile_outputs
+
+branching:
+  - after: bioinformatics_scout
+    if: "quality_too_low"
+    then: "halt — data failed QC thresholds"

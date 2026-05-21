@@ -1,0 +1,16 @@
+workflow_id: "financial_backtesting"
+name: "Financial Strategy Backtesting"
+description: "Intake prices → Strategy Design → Walk-Forward Validation → Risk Audit"
+
+agents:
+  - research_init
+  - quant_strategist
+  - data_scaffold
+  - execute_analysis
+  - risk_manager
+  - compile_outputs
+
+branching:
+  - after: risk_manager
+    if: "overfit_detected"
+    then: "halt — strategy is overfit, fail validation"
