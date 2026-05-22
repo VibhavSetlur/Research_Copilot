@@ -39,6 +39,7 @@ from research_os.project_ops import (
     generate_citations_md,
     load_state,
     now_iso,
+    save_state,
     regenerate_intake,
     render_workflow_diagram,
     scaffold_minimal_workspace,
@@ -936,22 +937,22 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
 
     if name == "research_agent":
         rel = _asset_by_name(manager, "agents", arguments["name"])
-        return _text(manager.read_text(rel) if rel else f"Agent '{arguments['name']}' not found.")
+        return _text(_success_envelope({"content": manager.read_text(rel)}) if rel else _error_envelope(f"Agent '{arguments['name']}' not found."))
 
     if name == "research_skill":
         rel = _asset_by_name(manager, "skills", arguments["name"])
-        return _text(manager.read_text(rel) if rel else f"Skill '{arguments['name']}' not found.")
+        return _text(_success_envelope({"content": manager.read_text(rel)}) if rel else _error_envelope(f"Skill '{arguments['name']}' not found."))
 
     if name == "research_workflow":
         config = yaml.safe_load(manager.read_text("config.yaml")) or {}
         workflow_id = arguments.get("name") or config.get("default_workflow", "quick_exploratory")
         rel = f"workflows/{workflow_id}.yaml"
-        return _text(manager.read_text(rel) if manager.exists(rel) else f"Workflow '{workflow_id}' not found.")
+        return _text(_success_envelope({"content": manager.read_text(rel)}) if manager.exists(rel) else _error_envelope(f"Workflow '{workflow_id}' not found."))
 
     if name == "route_intent":
         engine = ResearchEngine(root)
         result = engine.analyze_query(arguments["query"], depth=arguments.get("depth", "academic"))
-        return _text(result)
+        return _text(_success_envelope({"result": result}))
 
     if name in ("sys.branch.create", "create_experiment_branch"):
         from_step = arguments.get("from_step")
@@ -972,15 +973,16 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
         result = ledger.snapshot_workspace(ckpt_id, root)
 
         # Record checkpoint in state
-        state = load_state(root)
-        state.setdefault("checkpoint_history", []).append({
+        state_dict = ledger.get()
+        history = state_dict.get("checkpoint_history", [])
+        history.append({
             "id": ckpt_id,
-            "step": state.get("current_branch", "main"),
+            "step": state_dict.get("current_branch", "main"),
             "timestamp": now_iso(),
             "description": description,
             "files": result["files_snapshotted"],
         })
-        save_state(root, state)
+        ledger.update(checkpoint_history=history)
 
         return _text(_success_envelope(
             result,
@@ -992,9 +994,10 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
         mgr = _CkptMgr(root / ".os_state" / "checkpoints")
         all_cps = mgr.list_all()
 
-        # Also read from state ledger's checkpoint_history
-        state = load_state(root)
-        history = state.get("checkpoint_history", [])
+        from research_os.state.state_ledger import ResearchLedger as _Ledger
+        ledger = _Ledger(root / ".os_state" / "state_ledger.json")
+        state_dict = ledger.get()
+        history = state_dict.get("checkpoint_history", [])
 
         return _text(_success_envelope({
             "checkpoints": all_cps,
@@ -1003,21 +1006,15 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
 
     if name == "sys.branch.merge":
         from research_os.state.state_ledger import ResearchLedger as _Ledger
-        source = arguments["source"]
+        source = arguments.get("source")
         target = arguments.get("target", "main")
         msg = arguments.get("message", "")
 
         ledger = _Ledger(root / ".os_state" / "state_ledger.json")
-        ledger.merge_branch(source, target, msg)
-
-        # Also sync into project_ops state
-        state = load_state(root)
-        if source in state.get("branches", {}):
-            state["branches"][source]["status"] = "merged"
-            state["branches"][source]["merge_commit"] = f"merge_{source}_into_{target}"
-            state["branches"][source]["merged_at"] = now_iso()
-        state["current_branch"] = target
-        save_state(root, state)
+        try:
+            ledger.merge_branch(source, target, msg)
+        except Exception as e:
+            return _text(_error_envelope(str(e)))
 
         return _text(_success_envelope({
             "source": source,
@@ -1027,24 +1024,15 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
         }))
 
     if name == "sys.branch.abandon":
-        branch_id = arguments["branch_id"]
+        branch_id = arguments.get("branch_id")
         reason = arguments.get("reason", "")
-
-        state = load_state(root)
-        if branch_id not in state.get("branches", {}):
-            return _text(_error_envelope(f"Branch '{branch_id}' does not exist"))
-
-        if branch_id == "main":
-            return _text(_error_envelope("Cannot abandon the main branch"))
-
-        state["branches"][branch_id]["status"] = "abandoned"
-        state["branches"][branch_id]["evaluation"] = {
-            "decision": "abandon",
-            "rationale": reason or "Branch abandoned",
-        }
-        if state.get("current_branch") == branch_id:
-            state["current_branch"] = "main"
-        save_state(root, state)
+        from research_os.state.state_ledger import ResearchLedger as _Ledger
+        ledger = _Ledger(root / ".os_state" / "state_ledger.json")
+        
+        try:
+            ledger.abandon_branch(branch_id, reason)
+        except Exception as e:
+            return _text(_error_envelope(str(e)))
 
         return _text(_success_envelope(
             {"branch_id": branch_id, "status": "abandoned", "reason": reason},
@@ -1058,7 +1046,7 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
             rationale=arguments["rationale"],
             branch=arguments.get("branch_id"),
         )
-        return _text(result)
+        return _text(_success_envelope({"result": result}))
 
     if name == "save_artifact":
         check_write_permitted(root / arguments["filename"])
@@ -1069,7 +1057,8 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
             artifact_type=arguments.get("artifact_type", "artifact"),
             branch=arguments.get("branch_id"),
         )
-        abs_path = str((root / result["artifact"]).absolute())
+        artifact_rel = result.get("artifact") or result.get("filepath") or arguments["filename"]
+        abs_path = str((root / artifact_rel).absolute())
         sha = _compute_file_sha256(Path(abs_path))
         return _text(_success_envelope(
             result,
