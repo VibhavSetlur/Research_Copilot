@@ -27,7 +27,7 @@ class ResearchLedger:
     def __init__(self, state_path: Optional[Path] = None):
         if state_path is None:
             root = find_project_root()
-            state_path = root / "03_synthesis" / "state_ledger.json"
+            state_path = root / ".os_state" / "state_ledger.json"
         self._path = Path(state_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         from research_copilot.replay.session_replay import SessionReplayManager
@@ -91,7 +91,7 @@ class ResearchLedger:
                     "merged_at": None,
                     "evaluation": None,
                     "workspace_prefix": "",
-                    "experiment_dir": "02_experiments/exp_001_baseline",
+                    "experiment_dir": "workspace",
                     "data_hashes": {},
                 }
             },
@@ -639,7 +639,7 @@ class ResearchLedger:
             raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
 
         now = datetime.now(timezone.utc).isoformat()
-        experiment_dir = experiment_dir or f"02_experiments/{branch_id}"
+        experiment_dir = experiment_dir or f"workspace/logs/{branch_id}"
         workspace_prefix = f"{branch_id}/"
 
         branches[branch_id] = {

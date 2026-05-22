@@ -15,28 +15,43 @@ class DashboardCompiler:
         from research_copilot.utils.common import find_project_root
         self.root = root or find_project_root()
         
-    def export_ephemeral_dashboard(self, dashboard_id: str, components: Dict[str, Any]) -> Path:
-        """Export a dashboard to a self-contained JSON artifact.
+    def compile_dashboard(self, dashboard_id: str, load_data_code: str = "pass", metrics_code: str = "pass", charts_code: str = "pass") -> Path:
+        """Inject LLM-generated components into the predefined beautifully CSS-styled template.
         
         Args:
-            dashboard_id: Unique identifier for this dashboard instance.
-            components: Dictionary of plot definitions or JSON specifications.
+            dashboard_id: Unique identifier for this dashboard.
+            load_data_code: Python code string to inject into load_data()
+            metrics_code: Python code string to inject into render_metrics()
+            charts_code: Python code string to inject into render_charts()
             
         Returns:
-            Path to the saved JSON artifact.
+            Path to the saved Streamlit dashboard script.
         """
-        out_dir = self.root / "03_synthesis" / "ephemeral_dashboards"
+        template_path = Path(__file__).parent.parent.parent / "core" / "dashboard_template.py"
+        
+        if not template_path.exists():
+            raise FileNotFoundError(f"Dashboard template not found at {template_path}")
+            
+        template = template_path.read_text()
+        
+        # Inject the components
+        template = template.replace(
+            "def load_data():\n    # LLM-injected slot for data loading\n    pass",
+            f"def load_data():\n    # LLM-injected slot for data loading\n    {load_data_code}"
+        )
+        template = template.replace(
+            "def render_metrics():\n    # LLM-injected slot for top level metrics\n    pass",
+            f"def render_metrics():\n    # LLM-injected slot for top level metrics\n    {metrics_code}"
+        )
+        template = template.replace(
+            "def render_charts():\n    # LLM-injected slot for charts\n    pass",
+            f"def render_charts():\n    # LLM-injected slot for charts\n    {charts_code}"
+        )
+        
+        out_dir = self.root / "workspace" / "dashboards"
         out_dir.mkdir(parents=True, exist_ok=True)
         
-        out_path = out_dir / f"{dashboard_id}.json"
-        
-        payload = {
-            "dashboard_id": dashboard_id,
-            "type": "ephemeral_dashboard",
-            "components": components,
-        }
-        
-        with open(out_path, "w") as f:
-            json.dump(payload, f, indent=2)
+        out_path = out_dir / f"{dashboard_id}_dashboard.py"
+        out_path.write_text(template)
             
         return out_path

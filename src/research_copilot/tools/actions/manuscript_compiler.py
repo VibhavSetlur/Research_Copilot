@@ -26,7 +26,8 @@ class ManuscriptCompiler:
     def __init__(self, root: Optional[Path] = None):
         self.root = root or find_project_root()
         self.sections_dir = self.root / "03_synthesis" / "sections"
-        self.output_dir = self.root / "03_synthesis" / "manuscript"
+        self.output_dir = self.root / "workspace" / "manuscript"
+        self.figures_dir = self.root / "workspace" / "figures"
 
     def discover_sections(self) -> List[ManuscriptSection]:
         if not self.sections_dir.exists():
@@ -82,25 +83,43 @@ class ManuscriptCompiler:
                     md = parts[2].strip()
             content_parts.append(md)
 
-        output_path.write_text("\n\n---\n\n".join(content_parts))
+        # Auto-map figures into the manuscript
+        figures_markdown = []
+        if self.figures_dir.exists():
+            figures_markdown.append("\n\n## Figures\n")
+            for i, fig in enumerate(sorted(self.figures_dir.glob("*.png")), 1):
+                # Ensure path is relative to the manuscript folder or absolute
+                figures_markdown.append(f"![Figure {i}: {fig.stem}](../../workspace/figures/{fig.name})\n")
+                
+        output_path.write_text("\n\n---\n\n".join(content_parts) + "\n".join(figures_markdown))
         return output_path
 
-    def compile_pdf(self, markdown_path: Path, output_path: Optional[Path] = None) -> dict:
+    def compile_tex(self, markdown_path: Path, output_path: Optional[Path] = None) -> dict:
+        """Compile Markdown to .tex using Pandoc, then run pdflatex to generate PDF."""
         if output_path is None:
-            output_path = markdown_path.with_suffix(".pdf")
+            output_path = markdown_path.with_suffix(".tex")
 
         try:
-            cmd = [
+            cmd_pandoc = [
                 "pandoc",
                 str(markdown_path),
                 "-o", str(output_path),
-                "--pdf-engine=xelatex",
-                "-V", "geometry:margin=1in"
+                "--standalone"
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            subprocess.run(cmd_pandoc, capture_output=True, text=True, check=True)
+            
+            # Now autonomously run pdflatex
+            cmd_pdflatex = [
+                "pdflatex",
+                "-interaction=nonstopmode",
+                "-output-directory", str(output_path.parent),
+                str(output_path)
+            ]
+            result = subprocess.run(cmd_pdflatex, capture_output=True, text=True, check=True)
+            
             return {
                 "status": "success",
-                "output_path": output_path,
+                "output_path": output_path.with_suffix(".pdf"),
                 "stderr": result.stderr,
                 "pandoc_available": True
             }
@@ -108,27 +127,16 @@ class ManuscriptCompiler:
             return {
                 "status": "pandoc_missing",
                 "output_path": None,
-                "stderr": "Pandoc is not installed.",
+                "stderr": "Pandoc or pdflatex is not installed.",
                 "pandoc_available": False
             }
         except subprocess.CalledProcessError as e:
-            # Fallback to pdflatex
-            try:
-                cmd[4] = "--pdf-engine=pdflatex"
-                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-                return {
-                    "status": "success",
-                    "output_path": output_path,
-                    "stderr": result.stderr,
-                    "pandoc_available": True
-                }
-            except subprocess.CalledProcessError as e2:
-                return {
-                    "status": "failed",
-                    "output_path": None,
-                    "stderr": e2.stderr,
-                    "pandoc_available": True
-                }
+            return {
+                "status": "failed",
+                "output_path": None,
+                "stderr": e.stderr,
+                "pandoc_available": True
+            }
 
     def compile_html(self, markdown_path: Path, output_path: Optional[Path] = None) -> dict:
         if output_path is None:
@@ -176,11 +184,11 @@ class ManuscriptCompiler:
         outputs = {}
         errors = []
 
-        if "pdf" in formats:
-            pdf_res = self.compile_pdf(md_path)
+        if "pdf" in formats or "tex" in formats:
+            pdf_res = self.compile_tex(md_path)
             outputs["pdf"] = pdf_res
             if pdf_res["status"] != "success":
-                errors.append(f"PDF compile failed: {pdf_res['stderr']}")
+                errors.append(f"PDF/Tex compile failed: {pdf_res['stderr']}")
 
         if "html" in formats:
             html_res = self.compile_html(md_path)

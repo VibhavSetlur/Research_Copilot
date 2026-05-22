@@ -105,6 +105,7 @@ class PromptBuilder:
             "  - Proactively identify risks (methodological, statistical).",
             "  - Suggest next research directions.",
             "  - Ask clarifying questions ONLY when strictly necessary to proceed.",
+            "  - VISUALIZATION POLICY: You must load `workspace/figures/research_style.mplstyle` before plotting. All figures must be saved at 300 DPI, use a colorblind-friendly palette (e.g., viridis), and contain explicit titles, legends, and axis labels with units.",
             "\n--- INSTRUCTIONS ---",
             "You are the autonomous Operator. Decide exactly how to handle the user's intent.",
             "Determine the task_type from these options:",

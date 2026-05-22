@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "research-copilot"
+name = "agentic-research-os"
 version = "9.0.0"
 description = "A self-healing, citation-verified research engine that any LLM can operate — from raw data to publication-ready manuscript"
 readme = "README.md"

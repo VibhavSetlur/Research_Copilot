@@ -1,18 +1,41 @@
-# Research OS
+# Agentic Research OS
 
-A self-healing, citation-verified research engine that any LLM can operate — from raw data to publication-ready manuscript. It provides an autonomous execution layer with zero-to-research capabilities, tiered context memory, and cognitive state tracking.
+**An MCP-compliant Research Operating System.**
 
-## Architecture
+Connect Cursor, Claude, or any LLM to autonomously conduct literature reviews, execute exploratory data analysis, and compile publication-ready papers.
 
-Research OS uses an **Agentic Directed Acyclic Graph (DAG)** to model the research process. It is built natively on the **Model Context Protocol (MCP)**, allowing it to seamlessly integrate with standard open-source MCP servers for database and file system access.
+Agentic Research OS separates the *cognitive engine* (the AI models) from the *operating system layer* (memory tracking, execution sandboxing, data pipelining, and project operations). It provides a strict, rigid framework to stop LLMs from hallucinating file paths, generating poor code structures, and writing non-academic fluff.
 
-### Key Features
-- **Zero-to-Research Autonomous Initiation**: Describe your goal, and the OS dynamically compiles a rigorous execution DAG.
-- **Absolute Token Economy**: Implements tiered memory (System, Working, Cold) and semantic distillation.
-- **Execution Safety**: Embedded Stuck Loop detection and capability gating prevents catastrophic loops and hallucination side-effects.
-- **MCP Native**: Standard JSON-RPC interface exposing research capabilities, daemonized for IDE integrations.
-- **Semantic State Ledger**: Replaces fragmented manifest files with a single source of truth for the entire pipeline run.
+## Features
+- **Model Context Protocol (MCP)**: Run the OS securely within IDEs like Cursor via the MCP standard.
+- **Strict Execution Pipelines**: Forces models to perform "Data Peek" protocols and automated EDA before blindly writing analysis code.
+- **Visualization Governance**: Automatically injects strict styling (`research_style.mplstyle`) for high DPI, colorblind-friendly charts.
+- **Publication-Grade Compilation**: Autonomously map figures into Markdown/LaTeX, generate `references.bib`, and run `pdflatex` to output PDFs.
+- **Clean Workspace Taxonomy**:
+```
+workspace/
+├── data/
+│   ├── raw/           (Immutable inputs)
+│   └── derived/       (Cleaned datasets)
+├── figures/           (300 DPI PNGs/PDFs)
+├── manuscript/        (Tex, Bib, and final PDF)
+├── logs/              (Execution trails)
+└── lab_notebook.md    (Live human-readable timeline)
+```
 
-## Getting Started
+## Universal Intake
+Trigger the entire pipeline natively from the command line using natural language:
 
-Check out [QUICKSTART.md](QUICKSTART.md) for installation and basic usage. Start the daemon with `research-os start --daemon` or `rcp start --daemon`.
+```bash
+research-os run "Analyze the correlation between global shipping volume and ocean acidity from 2015-2025"
+```
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Documentation
+
+For full documentation on Agents, Skills, and architecture, refer to `docs/`.

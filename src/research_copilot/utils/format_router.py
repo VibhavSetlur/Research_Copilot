@@ -17,6 +17,9 @@ FORMAT_REGISTRY = {
     ".parquet": {"format": "PARQUET", "pandera_applicable": True, "domain_hint": "general", "parser": "pyarrow"},
     ".xlsx": {"format": "XLSX", "pandera_applicable": True, "domain_hint": "general", "parser": "openpyxl"},
     ".json": {"format": "JSON_TABLE", "pandera_applicable": True, "domain_hint": "general", "parser": "json"},
+    # typesetting
+    ".tex": {"format": "LATEX", "pandera_applicable": False, "domain_hint": "manuscript", "parser": "tex"},
+    ".typ": {"format": "TYPST", "pandera_applicable": False, "domain_hint": "manuscript", "parser": "typst"},
     # genomics
     ".fastq": {"format": "FASTQ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
     ".fastq.gz": {"format": "FASTQ_GZ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},

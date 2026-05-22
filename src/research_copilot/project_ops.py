@@ -40,11 +40,11 @@ def slugify(value: str, fallback: str = "branch") -> str:
 
 
 def state_path(root: Path) -> Path:
-    return root / "03_synthesis" / "state_ledger.json"
+    return root / ".os_state" / "state_ledger.json"
 
 
 def manifest_path(root: Path) -> Path:
-    return root / "03_synthesis" / "manifest.json"
+    return root / ".os_state" / "manifest.json"
 
 
 def read_json(path: Path, default: Any) -> Any:
@@ -65,14 +65,14 @@ def default_state() -> dict:
         "schema_version": "1.0",
         "created_at": now_iso(),
         "updated_at": now_iso(),
-        "current_branch": "exp_001_baseline",
+        "current_branch": "main",
         "branches": {
-            "exp_001_baseline": {
-                "branch_id": "exp_001_baseline",
+            "main": {
+                "branch_id": "main",
                 "parent_branch": None,
                 "status": "active",
-                "hypothesis": "Baseline research workflow",
-                "experiment_dir": "02_experiments/exp_001_baseline",
+                "hypothesis": "Primary research workflow",
+                "experiment_dir": "workspace",
                 "created_at": now_iso(),
                 "input_data_hashes": {},
             }
@@ -83,7 +83,7 @@ def default_state() -> dict:
 def load_state(root: Path | None = None) -> dict:
     root = _resolve_root(root)
     state = read_json(state_path(root), default_state())
-    state.setdefault("current_branch", "exp_001_baseline")
+    state.setdefault("current_branch", "main")
     state.setdefault("branches", {})
     return cast(dict, state)
 
@@ -108,7 +108,7 @@ def compute_file_hash(path: Path) -> str:
 def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
     root = _resolve_root(root)
     hashes: dict[str, str] = {}
-    for base in (root / "00_inputs" / "raw_data", root / "00_inputs" / "literature"):
+    for base in (root / "workspace" / "data" / "raw", root / "workspace" / "data" / "derived"):
         if not base.exists():
             continue
         for path in sorted(base.rglob("*")):
@@ -137,30 +137,39 @@ def write_readme(path: Path, title: str, body: str) -> None:
 
 
 def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
-    """Create the four top-level clean workspace directories and .research/config.yaml."""
+    """Create the unified workspace directory structure and .research config."""
     root.mkdir(parents=True, exist_ok=True)
+    
+    # Hide OS state
+    (root / ".os_state").mkdir(parents=True, exist_ok=True)
+    
     directories = {
-        "00_inputs": "Immutable canonical inputs after ingest.",
-        "00_inputs/raw_data": "Raw data files. Do not modify these after hashing.",
-        "00_inputs/literature": "Original literature files and extracted indexes.",
-        "workspace": "Human-AI working notes and scratch material.",
-        "workspace/scratchpad": "Queued ideas, links, and informal notes.",
-        "02_experiments": "Isolated hypothesis branches with local scripts and outputs.",
-        "02_experiments/exp_001_baseline": "Baseline experiment branch.",
-        "02_experiments/exp_001_baseline/scripts": "Numbered scripts for the baseline experiment.",
-        "02_experiments/exp_001_baseline/outputs": "Baseline generated outputs.",
-        "02_experiments/exp_001_baseline/outputs/figures": "Figures with sidecar metadata.",
-        "02_experiments/exp_001_baseline/outputs/tables": "Tables with sidecar metadata.",
-        "02_experiments/exp_001_baseline/outputs/artifacts": "Serialized models and processed artifacts.",
-        "02_experiments/exp_001_baseline/outputs/analysis": "Analysis plans, diagnostics, and result summaries.",
-        "03_synthesis": "Final synthesis, manifests, manuscript, and audit outputs.",
-        "03_synthesis/manuscript": "Manuscript drafts generated from ledgers and artifact metadata.",
-        "03_synthesis/final_figures": "Promoted final figures.",
-        "03_synthesis/quality_gates": "Recorded quality gate results.",
-        "03_synthesis/audit": "Adversarial and compliance review outputs.",
+        "workspace": "Human-AI working notes and research outputs.",
+        "workspace/data": "Data directory.",
+        "workspace/data/raw": "Immutable canonical inputs (untouched API/scrape outputs).",
+        "workspace/data/derived": "Cleaned, processed datasets.",
+        "workspace/figures": "300 DPI PNGs/PDFs and visual outputs.",
+        "workspace/manuscript": "Tex, Bib, and final PDF drafts.",
+        "workspace/logs": "system.log, routing_decisions.json, and other execution trails.",
     }
     for rel, body in directories.items():
         write_readme(root / rel, Path(rel).name.replace("_", " ").title(), body)
+        
+    # Generate strict mplstyle for figures
+    mplstyle_path = root / "workspace" / "figures" / "research_style.mplstyle"
+    if not mplstyle_path.exists():
+        mplstyle_path.write_text(
+            "figure.dpi: 300\n"
+            "savefig.dpi: 300\n"
+            "axes.titlesize: 14\n"
+            "axes.labelsize: 12\n"
+            "axes.prop_cycle: cycler('color', ['440154', '414487', '2a788e', '22a884', '7ad151', 'fde725'])\n"
+            "font.family: sans-serif\n"
+            "font.sans-serif: Arial, Helvetica, sans-serif\n"
+            "lines.linewidth: 2\n"
+            "axes.grid: True\n"
+            "grid.alpha: 0.3\n"
+        )
 
     # Create .research/config.yaml
     research_dir = root / ".research"
@@ -196,7 +205,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
             f"pin_dependency_versions: true\n"
         )
 
-    intake = root / "00_inputs" / "intake.md"
+    intake = root / "workspace" / "data" / "raw" / "intake.md"
     if not intake.exists():
         intake.write_text(
             f"# {project_name} Intake\n\n"
@@ -205,7 +214,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
             "## Research Questions\n\n"
             "1. \n\n"
             "## Data\n\n"
-            "- Place raw files in `00_inputs/raw_data/`.\n"
+            "- Place raw files in `workspace/data/raw/`.\n"
         )
 
     notebook = root / "workspace" / "lab_notebook.md"
@@ -218,11 +227,11 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
             "- Initialized clean Research Copilot workspace.\n"
         )
 
-    baseline_decisions = root / "02_experiments" / "exp_001_baseline" / "decisions.yaml"
+    baseline_decisions = root / "workspace" / "logs" / "decisions.yaml"
     if not baseline_decisions.exists():
         baseline_decisions.write_text(
             "schema_version: '1.0'\n"
-            "experiment_id: exp_001_baseline\n"
+            "experiment_id: main\n"
             "parent_experiment: null\n"
             f"created: {now_iso()}\n"
             "input_data_hashes: {}\n"
@@ -230,8 +239,8 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
             "  decision_001:\n"
             f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
             "    context: Clean workspace initialized from packaged Research Copilot assets.\n"
-            "    selected: Use experiment-driven directory structure.\n"
-            "    rationale: Keeps user workspace minimal while preserving provenance.\n"
+            "    selected: Unified workspace directory structure.\n"
+            "    rationale: Keeps user workspace strictly unified while preserving provenance.\n"
             "    linked_literature: []\n"
         )
 
@@ -239,15 +248,15 @@ def scaffold_minimal_workspace(root: Path, project_name: str) -> None:
         "schema_version": "1.0",
         "project": {"title": project_name},
         "created_at": now_iso(),
-        "architecture": "package_assets_clean_workspace",
-        "top_level_directories": ["00_inputs", "workspace", "02_experiments", "03_synthesis"],
-        "active_experiment": "exp_001_baseline",
-        "branches": {"exp_001_baseline": {"status": "active"}},
+        "architecture": "unified_workspace",
+        "top_level_directories": ["workspace", ".os_state"],
+        "active_experiment": "main",
+        "branches": {"main": {"status": "active"}},
     }
     write_json(manifest_path(root), manifest)
 
     state = default_state()
-    state["branches"]["exp_001_baseline"]["input_data_hashes"] = compute_input_hashes(root)
+    state["branches"]["main"]["input_data_hashes"] = compute_input_hashes(root)
     save_state(root, state)
 
     _copy_ai_rules_to_project(root)
@@ -328,8 +337,9 @@ def _setup_gitignore(root: Path) -> None:
             ".research/workflow_dag.json\n"
             ".research/workflow_dag.mermaid\n\n"
             "# Raw Data (Do not commit massive datasets)\n"
-            "00_inputs/raw_data/*\n"
-            "!00_inputs/raw_data/.gitkeep\n"
+            "workspace/data/raw/*\n"
+            "!workspace/data/raw/.gitkeep\n"
+            ".os_state/\n"
         )
 
 
@@ -390,6 +400,32 @@ def _copy_environment_to_project(root: Path) -> None:
             pass
 
 
+def _update_workspace_readme_manifest(root: Path) -> None:
+    readme_path = root / "workspace" / "README.md"
+    
+    # Read derived and raw files
+    raw_files = list((root / "workspace" / "data" / "raw").rglob("*"))
+    derived_files = list((root / "workspace" / "data" / "derived").rglob("*"))
+    
+    lines = [
+        "# Workspace Manifest",
+        "",
+        "This directory is actively managed by Agentic Research OS.",
+        "",
+        "## Data / Raw",
+    ]
+    for f in sorted(raw_files):
+        if f.is_file() and not f.name.startswith("."):
+            lines.append(f"- `{f.relative_to(root)}`")
+            
+    lines.append("")
+    lines.append("## Data / Derived")
+    for f in sorted(derived_files):
+        if f.is_file() and not f.name.startswith("."):
+            lines.append(f"- `{f.relative_to(root)}`")
+            
+    readme_path.write_text("\n".join(lines) + "\n")
+
 def create_experiment_branch(
     name: str,
     hypothesis: str = "",
@@ -399,19 +435,15 @@ def create_experiment_branch(
     """Create an isolated experiment branch and update state/manifest."""
     root = _resolve_root(root)
     state = load_state(root)
-    parent = parent or state.get("current_branch", "exp_001_baseline")
+    parent = parent or state.get("current_branch", "main")
     branch_id = name if name.startswith("exp_") else next_experiment_id(root, name)
     if branch_id in state.get("branches", {}):
         raise ValueError(f"Branch '{branch_id}' already exists.")
 
-    experiment_dir = root / "02_experiments" / branch_id
+    experiment_dir = root / "workspace" / "logs" / branch_id
+    experiment_dir.mkdir(parents=True, exist_ok=True)
+    
     data_hashes = compute_input_hashes(root)
-    for subdir in EXPERIMENT_SUBDIRS:
-        write_readme(
-            experiment_dir / subdir,
-            f"{branch_id} {subdir}",
-            f"Branch-specific `{subdir}` files for hypothesis: {hypothesis or name}.",
-        )
 
     decisions_path = experiment_dir / "decisions.yaml"
     decisions_path.write_text(
@@ -433,7 +465,7 @@ def create_experiment_branch(
         "parent_branch": parent,
         "status": "active",
         "hypothesis": hypothesis or name,
-        "experiment_dir": f"02_experiments/{branch_id}",
+        "experiment_dir": f"workspace/logs/{branch_id}",
         "created_at": now_iso(),
         "input_data_hashes": data_hashes,
     }
@@ -460,12 +492,14 @@ def create_experiment_branch(
 
 
 def current_branch(root: Path | None = None) -> str:
-    return cast(str, load_state(root).get("current_branch", "exp_001_baseline"))
+    return cast(str, load_state(root).get("current_branch", "main"))
 
 
 def branch_decisions_path(root: Path, branch_id: str | None = None) -> Path:
     branch_id = branch_id or current_branch(root)
-    return root / "02_experiments" / branch_id / "decisions.yaml"
+    if branch_id == "main":
+        return root / "workspace" / "logs" / "decisions.yaml"
+    return root / "workspace" / "logs" / branch_id / "decisions.yaml"
 
 
 def log_decision(
@@ -531,14 +565,17 @@ def save_artifact(
     branch_id = branch_id or current_branch(root)
     folder = {
         "figure": "figures",
-        "table": "tables",
-        "analysis": "analysis",
-        "artifact": "artifacts",
-    }.get(artifact_type, "artifacts")
+        "table": "data/derived",
+        "analysis": "data/derived",
+        "artifact": "data/derived",
+    }.get(artifact_type, "data/derived")
     safe_name = Path(filename).name
-    output_path = root / "02_experiments" / branch_id / "outputs" / folder / safe_name
+    output_path = root / "workspace" / folder / safe_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content)
+    
+    # Update README
+    _update_workspace_readme_manifest(root)
 
     input_files = input_files or []
     data_hashes = {}

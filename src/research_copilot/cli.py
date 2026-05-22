@@ -247,6 +247,19 @@ def cmd_intent(args: argparse.Namespace) -> None:
         print(f"  - {agent}")
 
 
+def cmd_run(args: argparse.Namespace) -> None:
+    from research_copilot.engine import ResearchEngine
+    root = _project_root()
+    engine = ResearchEngine(root, hitl_enabled=False)
+    print("=" * 60)
+    print("AGENTIC RESEARCH OS - RUN")
+    print("=" * 60)
+    print(f"Query: {args.query}")
+    print("Booting engine...\n")
+    result = engine.route_and_execute(args.query, depth=args.depth or "academic")
+    print(f"\nRun completed with status: {result.get('status', 'unknown')}")
+
+
 def cmd_branch(args: argparse.Namespace) -> None:
     result = create_experiment_branch(args.name, hypothesis=args.hypothesis, parent=args.parent, root=_project_root())
     print(f"Created branch: {result['branch_id']}")
@@ -430,6 +443,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("scan", help="Scan inputs and build research map")
     sub.add_parser("setup", help="Verify package assets and local overrides")
     sub.add_parser("status", help="Show clean workspace status")
+    
+    p_run = sub.add_parser("run", help="Run the Agentic Research OS on a natural language query")
+    p_run.add_argument("query", help="The research task to execute")
 
     p_compress = sub.add_parser(
         "compress",
@@ -516,6 +532,7 @@ def main() -> None:
     commands = {
         "chat": lambda a: __import__('research_copilot.chat').chat.start_chat_loop(),
         "init": cmd_init,
+        "run": cmd_run,
         "preflight": cmd_preflight,
         "scan": cmd_scan,
         "setup": cmd_setup,
