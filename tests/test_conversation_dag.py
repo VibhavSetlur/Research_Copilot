@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.control_plane.supervisor import SupervisorAgent
-from research_copilot.control_plane.scheduler import TaskScheduler
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.agents.supervisor import SupervisorAgent
+from research_copilot.execution.scheduler import TaskScheduler
 
 class MockPlanner:
     def generate_plan(self, request, state):

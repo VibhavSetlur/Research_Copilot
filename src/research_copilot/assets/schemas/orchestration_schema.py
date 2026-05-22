@@ -10,33 +10,24 @@ class SideTask(BaseModel):
     return_to_main_thread: bool = Field(True, description="Whether to resume the main task after this completes")
 
 class ExecutionIntent(BaseModel):
-    """Captures exactly what the execution engine must do next based on the Supervisor's decision."""
-    target_nodes: List[str] = Field(default_factory=list, description="Specific nodes to execute or re-execute")
-    branch_name_override: Optional[str] = Field(None, description="If branching, the new branch name")
-    rollback_target: Optional[str] = Field(None, description="If repairing/rolling back, the node to revert to")
-    suspend_execution: bool = Field(False, description="If True, execution is paused (e.g. for HITL approval or answering a question)")
-    interruption_class: Optional[InterruptionClass] = Field(None, description="Type of interruption if task_type is interruption")
-    side_task: Optional[SideTask] = Field(None, description="Side task details if this is a temporary detour")
-
-class ConversationState(BaseModel):
-    """Structures conversational memory."""
-    turns: List[Dict[str, str]] = Field(default_factory=list, description="List of dicts with role and content")
-    active_intent: str = Field(default="none", description="The current inferred user intent")
-    unanswered_questions: List[str] = Field(default_factory=list, description="Questions pending user response")
-
-class SupervisorDecision(BaseModel):
-    intent: str = Field(..., description="The inferred primary intent of the user (e.g., exploratory, causal, predictive)")
-    task_type: Literal[
-        "new_task", "continuation", "interruption", "modify", "branch", "answer", "pause", "replan", "repair", "request_approval"
+    user_goal: str = Field(..., description="The user's inferred goal")
+    intent_type: str = Field(..., description="The inferred primary intent type")
+    task_action: Literal[
+        "continue",
+        "modify",
+        "branch",
+        "pause",
+        "spawn_side_task",
+        "replan",
+        "answer_directly",
+        "repair_state"
     ] = Field(..., description="The nature of the action to take")
-    urgency: Literal["low", "medium", "high"] = Field(..., description="The urgency of the request")
-    needs_clarification: bool = Field(..., description="Whether the request is too ambiguous and needs user clarification")
-    needs_approval: bool = Field(..., description="Whether the proposed action requires user approval before execution")
-    selected_workflow: Optional[str] = Field(None, description="The name of the workflow to run, if applicable")
-    selected_agents: List[str] = Field(default_factory=list, description="The sub-agents that should be invoked")
-    next_action: str = Field(..., description="The immediate next action to take")
+    confidence: float = Field(..., description="Confidence in this intent mapping (0.0 to 1.0)")
+    requires_human_input: bool = Field(..., description="Whether the action requires user input/approval")
+    affected_research_objects: List[str] = Field(default_factory=list, description="IDs of research objects affected")
+    planning_depth: str = Field(..., description="How deep the planner should go (e.g., shallow, deep, exhaustive)")
+    next_action_description: str = Field(..., description="Description of the next action to take")
     state_patch: Dict[str, Any] = Field(default_factory=dict, description="Key-value pairs to update in the state ledger")
-    execution_intent: Optional[ExecutionIntent] = Field(None, description="Detailed instructions for the execution engine, if applicable")
 
 class GraphMutation(BaseModel):
     action: Literal["insert", "remove", "rewire"] = Field(..., description="The type of mutation")

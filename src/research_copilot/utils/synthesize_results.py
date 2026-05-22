@@ -264,7 +264,7 @@ def main():
     print("LLM-BASED PARALLEL SYNTHESIS")
     print("=" * 60)
     try:
-        from research_copilot.core.model_resolver import cascade_resolve
+        from research_copilot.runtime.model_resolver import cascade_resolve
         prompt = (
             "You are the synthesis selector for parallel branch outputs. "
             "Choose the single strongest branch using methodological rigor, statistical support, and conflict review.\n"
@@ -289,7 +289,7 @@ def main():
                 dag = ExecutionDAGManager(root)
                 dag.merge_branch_lineage(winning_branch)
                 print(f"Successfully merged data lineage for branch: {winning_branch}")
-                from research_copilot.core.state_ledger import ResearchLedger
+                from research_copilot.state.state_ledger import ResearchLedger
                 ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
                 ledger.update(
                     winning_branch_name=winning_branch,

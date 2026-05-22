@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from research_copilot.core.state_ledger import ResearchLedger
+from research_copilot.state.state_ledger import ResearchLedger
 
 
 class ProvenanceMapper:

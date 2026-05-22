@@ -3,8 +3,8 @@ import os
 import json
 from pathlib import Path
 
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.control_plane.supervisor import SupervisorAgent
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.agents.supervisor import SupervisorAgent
 
 class MockPlanner:
     def generate_plan(self, request, state):

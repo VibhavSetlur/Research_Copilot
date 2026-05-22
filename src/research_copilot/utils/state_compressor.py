@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from research_copilot.core.hooks import hook_engine
+from research_copilot.runtime.hooks import hook_engine
 from research_copilot.utils.common import find_project_root
 
 

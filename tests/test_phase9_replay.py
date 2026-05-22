@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 import json
 
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.core.session_replay import SessionReplayManager
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.replay.session_replay import SessionReplayManager
 
 def test_strict_determinism_check(tmp_path: Path):
     """Test that ledger automatically captures a snapshot on every update."""

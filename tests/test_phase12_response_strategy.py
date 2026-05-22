@@ -1,9 +1,9 @@
 import pytest
 from pathlib import Path
 
-from research_copilot.control_plane.prompt_builder import PromptBuilder
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.core.cognitive_tracker import CognitiveStateTracker
+from research_copilot.prompts.prompt_builder import PromptBuilder
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.cognition.cognitive_tracker import CognitiveStateTracker
 
 def test_response_strategy_modes(tmp_path: Path):
     """Test that PromptBuilder injects the correct conversational mode rules."""

@@ -1,8 +1,8 @@
 import pytest
 from pathlib import Path
 
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.core.cognitive_tracker import CognitiveStateTracker
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.cognition.cognitive_tracker import CognitiveStateTracker
 
 def test_contradictory_paper_ingestion(tmp_path: Path):
     """Test logging a contradiction reduces confidence in related claims."""

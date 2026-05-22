@@ -16,8 +16,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from research_copilot.core.hooks import hook_engine
-from research_copilot.core.state_ledger import ResearchLedger
+from research_copilot.runtime.hooks import hook_engine
+from research_copilot.state.state_ledger import ResearchLedger
 from research_copilot.intent_router import IntentRouter
 from research_copilot.project_ops import create_experiment_branch, log_decision, save_artifact
 from research_copilot.utils.asset_manager import AssetManager
@@ -71,7 +71,7 @@ class ResearchEngine:
         import sys
         self._interactive = sys.stdin.isatty()
 
-        from research_copilot.core.token_budget import TokenBudgetTracker
+        from research_copilot.runtime.token_budget import TokenBudgetTracker
         self.token_tracker = TokenBudgetTracker(max_tokens=200_000)
 
         try:

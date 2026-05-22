@@ -3,8 +3,8 @@ import os
 import json
 from pathlib import Path
 
-from research_copilot.core.state_ledger import ResearchLedger
-from research_copilot.control_plane.mutation_engine import PlanMutationEngine
+from research_copilot.state.state_ledger import ResearchLedger
+from research_copilot.graph.mutation_engine import PlanMutationEngine
 from research_copilot.engine import ResearchEngine
 
 def test_failed_statistical_analysis_alternate_selection(tmp_path: Path):

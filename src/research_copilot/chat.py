@@ -10,7 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from research_copilot.core.state_ledger import ResearchLedger
+from research_copilot.state.conversation_state import ConversationState
+from research_copilot.state.conversation_memory import ConversationMemory
+from research_copilot.state.state_ledger import ResearchLedger
 from research_copilot.utils.common import find_project_root
 from research_copilot.engine import ResearchEngine
 
@@ -31,12 +33,11 @@ def start_chat_loop():
         sys.exit(1)
 
     ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
-    engine = ResearchEngine(root, hitl_enabled=True)
+    conv_memory = ConversationMemory(root)
+    conv_state = ConversationState(conv_memory)
     
-    from research_copilot.control_plane.supervisor import SupervisorAgent
-    from research_copilot.control_plane.scheduler import TaskScheduler
+    from research_copilot.agents.supervisor_agent import SupervisorAgent
     supervisor = SupervisorAgent(root, ledger, call_llm_fn=call_llm)
-    scheduler = TaskScheduler(ledger)
     
     print("=" * 60)
     print("Research Copilot - Conversational Control Plane")
@@ -56,26 +57,28 @@ def start_chat_loop():
         if user_msg.lower() in ("exit", "quit"):
             break
 
+        conv_state.add_turn("user", user_msg)
         print("Supervisor is analyzing request...")
-        decision = supervisor.process_request(user_msg)
+        intent = supervisor.process_request(user_msg)
         
-        print(f"\n[{decision.task_type.upper()} | {decision.intent.upper()}] {decision.next_action}")
+        print(f"\n[ACTION: {intent.task_action.upper()} | GOAL: {intent.user_goal.upper()}] {intent.next_action_description}")
+        conv_state.add_turn("assistant", intent.next_action_description)
         
-        if decision.needs_clarification:
+        if intent.requires_human_input:
+            print("[System paused for human input]")
             continue
             
-        if decision.selected_workflow or decision.task_type in ("new_task", "continuation"):
-            # Get the current plan from state
-            current_plan = ledger.get().get("current_plan", {})
-            next_step = scheduler.get_next_executable_node(current_plan)
-            
-            if next_step:
-                print(f"Scheduler selected next node: {next_step}")
-                res = engine.execute_node(next_step)
-                print("Result:")
-                print(f" - {res.get('node', 'unknown')}: {res.get('status', 'unknown')}")
-            else:
-                print("No executable nodes remaining in the plan.")
+        # In future phases, pass this intent to the Planner Agent to mutate the DAG
+        # and then execute it via Execution Engine.
+        
+        # Phase 12 Proactive Reasoning
+        from research_copilot.agents.specialized_agents import ReflectionAgent
+        reflection_agent = ReflectionAgent(call_llm)
+        reflection = reflection_agent.reflect(str(conv_state.get_state().active_thread_turns))
+        if reflection.success and reflection.output.get("gaps"):
+            print("\n[PROACTIVE REASONING]")
+            for gap in reflection.output["gaps"]:
+                print(f" - Missing gap identified: {gap}")
 
 if __name__ == "__main__":
     start_chat_loop()

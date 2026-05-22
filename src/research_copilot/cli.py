@@ -300,7 +300,7 @@ def cmd_trace(args: argparse.Namespace) -> None:
 
 def cmd_continue(args: argparse.Namespace) -> None:
     root = _project_root()
-    from research_copilot.core.state_ledger import ResearchLedger
+    from research_copilot.state.state_ledger import ResearchLedger
     ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
     state = ledger.get()
     
@@ -348,7 +348,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
 def cmd_compress(args: argparse.Namespace) -> None:
     """Compress the state ledger using a local LLM to free context window space."""
     try:
-        from research_copilot.core.state_ledger import ResearchLedger
+        from research_copilot.state.state_ledger import ResearchLedger
 
         root = _project_root()
         ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
@@ -370,7 +370,7 @@ def cmd_compress(args: argparse.Namespace) -> None:
 
 def cmd_audit(args: argparse.Namespace) -> None:
     try:
-        from research_copilot.core.state_ledger import ResearchLedger
+        from research_copilot.state.state_ledger import ResearchLedger
         from research_copilot.utils.provenance_mapper import ProvenanceMapper
 
         root = _project_root()

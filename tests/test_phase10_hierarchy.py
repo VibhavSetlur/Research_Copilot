@@ -2,8 +2,8 @@ import pytest
 import json
 from pathlib import Path
 
-from research_copilot.control_plane.supervisor import SupervisorAgent
-from research_copilot.core.state_ledger import ResearchLedger
+from research_copilot.agents.supervisor import SupervisorAgent
+from research_copilot.state.state_ledger import ResearchLedger
 
 def test_handoff_context_preservation(tmp_path: Path):
     """Test that supervisor preserves context when routing to specialized agents."""
@@ -40,7 +40,7 @@ def test_handoff_context_preservation(tmp_path: Path):
 
 def test_agent_specialization_boundaries(tmp_path: Path):
     """Test that specialized agents only handle tasks within their authority."""
-    from research_copilot.control_plane.specialized_agents import CitationAgent, RecoveryAgent
+    from research_copilot.agents.specialized_agents import CitationAgent, RecoveryAgent
     
     def mock_llm(prompt: str) -> str:
         return json.dumps({"success": True, "output": {"verified": True}})

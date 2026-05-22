@@ -1,166 +1,54 @@
-# Architecture
+# Research Copilot Architecture
 
-Research Copilot is built around a lifecycle hook system that intercepts every stage of the research pipeline.
+The system has transitioned from a rigid pipeline to a dynamic, autonomous OS.
 
-## System Overview
+## Core Subsystems
 
-```
-User/AI Agent
-    │
-    ▼
-┌─────────────────────────────────────────────┐
-│  CLI (rcp / research_copilot.cli)           │
-│  14 commands, MCP server, approval gates    │
-└──────────────┬──────────────────────────────┘
-               │
-    ┌──────────┼──────────┐
-    ▼          ▼          ▼
-┌────────┐ ┌────────┐ ┌────────┐
-│ Agents │ │ Skills │ │Domains │
-│  13+   │ │  90+   │ │  19+   │
-│ (pkg)  │ │ (pkg)  │ │ (pkg)  │
-└────────┘ └────────┘ └────────┘
-               │
-    ┌──────────┼──────────┐
-    ▼          ▼          ▼
-┌────────┐ ┌────────┐ ┌────────┐
-│ State  │ │  DAG   │ │ Cache  │
-│ Ledger │ │Manager │ │ (SQLite│
-│        │ │        │ │ +Disk) │
-└────────┘ └────────┘ └────────┘
-```
+```mermaid
+flowchart LR
+    subgraph Control Plane
+        Supervisor[Supervisor Agent]
+        Planner[Planner Agent]
+    end
 
-**System Location:** All agents, skills, workflows, and domains are bundled in the installed Python package (`research_copilot.assets`). The `.research/` folder contains only `config.yaml` (project configuration) and runtime cache (auto-created).
+    subgraph Cognition & Agents
+        Critic[Critic Agent]
+        Skeptic[Skeptic Agent]
+        Tracker[Cognitive Tracker]
+    end
 
-## Lifecycle Hook System
+    subgraph Memory & State
+        Ledger[State Ledger]
+        Synthesizer[Memory Synthesizer]
+        Compressor[State Compressor]
+    end
 
-Five hook stages intercept every pipeline operation:
+    subgraph Execution
+        Scheduler[DAG Scheduler]
+        Graph[Mutation Engine]
+    end
 
-### 1. `pre_routing` — Before Task Selection
-
-- **Semantic skill router**: Matches user query against skill index, loads only 2-4 relevant skills (not all 92+)
-- **Data scale detection**: Scans input files, enforces polars lazy frames for files >1GB
-- **Token budget throttle**: Truncates context at 60/80/90% thresholds
-
-### 2. `pre_execution` — Before Running Code
-
-- **Token budget management**: Emergency split + CTM generation at 90%
-- **Cache lookup**: Skips redundant computation if identical operation+params exist
-
-### 3. `post_execution` — After Running Code
-
-- **Code syntax validation**: AST parse of generated Python before execution
-- **Dependency detection**: Auto-installs missing imports (if enabled)
-- **Critic agent trigger**: Adversarial review for critical phases
-- **Reviewer 2**: Aggressive critique after manuscript compilation
-
-### 4. `pre_ledger_commit` — Before Saving State
-
-- **Pydantic schema validation**: Rejects malformed outputs before serialization
-- **Approval gate**: Blocks pipeline until human approves (30s auto-approve fallback)
-
-### 5. `on_failure` — On Any Error
-
-- **State freeze**: Serializes current state to snapshot
-- **Recovery point**: Records where to resume
-- **Dead end logging**: Documents failed approaches for future reference
-
-## State Ledger
-
-The state ledger (`.research/cache/state.json`) is the single source of truth for project state:
-
-```json
-{
-  "run_id": "run_20260520_143022",
-  "phase": "execute_analysis",
-  "step": 3,
-  "active_branch": "main",
-  "decisions": [...],
-  "dead_ends": [...],
-  "resumable_from": "execute_analysis:step_3"
-}
+    Supervisor --> Planner
+    Planner --> Graph
+    Graph --> Scheduler
+    Scheduler --> Ledger
+    Ledger --> Tracker
+    Ledger --> Synthesizer
+    Tracker --> Critic
+    Tracker --> Skeptic
 ```
 
-Key methods:
-- `get_project_summary(max_tokens=500)` — Compact string for context injection
-- `get_latest_checkpoint_summary()` — Latest checkpoint with key results
+### 1. Agents Layer (`src/research_copilot/agents/`)
+Contains the LLM personas (Supervisor, Critic, Skeptic) that steer the research.
 
-## Execution DAG
+### 2. Cognition Layer (`src/research_copilot/cognition/`)
+Tracks hypotheses, claims, contradictions, and evidence. Maintains the epistemic state of the project.
 
-Every script execution is registered in the DAG (`.research/cache/execution_dag.json`):
+### 3. Memory Layer (`src/research_copilot/memory/`)
+Synthesizes episodic memory into semantic project context.
 
-```json
-{
-  "nodes": {
-    "02_descriptive_stats_base_20260520": {
-      "script": "02_descriptive_stats.py",
-      "input_files": ["00_inputs/raw_data/survey.csv"],
-      "output_files": ["outputs/analysis/descriptive_results.json"],
-      "depends_on": ["01_data_ingestion_base_20260520"],
-      "status": "complete",
-      "duration": 2.3
-    }
-  }
-}
-```
+### 4. Planning & Execution (`src/research_copilot/planning/`, `src/research_copilot/execution/`)
+Builds and executes the directed acyclic graph (DAG) of research tasks.
 
-The DAG enables:
-- Reproducibility: replay exact execution order
-- Parallel execution: identify independent nodes
-- Incremental runs: skip already-complete nodes
-
-## Token Budget Management
-
-| Threshold | Action |
-|-----------|--------|
-| <60% | Full context available |
-| 60% | Summarize completed phases |
-| 80% | Flush non-essential skill docs |
-| 90% | Force checkpoint, generate CTM, split conversation |
-
-### Context Transfer Memorandum (CTM)
-
-At 90% capacity, the system generates a CTM capturing:
-- Abandoned paths and dead ends
-- Micro-decisions made during analysis
-- Immediate tactical goals
-- Partial results and open questions
-
-The CTM is saved to `.research/cache/context_transfer_memos/` and indexed in the knowledge graph.
-
-## Knowledge Graph
-
-Triplets extracted from literature are stored in a NetworkX graph (`.research/cache/knowledge_graph.pkl`):
-
-```
-[Variable X] -> [confounded_by] -> [Variable Y]
-[Method A] -> [validated_by] -> [Paper B]
-[Finding C] -> [contradicted_by] -> [Finding D]
-```
-
-Query via CLI:
-```bash
-rcp graph-query --confounders "income"
-rcp graph-query --relation "mediates"
-```
-
-## Branching Engine
-
-Research branches enable divergent hypotheses without overwriting core findings:
-
-```bash
-rcp branch hypothesis_B --hypothesis "Bayesian approach"
-# ... run analysis on branch ...
-rcp merge hypothesis_B    # Merge findings back to main
-rcp abandon hypothesis_B  # Or abandon exploratory branch
-```
-
-Each branch creates an isolated experiment directory under `02_experiments/`.
-
-## Anti-Hallucination System
-
-1. **Citation verification**: Three-pass check (existence, content, retraction)
-2. **Claim tracing**: Every claim traced to data or verified citation
-3. **Context7 API**: Library signatures verified before code generation
-4. **Schema enforcement**: Pydantic validation on all agent outputs
-5. **Grounding rules**: Never invent p-values, effect sizes, or citations
+### 5. Prompts (`src/research_copilot/prompts/`)
+Modular, compressed system prompts injected dynamically based on cognitive state.

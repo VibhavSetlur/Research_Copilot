@@ -1,7 +1,7 @@
 import pytest
 import json
 
-from research_copilot.control_plane.critic import CriticAgent, SkepticAgent
+from research_copilot.agents.critic import CriticAgent, SkepticAgent
 
 def create_mock_llm(response_json):
     def mock_llm_call(prompt: str) -> str:

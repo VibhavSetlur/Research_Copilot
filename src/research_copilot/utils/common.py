@@ -231,16 +231,73 @@ _DEFAULT_CONFIG = {
 }
 
 
+def load_env(root: Path) -> dict:
+    """Load .env file from project root."""
+    env_vars = {}
+    env_path = root / ".env"
+    if env_path.exists():
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if v.lower() == "true": v = True
+                    elif v.lower() == "false": v = False
+                    elif v.isdigit(): v = int(v)
+                    env_vars[k] = v
+    # Also override with actual os.environ
+    for k in ["RESEARCH_MODE", "MEMORY_TIER_LIMITS", "MAX_BRANCH_DEPTH", "ENABLE_DYNAMIC_REPLANNING",
+              "ENABLE_SELF_CRITIQUE", "ENABLE_DEBATE_LOOP", "ENABLE_AUTONOMOUS_RECOVERY",
+              "CONFIDENCE_THRESHOLD", "MAX_INTERRUPT_DEPTH", "ENABLE_SESSION_REPLAY"]:
+        if k in os.environ:
+            v = os.environ[k]
+            if v.lower() == "true": v = True
+            elif v.lower() == "false": v = False
+            elif v.isdigit(): v = int(v)
+            env_vars[k] = v
+    return env_vars
+
+def get_runtime_profile(mode: str) -> dict:
+    """Return configuration overrides for a specific runtime profile."""
+    profiles = {
+        "lightweight": {
+            "ENABLE_DYNAMIC_REPLANNING": False,
+            "ENABLE_SELF_CRITIQUE": False,
+            "ENABLE_SESSION_REPLAY": False,
+            "MAX_BRANCH_DEPTH": 1,
+        },
+        "exploratory": {
+            "ENABLE_DYNAMIC_REPLANNING": True,
+            "ENABLE_SELF_CRITIQUE": False,
+            "CONFIDENCE_THRESHOLD": 0.5,
+        },
+        "publication-grade": {
+            "ENABLE_DYNAMIC_REPLANNING": True,
+            "ENABLE_SELF_CRITIQUE": True,
+            "ENABLE_DEBATE_LOOP": True,
+            "CONFIDENCE_THRESHOLD": 0.8,
+            "ENABLE_SESSION_REPLAY": True,
+        },
+        "high-rigor": {
+            "ENABLE_DYNAMIC_REPLANNING": True,
+            "ENABLE_SELF_CRITIQUE": True,
+            "ENABLE_DEBATE_LOOP": True,
+            "CONFIDENCE_THRESHOLD": 0.9,
+            "ENABLE_SESSION_REPLAY": True,
+        },
+        "autonomous-lab": {
+            "ENABLE_DYNAMIC_REPLANNING": True,
+            "ENABLE_SELF_CRITIQUE": True,
+            "ENABLE_DEBATE_LOOP": True,
+            "ENABLE_AUTONOMOUS_RECOVERY": True,
+            "ENABLE_SESSION_REPLAY": True,
+        }
+    }
+    return profiles.get(mode.lower(), {})
+
 def get_config(root: Optional[Path] = None, defaults: Optional[dict] = None) -> dict:
-    """Load config.yaml with defaults.
-
-    Args:
-        root: Project root path (auto-detected if None)
-        defaults: Override default config values (merged with built-in defaults)
-
-    Returns:
-        Config dict with all keys populated.
-    """
+    """Load config.yaml, .env, and apply runtime profiles."""
     if root is None:
         root = require_project_root()
 
@@ -250,12 +307,23 @@ def get_config(root: Optional[Path] = None, defaults: Optional[dict] = None) -> 
     except Exception:
         config = {}
     
+    # Merge defaults
     merged_defaults = {**_DEFAULT_CONFIG}
     if defaults:
         merged_defaults.update(defaults)
 
     for k, v in merged_defaults.items():
         config.setdefault(k, v)
+        
+    # Load .env
+    env_vars = load_env(root)
+    config.update(env_vars)
+    
+    # Apply runtime profile
+    mode = config.get("RESEARCH_MODE", "exploratory")
+    profile_overrides = get_runtime_profile(mode)
+    config.update(profile_overrides)
+    
     return config
 
 
