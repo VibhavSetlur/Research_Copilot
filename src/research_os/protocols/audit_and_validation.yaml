@@ -1,14 +1,26 @@
 name: audit_and_validation
-version: 1.0.0
-description: Process for auditing and validating research outputs.
+version: 2.0.0
+description: Protocol to audit citations, assumptions, and code quality.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/logs/audit.log: Detailed report of validation passes"
+  - "workspace/analysis.md: Final validation summary"
+validators:
+  citation_validator:
+    pass_1_doi: "Attempt to resolve all DOIs. Flag broken links."
+    pass_2_abstract: "Verify that the claim in the text matches the abstract's conclusion."
+    pass_3_retraction: "Query the Retraction Watch database or Crossref for retracted status."
+  statistical_assumptions:
+    action: "Re-read the assumptions logged during methodology_selection. Run specific tests (e.g., Shapiro-Wilk for normality, VIF for multicollinearity) and log the p-values/metrics."
+  code_linter:
+    command_python: "ruff check workspace/02_analysis/ || pylint workspace/02_analysis/"
 steps:
-  - id: peer_review
-    name: "Simulated Peer Review"
-    description: "Critique the methodology and findings as an external reviewer."
-  - id: data_integrity
-    name: "Data Integrity Check"
-    description: "Verify that all data points in the text match the figures and tables."
-  - id: logical_flow
-    name: "Logical Flow"
-    description: "Ensure the conclusions logically follow from the results."
+  - id: validate_citations
+    name: "Validate Citations"
+    description: "Execute the three-pass citation validator."
+  - id: check_assumptions
+    name: "Check Assumptions"
+    description: "Run statistical tests to verify the assumptions hold true on the actual data."
+  - id: lint_code
+    name: "Lint Code"
+    description: "Run code linters to ensure syntax and style compliance."

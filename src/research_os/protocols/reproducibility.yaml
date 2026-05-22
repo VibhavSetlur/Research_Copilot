@@ -1,14 +1,34 @@
 name: reproducibility
-version: 1.0.0
-description: Standards for reproducible research.
+version: 2.0.0
+description: Checklist and instructions to ensure full reproducibility.
 schema_version: "1.0"
-guidelines:
-  - id: environment
-    name: "Environment"
-    description: "Pin all dependencies and document OS/hardware details."
-  - id: seeds
-    name: "Random Seeds"
-    description: "Fix random seeds for all stochastic processes."
-  - id: data_access
-    name: "Data Access"
-    description: "Ensure data is accessible or provide clear synthetic alternatives."
+expected_outputs:
+  - "workspace/methods.md: Appended reproducibility verification"
+  - "environment/requirements.txt: Frozen environment"
+reproducibility_checklist:
+  1: "Are all raw data files immutable and strictly read-only?"
+  2: "Are derived datasets saved separately in data/derived/?"
+  3: "Are all methodological choices logged in methods.md?"
+  4: "Is the random seed explicitly set for all stochastic operations?"
+  5: "Are all script paths relative to the workspace root?"
+  6: "Is the environment properly frozen (e.g., requirements.txt)?"
+  7: "Is code linted and free of obvious syntax errors?"
+  8: "Do scripts run from top to bottom without manual intervention?"
+  9: "Are third-party data access dates/versions recorded?"
+  10: "Are intermediate outputs properly cached or consistently regenerated?"
+  11: "Are figure generation scripts separate from heavy analysis scripts?"
+  12: "Are dependencies restricted to stable, version-pinned releases?"
+instructions:
+  freeze_environment:
+    command: "pip freeze > environment/requirements.txt"
+  relative_paths:
+    rule: "Never use absolute paths like /home/user/... Always use paths starting with inputs/ or workspace/."
+  random_seeds:
+    python: "import numpy as np; np.random.seed(42); import random; random.seed(42)"
+steps:
+  - id: verify_checklist
+    name: "Verify Checklist"
+    description: "Ensure all 12 points of the reproducibility checklist are met."
+  - id: freeze_env
+    name: "Freeze Environment"
+    description: "Run pip freeze to lock down dependency versions."

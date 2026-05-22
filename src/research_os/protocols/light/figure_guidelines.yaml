@@ -1,0 +1,45 @@
+chart_chooser:
+  comparison:
+    categories: Bar Chart (Horizontal if many categories)
+    over_time: Line Chart
+  distribution:
+    multiple_variables: Box Plot / Violin Plot
+    single_variable: Histogram / Density Plot
+  meta_analysis:
+    effect_sizes: Forest Plot
+    publication_bias: Funnel Plot
+  relationship:
+    three_continuous: Bubble Chart
+    two_continuous: Scatter Plot
+description: Guidelines for selecting and formatting publication-ready figures.
+formatting:
+  color_blind_palettes:
+    okabe_ito:
+    - '#E69F00'
+    - '#56B4E9'
+    - '#009E73'
+    - '#F0E442'
+    - '#0072B2'
+    - '#D55E00'
+    - '#CC79A7'
+    viridis:
+    - '#440154'
+    - '#31688E'
+    - '#35B779'
+    - '#FDE725'
+  layouts:
+    forest_plot: Ensure lines for 95% CI are distinct, align study names left, align
+      OR/RR values right.
+    funnel_plot: Symmetrical pseudo-95% confidence limits must be drawn as dashed
+      lines.
+  typography:
+    min_font_size: 8pt (for publication)
+    title_font_size: 10pt
+name: figure_guidelines
+schema_version: '1.0'
+steps:
+- id: select_chart
+  name: Select Chart Type
+- id: apply_formatting
+  name: Apply Formatting
+version: 2.0.0

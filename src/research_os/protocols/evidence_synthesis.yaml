@@ -1,14 +1,30 @@
 name: evidence_synthesis
-version: 1.0.0
-description: Synthesize evidence from multiple sources.
+version: 2.0.0
+description: Synthesise findings, build evidence tables, and detect contradictions.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/03_synthesis/evidence_table.md"
+  - "workspace/03_synthesis/contradictions.md"
+templates:
+  evidence_table_apa: |
+    | Author(s) & Year | Study Design | Sample Size | Key Findings | GRADE Strength |
+    |------------------|--------------|-------------|--------------|----------------|
+    | Doe et al., 2023 | RCT          | N=250       | ...          | High           |
+grade_system:
+  high: "RCTs without serious limitations, or overwhelming evidence from observational studies."
+  moderate: "RCTs with limitations, or strong observational studies."
+  low: "Observational studies with limitations."
+  very_low: "Case series, expert opinion, or studies with severe flaws."
+automated_contradiction_detector:
+  rule: "Extract the primary outcome direction (positive, negative, null) for each paper. If Paper A asserts positive and Paper B asserts negative/null for the same relationship, flag as a contradiction."
+  action: "Log all flagged contradictions in workspace/03_synthesis/contradictions.md and prompt for potential reasons (e.g., different populations, dosages, or timeframes)."
 steps:
-  - id: extract_data
-    name: "Extract Data"
-    description: "Pull relevant data points from screened literature."
-  - id: analyze_bias
-    name: "Analyze Bias"
-    description: "Assess risk of bias in included studies."
-  - id: synthesize_findings
-    name: "Synthesize Findings"
-    description: "Combine findings into a coherent narrative or meta-analysis."
+  - id: build_evidence_table
+    name: "Build Evidence Table"
+    description: "Extract data from included papers and fill the APA-style template."
+  - id: grade_evidence
+    name: "Grade Evidence"
+    description: "Assign a GRADE strength to each paper."
+  - id: detect_contradictions
+    name: "Detect Contradictions"
+    description: "Run the automated contradiction detector and log conflicts."

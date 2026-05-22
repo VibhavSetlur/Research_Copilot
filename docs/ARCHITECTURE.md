@@ -8,8 +8,8 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    AI IDE (Brain)                        │
-│  Cursor / Windsurf / Claude Desktop / VS Code           │
+│                    AI IDE (Brain)                       │
+│  Cursor / Claude Desktop / VS Code / Antigravity        │
 │  ┌─────────────────────────────────────────────────┐    │
 │  │  The IDE:                                       │    │
 │  │  1. Receives user request (NLP)                 │    │
@@ -22,20 +22,20 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
                        │ MCP Protocol (stdio JSON-RPC)
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              Research OS (Executor)                      │
-│                                                          │
+│              Research OS (Executor)                     │
+│                                                         │
 │  ┌───────────────┐  ┌────────────────────────────────┐  │
-│  │  Tool Router   │  │  State Ledger                  │  │
-│  │  (server.py)   │  │  (.os_state/state_ledger.yaml) │  │
-│  │                │  │  - current_branch              │  │
-│  │  sys.*         │  │  - branches & statuses         │  │
-│  │  tool.*        │  │  - checkpoint_history          │  │
-│  │  view.*        │  │  - pipeline_stage              │  │
-│  │  mem.*         │  │                                │  │
+│  │  Tool Router  │  │  State Ledger                  │  │
+│  │  (server.py)  │  │  (.os_state/state_ledger.yaml) │  │
+│  │               │  │  - current_branch              │  │
+│  │  sys.*        │  │  - branches & statuses         │  │
+│  │  tool.*       │  │  - checkpoint_history          │  │
+│  │  view.*       │  │  - pipeline_stage              │  │
+│  │  mem.*        │  │                                │  │
 │  └───────┬───────┘  └────────────────────────────────┘  │
-│          │                                                │
-│  ┌───────▼────────────────────────────────────────────┐  │
-│  │  Tool Implementations                              │  │
+│          │                                              │
+│  ┌───────▼───────────────────────────────────────────┐  │
+│  │  Tool Implementations                             │  │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │  │
 │  │  │ Hands    │ │ Eyes     │ │ Memory           │   │  │
 │  │  │ (tool.*) │ │ (view.*) │ │ (mem.*)          │   │  │
@@ -47,21 +47,21 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
 │  │  │ transform│ │          │ │ citations.generate│  │  │
 │  │  │ dashboard│ │          │ │ checkpoint       │   │  │
 │  │  └──────────┘ └──────────┘ └──────────────────┘   │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │  Project State (project_ops.py)                    │  │
-│  │  - Workspace scaffold & conventions                │  │
-│  │  - Numbered experiment creation                    │  │
-│  │  - Input intake & hashing                          │  │
-│  │  - Literature indexing                             │  │
-│  └────────────────────────────────────────────────────┘  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  Project State (project_ops.py)                   │  │
+│  │  - Workspace scaffold & conventions               │  │
+│  │  - Numbered experiment creation                   │  │
+│  │  - Input intake & hashing                         │  │
+│  │  - Literature indexing                            │  │
+│  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    Workspace (Filesystem)                │
-│                                                          │
+│                    Workspace (Filesystem)               │
+│                                                         │
 │  inputs/    workspace/    synthesis/    .os_state/      │
 │  (immutable) (active)     (outputs)     (internal)      │
 └─────────────────────────────────────────────────────────┘

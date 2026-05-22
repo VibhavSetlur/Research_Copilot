@@ -50,3 +50,18 @@ We use `pytest` for testing. Place your tests in the `tests/` directory. If your
 ## Bug Reports and Feature Requests
 
 Please use the provided GitHub Issue templates to report bugs or request features. Ensure you provide as much detail as possible to help us understand and resolve the issue quickly.
+
+## Adding New Protocols
+
+Protocols are YAML files located in `src/research_os/protocols/`.
+To add a new protocol:
+1. Create a `your_protocol.yaml` file in the directory.
+2. Define `name`, `version`, `description`, `expected_outputs`, and a list of `steps`.
+3. Generate `light/` variants for small models.
+
+## Adding New Tools
+
+To add a new MCP tool:
+1. Define the tool logic in the appropriate file inside `src/research_os/tools/actions/`.
+2. Register the tool's JSON schema in `src/research_os/server.py` inside the `TOOL_DEFINITIONS` dictionary.
+3. Add an `if name == "your_tool_name":` routing block in the `_handle_tool_call` function in `server.py` to map the MCP invocation to your action logic.

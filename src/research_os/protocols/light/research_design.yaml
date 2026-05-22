@@ -1,0 +1,41 @@
+decision_tree:
+  flowchart:
+    q1:
+      question: Is the treatment assigned randomly by the researcher?
+      true: Randomised Controlled Trial (RCT)
+      false: q2
+    q2:
+      question: Is there a control group?
+      true: q3
+      false: Case Series / Cross-sectional (No comparator)
+    q3:
+      question: Is the outcome rare?
+      true: Case-Control Study
+      false: q4
+    q4:
+      question: Is time a factor (before/after)?
+      true: Longitudinal / Difference-in-Differences (DiD)
+      false: Cohort Study
+description: Select the appropriate research design and compute sample size justification.
+name: research_design
+sample_size_justification:
+  formulae:
+    binary_outcome:
+      alpha: 0.05
+      description: Comparing two proportions.
+      formula: n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - p2)
+        )^2
+      power: 0.8
+    continuous_outcome:
+      alpha: 0.05
+      description: Using Cohen's d for comparing two means.
+      example: "For d=0.5, n \u2248 64 per group."
+      formula: n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2
+      power: 0.8
+schema_version: '1.0'
+steps:
+- id: traverse_flowchart
+  name: Traverse Design Flowchart
+- id: calculate_sample_size
+  name: Calculate Sample Size
+version: 2.0.0

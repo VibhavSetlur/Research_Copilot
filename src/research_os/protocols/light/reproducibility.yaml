@@ -1,0 +1,30 @@
+description: Checklist and instructions to ensure full reproducibility.
+instructions:
+  freeze_environment:
+    command: pip freeze > environment/requirements.txt
+  random_seeds:
+    python: import numpy as np; np.random.seed(42); import random; random.seed(42)
+  relative_paths:
+    rule: Never use absolute paths like /home/user/... Always use paths starting with
+      inputs/ or workspace/.
+name: reproducibility
+reproducibility_checklist:
+  1: Are all raw data files immutable and strictly read-only?
+  2: Are derived datasets saved separately in data/derived/?
+  3: Are all methodological choices logged in methods.md?
+  4: Is the random seed explicitly set for all stochastic operations?
+  5: Are all script paths relative to the workspace root?
+  6: Is the environment properly frozen (e.g., requirements.txt)?
+  7: Is code linted and free of obvious syntax errors?
+  8: Do scripts run from top to bottom without manual intervention?
+  9: Are third-party data access dates/versions recorded?
+  10: Are intermediate outputs properly cached or consistently regenerated?
+  11: Are figure generation scripts separate from heavy analysis scripts?
+  12: Are dependencies restricted to stable, version-pinned releases?
+schema_version: '1.0'
+steps:
+- id: verify_checklist
+  name: Verify Checklist
+- id: freeze_env
+  name: Freeze Environment
+version: 2.0.0

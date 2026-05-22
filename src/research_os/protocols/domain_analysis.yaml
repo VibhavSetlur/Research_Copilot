@@ -1,11 +1,49 @@
 name: domain_analysis
-version: 1.0.0
-description: Analyze a research domain to identify trends and gaps.
+version: 2.0.0
+description: Analyze a research domain to identify trends, required reporting standards, and domain-specific biases.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/logs/domain_analysis.log: Log of domain mapping and decisions"
+  - "workspace/analysis.md: Appended domain assumptions and standard guidelines"
+decision_tree:
+  mapping:
+    clinical:
+      file_extensions: [".dcm", ".edf", ".nii", ".csv"]
+      columns: ["bp", "cholesterol", "patient_id", "diagnosis", "treatment", "bmi"]
+      reporting_standards: ["CONSORT (for RCTs)", "STROBE (for Observational Studies)", "PRISMA (for Systematic Reviews)"]
+      biases_checklist:
+        - "Selection bias (e.g., non-representative sample)"
+        - "Attrition bias (e.g., loss to follow-up)"
+        - "Confounding by indication"
+        - "Measurement bias"
+    finance:
+      file_extensions: [".csv", ".xml", ".json", ".xlsx"]
+      columns: ["ticker", "price", "volume", "market_cap", "pe_ratio", "yield"]
+      reporting_standards: ["GIPS (Global Investment Performance Standards)", "IFRS (International Financial Reporting Standards)"]
+      biases_checklist:
+        - "Survivorship bias (ignoring delisted companies)"
+        - "Look-ahead bias (using data not available at the time)"
+        - "Time period bias"
+        - "Data snooping/overfitting"
+    social_sciences:
+      file_extensions: [".sav", ".dta", ".csv"]
+      columns: ["survey", "likert", "demographics", "respondent", "age_group", "income_bracket"]
+      reporting_standards: ["APA Guidelines", "JARS (Journal Article Reporting Standards)"]
+      biases_checklist:
+        - "Social desirability bias"
+        - "Non-response bias"
+        - "Sampling bias"
+        - "Recall bias"
 steps:
-  - id: identify_keywords
-    name: "Identify Keywords"
-    description: "Extract key terms from the problem statement."
+  - id: identify_domain
+    name: "Identify Domain"
+    description: "Examine file extensions and column names to map to a specific domain using the decision_tree mapping."
   - id: map_landscape
     name: "Map Landscape"
-    description: "Identify major sub-fields and leading authors."
+    description: "Identify major sub-fields and leading authors based on the problem statement."
+  - id: check_reporting_standards
+    name: "Check Reporting Standards"
+    description: "Ensure the identified domain's reporting standards are documented in methods.md."
+  - id: evaluate_biases
+    name: "Evaluate Biases"
+    description: "Run through the domain-specific biases checklist and note potential risks in analysis.md."

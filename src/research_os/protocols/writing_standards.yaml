@@ -1,14 +1,41 @@
 name: writing_standards
-version: 1.0.0
-description: Academic writing standards for publication-ready outputs.
+version: 2.0.0
+description: Standards for IMRAD structuring, writing style, and tables.
 schema_version: "1.0"
-guidelines:
-  - id: tone
-    name: "Tone and Voice"
-    description: "Maintain an objective, formal academic tone. Avoid passive voice where possible."
-  - id: structure
-    name: "IMRAD Structure"
-    description: "Follow Introduction, Methods, Results, and Discussion structure."
-  - id: citations
-    name: "Citation Format"
-    description: "Use consistent APA style for all citations unless otherwise specified."
+expected_outputs:
+  - "workspace/03_synthesis/draft.md: Draft adhering to budgets and rules"
+imrad_budgets:
+  Introduction: "500-750 words (Context, Gap, Objective)"
+  Methods: "750-1000 words (Design, Sample, Measures, Analysis)"
+  Results: "500-800 words (Primary findings, Secondary findings, Sensitivities)"
+  Discussion: "1000-1500 words (Summary, Context, Limitations, Conclusion)"
+writing_rules:
+  do_this:
+    - "State the direction and magnitude of effects."
+    - "Use past tense for completed actions."
+  not_that:
+    - "Do not repeat all table numbers in the text."
+    - "Do not use 'prove' (use 'suggest' or 'indicate')."
+  causal_language:
+    avoid_if_observational: ["caused", "led to", "resulted in", "impacted", "determined"]
+    use_instead: ["was associated with", "was correlated with", "predicted"]
+templates:
+  apa_table: |
+    Table 1
+    Descriptive Statistics
+    ---------------------------------------------------
+    Variable          M         SD        N
+    ---------------------------------------------------
+    Age               35.2      4.1       120
+    ---------------------------------------------------
+    Note. M = Mean, SD = Standard Deviation.
+steps:
+  - id: check_word_budgets
+    name: "Check Word Budgets"
+    description: "Ensure each section falls within the allocated word count."
+  - id: enforce_rules
+    name: "Enforce Writing Rules"
+    description: "Scan the text to replace causal language in observational studies."
+  - id: format_tables
+    name: "Format Tables"
+    description: "Apply the APA table template to all data summaries."

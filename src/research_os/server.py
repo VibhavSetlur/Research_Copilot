@@ -47,7 +47,7 @@ from research_os.tools.actions.external_mcp import discover_mcp
 from research_os.tools.actions.task import task_monitor, task_kill
 from research_os.tools.actions.data import data_sample
 from research_os.tools.actions.search import search_semantic_scholar, search_pubmed, search_crossref
-from research_os.tools.actions.protocol import get_protocol, list_protocols
+from research_os.tools.actions.protocol import get_protocol, list_protocols, validate_protocol
 from research_os.tools.actions.profiling import _profile_inputs
 
 try:
@@ -126,6 +126,17 @@ TOOL_DEFINITIONS = {
         "category": "guidance",
         "inputSchema": {"type": "object", "properties": {}}
     },
+    "sys.guidance.validate": {
+        "description": "Validates if the expected outputs of a protocol exist in the workspace.",
+        "category": "guidance",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "protocol_name": {"type": "string", "description": "Protocol name (e.g., domain_analysis)"}
+            },
+            "required": ["protocol_name"]
+        }
+    },
     "sys.workspace.scaffold": {
         "description": "Create the full directory structure for a new project.",
         "category": "workspace",
@@ -148,7 +159,11 @@ TOOL_DEFINITIONS = {
         "category": "workspace",
         "inputSchema": {
             "type": "object",
-            "properties": {"filepath": {"type": "string"}, "content": {"type": "string"}},
+            "properties": {
+                "filepath": {"type": "string"},
+                "content": {"type": "string"},
+                "force": {"type": "boolean", "description": "Force overwrite even in protected directories like synthesis/"}
+            },
             "required": ["filepath", "content"]
         }
     },
@@ -177,6 +192,11 @@ TOOL_DEFINITIONS = {
     },
     "sys.state.summary": {
         "description": "Get a brief summary of the state.",
+        "category": "state",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    "sys.state.minimal_context": {
+        "description": "Get a <=500 token snapshot of the current state, optimized for small models.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}}
     },
@@ -339,6 +359,15 @@ TOOL_DEFINITIONS = {
              "required": ["query"]
         }
     },
+    "tool.audit.synthesis": {
+        "description": "Audit a generated manuscript for completeness and scientific claims.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"paper_path": {"type": "string"}},
+            "required": ["paper_path"]
+        }
+    },
     "mem.analysis.log": {
         "description": "Append to workspace/analysis.md",
         "category": "memory",
@@ -412,7 +441,7 @@ TOOL_DEFINITIONS = {
         }
     },
     "tool.python.exec": {
-        "description": "Execute a Python script.",
+        "description": "Execute a python script in the workspace. WARNING: Scripts run with the same permissions as the host OS user. For strict sandboxing, run Research OS inside a Docker container.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -498,7 +527,32 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         
     if name == "sys.guidance.get":
         p_name = arguments.get("protocol_name")
+        # Check model profile
+        config_res = get_config(root)
+        profile = "large"
+        if config_res.get("status") == "success":
+             profile = config_res.get("config", {}).get("model_profile", "large")
+             
         res = get_protocol(p_name, root)
+        if "error" in res:
+             return _text(_error_envelope(res["error"]))
+             
+        if profile == "small":
+             # Step-by-step mode: simplify protocol and just return next steps or stripped version
+             import yaml
+             try:
+                 data = yaml.safe_load(res["content"])
+                 stripped = {"name": data.get("name"), "description": data.get("description"), "steps": data.get("steps", [])}
+                 res["content"] = yaml.dump(stripped)
+                 res["note"] = "Loaded in step-by-step mode due to 'small' model profile."
+             except Exception:
+                 pass
+                 
+        return _text(_success_envelope(res))
+
+    if name == "sys.guidance.validate":
+        p_name = arguments.get("protocol_name")
+        res = validate_protocol(p_name, root)
         if "error" in res:
              return _text(_error_envelope(res["error"]))
         return _text(_success_envelope(res))
@@ -526,14 +580,21 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         p = root / arguments["filepath"]
         if not p.exists() or not p.is_file():
             return _text(_error_envelope("File not found"))
+        # Add a size limit of 50MB
+        if p.stat().st_size > 50 * 1024 * 1024:
+             return _text(_error_envelope("File too large (>50MB). Use tool.data.sample instead."))
         return _text(_success_envelope({"content": p.read_text()}))
 
     if name == "sys.file.write":
         p = root / arguments["filepath"]
-        # Immutability enforcement phase 6
+        force = arguments.get("force", False)
+        # Immutability enforcement
         if "inputs/raw_data" in str(p) or "inputs/literature" in str(p):
             if "inputs/literature_index.yaml" not in str(p):
                 return _text(_error_envelope("WriteProtectedError: Cannot modify raw inputs."))
+        if "synthesis/" in str(p) and p.exists() and not force:
+            return _text(_error_envelope("WriteProtectedError: Cannot overwrite files in synthesis/ without force=true."))
+            
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(arguments["content"])
         return _text(_success_envelope({"written": True, "checksum": compute_file_hash(p)}))
@@ -561,6 +622,22 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             "current_branch": state.get("current_branch"),
             "branches": list(state.get("branches", {}).keys())
         }))
+        
+    if name == "sys.state.minimal_context":
+        from research_os.state.state_ledger import StateLedger
+        ledger = StateLedger(root)
+        summary = ledger.get_project_summary(max_tokens=450)
+        return _text(_success_envelope({"minimal_context": summary}))
+        
+    if name == "tool.task.create":
+        from research_os.tools.actions.task import create_task
+        res = create_task(arguments.get("task_description", ""), root)
+        return _text(_success_envelope(res)) if res["status"] == "success" else _text(_error_envelope(res["message"]))
+        
+    if name == "tool.audit.synthesis":
+        from research_os.tools.actions.audit import audit_synthesis
+        res = audit_synthesis(arguments["paper_path"], root)
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
         
     if name == "sys.checkpoint.create":
         res = create_checkpoint(arguments.get("description", ""), root)
@@ -684,26 +761,42 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 
     if name == "tool.python.exec":
         p = root / arguments["script_path"]
-        if not p.exists():
+        if not p.exists() or not p.is_file():
             return _text(_error_envelope("Script not found"))
             
-        # Try to read data_inventory to check duration
         try:
              inventory_path = root / "workspace" / "logs" / "data_inventory.json"
              if inventory_path.exists():
                   with open(inventory_path, "r") as f:
                        inv = json.load(f)
                   est_sec = inv.get("estimated_processing_time_seconds", 0)
-                  # If est_sec > 300, issue warning instead of executing, user must confirm
-                  # We'll assume the client parses this structure
         except Exception:
              pass
         
-        res = subprocess.run([sys.executable, str(p)], cwd=str(p.parent), capture_output=True, text=True)
+        # Determine step for logging
+        step_name = p.stem
+        log_dir = root / "workspace" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        exec_log_path = log_dir / f"{step_name}_exec.log"
+        
+        cmd = [sys.executable, str(p)]
+        res = subprocess.run(cmd, cwd=str(p.parent), capture_output=True, text=True)
+        
+        with open(exec_log_path, "a") as f:
+            f.write(f"--- Executed at {now_iso()} ---\nCommand: {' '.join(cmd)}\nReturn Code: {res.returncode}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}\n\n")
+            
         return _text(_success_envelope({"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode}))
         
     if name == "tool.package.install":
-        res = package_install(arguments["packages"])
+        packages = arguments["packages"]
+        # Verify in a sub-process
+        res = package_install(packages)
+        if res.get("status") == "success":
+             req_path = root / "environment" / "requirements.txt"
+             req_path.parent.mkdir(parents=True, exist_ok=True)
+             with open(req_path, "a") as f:
+                  for pkg in packages:
+                       f.write(f"{pkg}\n")
         return _text(_success_envelope(res))
         
     if name == "tool.env.freeze":
@@ -733,10 +826,20 @@ if HAS_MCP:
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return [
-            Tool(name=name, description=schema["description"], inputSchema=schema["inputSchema"])
-            for name, schema in TOOL_DEFINITIONS.items()
-        ]
+        import os
+        root = Path(os.getcwd())
+        config_res = get_config(root)
+        profile = "large"
+        if config_res.get("status") == "success":
+             profile = config_res.get("config", {}).get("model_profile", "large")
+             
+        tools = []
+        for name, schema in TOOL_DEFINITIONS.items():
+            desc = schema["description"]
+            if profile == "small":
+                 desc = desc.split(".")[0] + "." # Bare essentials
+            tools.append(Tool(name=name, description=desc, inputSchema=schema["inputSchema"]))
+        return tools
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:

@@ -1,11 +1,56 @@
 name: methodology_selection
-version: 1.0.0
-description: Select the appropriate methodology for the research question.
+version: 2.0.0
+description: Three-layer decision matrix to select the best methodology and tools.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/methods.md: Appended methodological choices, libraries, and assumption checks"
+  - "workspace/logs/methodology.log"
+decision_matrix:
+  layers:
+    1_outcome_type: ["continuous", "binary", "count", "time-to-event"]
+    2_data_structure: ["independent", "repeated", "nested", "spatial"]
+    3_number_of_variables: ["univariate", "multivariate", "high-dimensional"]
+  mappings:
+    continuous_independent_multivariate:
+      method: "Multiple Linear Regression"
+      library: "statsmodels (Python) / lm (R)"
+      template: |
+        import statsmodels.api as sm
+        X = sm.add_constant(df[['var1', 'var2']])
+        model = sm.OLS(df['outcome'], X).fit()
+        print(model.summary())
+      assumptions: ["Linearity", "Independence of errors", "Homoscedasticity", "Normality of residuals", "No multicollinearity"]
+    binary_independent_multivariate:
+      method: "Logistic Regression"
+      library: "scikit-learn (Python) / glm (R)"
+      template: |
+        from sklearn.linear_model import LogisticRegression
+        clf = LogisticRegression()
+        clf.fit(X, y)
+      assumptions: ["Linearity of independent variables and log-odds", "Absence of multicollinearity"]
+    time-to-event_independent_multivariate:
+      method: "Cox Proportional Hazards"
+      library: "lifelines (Python) / survival (R)"
+      template: |
+        from lifelines import CoxPHFitter
+        cph = CoxPHFitter()
+        cph.fit(df, duration_col='T', event_col='E')
+        cph.print_summary()
+      assumptions: ["Proportional hazards", "Non-informative censoring"]
+    fallback:
+      method: "Random Forest / Gradient Boosting (Non-parametric)"
+      library: "scikit-learn / xgboost"
+      template: |
+        from sklearn.ensemble import RandomForestRegressor
+        rf = RandomForestRegressor().fit(X, y)
+      assumptions: ["Representative sampling", "Stationarity (if time series)"]
 steps:
-  - id: evaluate_options
-    name: "Evaluate Options"
-    description: "Compare quantitative, qualitative, and mixed methods."
-  - id: justify_selection
-    name: "Justify Selection"
-    description: "Provide rationale for the chosen method based on the research question."
+  - id: identify_layers
+    name: "Identify Matrix Layers"
+    description: "Determine outcome type, data structure, and number of variables."
+  - id: select_methodology
+    name: "Select Methodology"
+    description: "Use the decision matrix mapping to pick the method, library, and template."
+  - id: document_assumptions
+    name: "Document Assumptions"
+    description: "List the assumptions that must be tested during the analysis."

@@ -1,0 +1,85 @@
+decision_matrix:
+  layers:
+    1_outcome_type:
+    - continuous
+    - binary
+    - count
+    - time-to-event
+    2_data_structure:
+    - independent
+    - repeated
+    - nested
+    - spatial
+    3_number_of_variables:
+    - univariate
+    - multivariate
+    - high-dimensional
+  mappings:
+    binary_independent_multivariate:
+      assumptions:
+      - Linearity of independent variables and log-odds
+      - Absence of multicollinearity
+      library: scikit-learn (Python) / glm (R)
+      method: Logistic Regression
+      template: 'from sklearn.linear_model import LogisticRegression
+
+        clf = LogisticRegression()
+
+        clf.fit(X, y)
+
+        '
+    continuous_independent_multivariate:
+      assumptions:
+      - Linearity
+      - Independence of errors
+      - Homoscedasticity
+      - Normality of residuals
+      - No multicollinearity
+      library: statsmodels (Python) / lm (R)
+      method: Multiple Linear Regression
+      template: 'import statsmodels.api as sm
+
+        X = sm.add_constant(df[[''var1'', ''var2'']])
+
+        model = sm.OLS(df[''outcome''], X).fit()
+
+        print(model.summary())
+
+        '
+    fallback:
+      assumptions:
+      - Representative sampling
+      - Stationarity (if time series)
+      library: scikit-learn / xgboost
+      method: Random Forest / Gradient Boosting (Non-parametric)
+      template: 'from sklearn.ensemble import RandomForestRegressor
+
+        rf = RandomForestRegressor().fit(X, y)
+
+        '
+    time-to-event_independent_multivariate:
+      assumptions:
+      - Proportional hazards
+      - Non-informative censoring
+      library: lifelines (Python) / survival (R)
+      method: Cox Proportional Hazards
+      template: 'from lifelines import CoxPHFitter
+
+        cph = CoxPHFitter()
+
+        cph.fit(df, duration_col=''T'', event_col=''E'')
+
+        cph.print_summary()
+
+        '
+description: Three-layer decision matrix to select the best methodology and tools.
+name: methodology_selection
+schema_version: '1.0'
+steps:
+- id: identify_layers
+  name: Identify Matrix Layers
+- id: select_methodology
+  name: Select Methodology
+- id: document_assumptions
+  name: Document Assumptions
+version: 2.0.0
