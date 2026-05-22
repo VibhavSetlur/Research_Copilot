@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import List
-from research_copilot.tools.capability_registry import CapabilityRegistry, CapabilityMetadata
+from research_copilot.tools.capability_registry import CapabilityRegistry
 
 logger = logging.getLogger(__name__)
 

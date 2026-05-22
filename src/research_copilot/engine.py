@@ -14,7 +14,7 @@ import json
 import tempfile
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from research_copilot.runtime.hooks import hook_engine
 from research_copilot.state.state_ledger import ResearchLedger
@@ -211,7 +211,7 @@ class ResearchEngine:
         base_prompt: str = "",
         node_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        from research_copilot.assets.schemas.validator import validate_with_retry, get_schema_for_task
+        from research_copilot.schemas.validator import validate_with_retry, get_schema_for_task
 
         try:
             schema = get_schema_for_task(task_name)

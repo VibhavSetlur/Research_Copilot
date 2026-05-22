@@ -5,7 +5,6 @@ Performs quality and publication compliance checks on generated PNG figures.
 Checks DPI, margin truncation, colorblind safety, and axis labels.
 """
 
-import os
 import sys
 import argparse
 from pathlib import Path

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Dict, Any
 from research_copilot.prompts.agent_prompts import AGENT_PROMPTS
 from research_copilot.prompts.skill_prompts import SKILL_PROMPTS
@@ -67,8 +67,7 @@ class ReflectionAgent:
         self.authority = "strategic_reflection"
         
     def reflect(self, trajectory: str) -> AgentResponse:
-        base_prompt = AGENT_PROMPTS.get("10_critic", "")
-        prompt = f"{base_prompt}\n\nReflect on this trajectory and identify gaps: {trajectory}"
+        AGENT_PROMPTS.get("10_critic", "")
         return AgentResponse(success=True, output={"gaps": ["Need more data"]}, escalate=False)
 
 class ValidationAgent:
@@ -78,8 +77,7 @@ class ValidationAgent:
         self.authority = "output_validation"
         
     def validate(self, output_data: str, constraints: str) -> AgentResponse:
-        base_prompt = AGENT_PROMPTS.get("07_audit_validate", "")
-        prompt = f"{base_prompt}\n\nValidate this data against constraints: {output_data} | {constraints}"
+        AGENT_PROMPTS.get("07_audit_validate", "")
         return AgentResponse(success=True, output={"valid": True}, escalate=False)
 
 class MemoryAgent:
@@ -89,5 +87,4 @@ class MemoryAgent:
         self.authority = "memory_retrieval"
         
     def query(self, query: str) -> AgentResponse:
-        prompt = f"Query memory for: {query}"
         return AgentResponse(success=True, output={"results": []}, escalate=False)

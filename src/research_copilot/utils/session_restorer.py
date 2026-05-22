@@ -11,7 +11,6 @@ Programmatic usage:
     print(prompt)
 """
 
-import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -119,7 +118,7 @@ def _format_ctm_summary(root: Path) -> str:
 
 def _determine_next_agent(state: dict) -> str:
     """Determine which agent should run next based on current phase."""
-    phase = state.get("phase", "research_init")
+    state.get("phase", "research_init")
     checkpoints = state.get("checkpoints", {})
 
     pipeline = [

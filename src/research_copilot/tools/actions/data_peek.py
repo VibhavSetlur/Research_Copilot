@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, Union
+from typing import Dict, Any
 from research_copilot.project_ops import _resolve_root
 
 class DataPeekProtocol:

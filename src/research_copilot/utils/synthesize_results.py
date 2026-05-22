@@ -5,14 +5,13 @@ Reads parallel runner execution results, compiles individual task outputs,
 detects empirical conflicts, and updates the research map and manifest.
 """
 
-import os
 import sys
 import json
 import argparse
 import hashlib
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -182,7 +181,7 @@ def main():
     for worker in worker_results:
         task_id = worker.get("id")
         success = worker.get("success", False)
-        log_file = worker.get("log_file")
+        worker.get("log_file")
 
         if not success:
             print(f"  [✗] Task {task_id} failed. Skipping output collection.")

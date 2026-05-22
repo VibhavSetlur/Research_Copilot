@@ -5,7 +5,6 @@ Reads the analysis blueprint, checks required tools against the tool registry,
 and writes a tool availability report to .research/cache/.
 """
 import argparse
-import json
 import shutil
 import subprocess
 from pathlib import Path

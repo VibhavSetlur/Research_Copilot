@@ -1,4 +1,3 @@
-import pytest
 from pathlib import Path
 
 from research_copilot.prompts.prompt_builder import PromptBuilder

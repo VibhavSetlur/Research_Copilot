@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  research-os:
+    build: .
+    volumes:
+      - ./workspace:/app/workspace
+    env_file:
+      - .env
+    # research-os CLI accepts 'run' commands
+    # e.g., docker-compose run research-os run "Analyze the dataset"

@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import logging
 from research_copilot.state.state_ledger import ResearchLedger
 from research_copilot.project_ops import _resolve_root
@@ -40,7 +40,7 @@ class TaskScheduler:
         if not steps:
             return None
             
-        state = self.ledger.get()
+        self.ledger.get()
         dag = self.ledger.get_dag()
         recent_nodes = dag.get("nodes", {})
         

@@ -1,7 +1,6 @@
-import pytest
 import json
 
-from research_copilot.tools.tool_registry import ToolRegistry, ToolMetadata
+from research_copilot.tools.tool_registry import ToolRegistry
 from research_copilot.planning.capability_planner import CapabilityPlanner
 
 def create_mock_llm(response_json):

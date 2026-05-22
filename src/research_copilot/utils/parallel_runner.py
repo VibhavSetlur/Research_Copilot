@@ -19,7 +19,7 @@ import asyncio
 import argparse
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 
 class FileLock:
@@ -85,7 +85,7 @@ def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[st
 
         matched = None
         for q in questions_data:
-            q_text = q.get("text", "").lower()
+            q.get("text", "").lower()
             q_idx = questions_data.index(q) + 1
             if q_id_clean == f"q{q_idx}" or q_id_clean == str(q_idx):
                 matched = q

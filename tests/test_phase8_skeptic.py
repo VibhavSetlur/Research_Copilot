@@ -1,4 +1,3 @@
-import pytest
 import json
 
 from research_copilot.agents.critic import CriticAgent, SkepticAgent

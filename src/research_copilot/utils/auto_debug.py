@@ -17,11 +17,9 @@ Usage:
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
-import traceback as tb_module
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -300,7 +298,7 @@ def run_auto_debug(
     fix_func: Optional[str] = None,
 ) -> dict:
     """Run the auto-debugging loop."""
-    root = find_project_root()
+    find_project_root()
     results = []
 
     for attempt in range(1, max_attempts + 1):

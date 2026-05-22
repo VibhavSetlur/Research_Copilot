@@ -8,7 +8,6 @@ Agent queries are routed through these standard protocols natively, removing
 the need for custom one-off adapters.
 """
 
-import json
 import logging
 import shutil
 import subprocess

@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict, Any
 
-from research_copilot.assets.schemas.orchestration_schema import PlannerDecision
+from research_copilot.schemas.orchestration_schema import PlannerDecision
 
 logger = logging.getLogger("research.planner")
 

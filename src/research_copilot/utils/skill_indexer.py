@@ -13,7 +13,6 @@ Search priority:
   2. src/research_copilot/assets/skills/  (bundled package skills)
 """
 
-import os
 import sys
 import json
 import re

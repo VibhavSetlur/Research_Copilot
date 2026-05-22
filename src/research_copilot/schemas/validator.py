@@ -1,9 +1,9 @@
 import json
 import logging
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
+from typing import Callable, Optional, Type, TypeVar, Union
 from pathlib import Path
 
-from pydantic import ConfigDict, BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger("research.schemas.validator")
 

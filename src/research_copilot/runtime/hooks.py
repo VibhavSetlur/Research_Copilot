@@ -11,7 +11,7 @@ import json
 import logging
 import asyncio
 from pathlib import Path
-from typing import Callable, Dict, List, Any, Optional, Union
+from typing import Callable, Dict, List, Any, Optional
 from datetime import datetime, timezone
 
 logger = logging.getLogger("research.hooks")

@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from research_copilot.tools.tool_registry import ToolRegistry, ToolMetadata
 

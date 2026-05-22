@@ -20,7 +20,6 @@ import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Any
-from research_copilot.utils.common import load_yaml
 
 _MODELS_YAML = Path(__file__).resolve().parents[1] / "models.yaml"
 _RESOLVED_CACHE = {}
@@ -455,6 +454,9 @@ def cascade_resolve(
     # ── Phase 1: local / cheap model ─────────────────────────────────────────
     dialect_prompt = LLMDialectRouter.format_prompt(prompt, local_model_id, expects_json=schema is not None)
     
+    from research_copilot.utils.cost_tracker import global_cost_tracker
+    estimated_prompt_tokens = len(dialect_prompt) // 4
+    
     for attempt in range(max_local_retries):
         try:
             raw = call_llm(local_model_id, dialect_prompt)
@@ -469,6 +471,11 @@ def cascade_resolve(
                     node_id=node_id,
                 )
                 validated_output = instance.model_dump()
+
+            estimated_completion_tokens = len(raw) // 4
+            global_cost_tracker.add_usage(local_model_id, estimated_prompt_tokens, estimated_completion_tokens)
+            # Log summary occasionally
+            global_cost_tracker.print_summary()
 
             import logging as _logging
             _logging.getLogger("research.model_resolver").info(
@@ -530,6 +537,11 @@ def cascade_resolve(
                 node_id=node_id,
             )
             validated_output = instance.model_dump()
+
+        estimated_api_prompt_tokens = len(api_dialect_prompt) // 4
+        estimated_api_completion_tokens = len(raw) // 4
+        global_cost_tracker.add_usage(api_model_id, estimated_api_prompt_tokens, estimated_api_completion_tokens)
+        global_cost_tracker.print_summary()
 
         return {
             "raw_output": raw,

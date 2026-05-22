@@ -13,7 +13,7 @@ import hashlib
 import time
 import argparse
 from pathlib import Path
-from typing import Any, Optional, Dict, Tuple, List
+from typing import Any, Optional, Dict, List
 
 
 # Simple file lock for state.json

@@ -1,7 +1,7 @@
 """Schema definitions for the global research state ledger."""
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
 

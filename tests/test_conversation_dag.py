@@ -1,11 +1,8 @@
-import pytest
-import os
 import json
 from pathlib import Path
-from typing import Dict, Any
 
 from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.agents.supervisor import SupervisorAgent
+from research_copilot.agents.supervisor_agent import SupervisorAgent
 from research_copilot.execution.scheduler import TaskScheduler
 
 class MockPlanner:

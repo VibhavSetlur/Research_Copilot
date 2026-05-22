@@ -4,11 +4,10 @@
 Compiles parallel markdown sections into a final PDF/HTML using Pandoc.
 """
 
-import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from research_copilot.utils.common import find_project_root
 

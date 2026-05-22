@@ -12,7 +12,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from research_copilot.utils.common import find_project_root
 

@@ -1,9 +1,7 @@
 import json
 import logging
-from typing import Dict, Any, Optional
 
-from research_copilot.assets.schemas.orchestration_schema import ExecutionIntent
-from research_copilot.prompts.prompt_builder import PromptBuilder
+from research_copilot.schemas.orchestration_schema import ExecutionIntent
 from research_copilot.state.state_ledger import ResearchLedger
 
 logger = logging.getLogger("research.supervisor")
@@ -11,9 +9,12 @@ logger = logging.getLogger("research.supervisor")
 class SupervisorAgent:
     """Top-level cognitive orchestrator that interprets user intent and steers the execution graph."""
 
+    MAX_ITERATIONS = 15
+
     def __init__(self, root, ledger: ResearchLedger, call_llm_fn=None):
         self.root = root
         self.ledger = ledger
+        self.session_iterations = 0
         if call_llm_fn:
             self.call_llm = call_llm_fn
         else:
@@ -26,6 +27,11 @@ class SupervisorAgent:
 
     def process_request(self, user_request: str, mode: str = "exploratory") -> ExecutionIntent:
         """Determines the nature of the request and decides on next actions."""
+        self.session_iterations += 1
+        if self.session_iterations > self.MAX_ITERATIONS:
+            logger.error("Halt-and-Catch-Fire: MAX_ITERATIONS reached.")
+            raise RuntimeError(f"Safety limit reached: SupervisorAgent exceeded {self.MAX_ITERATIONS} iterations.")
+
         
         # Simple prompt for Phase 1
         prompt = f"""

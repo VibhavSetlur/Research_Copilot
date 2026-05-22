@@ -1,6 +1,5 @@
-from research_copilot.planning.dynamic_planner import ExecutionNode, PlanMutation
+from research_copilot.planning.dynamic_planner import PlanMutation
 from research_copilot.project_ops import _resolve_root
-import os
 
 class PlanMutationEngine:
     """Applies runtime operations to the Execution Graph."""
@@ -64,7 +63,6 @@ class PlanMutationEngine:
             lines = ["graph TD"]
             for node_id, node_info in dag.get("nodes", {}).items():
                 status = node_info.get("status", "pending")
-                color = "green" if status == "success" else "yellow" if status == "pending" else "red"
                 lines.append(f"    {node_id}[{node_id}]:::class_{status}")
                 for dep in node_info.get("dependencies", []):
                     lines.append(f"    {dep} --> {node_id}")
@@ -75,6 +73,6 @@ class PlanMutationEngine:
             
             with open(mermaid_path, "w") as f:
                 f.write("\n".join(lines))
-        except Exception as e:
+        except Exception:
             pass
 

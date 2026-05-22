@@ -1,8 +1,7 @@
-import pytest
 import json
 from pathlib import Path
 
-from research_copilot.agents.supervisor import SupervisorAgent
+from research_copilot.agents.supervisor_agent import SupervisorAgent
 from research_copilot.state.state_ledger import ResearchLedger
 
 def test_user_removing_evidence(tmp_path: Path):

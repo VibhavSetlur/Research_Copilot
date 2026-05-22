@@ -1,7 +1,9 @@
 import logging
 import json
 from typing import Dict, Any, List
+import os
 from tenacity import retry, wait_exponential, stop_after_attempt
+from research_copilot.config import settings
 
 logger = logging.getLogger("research.tools.literature_retrieval")
 
@@ -27,6 +29,8 @@ def search_crossref(query: str, limit: int = 5) -> List[Dict[str, Any]]:
 def search_pubmed(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     try:
         from metapub import PubMedFetcher
+        if settings.NCBI_API_KEY:
+            os.environ["NCBI_API_KEY"] = settings.NCBI_API_KEY
         fetch = PubMedFetcher()
         pmids = fetch.pmids_for_query(query, retmax=limit)
         results = []
@@ -79,7 +83,12 @@ def retrieve_literature(query: str, source: str = "crossref", limit: int = 5) ->
         if source == "crossref":
             results = search_crossref(query, limit)
         elif source == "pubmed":
-            results = search_pubmed(query, limit)
+            try:
+                results = search_pubmed(query, limit)
+            except Exception as e:
+                logger.warning(f"PubMed failed, falling back to Crossref: {e}")
+                results = search_crossref(query, limit)
+                source = "crossref (fallback)"
         elif source == "arxiv":
             results = search_arxiv(query, limit)
         else:

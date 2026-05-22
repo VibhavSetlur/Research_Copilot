@@ -20,7 +20,7 @@ from research_copilot.project_ops import (
     scaffold_minimal_workspace,
 )
 from research_copilot.utils.asset_manager import AssetManager
-from research_copilot.utils.manuscript_compiler import cmd_compile, ManuscriptCompiler
+from research_copilot.utils.manuscript_compiler import cmd_compile
 
 # All valid depth values — quick/standard/deep are user-facing aliases;
 
@@ -260,6 +260,51 @@ def cmd_run(args: argparse.Namespace) -> None:
     print(f"\nRun completed with status: {result.get('status', 'unknown')}")
 
 
+def cmd_doctor(args: argparse.Namespace) -> None:
+    import shutil
+    import os
+    from research_copilot.config import settings
+    
+    print("=" * 60)
+    print("AGENTIC RESEARCH OS - DOCTOR (Pre-Flight Check)")
+    print("=" * 60)
+    
+    # 1. API Keys
+    print("\n[API Keys]")
+    if settings.OPENAI_API_KEY or settings.ANTHROPIC_API_KEY:
+        print("✅ Primary LLM Provider Key configured.")
+    else:
+        print("❌ WARNING: No OPENAI_API_KEY or ANTHROPIC_API_KEY found.")
+        
+    if settings.SEMANTIC_SCHOLAR_API_KEY:
+        print("✅ Semantic Scholar API configured.")
+    else:
+        print("ℹ️  INFO: Semantic Scholar API key missing (will fallback or fail gracefully).")
+
+    # 2. Dependencies
+    print("\n[System Dependencies]")
+    if shutil.which("pdflatex"):
+        print("✅ pdflatex found (PDF compilation available).")
+    else:
+        print("❌ WARNING: pdflatex not found. You will only get Markdown outputs, not PDFs.")
+        
+    if shutil.which("pandoc"):
+        print("✅ pandoc found.")
+    else:
+        print("❌ WARNING: pandoc not found. Manuscript compilation may fail.")
+        
+    # 3. Permissions
+    print("\n[Permissions]")
+    workspace_dir = _project_root() / "workspace"
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    if os.access(workspace_dir, os.W_OK):
+        print("✅ Workspace directory is writable.")
+    else:
+        print("❌ WARNING: Workspace directory is NOT writable.")
+        
+    print("\nDone.")
+
+
 def cmd_branch(args: argparse.Namespace) -> None:
     result = create_experiment_branch(args.name, hypothesis=args.hypothesis, parent=args.parent, root=_project_root())
     print(f"Created branch: {result['branch_id']}")
@@ -446,6 +491,9 @@ def build_parser() -> argparse.ArgumentParser:
     
     p_run = sub.add_parser("run", help="Run the Agentic Research OS on a natural language query")
     p_run.add_argument("query", help="The research task to execute")
+    p_run.add_argument("--plan-only", action="store_true", help="Generate the research plan and exit without executing loops.")
+    
+    sub.add_parser("doctor", help="Pre-flight check for API keys, LaTeX, and permissions")
 
     p_compress = sub.add_parser(
         "compress",
@@ -533,6 +581,7 @@ def main() -> None:
         "chat": lambda a: __import__('research_copilot.chat').chat.start_chat_loop(),
         "init": cmd_init,
         "run": cmd_run,
+        "doctor": cmd_doctor,
         "preflight": cmd_preflight,
         "scan": cmd_scan,
         "setup": cmd_setup,

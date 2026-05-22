@@ -1,10 +1,10 @@
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Optional, Any
 from datetime import datetime, timezone
 
 from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.assets.schemas.state_schema import EpisodicMemory, SemanticMemory, MemoryState
+from research_copilot.schemas.state_schema import EpisodicMemory, SemanticMemory, MemoryState
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class MemorySynthesizer:
             from research_copilot.chat import call_llm
             self.call_llm = call_llm
 
-    def synthesize_episode(self, trigger: str, recent_turns: List[Dict[str, str]], decisions: List[str] = None, rejected: List[str] = None) -> EpisodicMemory:
+    def synthesize_episode(self, trigger: str, recent_turns: List[Dict[str, str]], decisions: Optional[List[str]] = None, rejected: Optional[List[str]] = None) -> EpisodicMemory:
         """Creates a new episodic memory from recent context and adds it to the ledger."""
         decisions = decisions or []
         rejected = rejected or []

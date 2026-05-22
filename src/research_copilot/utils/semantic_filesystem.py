@@ -360,7 +360,6 @@ class SemanticFilesystemEnforcer:
             Validation result dict
         """
         relative = file_path.relative_to(self.root) if file_path.is_absolute() else file_path
-        parts = relative.parts
 
         result = {
             "file": str(file_path),

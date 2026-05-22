@@ -1,5 +1,4 @@
 import json
-from typing import Dict, Any
 from research_copilot.state.state_ledger import ResearchLedger
 from research_copilot.cognition.cognitive_tracker import CognitiveStateTracker
 
@@ -159,7 +158,7 @@ class PromptBuilder:
         pending_actions = "\n".join(f"- {p}" for p in state.get("hitl_pending", {}).get("proposed_plan", []))
         
         memory_state = state.get("memory", {})
-        semantic_memory = memory_state.get("semantic", {})
+        memory_state.get("semantic", {})
         token_used = memory_state.get("token_usage", 0)
         token_limit = 128000
         

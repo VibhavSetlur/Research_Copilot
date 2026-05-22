@@ -1,10 +1,9 @@
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from typing import List, Optional, Any, Dict
 import uuid
 from datetime import datetime, timezone
 
 from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.assets.schemas.state_schema import (
+from research_copilot.schemas.state_schema import (
     Hypothesis, Claim, Evidence, Contradiction, CognitiveObjects, CitationObject
 )
 
@@ -53,7 +52,7 @@ class CognitiveStateTracker:
                 break
         self._save_cognitive_objects(objects)
 
-    def add_claim(self, description: str, provenance: str = "", source_nodes: List[str] = None) -> str:
+    def add_claim(self, description: str, provenance: str = "", source_nodes: Optional[List[str]] = None) -> str:
         """Record a verified or pending claim."""
         objects = self._get_cognitive_objects()
         c_id = f"claim_{uuid.uuid4().hex[:8]}"
@@ -73,7 +72,7 @@ class CognitiveStateTracker:
                 break
         self._save_cognitive_objects(objects)
 
-    def add_evidence(self, description: str, source_file: str = None, provenance: str = "") -> str:
+    def add_evidence(self, description: str, source_file: Optional[str] = None, provenance: str = "") -> str:
         """Record a piece of evidence."""
         objects = self._get_cognitive_objects()
         e_id = f"ev_{uuid.uuid4().hex[:8]}"
@@ -82,7 +81,7 @@ class CognitiveStateTracker:
         self._save_cognitive_objects(objects)
         return e_id
         
-    def add_citation(self, title: str, authors: List[str], url_or_doi: str = None) -> str:
+    def add_citation(self, title: str, authors: List[str], url_or_doi: Optional[str] = None) -> str:
         """Record a formal citation."""
         objects = self._get_cognitive_objects()
         cit_id = f"cit_{uuid.uuid4().hex[:8]}"
@@ -107,7 +106,7 @@ class CognitiveStateTracker:
                 break
         self._save_cognitive_objects(objects)
 
-    def log_contradiction(self, description: str, related_claims: List[str] = None) -> str:
+    def log_contradiction(self, description: str, related_claims: Optional[List[str]] = None) -> str:
         """Log a contradiction and decay confidence in related claims."""
         objects = self._get_cognitive_objects()
         c_id = f"contra_{uuid.uuid4().hex[:8]}"

@@ -1,9 +1,9 @@
 import json
-from typing import List, Dict, Optional
+from typing import List
 from datetime import datetime, timezone
 
 from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.assets.schemas.state_schema import DAGNode, ExecutionDAG
+from research_copilot.schemas.state_schema import DAGNode, ExecutionDAG
 
 class PlanMutationEngine:
     """Safely manages runtime mutations to the execution DAG."""

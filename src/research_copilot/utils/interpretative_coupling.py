@@ -11,12 +11,10 @@ Usage (as interceptor):
     state = generate_interpretation(state, figure_path="reports/figures/scatter.png")
 """
 
-import json
 import logging
-import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from research_copilot.utils.common import find_project_root
 

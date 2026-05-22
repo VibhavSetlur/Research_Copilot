@@ -74,7 +74,7 @@ class CitationRetractedError(Exception):
         self.identifier = identifier
 
 
-from research_copilot.utils.common import find_project_root, save_json_atomic, now_iso
+from research_copilot.utils.common import find_project_root
 
 
 def add_core_path():
