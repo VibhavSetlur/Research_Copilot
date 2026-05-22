@@ -73,8 +73,14 @@ def start_chat_loop():
         
         # Phase 12 Proactive Reasoning
         from research_copilot.agents.specialized_agents import ReflectionAgent
+        from research_copilot.intent_router import IntentRouter
+        
+        router = IntentRouter(root)
+        kg = conv_state.get_state().model_dump()
+        minimal_context = router.get_minimal_context(user_msg, project_state=kg, knowledge_graph=kg)
+        
         reflection_agent = ReflectionAgent(call_llm)
-        reflection = reflection_agent.reflect(str(conv_state.get_state().active_thread_turns))
+        reflection = reflection_agent.reflect(str(minimal_context["kg_fragment"]))
         if reflection.success and reflection.output.get("gaps"):
             print("\n[PROACTIVE REASONING]")
             for gap in reflection.output["gaps"]:

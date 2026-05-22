@@ -6,8 +6,9 @@ logger = logging.getLogger(__name__)
 
 class InterruptEngine:
     """Handles deep interruptions and state preservation during nested tasks."""
-    def __init__(self, ledger: ResearchLedger):
+    def __init__(self, ledger: ResearchLedger, conversation_state=None):
         self.ledger = ledger
+        self.conversation_state = conversation_state
 
     def trigger_interrupt(self, interrupt_type: str, context: Dict[str, Any]):
         """Types: informational, corrective, branching, speculative, destructive, exploratory"""
@@ -30,6 +31,10 @@ class InterruptEngine:
         })
         
         self.ledger.update(interrupt_stack=interrupt_stack, active_node=None)
+        
+        if self.conversation_state:
+            self.conversation_state.push_interrupt(interrupt_type, snapshot)
+            
         logger.info(f"Triggered {interrupt_type} interrupt. State saved.")
 
     def recover(self) -> Optional[Dict[str, Any]]:
@@ -48,5 +53,9 @@ class InterruptEngine:
             pending_validations=snapshot["pending_validations"],
             active_hypothesis=snapshot["active_hypothesis"]
         )
+        
+        if self.conversation_state:
+            self.conversation_state.pop_interrupt()
+            
         logger.info("Recovered from interrupt. Restored previous state.")
         return snapshot

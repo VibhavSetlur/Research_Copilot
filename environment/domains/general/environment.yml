@@ -1,6 +1,0 @@
-name: research-copilot-general
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - python=3.11

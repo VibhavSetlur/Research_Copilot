@@ -20,7 +20,11 @@ class SideTaskManager:
         # Suspend main thread
         self.interrupt_engine.trigger_interrupt("exploratory", context={"side_task": description})
         
-        task = SideTask(description, context)
+        # Isolate context window from main thread
+        isolated_context = dict(context)
+        isolated_context["active_thread_turns"] = []
+        
+        task = SideTask(description, isolated_context)
         self.active_tasks[task.id] = task
         return task.id
 

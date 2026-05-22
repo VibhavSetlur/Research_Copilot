@@ -280,22 +280,19 @@ class IntentRouter:
         """
         return set(NULL_SPACE_KEYWORDS.get(primary_intent, []))
 
-    def get_minimal_context(self, query: str, project_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_minimal_context(self, query: str, project_state: Optional[Dict[str, Any]] = None, knowledge_graph: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get the minimal context payload for a query.
 
         Args:
             query: User's natural language query
             project_state: Current state of the project
+            knowledge_graph: Full ResearchKnowledgeGraph to subset
 
         Returns:
             Dict matching SkillPlannerOutput format
         """
         classification = self.classify_intent(query)
         primary = classification["primary_intent"]
-        
-        # Estimate depth dynamically (replacing manual depth selection)
-        # For a full implementation, we rely on PlannerAgent for this, but router
-        # will provide all possible relevant skills for the intent.
         
         null_space = self.compute_null_space(primary)
         config = INTENT_CATEGORIES[primary]
@@ -305,6 +302,18 @@ class IntentRouter:
         workflow_steps = list(config["workflow_steps"])
 
         enhanced_skills = self._enhance_skills_from_index(skills, query)
+        
+        # Pass only strictly necessary fragments of the ResearchKnowledgeGraph
+        kg_fragment = {}
+        if knowledge_graph:
+            if primary in ["hypothesis_test", "causal", "bayesian", "predictive", "robustness"]:
+                kg_fragment = {"methodology": knowledge_graph.get("methodology", {}), "data": knowledge_graph.get("data", {})}
+            elif primary == "literature":
+                kg_fragment = {"background": knowledge_graph.get("background", {}), "citations": knowledge_graph.get("citations", {})}
+            elif primary == "visualization":
+                kg_fragment = {"data": knowledge_graph.get("data", {}), "results": knowledge_graph.get("results", {})}
+            else:
+                kg_fragment = knowledge_graph
 
         return {
             "relevant_skills": enhanced_skills,
@@ -312,8 +321,9 @@ class IntentRouter:
             "required_agents": agents,
             "workflow_steps": workflow_steps,
             "expected_outputs": [],
-            "confidence_score": 0.9, # Placeholder, can be dynamically calculated based on classification score
-            "classification": classification # Kept for backward compatibility if needed
+            "confidence_score": 0.9, 
+            "classification": classification,
+            "kg_fragment": kg_fragment
         }
 
     @staticmethod

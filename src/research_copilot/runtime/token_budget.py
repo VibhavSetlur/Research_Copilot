@@ -29,9 +29,11 @@ class TokenBudgetTracker:
         if ratio >= _WARNING_THRESHOLD and not self._warned:
             self._warned = True
             logger.warning(
-                "Token budget at %.0f%%. Consider running `rcp compress` to free context.",
+                "Token budget at %.0f%%. Triggering automatic semantic chunking/compression.",
                 ratio * 100,
             )
+            from research_copilot.runtime.hooks import hook_engine
+            hook_engine.trigger_sync("compress_memory", {"status": "budget_warning"})
 
         if ratio >= _EMERGENCY_THRESHOLD and not self.limit_reached:
             self.limit_reached = True

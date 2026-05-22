@@ -51,7 +51,7 @@ class ResearchLedger:
         )
         try:
             with os.fdopen(fd, "w") as f:
-                json.dump(data, f, indent=2, default=str)
+                json.dump(data, f, indent=2, default=str, sort_keys=True)
             os.replace(tmp_path, str(self._path))
         except Exception:
             if os.path.exists(tmp_path):
@@ -293,7 +293,7 @@ class ResearchLedger:
         fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
         try:
             with os.fdopen(fd, "w") as f:
-                json.dump(data, f, indent=2, default=str)
+                json.dump(data, f, indent=2, default=str, sort_keys=True)
             os.replace(tmp_path, str(path))
         except Exception:
             if os.path.exists(tmp_path):

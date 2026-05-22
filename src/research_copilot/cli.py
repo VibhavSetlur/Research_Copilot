@@ -387,6 +387,13 @@ def cmd_audit(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_start(args: argparse.Namespace) -> None:
+    from research_copilot.server import main
+    import sys
+    if "start" in sys.argv:
+        sys.argv.remove("start")
+    main()
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rcp",
@@ -476,6 +483,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_artifact.add_argument("--source-script")
     p_artifact.add_argument("--branch")
 
+    p_start = sub.add_parser("start", help="Boot the MCP server")
+    p_start.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    p_start.add_argument("--port", type=int, default=8080)
+
     return parser
 
 
@@ -511,6 +522,7 @@ def main() -> None:
         "branches": cmd_branches,
         "log-decision": cmd_log_decision,
         "save-artifact": cmd_save_artifact,
+        "start": cmd_start,
     }
     handler = commands.get(args.command)
     if handler:

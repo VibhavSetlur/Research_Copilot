@@ -48,6 +48,11 @@ dependencies = [
     "Pillow>=10.0",
     "jinja2>=3.0",
     "tenacity>=8.0",
+    "openpyxl>=3.1",
+    "missingno>=0.5",
+    "matplotlib-venn>=0.11",
+    "wordcloud>=1.9",
+    "pycirclize>=0.13",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +66,12 @@ dashboard = [
     "bokeh>=3.3",
     "plotly>=5.18",
     "altair>=5.2",
+    "dash>=2.16",
+    "dash-bootstrap-components>=1.5",
+    "param>=2.1",
+    "holoviews>=1.18",
+    "pygwalker>=0.4",
+    "vega_datasets>=0.9",
 ]
 export = [
     "pypandoc>=1.11",

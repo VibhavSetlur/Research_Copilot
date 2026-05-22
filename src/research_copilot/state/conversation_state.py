@@ -30,6 +30,15 @@ class ConversationState:
 
     def add_turn(self, role: str, content: str):
         self.state_data.active_thread_turns.append({"role": role, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()})
+        
+        if len(self.state_data.active_thread_turns) > 15:
+            from research_copilot.prompts.prompt_compression import PromptCompressor
+            older = self.state_data.active_thread_turns[:-5]
+            episodic_format = [{"timestamp": t.get("timestamp", ""), "summary": f"{t['role']}: {t['content'][:100]}"} for t in older]
+            compressed = PromptCompressor.compress_trajectory(episodic_format, max_items=10)
+            self.state_data.reasoning_trajectory.append(compressed)
+            self.state_data.active_thread_turns = self.state_data.active_thread_turns[-5:]
+            
         self.memory.save(self.state_data)
 
     def push_interrupt(self, reason: str, state_snapshot: Dict[str, Any]):
