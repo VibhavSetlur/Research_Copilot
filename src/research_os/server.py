@@ -907,8 +907,11 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
     # ── Query analysis ─────────────────────────────────────────────
 
     if name == "view.analyze_intent":
+        query = arguments.get("query")
+        if not query:
+            return _text(_error_envelope("Missing required argument: query"))
         analyzer = IntentAnalyzer(root)
-        intake = analyzer.build_bootstrap_intake(arguments["query"])
+        intake = analyzer.build_bootstrap_intake(query)
         intake["constraints"]["depth"] = arguments.get("depth", "academic")
         suggested = intake.get("suggested_skills", [])[:3]
         return _text(_success_envelope(
