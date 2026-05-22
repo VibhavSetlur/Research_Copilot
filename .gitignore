@@ -86,3 +86,6 @@ desktop.ini
 
 # Task logs
 *.log
+
+# Temporary scratch folder
+scratch/

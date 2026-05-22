@@ -30,6 +30,8 @@ class ResearchLedger:
             state_path = root / "03_synthesis" / "state_ledger.json"
         self._path = Path(state_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        from research_copilot.core.session_replay import SessionReplayManager
+        self.replay_manager = SessionReplayManager(self._path.parent / "replay_logs")
 
     def _load(self) -> dict:
         if self._path.exists():
@@ -40,6 +42,10 @@ class ResearchLedger:
     def _save(self, data: dict) -> None:
         """Atomic write: write to temp file, then rename to avoid corruption."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if hasattr(self, 'replay_manager'):
+            self.replay_manager.capture_snapshot("ledger_save", data)
+            
         fd, tmp_path = tempfile.mkstemp(
             dir=str(self._path.parent), suffix=".tmp"
         )

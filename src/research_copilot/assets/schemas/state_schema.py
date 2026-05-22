@@ -1,7 +1,8 @@
 """Schema definitions for the global research state ledger."""
 
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
+from datetime import datetime, timezone
 
 
 class TokenBudget(BaseModel):
@@ -120,6 +121,80 @@ class BranchState(BaseModel):
     )
 
 
+class ResearchObject(BaseModel):
+    """Base class for all first-class research entities."""
+    id: str = Field(..., description="Unique ID")
+    description: str = Field(..., description="Description of the entity")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="ISO timestamp")
+    provenance: str = Field(default="", description="Origin of this object")
+    revisions: List[Dict[str, Any]] = Field(default_factory=list, description="History of changes")
+    supporting_nodes: List[str] = Field(default_factory=list, description="DAG nodes supporting this")
+    conflicting_nodes: List[str] = Field(default_factory=list, description="DAG nodes contradicting this")
+
+class Hypothesis(ResearchObject):
+    status: str = Field(default="active", description="Status: active, validated, invalidated")
+    confidence: float = Field(default=0.5, description="Confidence score 0.0 to 1.0")
+    supporting_evidence: List[str] = Field(default_factory=list)
+    contradicting_evidence: List[str] = Field(default_factory=list)
+
+class Claim(ResearchObject):
+    confidence: float = Field(default=0.5, description="Confidence score 0.0 to 1.0")
+
+class Evidence(ResearchObject):
+    source_file: Optional[str] = Field(default=None)
+
+class Contradiction(ResearchObject):
+    related_claims: List[str] = Field(default_factory=list)
+    resolved: bool = Field(default=False)
+
+class DatasetObject(ResearchObject):
+    path: str = Field(..., description="Path to the dataset")
+    schema_info: Dict[str, str] = Field(default_factory=dict)
+
+class ExperimentObject(ResearchObject):
+    methodology: str = Field(..., description="The experimental methodology used")
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+
+class CritiqueObject(ResearchObject):
+    target_object_id: str = Field(..., description="The ID of the object being critiqued")
+    severity: str = Field(default="medium")
+
+class CitationObject(ResearchObject):
+    title: str = Field(..., description="Title of the paper or source")
+    authors: List[str] = Field(default_factory=list)
+    url_or_doi: Optional[str] = Field(default=None)
+
+class CognitiveObjects(BaseModel):
+    hypotheses: List[Hypothesis] = Field(default_factory=list)
+    claims: List[Claim] = Field(default_factory=list)
+    contradictions: List[Contradiction] = Field(default_factory=list)
+    evidence: List[Evidence] = Field(default_factory=list)
+    datasets: List[DatasetObject] = Field(default_factory=list)
+    experiments: List[ExperimentObject] = Field(default_factory=list)
+    critiques: List[CritiqueObject] = Field(default_factory=list)
+    citations: List[CitationObject] = Field(default_factory=list)
+    open_questions: List[str] = Field(default_factory=list)
+    pending_validation: List[str] = Field(default_factory=list)
+
+
+class EpisodicMemory(BaseModel):
+    """A snapshot of a specific reasoning episode or interaction."""
+    timestamp: str = Field(..., description="ISO timestamp of the episode")
+    trigger: str = Field(..., description="What triggered this memory (e.g. workflow_completion, branch)")
+    summary: str = Field(..., description="Summary of the events")
+    decisions_made: List[str] = Field(default_factory=list, description="Key decisions made during this episode")
+    rejected_alternatives: List[str] = Field(default_factory=list, description="Paths considered but abandoned")
+
+class SemanticMemory(BaseModel):
+    """Compressed semantic knowledge about the project."""
+    project_summary: str = Field(default="", description="Rolling summary of the entire project's current state")
+    confidence_evolution: str = Field(default="", description="Narrative of how confidence in hypotheses has changed")
+
+class MemoryState(BaseModel):
+    """The multi-tiered memory architecture for the research copilot."""
+    episodic: List[EpisodicMemory] = Field(default_factory=list, description="Chronological reasoning trace")
+    semantic: SemanticMemory = Field(default_factory=SemanticMemory, description="Compressed semantic knowledge")
+
 class ResearchState(BaseModel):
     """Global research state ledger — single source of truth."""
 
@@ -129,6 +204,12 @@ class ResearchState(BaseModel):
     step: int = Field(..., ge=0, description="Current step within phase")
     checkpoints: Dict[str, str] = Field(
         default={}, description="Phase completion status: {phase: status}"
+    )
+    memory: MemoryState = Field(
+        default_factory=MemoryState, description="Tiered memory storage"
+    )
+    research_objects: CognitiveObjects = Field(
+        default_factory=CognitiveObjects, description="Semantic state of the research (hypotheses, claims, etc.)"
     )
     active_hypotheses: List[dict] = Field(default=[], description="Active hypotheses being tested")
     dead_ends: List[str] = Field(default=[], description="Approaches tried and abandoned")
