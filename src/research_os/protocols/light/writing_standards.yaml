@@ -1,0 +1,52 @@
+description: Standards for IMRAD structuring, writing style, and tables.
+imrad_budgets:
+  Discussion: 1000-1500 words (Summary, Context, Limitations, Conclusion)
+  Introduction: 500-750 words (Context, Gap, Objective)
+  Methods: 750-1000 words (Design, Sample, Measures, Analysis)
+  Results: 500-800 words (Primary findings, Secondary findings, Sensitivities)
+name: writing_standards
+schema_version: '1.0'
+steps:
+- id: check_word_budgets
+  name: Check Word Budgets
+- id: enforce_rules
+  name: Enforce Writing Rules
+- id: format_tables
+  name: Format Tables
+templates:
+  apa_table: 'Table 1
+
+    Descriptive Statistics
+
+    ---------------------------------------------------
+
+    Variable          M         SD        N
+
+    ---------------------------------------------------
+
+    Age               35.2      4.1       120
+
+    ---------------------------------------------------
+
+    Note. M = Mean, SD = Standard Deviation.
+
+    '
+version: 2.0.0
+writing_rules:
+  causal_language:
+    avoid_if_observational:
+    - caused
+    - led to
+    - resulted in
+    - impacted
+    - determined
+    use_instead:
+    - was associated with
+    - was correlated with
+    - predicted
+  do_this:
+  - State the direction and magnitude of effects.
+  - Use past tense for completed actions.
+  not_that:
+  - Do not repeat all table numbers in the text.
+  - Do not use 'prove' (use 'suggest' or 'indicate').

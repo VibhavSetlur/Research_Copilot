@@ -1,0 +1,79 @@
+decision_tree:
+  mapping:
+    clinical:
+      biases_checklist:
+      - Selection bias (e.g., non-representative sample)
+      - Attrition bias (e.g., loss to follow-up)
+      - Confounding by indication
+      - Measurement bias
+      columns:
+      - bp
+      - cholesterol
+      - patient_id
+      - diagnosis
+      - treatment
+      - bmi
+      file_extensions:
+      - .dcm
+      - .edf
+      - .nii
+      - .csv
+      reporting_standards:
+      - CONSORT (for RCTs)
+      - STROBE (for Observational Studies)
+      - PRISMA (for Systematic Reviews)
+    finance:
+      biases_checklist:
+      - Survivorship bias (ignoring delisted companies)
+      - Look-ahead bias (using data not available at the time)
+      - Time period bias
+      - Data snooping/overfitting
+      columns:
+      - ticker
+      - price
+      - volume
+      - market_cap
+      - pe_ratio
+      - yield
+      file_extensions:
+      - .csv
+      - .xml
+      - .json
+      - .xlsx
+      reporting_standards:
+      - GIPS (Global Investment Performance Standards)
+      - IFRS (International Financial Reporting Standards)
+    social_sciences:
+      biases_checklist:
+      - Social desirability bias
+      - Non-response bias
+      - Sampling bias
+      - Recall bias
+      columns:
+      - survey
+      - likert
+      - demographics
+      - respondent
+      - age_group
+      - income_bracket
+      file_extensions:
+      - .sav
+      - .dta
+      - .csv
+      reporting_standards:
+      - APA Guidelines
+      - JARS (Journal Article Reporting Standards)
+description: Analyze a research domain to identify trends, required reporting standards,
+  and domain-specific biases.
+name: domain_analysis
+schema_version: '1.0'
+steps:
+- id: identify_domain
+  name: Identify Domain
+- id: map_landscape
+  name: Map Landscape
+- id: check_reporting_standards
+  name: Check Reporting Standards
+- id: evaluate_biases
+  name: Evaluate Biases
+version: 2.0.0

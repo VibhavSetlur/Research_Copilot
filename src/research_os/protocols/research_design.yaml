@@ -1,17 +1,45 @@
 name: research_design
-version: 1.0.0
-description: Design rigorous research methodologies and hypothesis testing frameworks.
+version: 2.0.0
+description: Select the appropriate research design and compute sample size justification.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/methods.md: Appended chosen research design and sample size justification"
+  - "workspace/logs/research_design.log"
+decision_tree:
+  flowchart:
+    q1:
+      question: "Is the treatment assigned randomly by the researcher?"
+      yes: "Randomised Controlled Trial (RCT)"
+      no: "q2"
+    q2:
+      question: "Is there a control group?"
+      yes: "q3"
+      no: "Case Series / Cross-sectional (No comparator)"
+    q3:
+      question: "Is the outcome rare?"
+      yes: "Case-Control Study"
+      no: "q4"
+    q4:
+      question: "Is time a factor (before/after)?"
+      yes: "Longitudinal / Difference-in-Differences (DiD)"
+      no: "Cohort Study"
+sample_size_justification:
+  formulae:
+    continuous_outcome:
+      description: "Using Cohen's d for comparing two means."
+      power: 0.8
+      alpha: 0.05
+      formula: "n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2"
+      example: "For d=0.5, n ≈ 64 per group."
+    binary_outcome:
+      description: "Comparing two proportions."
+      power: 0.8
+      alpha: 0.05
+      formula: "n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - p2) )^2"
 steps:
-  - id: define_variables
-    name: "Define Variables"
-    description: "Identify independent, dependent, and confounding variables."
-    required_outputs: ["variables.md"]
-  - id: select_methodology
-    name: "Select Methodology"
-    description: "Choose experimental, observational, or quasi-experimental design."
-    required_outputs: ["methodology.md"]
-  - id: power_analysis
-    name: "Power Analysis"
-    description: "Determine required sample size for adequate statistical power."
-    required_outputs: ["power_analysis.md"]
+  - id: traverse_flowchart
+    name: "Traverse Design Flowchart"
+    description: "Answer the flowchart questions to determine the correct research design."
+  - id: calculate_sample_size
+    name: "Calculate Sample Size"
+    description: "Use the provided formulae to compute and justify the required sample size, given power=0.8 and alpha=0.05."

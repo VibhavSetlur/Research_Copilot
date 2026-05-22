@@ -1,11 +1,40 @@
 name: analysis_plan
-version: 1.0.0
-description: Plan the statistical or qualitative analysis.
+version: 2.0.0
+description: Plan the directory structure, create boilerplates, and manage branching.
 schema_version: "1.0"
+expected_outputs:
+  - "workspace/methods.md: Appended analysis steps"
+  - "workspace/01_data_prep/README.md"
+  - "workspace/02_analysis/README.md"
+structure:
+  01_data_prep:
+    purpose: "Data cleaning, filtering, and feature engineering."
+  02_analysis:
+    purpose: "Statistical modelling and core computations."
+  03_synthesis:
+    purpose: "Figure generation, table formatting, and text synthesis."
+templates:
+  boilerplate_readme: |
+    # {Folder_Name}
+    **Objective**: {Description of tasks in this phase}
+    **Inputs**: {List of input files/paths}
+    **Outputs**: {List of expected output files}
+    **Scripts**: {List of scripts with brief descriptions}
+branching_criteria:
+  fork_when:
+    - "Testing a high-risk data transformation (e.g., massive outlier removal)."
+    - "Trying an alternative, unproven model architecture."
+    - "Conducting a separate sensitivity analysis that might disrupt the main flow."
+  continue_when:
+    - "Adding standard robustness checks."
+    - "Fixing bugs in the current script."
 steps:
-  - id: define_models
-    name: "Define Models"
-    description: "Specify statistical models or analytical frameworks."
-  - id: preprocessing
-    name: "Preprocessing Steps"
-    description: "Detail data cleaning and transformation steps."
+  - id: setup_directories
+    name: "Setup Directories"
+    description: "Ensure the 01_, 02_, 03_ structure exists."
+  - id: write_readmes
+    name: "Write READMEs"
+    description: "Populate each directory with the boilerplate README."
+  - id: evaluate_branching
+    name: "Evaluate Branching"
+    description: "Review branching criteria to decide if current plan requires a new branch."

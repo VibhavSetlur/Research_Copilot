@@ -1,0 +1,35 @@
+description: Protocol for systematic literature search and deduplication.
+filters:
+  deduplication_algorithm:
+    step1: Exact match on DOI
+    step2: Fuzzy match on Title (Levenshtein distance < 3) AND exact match on first
+      author's last name
+  quality:
+    exception_years_recent: 2
+    min_citations: 5
+name: literature_search
+prisma_flow:
+  steps:
+    1_identification: Record total records identified from each database.
+    2_screening: Remove duplicates using the deduplication_algorithm. Record count.
+    3_eligibility: Apply quality filters (citations/recency). Record excluded count.
+    4_included: Final list of studies included in synthesis.
+schema_version: '1.0'
+search_strategies:
+  arxiv:
+    string_template: all:"{concept1}" AND all:"{concept2}"
+  pubmed:
+    string_template: ("{concept1}"[Mesh] OR "{concept1}") AND ("{concept2}"[Mesh]
+      OR "{concept2}")
+  semantic_scholar:
+    string_template: ("{concept1}") AND ("{concept2}")
+steps:
+- id: generate_search_strings
+  name: Generate Search Strings
+- id: execute_search
+  name: Execute Search
+- id: deduplicate
+  name: Deduplicate
+- id: build_prisma_flow
+  name: Build PRISMA Flow
+version: 2.0.0

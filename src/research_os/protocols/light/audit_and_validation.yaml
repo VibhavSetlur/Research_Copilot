@@ -1,0 +1,23 @@
+description: Protocol to audit citations, assumptions, and code quality.
+name: audit_and_validation
+schema_version: '1.0'
+steps:
+- id: validate_citations
+  name: Validate Citations
+- id: check_assumptions
+  name: Check Assumptions
+- id: lint_code
+  name: Lint Code
+validators:
+  citation_validator:
+    pass_1_doi: Attempt to resolve all DOIs. Flag broken links.
+    pass_2_abstract: Verify that the claim in the text matches the abstract's conclusion.
+    pass_3_retraction: Query the Retraction Watch database or Crossref for retracted
+      status.
+  code_linter:
+    command_python: ruff check workspace/02_analysis/ || pylint workspace/02_analysis/
+  statistical_assumptions:
+    action: Re-read the assumptions logged during methodology_selection. Run specific
+      tests (e.g., Shapiro-Wilk for normality, VIF for multicollinearity) and log
+      the p-values/metrics.
+version: 2.0.0

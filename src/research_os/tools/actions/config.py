@@ -11,9 +11,27 @@ def get_config(root: Path) -> Dict[str, Any]:
         config_path = root / "inputs" / "researcher_config.yaml"
         if not config_path.exists():
             return {"status": "error", "message": "Config not found"}
+            
+        # Check permissions (warning if world-readable)
+        warning = None
+        if os.name != 'nt':
+            try:
+                mode = os.stat(config_path).st_mode
+                if bool(mode & 0o004): # Others have read permission
+                    warning = "WARNING: inputs/researcher_config.yaml is world-readable! Please run `chmod 600 inputs/researcher_config.yaml` to secure your API keys."
+            except Exception:
+                pass
+
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-        return {"status": "success", "config": config}
+            
+        # Mask API keys before returning
+        safe_config = _mask_api_keys(config)
+        
+        res = {"status": "success", "config": safe_config}
+        if warning:
+            res["warning"] = warning
+        return res
     except Exception as e:
         logger.error(f"Get config failed: {e}")
         return {"status": "error", "message": str(e)}
@@ -53,12 +71,31 @@ def init_config(root: Path) -> Dict[str, Any]:
         default_config = {
             "researcher": {"name": "", "expertise_level": "intermediate", "field": ""},
             "interaction": {"autonomy_level": "supervised", "notification_preferences": {"on_error": True}},
-            "api_keys": {"firecrawl": "", "openai": ""}
+            "api_keys": {"firecrawl": "", "openai": ""},
+            "model_profile": "medium" # small, medium, large
         }
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(config_path, 'w') as f:
             yaml.dump(default_config, f, default_flow_style=False)
-        return {"status": "success", "message": "Initialized default config. Please populate api keys."}
+            
+        # Restrict permissions
+        if os.name != 'nt':
+            try:
+                os.chmod(config_path, 0o600)
+            except Exception:
+                pass
+                
+        # Add to .gitignore
+        gitignore_path = root / ".gitignore"
+        gitignore_content = ""
+        if gitignore_path.exists():
+            gitignore_content = gitignore_path.read_text()
+            
+        if "inputs/researcher_config.yaml" not in gitignore_content:
+            with open(gitignore_path, "a") as gf:
+                gf.write("\n# Secure config\ninputs/researcher_config.yaml\n")
+                
+        return {"status": "success", "message": "Initialized default config and secured it. Please populate api keys."}
     return {"status": "success", "message": "Config already exists."}
 
 def validate_config(root: Path) -> Dict[str, Any]:
@@ -76,3 +113,14 @@ def validate_config(root: Path) -> Dict[str, Any]:
          validations.append("Firecrawl API Key: Missing")
          
     return {"status": "success", "validations": validations}
+
+def _mask_api_keys(config: Dict[str, Any]) -> Dict[str, Any]:
+    import copy
+    safe_config = copy.deepcopy(config)
+    if "api_keys" in safe_config and isinstance(safe_config["api_keys"], dict):
+        for k, v in safe_config["api_keys"].items():
+            if isinstance(v, str) and len(v) > 8:
+                safe_config["api_keys"][k] = f"{v[:4]}...{v[-4:]}"
+            elif isinstance(v, str) and len(v) > 0:
+                safe_config["api_keys"][k] = "***"
+    return safe_config

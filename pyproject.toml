@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "research-os"
+name = "agentic-research-os"
 version = "0.1.0"
 description = "A Guidance Engine for Autonomous Research Workflows"
 readme = "README.md"
@@ -35,6 +35,12 @@ dev = [
     "isort>=5.0.0",
     "mypy>=1.0.0"
 ]
+all = [
+    "agentic-research-os[mcp,dev]"
+]
 
 [project.scripts]
 research-os = "research_os.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/research_os"]
