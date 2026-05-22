@@ -33,24 +33,29 @@ async def start_chat_loop():
             await session.initialize()
             print("Connected to MCP Server. Type your request (or 'exit' / 'quit' to stop).")
 
-            while True:
-                # Use synchronous input in an executor to avoid blocking the event loop
-                user_msg = await asyncio.get_event_loop().run_in_executor(None, input, "\n> ")
-                user_msg = user_msg.strip()
-                
-                if not user_msg:
-                    continue
-                if user_msg.lower() in ("exit", "quit"):
-                    break
+            try:
+                while True:
+                    # Use synchronous input in an executor to avoid blocking the event loop
+                    user_msg = await asyncio.get_event_loop().run_in_executor(None, input, "\n> ")
+                    user_msg = user_msg.strip()
+                    
+                    if not user_msg:
+                        continue
+                    if user_msg.lower() in ("exit", "quit"):
+                        break
 
-                try:
-                    print("Routing intent via MCP server...")
-                    result = await session.call_tool("route_intent", arguments={"query": user_msg})
-                    for content in result.content:
-                        if content.type == "text":
-                            print(content.text)
-                except Exception as e:
-                    print(f"Error calling MCP tool: {e}")
+                    try:
+                        print("Routing intent via MCP server...")
+                        result = await session.call_tool("route_intent", arguments={"query": user_msg})
+                        for content in result.content:
+                            if content.type == "text":
+                                print(content.text)
+                    except Exception as e:
+                        print(f"Error calling MCP tool: {e}")
+            except (KeyboardInterrupt, EOFError):
+                pass
+            finally:
+                print("\nShutting down server gracefully to prevent zombies...")
 
 def main():
     try:

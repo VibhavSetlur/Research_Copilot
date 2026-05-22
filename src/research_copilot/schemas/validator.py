@@ -3,7 +3,7 @@ import logging
 from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ConfigDict, BaseModel, ValidationError
 
 logger = logging.getLogger("research.schemas.validator")
 
@@ -72,6 +72,8 @@ def validate_with_retry(
                 "Do not include markdown formatting or explanations."
             )
 
+            if call_llm is None:
+                raise e
             try:
                 current_payload = call_llm(recovery_prompt)
             except Exception as llm_err:

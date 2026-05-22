@@ -1,8 +1,11 @@
 import logging
+import json
 from typing import Dict, Any, List
+from tenacity import retry, wait_exponential, stop_after_attempt
 
 logger = logging.getLogger("research.tools.literature_retrieval")
 
+@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
 def search_crossref(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     try:
         from habanero import Crossref
@@ -20,6 +23,7 @@ def search_crossref(query: str, limit: int = 5) -> List[Dict[str, Any]]:
         logger.error(f"Crossref search failed: {e}")
         return []
 
+@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
 def search_pubmed(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     try:
         from metapub import PubMedFetcher
@@ -43,6 +47,7 @@ def search_pubmed(query: str, limit: int = 5) -> List[Dict[str, Any]]:
         logger.error(f"PubMed search failed: {e}")
         return []
 
+@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
 def search_arxiv(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     # Simple arxiv search via urllib
     import urllib.request
@@ -68,19 +73,36 @@ def search_arxiv(query: str, limit: int = 5) -> List[Dict[str, Any]]:
 
 def retrieve_literature(query: str, source: str = "crossref", limit: int = 5) -> Dict[str, Any]:
     """Retrieve literature from live sources."""
-    results = []
-    if source == "crossref":
-        results = search_crossref(query, limit)
-    elif source == "pubmed":
-        results = search_pubmed(query, limit)
-    elif source == "arxiv":
-        results = search_arxiv(query, limit)
-    else:
-        results = search_crossref(query, limit)
+    limit = min(limit, 5)  # Enforce max 5
+    try:
+        results = []
+        if source == "crossref":
+            results = search_crossref(query, limit)
+        elif source == "pubmed":
+            results = search_pubmed(query, limit)
+        elif source == "arxiv":
+            results = search_arxiv(query, limit)
+        else:
+            results = search_crossref(query, limit)
+            
+        payload = {
+            "status": "success",
+            "source": source,
+            "query": query,
+            "results": results
+        }
         
-    return {
-        "status": "success",
-        "source": source,
-        "query": query,
-        "results": results
-    }
+        # Token truncation
+        payload_str = json.dumps(payload)
+        if len(payload_str) > 15000:
+            payload["results"] = payload["results"][:2]
+            payload["warning"] = "[Data truncated. Narrow your search terms to see more specific results.]"
+            
+        return payload
+    except Exception as e:
+        logger.error(f"Retrieve literature failed: {e}")
+        return {
+            "status": "error",
+            "details": str(e),
+            "suggestion": "Try reducing the date range or narrowing the query."
+        }

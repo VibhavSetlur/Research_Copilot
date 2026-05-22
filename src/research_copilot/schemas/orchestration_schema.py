@@ -1,15 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 from typing import List, Optional, Dict, Any, Literal
 
 InterruptionClass = Literal["informational", "corrective", "branching", "speculative", "destructive", "replanning"]
 
 class SideTask(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     task_id: str = Field(..., description="Unique ID for the side task")
     description: str = Field(..., description="Description of the side task")
     interruption_class: InterruptionClass = Field(..., description="Type of interruption")
     return_to_main_thread: bool = Field(True, description="Whether to resume the main task after this completes")
 
 class ExecutionIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     user_goal: str = Field(..., description="The user's inferred goal")
     intent_type: str = Field(..., description="The inferred primary intent type")
     task_action: Literal[
@@ -30,12 +32,14 @@ class ExecutionIntent(BaseModel):
     state_patch: Dict[str, Any] = Field(default_factory=dict, description="Key-value pairs to update in the state ledger")
 
 class GraphMutation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     action: Literal["insert", "remove", "rewire"] = Field(..., description="The type of mutation")
     node_id: str = Field(..., description="The target node ID")
     script_path: Optional[str] = Field(None, description="Script path (for insert)")
     depends_on: Optional[List[str]] = Field(None, description="Dependencies (for insert or rewire)")
 
 class PlannerDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     workflow_name: str = Field(..., description="The inferred workflow name")
     workflow_steps: List[str] = Field(..., description="The sequence of steps to execute")
     mutations: List[GraphMutation] = Field(default_factory=list, description="Graph mutations to apply to the execution DAG (if replanning)")
@@ -45,6 +49,7 @@ class PlannerDecision(BaseModel):
     stop_conditions: List[str] = Field(default_factory=list, description="Conditions under which execution should halt")
 
 class SkillPlannerOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     relevant_skills: List[str] = Field(..., description="Skills to be loaded into context")
     excluded_skills: List[str] = Field(default_factory=list, description="Skills explicitly excluded from this workflow")
     required_agents: List[str] = Field(..., description="Agents required to complete the steps")

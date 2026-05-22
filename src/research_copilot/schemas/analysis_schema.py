@@ -1,10 +1,11 @@
 """Schema definitions for analysis results."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator
 from typing import List, Optional
 
 
 class StatisticalTest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Results of a single statistical test."""
 
     test_name: str = Field(..., description="Name of statistical test (e.g., 't-test', 'ANOVA', 'OLS regression')")
@@ -31,6 +32,7 @@ class StatisticalTest(BaseModel):
 
 
 class AnalysisResults(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Complete analysis results for a research question."""
 
     question_id: str = Field(..., description="Research question identifier (Q1, Q2, etc.)")

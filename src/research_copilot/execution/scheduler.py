@@ -24,8 +24,12 @@ class TaskScheduler:
             with open(notebook_path, "a") as f:
                 f.write(entry)
             logger.info(f"Appended to lab_notebook.md: {summary[:50]}...")
+            
+            # Explicitly flush state to disk to prevent phantom memory
+            self.ledger._save(self.ledger.get())
+            logger.info(f"State explicitly flushed to disk for node {node_id}")
         except Exception as e:
-            logger.error(f"Failed to write to lab_notebook.md: {e}")
+            logger.error(f"Failed to write to lab_notebook.md or flush state: {e}")
 
     def get_next_executable_node(self, plan: Dict[str, Any]) -> Optional[str]:
         """Determine the next step in the workflow based on the active plan and DAG."""

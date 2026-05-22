@@ -1,10 +1,11 @@
 """Schema definitions for audit reports."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator
 from typing import List, Optional, Literal
 
 
 class AuditCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A single audit check result."""
 
     check_name: str = Field(..., description="Name of audit check")
@@ -14,6 +15,7 @@ class AuditCheck(BaseModel):
 
 
 class AuditReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Complete audit report for a phase."""
 
     audit_type: str = Field(..., description="Type of audit (reproducibility, citations, claims, etc.)")

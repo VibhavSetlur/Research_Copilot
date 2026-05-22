@@ -1,10 +1,11 @@
 """Schema definitions for literature corpus."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator
 from typing import List, Optional, Literal
 
 
 class PaperEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A single paper in the literature corpus."""
 
     doi: Optional[str] = Field(default=None, description="Digital Object Identifier")
@@ -30,6 +31,7 @@ class PaperEntry(BaseModel):
 
 
 class LiteratureCorpus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Complete literature corpus for a project."""
 
     schema_version: str = Field(..., pattern=r"^\d+\.\d+\.\d+$")

@@ -10,6 +10,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import logging
+import sys
+
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 from research_copilot.engine import ResearchEngine
 from research_copilot.project_ops import compute_input_hashes, current_branch
@@ -409,6 +417,7 @@ def main() -> None:
     parser.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--list-tools", action="store_true", help="List available tools and exit")
+    parser.add_argument("--resume", action="store_true", help="Resume from the latest state on disk instead of starting fresh")
     args = parser.parse_args()
 
     if args.list_tools:

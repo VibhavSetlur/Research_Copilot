@@ -1,11 +1,12 @@
 """Schema definitions for the global research state ledger."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 
 
 class TokenBudget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Token budget tracking for context window management."""
 
     used: int = Field(..., ge=0, description="Tokens used so far")
@@ -23,6 +24,7 @@ class TokenBudget(BaseModel):
 
 
 class ContextTransferMemo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Context Transfer Memorandum — generated at 90% token budget to preserve
     latent context that cannot be transferred via structured state alone.
 
@@ -66,6 +68,7 @@ class ContextTransferMemo(BaseModel):
 
 
 class DAGNode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A single node in the execution DAG representing a script run."""
 
     node_id: str = Field(..., description="Unique node ID (format: <script_name>_<iteration_id>_<run_index>)")
@@ -81,6 +84,7 @@ class DAGNode(BaseModel):
 
 
 class ExecutionDAG(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Directed Acyclic Graph tracking script execution lineage across iterations.
 
     Maintains a complete record of which scripts ran, in what order, what data
@@ -98,6 +102,7 @@ class ExecutionDAG(BaseModel):
 
 
 class BranchState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Git-like branch state for non-linear, branched research execution.
 
     Each branch represents a divergent hypothesis or methodological exploration
@@ -122,6 +127,7 @@ class BranchState(BaseModel):
 
 
 class ResearchObject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Base class for all first-class research entities."""
     id: str = Field(..., description="Unique ID")
     description: str = Field(..., description="Description of the entity")
@@ -165,6 +171,7 @@ class CitationObject(ResearchObject):
     url_or_doi: Optional[str] = Field(default=None)
 
 class CognitiveObjects(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     hypotheses: List[Hypothesis] = Field(default_factory=list)
     claims: List[Claim] = Field(default_factory=list)
     contradictions: List[Contradiction] = Field(default_factory=list)
@@ -178,6 +185,7 @@ class CognitiveObjects(BaseModel):
 
 
 class EpisodicMemory(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A snapshot of a specific reasoning episode or interaction."""
     timestamp: str = Field(..., description="ISO timestamp of the episode")
     trigger: str = Field(..., description="What triggered this memory (e.g. workflow_completion, branch)")
@@ -186,16 +194,19 @@ class EpisodicMemory(BaseModel):
     rejected_alternatives: List[str] = Field(default_factory=list, description="Paths considered but abandoned")
 
 class SemanticMemory(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Compressed semantic knowledge about the project."""
     project_summary: str = Field(default="", description="Rolling summary of the entire project's current state")
     confidence_evolution: str = Field(default="", description="Narrative of how confidence in hypotheses has changed")
 
 class MemoryState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """The multi-tiered memory architecture for the research copilot."""
     episodic: List[EpisodicMemory] = Field(default_factory=list, description="Chronological reasoning trace")
     semantic: SemanticMemory = Field(default_factory=SemanticMemory, description="Compressed semantic knowledge")
 
 class ResearchState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Global research state ledger — single source of truth."""
 
     run_id: str = Field(..., description="UUID for this research run")

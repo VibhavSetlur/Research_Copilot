@@ -1,10 +1,11 @@
 """Schema definitions for execution results and tool availability."""
 
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 from typing import List, Optional
 
 
 class ExecutionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Structured result from any runtime execution."""
 
     runtime: str = Field(..., description="Runtime used (python, r, bash, etc.)")
@@ -18,6 +19,7 @@ class ExecutionResult(BaseModel):
 
 
 class ToolStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Availability status for a single tool."""
 
     tool_id: str = Field(..., description="Tool registry ID")
@@ -27,6 +29,7 @@ class ToolStatus(BaseModel):
 
 
 class ToolAvailabilityReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Report of tool availability for a given analysis blueprint."""
 
     generated_at: str = Field(..., description="ISO 8601 timestamp")

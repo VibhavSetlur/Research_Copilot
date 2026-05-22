@@ -1,10 +1,11 @@
 """Schema definitions for research questions and research map."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import ConfigDict, BaseModel, Field, field_validator
 from typing import List, Optional, Literal, Dict, Any
 
 
 class ResearchQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A single research question with all required metadata."""
 
     text: str = Field(..., min_length=10, description="The research question text")
@@ -26,6 +27,7 @@ class ResearchQuestion(BaseModel):
 
 
 class DataFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """A single data file entry in the research map."""
 
     path: str = Field(..., description="Relative path to the data file")
@@ -37,6 +39,7 @@ class DataFile(BaseModel):
 
 
 class DataSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Data section of the research map."""
 
     files: List[DataFile] = Field(default=[], description="Detected data files")
@@ -46,6 +49,7 @@ class DataSection(BaseModel):
 
 
 class ResearchMap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     """Complete research map for a project."""
 
     schema_version: str = Field(..., pattern=r"^\d+\.\d+\.\d+$")
