@@ -81,3 +81,26 @@ class SafetyGater:
             return {"action": "branch_for_debug", "node_id": active_node}
             
         return {"action": "escalate_to_user", "reason": str(error)}
+
+class ToolCapabilityCheck:
+    """Gates access to high-risk tools based on confidence."""
+    
+    @staticmethod
+    def can_execute(tool_meta, cognitive_state: Dict[str, Any]) -> bool:
+        """Check if a tool is allowed to execute based on its risk profile and current confidence."""
+        if getattr(tool_meta, "risk", "low").lower() != "high":
+            return True
+            
+        # Calculate average confidence of active claims
+        claims = cognitive_state.get("claims", [])
+        if not claims:
+            logger.warning(f"Blocking high-risk tool '{getattr(tool_meta, 'tool_name', 'unknown')}': No verified claims to justify execution.")
+            return False
+            
+        avg_confidence = sum(c.get("confidence", 0.0) for c in claims) / len(claims)
+        
+        if avg_confidence > 0.85:
+            return True
+            
+        logger.warning(f"Blocking high-risk tool '{getattr(tool_meta, 'tool_name', 'unknown')}': Average confidence ({avg_confidence:.2f}) is below the 0.85 threshold.")
+        return False

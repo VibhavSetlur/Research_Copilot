@@ -162,3 +162,28 @@ class CognitiveStateTracker:
                 lines.append(f"  - {d}")
 
         return "\n".join(lines) if lines else "No semantic cognitive state established yet."
+
+
+class StuckLoopException(Exception):
+    """Raised when the agent gets stuck in a loop of identical errors."""
+    pass
+
+class ExecutionStuckDetector:
+    """Detects if the agent is stuck in an execution loop."""
+    def __init__(self):
+        self.error_counts = {}
+
+    def report_error(self, tool_name: str, parameters: dict, error_message: str):
+        import hashlib
+        # Hash the tool call and error message to detect identical loops
+        param_str = str(sorted(parameters.items())) if parameters else ""
+        error_sig = f"{tool_name}:{param_str}:{error_message}"
+        sig_hash = hashlib.sha256(error_sig.encode()).hexdigest()
+        
+        count = self.error_counts.get(sig_hash, 0) + 1
+        self.error_counts[sig_hash] = count
+        
+        if count >= 3:
+            # We hit the loop threshold. Clear the count and raise.
+            self.error_counts[sig_hash] = 0
+            raise StuckLoopException(f"Stuck in execution loop with tool '{tool_name}'. Repeated error: {error_message}")

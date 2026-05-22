@@ -446,3 +446,32 @@ class IntentRouter:
             lines.append("")
 
         return "\n".join(lines)
+
+    def build_bootstrap_intake(self, raw_query: str, call_llm=None) -> Dict[str, Any]:
+        """Bootstrap a structured intake configuration from a raw text query.
+        
+        Args:
+            raw_query: The user's unstructured request.
+            call_llm: Optional callable to use an LLM for extraction.
+            
+        Returns:
+            A dictionary matching the intake schema.
+        """
+        classification = self.classify_intent(raw_query)
+        primary = classification["primary_intent"]
+        
+        # In a real system, we might use call_llm here to extract these fields using Pydantic.
+        # For now, we perform heuristic extraction.
+        intake = {
+            "project_name": "Autonomous Research",
+            "research_goal": raw_query,
+            "primary_intent": primary,
+            "hypotheses": [],
+            "data_sources": [],
+            "constraints": {
+                "depth": "academic",
+                "exclude_null_space": list(self.compute_null_space(primary))
+            }
+        }
+        
+        return intake

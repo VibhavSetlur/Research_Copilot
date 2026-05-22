@@ -138,4 +138,65 @@ class PromptBuilder:
             "}"
         ])
         
+        
+        return "\n".join(prompt)
+
+    def build_handoff_prompt(self, project_title: str = "Research Project Workspace") -> str:
+        """Build the new chat handoff prompt natively instead of reading markdown files."""
+        state = self.ledger.get()
+        
+        phase = state.get("phase", "init")
+        active_branch = state.get("current_branch", state.get("active_branch", "main"))
+        last_updated = state.get("last_updated", "Unknown")
+        
+        phase_checkpoints = state.get("execution_dag", {}).get("nodes", {})
+        recent_checkpoints = [f"- {n.get('id', 'unknown')}: {n.get('status', 'unknown')}" for n in list(phase_checkpoints.values())[-5:]]
+        
+        last_decisions = "\n".join(f"- {d}" for d in state.get("decisions", [])[-3:])
+        key_findings = "\n".join(f"- {c.get('description', '')}" for c in state.get("research_objects", {}).get("claims", [])[-3:])
+        dead_ends = "\n".join(f"- {d}" for d in state.get("dead_ends", [])[-3:])
+        pending_actions = "\n".join(f"- {p}" for p in state.get("hitl_pending", {}).get("proposed_plan", []))
+        
+        memory_state = state.get("memory", {})
+        semantic_memory = memory_state.get("semantic", {})
+        token_used = memory_state.get("token_usage", 0)
+        token_limit = 128000
+        
+        prompt = [
+            "# New Chat Handoff Template",
+            "> Inject this at the start of a new conversation to restore context without re-reading entire history.",
+            "> Target: under 800 tokens.",
+            "---",
+            "## Context Restoration",
+            "You are resuming a Research Copilot project. Here is the current state:",
+            "### Project Overview",
+            f"- **Project**: {project_title}",
+            f"- **Current Phase**: {phase}",
+            f"- **Active Branch**: {active_branch}",
+            f"- **Last Updated**: {last_updated}",
+            "### Phase Progress",
+            "\n".join(recent_checkpoints) if recent_checkpoints else "No checkpoints.",
+            "### Last 3 Decisions",
+            last_decisions if last_decisions else "None.",
+            "### Key Findings So Far",
+            key_findings if key_findings else "None.",
+            "### Dead Ends to Avoid",
+            dead_ends if dead_ends else "None.",
+            "### Pending Actions",
+            pending_actions if pending_actions else "None.",
+            "---",
+            "## Instructions",
+            "1. Read `.research/cache/state.json` for the full structured state",
+            "2. Read the latest CTM from `.research/cache/context_transfer_memos/` if one exists",
+            "3. Read `03_synthesis/state_ledger.json` for the global ledger",
+            "4. Load only the skill needed for the next action — do NOT load all skills",
+            "5. Continue from the phase indicated above",
+            "6. If a CTM exists, read its `immediate_goals` and `open_questions` first",
+            "7. Do NOT repeat completed phases unless explicitly asked",
+            "## Quick Reference",
+            f"- **Token budget**: {token_used} / {token_limit} used",
+            "## If State Is Missing",
+            "If any of the state files above do not exist, the project has not been initialized. Run `research_init` first."
+        ]
+        
         return "\n".join(prompt)

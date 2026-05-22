@@ -334,9 +334,20 @@ if HAS_MCP:
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
+        from research_copilot.tools.tool_registry import ToolRegistry
+        registry = ToolRegistry()
+        dynamic_tools = {}
+        for tool_meta in registry.get_all():
+            dynamic_tools[tool_meta.tool_name] = {
+                "description": f"Capabilities: {', '.join(tool_meta.capabilities)}",
+                "inputSchema": tool_meta.inputSchema
+            }
+        
+        merged_tools = {**TOOL_DEFINITIONS, **dynamic_tools}
+        
         return [
             Tool(name=name, description=schema["description"], inputSchema=schema["inputSchema"])
-            for name, schema in TOOL_DEFINITIONS.items()
+            for name, schema in merged_tools.items()
         ]
 
     @server.call_tool()
@@ -357,8 +368,17 @@ def run_fallback_stdio() -> None:
             method = request.get("method", "")
             params = request.get("params", {})
             if method == "list_tools":
+                from research_copilot.tools.tool_registry import ToolRegistry
+                registry = ToolRegistry()
+                dynamic_tools = {}
+                for tool_meta in registry.get_all():
+                    dynamic_tools[tool_meta.tool_name] = {
+                        "description": f"Capabilities: {', '.join(tool_meta.capabilities)}",
+                        "inputSchema": tool_meta.inputSchema
+                    }
+                merged_tools = {**TOOL_DEFINITIONS, **dynamic_tools}
                 response = {
-                    "result": {"tools": [{"name": n, **schema} for n, schema in TOOL_DEFINITIONS.items()]},
+                    "result": {"tools": [{"name": n, **schema} for n, schema in merged_tools.items()]},
                     "error": None,
                 }
             elif method == "call_tool":

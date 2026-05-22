@@ -71,6 +71,8 @@ class HookRegistry:
         "post_generation",
         "pre_ledger_commit",
         "on_failure",
+        "compress_memory",
+        "emergency_synthesize",
     )
 
     def __init__(self, log_path: Optional[Path] = None):

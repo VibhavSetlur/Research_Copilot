@@ -93,6 +93,7 @@ all = [
 ]
 
 [project.scripts]
+research-os = "research_copilot.cli:main"
 rcp = "research_copilot.cli:main"
 research-copilot-mcp = "research_copilot.server:main"
 

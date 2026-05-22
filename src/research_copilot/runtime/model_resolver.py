@@ -373,9 +373,32 @@ def _first_available_api_model() -> Optional[dict]:
     return None
 
 
+class LLMDialectRouter:
+    """Formats prompts according to the quirks of the active LLM dialect."""
+    @staticmethod
+    def format_prompt(prompt: str, model_id: str, expects_json: bool = False) -> str:
+        model_lower = model_id.lower()
+        # Reasoning models
+        if "deepseek" in model_lower or "reasoning" in model_lower or "r1" in model_lower or "o1" in model_lower or "o3" in model_lower:
+            prompt = (
+                "You are a reasoning model. Please explicitly wrap your internal reasoning in "
+                "<thinking> ... </thinking> tags before producing your final output.\n\n"
+            ) + prompt
+            if expects_json:
+                prompt += "\n\nAfter your <thinking> block, output EXACTLY AND ONLY valid JSON."
+        # Fast / structured models
+        elif "gemini" in model_lower or "gpt-4o-mini" in model_lower or "nemotron" in model_lower or "haiku" in model_lower:
+            if expects_json:
+                prompt += (
+                    "\n\nSTRICT REQUIREMENT: Output EXACTLY AND ONLY valid JSON. "
+                    "Do not include any markdown formatting, code blocks, or conversational filler."
+                )
+        return prompt
+
+
 def cascade_resolve(
     task_name: str,
-    call_model: "Callable[[str, str], str]",  # (model_id, prompt) -> raw_json
+    call_llm: "Callable[[str, str], str]",  # (model_id, prompt) -> raw_json
     prompt: str,
     schema: "Optional[Any]" = None,
     max_local_retries: int = 3,
@@ -392,7 +415,7 @@ def cascade_resolve(
 
     Args:
         task_name:         Task / agent name used to look up the task model.
-        call_model:        Callable ``(model_id, prompt) -> raw_json_string``.
+        call_llm:          Callable ``(model_id, prompt) -> raw_json_string``.
                            ``model_id`` is a string like ``"ollama/llama3"``
                            or ``"google/gemini-2.5-flash"``.
         prompt:            The prompt to send.
@@ -408,7 +431,7 @@ def cascade_resolve(
     Raises:
         RuntimeError: If all models in the cascade are exhausted.
     """
-    from research_copilot.assets.schemas.validator import validate_with_retry
+    from research_copilot.schemas.validator import validate_with_retry
 
     # Determine the local model to try first.
     if config is None:
@@ -430,16 +453,18 @@ def cascade_resolve(
     validated_output: Optional[dict] = None
 
     # ── Phase 1: local / cheap model ─────────────────────────────────────────
+    dialect_prompt = LLMDialectRouter.format_prompt(prompt, local_model_id, expects_json=schema is not None)
+    
     for attempt in range(max_local_retries):
         try:
-            raw = call_model(local_model_id, prompt)
+            raw = call_llm(local_model_id, dialect_prompt)
 
             if schema is not None:
                 instance = validate_with_retry(
                     raw_json=raw,
                     schema=schema,
-                    call_llm=lambda p: call_model(local_model_id, p),
-                    base_prompt=prompt,
+                    call_llm=lambda p: call_llm(local_model_id, p),
+                    base_prompt=dialect_prompt,
                     max_retries=0,  # single attempt here; outer loop handles retries
                     node_id=node_id,
                 )
@@ -492,14 +517,16 @@ def cascade_resolve(
         fallback_msg,
     )
 
+    api_dialect_prompt = LLMDialectRouter.format_prompt(prompt, api_model_id, expects_json=schema is not None)
+
     try:
-        raw = call_model(api_model_id, prompt)
+        raw = call_llm(api_model_id, api_dialect_prompt)
         if schema is not None:
             instance = validate_with_retry(
                 raw_json=raw,
                 schema=schema,
-                call_llm=lambda p: call_model(api_model_id, p),
-                base_prompt=prompt,
+                call_llm=lambda p: call_llm(api_model_id, p),
+                base_prompt=api_dialect_prompt,
                 node_id=node_id,
             )
             validated_output = instance.model_dump()

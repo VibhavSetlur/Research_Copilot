@@ -39,3 +39,8 @@ class SideTaskManager:
             
             # Resume main thread
             self.interrupt_engine.recover()
+
+    def handle_stuck_loop(self, exception: Exception, context: Dict[str, Any]) -> str:
+        """Called when StuckLoopException is caught. Spawns CriticAgent to break the loop."""
+        description = f"Stuck in execution loop. Need CriticAgent to suggest alternatives. Error: {str(exception)}"
+        return self.spawn(description, context)

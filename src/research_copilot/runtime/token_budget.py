@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger("research.token_budget")
 
-_WARNING_THRESHOLD = 0.80  # fire HITL compress warning at 80 %
+_WARNING_THRESHOLD = 0.75  # fire HITL compress warning at 75 %
 _EMERGENCY_THRESHOLD = 0.90  # fire force_synthesize at 90 %
 
 

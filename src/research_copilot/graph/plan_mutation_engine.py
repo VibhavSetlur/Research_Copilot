@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from research_copilot.planning.dynamic_planner import ExecutionNode, PlanMutation
 
 class PlanMutationEngine:
@@ -28,3 +28,25 @@ class PlanMutationEngine:
                     dag["nodes"][mut.target_node]["status"] = "pending"
                     
         self.ledger.update(execution_dag=dag)
+
+    def build_dag_from_intake(self, intake: Dict[str, Any]):
+        """Constructs a ConversationDAG dynamically without disk files from an intake schema."""
+        state = self.ledger.get()
+        dag = state.get("execution_dag", {"nodes": {}})
+        
+        # Simple heuristic mapping to DAG nodes based on primary_intent
+        primary = intake.get("primary_intent", "exploratory")
+        
+        nodes = {}
+        if primary == "exploratory":
+            nodes["intake"] = {"id": "intake", "status": "pending", "dependencies": []}
+            nodes["scan"] = {"id": "scan", "status": "pending", "dependencies": ["intake"]}
+            nodes["data_profile"] = {"id": "data_profile", "status": "pending", "dependencies": ["scan"]}
+            nodes["report"] = {"id": "report", "status": "pending", "dependencies": ["data_profile"]}
+        else:
+            nodes["intake"] = {"id": "intake", "status": "pending", "dependencies": []}
+            nodes["analysis"] = {"id": "analysis", "status": "pending", "dependencies": ["intake"]}
+            nodes["validate"] = {"id": "validate", "status": "pending", "dependencies": ["analysis"]}
+            
+        dag["nodes"] = nodes
+        self.ledger.update(execution_dag=dag, phase="initialized")

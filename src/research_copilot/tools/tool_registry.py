@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 class ToolMetadata(BaseModel):
@@ -8,6 +8,7 @@ class ToolMetadata(BaseModel):
     risk: str = Field(..., description="low, medium, high")
     failure_modes: List[str] = Field(default_factory=list, description="Known ways this tool can fail")
     preferred_when: List[str] = Field(default_factory=list, description="Conditions under which this tool is preferred")
+    inputSchema: Dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}}, description="JSON Schema for MCP")
 
 class ToolRegistry:
     """Registry that maps semantic capabilities to specific tools."""

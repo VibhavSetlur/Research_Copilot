@@ -388,10 +388,24 @@ def cmd_audit(args: argparse.Namespace) -> None:
 
 
 def cmd_start(args: argparse.Namespace) -> None:
+    if getattr(args, "daemon", False):
+        import subprocess
+        import sys
+        cmd = [sys.executable, "-m", "research_copilot.server"]
+        if args.transport:
+            cmd.extend(["--transport", args.transport])
+        if args.port:
+            cmd.extend(["--port", str(args.port)])
+        subprocess.Popen(cmd, start_new_session=True)
+        print(f"Started MCP server daemon (transport: {args.transport}, port: {args.port})")
+        return
+
     from research_copilot.server import main
     import sys
     if "start" in sys.argv:
         sys.argv.remove("start")
+    if getattr(args, "daemon", False) and "--daemon" in sys.argv:
+        sys.argv.remove("--daemon")
     main()
 
 def build_parser() -> argparse.ArgumentParser:
@@ -486,6 +500,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_start = sub.add_parser("start", help="Boot the MCP server")
     p_start.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     p_start.add_argument("--port", type=int, default=8080)
+    p_start.add_argument("--daemon", action="store_true", help="Run server in the background")
 
     return parser
 
