@@ -24,7 +24,7 @@ from research_os.utils.common import find_project_root, now_iso
 def _resolve_root(root: Path | None = None) -> Path:
     r = find_project_root(root)
     if not r:
-        raise ValueError("Could not find project root containing .research/")
+        raise ValueError("Could not find project root containing .os_state/")
     return r
 
 
@@ -257,7 +257,7 @@ def write_readme(path: Path, title: str, body: str) -> None:
 
 
 def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: dict | None = None) -> None:
-    """Create the unified workspace directory structure and .research config.
+    """Create the unified workspace directory structure and .os_state config.
 
     Args:
         root: Target directory path.
@@ -347,9 +347,9 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
         )
 
     # ── Auto-generate config.yaml from questionnaire or defaults ──
-    research_dir = root / ".research"
-    research_dir.mkdir(parents=True, exist_ok=True)
-    config_path = research_dir / "config.yaml"
+    os_state_dir = root / ".os_state"
+    os_state_dir.mkdir(parents=True, exist_ok=True)
+    config_path = os_state_dir / "config.yaml"
     if not config_path.exists():
         depth = config_overrides.get("depth", "academic")
         domain = config_overrides.get("domain", "general")
@@ -393,7 +393,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
             f"- Domain: {domain}\n"
             f"- Depth: {depth}\n\n"
             "## Research Question\n\n"
-            f"{rq if rq else '(Set your research question in .research/config.yaml)'}\n\n"
+            f"{rq if rq else '(Set your research question in .os_state/config.yaml)'}\n\n"
             "## Input Files\n\n"
             "- Place raw data in `inputs/raw_data/`\n"
             "- Place literature PDFs in `inputs/literature/`\n"
@@ -521,10 +521,10 @@ def _setup_gitignore(root: Path) -> None:
             "# System\n"
             ".DS_Store\n\n"
             "# Research OS Runtime Cache\n"
-            ".research/cache/\n"
-            ".research/state/\n"
-            ".research/workflow_dag.json\n"
-            ".research/workflow_dag.mermaid\n\n"
+            ".os_state/cache/\n"
+            ".os_state/state/\n"
+            ".os_state/workflow_dag.json\n"
+            ".os_state/workflow_dag.mermaid\n\n"
             "# Raw Data (Do not commit massive datasets)\n"
             "workspace/data/raw/*\n"
             "!workspace/data/raw/.gitkeep\n"
@@ -862,7 +862,7 @@ def regenerate_intake(root: Path, project_name: str | None = None, config_overri
     project_name = project_name or state.get("project_name", "Research OS Project")
 
     # Determine domain and depth from config
-    config_path = root / ".research" / "config.yaml"
+    config_path = root / ".os_state" / "config.yaml"
     domain = config_overrides.get("domain", "general")
     depth = config_overrides.get("depth", "academic")
     if config_path.exists() and yaml:
@@ -899,7 +899,7 @@ def regenerate_intake(root: Path, project_name: str | None = None, config_overri
         "",
         "## Research Question",
         "",
-        f"{config_overrides.get('research_question', '(Set in .research/config.yaml)')}",
+        f"{config_overrides.get('research_question', '(Set in .os_state/config.yaml)')}",
         "",
         "## Keywords",
         "",

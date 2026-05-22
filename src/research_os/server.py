@@ -1057,7 +1057,7 @@ def _handle_tool_call(name: str, arguments: dict | None) -> list[TextContent]:
             artifact_type=arguments.get("artifact_type", "artifact"),
             branch=arguments.get("branch_id"),
         )
-        artifact_rel = result.get("artifact") or result.get("filepath") or arguments["filename"]
+        artifact_rel = result.get("path") or result.get("filepath") or arguments["filename"]
         abs_path = str((root / artifact_rel).absolute())
         sha = _compute_file_sha256(Path(abs_path))
         return _text(_success_envelope(
