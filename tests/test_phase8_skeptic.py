@@ -1,6 +1,6 @@
 import json
 
-from research_copilot.agents.critic import CriticAgent, SkepticAgent
+from research_os.agents.critic import CriticAgent, SkepticAgent
 
 def create_mock_llm(response_json):
     def mock_llm_call(prompt: str) -> str:

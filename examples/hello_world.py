@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""Hello World example for Research Copilot using MCP."""
+"""Hello World example for Research OS using MCP."""
 
 import asyncio
 import logging
-from research_copilot.intent_router import IntentRouter
-from research_copilot.utils.common import find_project_root
+from research_os.intent_router import IntentAnalyzer
+from research_os.utils.common import find_project_root
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
     root = find_project_root()
-    router = IntentRouter(root)
-    
+    analyzer = IntentAnalyzer(root)
+
     query = "Analyze the basic demographics of the provided dataset and create a summary report."
-    print(f"Routing query: '{query}'")
-    
-    result = router.route(query, depth="quick")
-    
-    print("\nRouting Result:")
-    print(f"Primary Intent: {result['classification']['primary_intent']}")
-    print(f"Agents Required: {', '.join(result['context']['agents'])}")
-    print(f"Skills Required: {', '.join(result['context']['skills'])}")
-    print("\nNext step: Start the MCP server using `rcp start` and submit the query via your MCP client.")
+    print(f"Analyzing query: '{query}'")
+
+    intake = analyzer.build_bootstrap_intake(query)
+
+    cls = intake.get("classification", {})
+    print("\nIntake Analysis:")
+    print(f"Primary Intent: {cls.get('primary_intent', 'unknown')}")
+    print(f"Suggested Skills: {', '.join(intake.get('suggested_skills', []))}")
+    print(f"Suggested Agents: {', '.join(intake.get('suggested_agents', []))}")
+    print("\nNext step: IDE uses this intake to decide which MCP tools to call.")
 
 if __name__ == "__main__":
     asyncio.run(main())

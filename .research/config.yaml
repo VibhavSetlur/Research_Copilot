@@ -1,8 +1,8 @@
-# Research Copilot — Project Configuration
+# Research OS — Project Configuration
 # Schema version: 9.0.0
 # This file is created by `rcp init` and customized per project.
 
-project_id: "research-copilot"
+project_id: "research-os"
 schema_version: "9.0.0"
 
 # Default workflow: quick_exploratory | full_publication | systematic_review | causal_investigation | predictive_modeling

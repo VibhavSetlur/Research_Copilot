@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.graph.mutation_engine import PlanMutationEngine
-from research_copilot.engine import ResearchEngine
+from research_os.state.state_ledger import ResearchLedger
+from research_os.graph.mutation_engine import PlanMutationEngine
+from research_os.engine import ResearchEngine
 
 def test_failed_statistical_analysis_alternate_selection(tmp_path: Path):
     """Test engine handles a dead-end and suggests alternative pathway."""

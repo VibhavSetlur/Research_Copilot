@@ -1,8 +1,8 @@
 import pytest
 import json
 from pathlib import Path
-from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.memory.memory_synthesizer import MemorySynthesizer
+from research_os.state.state_ledger import ResearchLedger
+from research_os.memory.memory_synthesizer import MemorySynthesizer
 
 def test_synthesize_episode_mocked_llm(tmp_path, mocker):
     """Test synthesizing an episodic memory using a mocked LLM call."""

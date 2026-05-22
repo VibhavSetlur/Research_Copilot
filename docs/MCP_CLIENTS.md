@@ -18,7 +18,7 @@ Add the following JSON configuration:
     "research-os": {
       "command": "research-os",
       "args": [
-        "research-copilot-mcp"
+        "research-os-mcp"
       ],
       "env": {
         "OPENAI_API_KEY": "your-key",
@@ -42,7 +42,7 @@ Cursor has built-in support for MCP servers.
 4. Configure as follows:
    - **Name:** `Agentic Research OS`
    - **Type:** `command`
-   - **Command:** `research-copilot-mcp` (or the absolute path to your `bin/research-copilot-mcp`)
+   - **Command:** `research-os-mcp` (or the absolute path to your `bin/research-os-mcp`)
 
 ## 3. Windsurf
 
@@ -50,4 +50,4 @@ Windsurf (Codeium) supports MCP natively.
 
 1. Open the command palette (`Cmd/Ctrl + Shift + P`)
 2. Type `Windsurf: Manage MCP Servers`
-3. Add the server using the identical command as Cursor (`research-copilot-mcp`).
+3. Add the server using the identical command as Cursor (`research-os-mcp`).

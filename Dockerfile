@@ -17,9 +17,10 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# Install dependencies and the package itself
-RUN pip install --no-cache-dir -e .[all]
+# Install jupyterlab and package dependencies
+RUN pip install --no-cache-dir jupyterlab && \
+    pip install --no-cache-dir -e .[all]
 
-# Entry point for the OS CLI
+# Default entry point for the OS CLI
 ENTRYPOINT ["research-os"]
 CMD ["--help"]

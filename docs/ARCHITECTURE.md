@@ -1,30 +1,138 @@
-# Research OS Architecture Guide
+# Research OS Architecture
 
-Research OS models research as an **Agentic Directed Acyclic Graph (DAG)** running on the **Model Context Protocol (MCP)**. It dynamically adapts to user goals through a "zero-to-research" intake layer.
+Research OS is an **MCP server** that provides tools (hands), observability (eyes), and state management (memory) for AI-driven research. The IDE is the brain — it thinks, plans, and decides which tools to call. Research OS executes.
 
-## Core Components
-1. **MCP Server (`server.py`)**: The primary daemonized entry point. Exposes capabilities via JSON-RPC.
-2. **Intent Router (`intent_router.py`)**: Bootstraps unstructured text into a rigorous intake schema.
-3. **Execution Engine**:
-   - `interrupt_engine.py`: Halts execution and saves state for human-in-the-loop or side tasks.
-   - `side_task_manager.py`: Handles `StuckLoopException` and spawns isolated side tasks.
-   - `plan_mutation_engine.py`: Dynamically computes DAG nodes based on intent.
-4. **Cognitive Subsystem**:
-   - `cognitive_tracker.py`: Maintains active hypotheses, claims, evidence, and tracks execution stuck loops.
-   - `token_budget.py` & `prompt_compression.py`: Enforces memory tiers and performs rolling semantic distillation.
-5. **Semantic State Ledger (`state_ledger.py`)**: The single source of truth for the entire pipeline run.
+---
 
-## Workflow
-```mermaid
-graph TD
-    A[User Prompt] --> B[IntentRouter]
-    B --> C[PlanMutationEngine]
-    C --> D[Agentic DAG Execution]
-    D --> E[Tool Registry & MCP]
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AI IDE (Brain)                        │
+│  Cursor / Windsurf / Claude Desktop / VS Code           │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  The IDE:                                       │    │
+│  │  1. Receives user request (NLP)                 │    │
+│  │  2. Analyzes intent via view.analyze_intent     │    │
+│  │  3. Decides which tools to call                 │    │
+│  │  4. Calls tools in sequence                     │    │
+│  │  5. Reads responses, updates chat               │    │
+│  └─────────────────────────────────────────────────┘    │
+└──────────────────────┬──────────────────────────────────┘
+                       │ MCP Protocol (stdio JSON-RPC)
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              Research OS (Executor)                      │
+│                                                          │
+│  ┌───────────────┐  ┌────────────────────────────────┐  │
+│  │  Tool Router   │  │  State Ledger                  │  │
+│  │  (server.py)   │  │  (.os_state/state_ledger.yaml) │  │
+│  │                │  │  - current_branch              │  │
+│  │  sys.*         │  │  - branches & statuses         │  │
+│  │  tool.*        │  │  - checkpoint_history          │  │
+│  │  view.*        │  │  - pipeline_stage              │  │
+│  │  mem.*         │  │                                │  │
+│  └───────┬───────┘  └────────────────────────────────┘  │
+│          │                                                │
+│  ┌───────▼────────────────────────────────────────────┐  │
+│  │  Tool Implementations                              │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │  │
+│  │  │ Hands    │ │ Eyes     │ │ Memory           │   │  │
+│  │  │ (tool.*) │ │ (view.*) │ │ (mem.*)          │   │  │
+│  │  │          │ │          │ │                  │   │  │
+│  │  │ latex    │ │ tree     │ │ methods.append   │   │  │
+│  │  │ pubmed   │ │ data.head│ │ citation.add     │   │  │
+│  │  │ ttest    │ │ figure   │ │ regenerate.intake│   │  │
+│  │  │ figure   │ │ analyze  │ │ literature.index │   │  │
+│  │  │ transform│ │          │ │ citations.generate│  │  │
+│  │  │ dashboard│ │          │ │ checkpoint       │   │  │
+│  │  └──────────┘ └──────────┘ └──────────────────┘   │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  Project State (project_ops.py)                    │  │
+│  │  - Workspace scaffold & conventions                │  │
+│  │  - Numbered experiment creation                    │  │
+│  │  - Input intake & hashing                          │  │
+│  │  - Literature indexing                             │  │
+│  └────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Workspace (Filesystem)                │
+│                                                          │
+│  inputs/    workspace/    synthesis/    .os_state/      │
+│  (immutable) (active)     (outputs)     (internal)      │
+└─────────────────────────────────────────────────────────┘
 ```
 
-1. User invokes `research-os start --daemon`.
-2. The query is routed to the `IntentRouter`, which builds a dynamic DAG intake schema.
-3. The graph is executed. At each node, the state is serialized to the `StateLedger`.
-4. High-risk tools (e.g., shell access) are gated by `ToolCapabilityCheck` requiring high confidence.
-5. If hallucinations, compilation errors, or stuck loops occur, the `SafetyGater` or `SideTaskManager` routes back to recovery protocols to correct the issue.
+---
+
+## Key Design Decisions
+
+### 1. IDE is the Brain, OS is the Body
+
+The IDE (Cursor, Windsurf, Claude Desktop) is the cognitive layer. It:
+- Understands natural language requests
+- Analyzes intent and plans tool sequences
+- Calls tools in the right order
+- Reads results and presents them to the user
+
+Research OS never:
+- Makes autonomous decisions
+- Plans research steps
+- Selects tools on its own
+- Thinks or reasons about the problem
+
+### 2. Tool Categories
+
+| Category | Prefix | Responsibility | Examples |
+|----------|--------|---------------|---------|
+| Hands | `tool.` | Execute actions on data | `tool.statistical.test`, `tool.figure.create`, `tool.latex.compile` |
+| Eyes | `view.` | Read/observe state | `view.workspace.tree`, `view.data.head`, `view.figure.show` |
+| Memory | `mem.` | Read/write persistent state | `mem.methods.append`, `mem.citation.add`, `mem.checkpoint` |
+| System | `sys.` | Control the OS itself | `sys.branch.create`, `sys.state`, `sys.synthesize` |
+
+### 3. State Ledger as Source of Truth
+
+Every tool call updates `.os_state/state_ledger.yaml`:
+- Atomic writes (temp file + rename)
+- Before/after diffs logged to `workspace/logs/state_changes.log`
+- JSON backup format for backward compatibility
+- SHA-256 checksums on every file write
+
+### 4. Immutable Inputs
+
+The `inputs/` directory is write-protected at the tool level. Any tool that attempts to write to `inputs/` receives a `WriteProtectedError`. Data must be copied to `workspace/` for processing.
+
+### 5. Numbered Experiment Folders
+
+Experiments are created as `workspace/01_name/`, `02_name/`, etc. by `sys.branch.create`. Each folder is self-contained with README.md, conclusions.md, data/, scripts/, and outputs/.
+
+---
+
+## Component Details
+
+### MCP Server (`server.py`)
+- Listens on stdio (default) or SSE
+- Exposes 44+ tools via `list_tools`
+- Routes tool calls to handler functions
+- Returns standardized JSON envelope with checksums
+
+### Project Operations (`project_ops.py`)
+- Workspace scaffold, intake regeneration
+- State ledger read/write with YAML + JSON
+- Numbered experiment folder creation
+- Literature index and citation management
+- Workflow diagram rendering
+
+### Tool Implementations (`tools/tool_impls.py`)
+- Standalone functions for each tool
+- No side effects beyond file writes and tool responses
+- All results returned as dicts
+
+### Dependencies
+- **Python**: pandas, numpy, scipy, scikit-learn, matplotlib, seaborn, statsmodels
+- **Optional**: panel + plotly (dashboards), mmdc (Mermaid PNG), pdflatex (LaTeX)
+- **Runtime**: Python 3.10+, MCP-compatible IDE

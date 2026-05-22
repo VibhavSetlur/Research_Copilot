@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from research_copilot.utils.dag_manager import ExecutionDAGManager
+from research_os.utils.dag_manager import ExecutionDAGManager
 
 def test_dag_manager_initialization(tmp_path):
     """Test that the DAG manager initializes correctly."""

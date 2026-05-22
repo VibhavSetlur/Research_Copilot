@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from research_copilot.state.state_ledger import ResearchLedger
-from research_copilot.cognition.cognitive_tracker import CognitiveStateTracker
+from research_os.state.state_ledger import ResearchLedger
+from research_os.cognition.cognitive_tracker import CognitiveStateTracker
 
 def test_citation_lineage_integrity(tmp_path: Path):
     """Test that a claim can trace its lineage back to a citation."""

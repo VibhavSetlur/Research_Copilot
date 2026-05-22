@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from research_copilot.agents.supervisor_agent import SupervisorAgent
-from research_copilot.state.state_ledger import ResearchLedger
+from research_os.agents.supervisor_agent import SupervisorAgent
+from research_os.state.state_ledger import ResearchLedger
 
 def test_user_removing_evidence(tmp_path: Path):
     """Test that a user correction to remove evidence modifies the state ledger."""

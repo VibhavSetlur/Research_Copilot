@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Research Copilot Contributors"}
+    {name = "Research OS Contributors"}
 ]
 keywords = ["research", "ai", "llm", "academic", "analysis", "reproducible", "mcp", "citation-verification"]
 classifiers = [
@@ -91,27 +91,28 @@ dev = [
     "mypy>=1.0",
 ]
 all = [
-    "research-copilot[mcp,dashboard,export]",
+    "agentic-research-os[mcp,dashboard,export]",
 ]
 
 [project.scripts]
-research-os = "research_copilot.cli:main"
-rcp = "research_copilot.cli:main"
-research-copilot-mcp = "research_copilot.server:main"
+research-os = "research_os.cli:main"
+ros = "research_os.cli:main"
+rcp = "research_os.cli:main"
+research-os-mcp = "research_os.server:main"
 
 [project.urls]
-Homepage = "https://github.com/VibhavSetlur/research-copilot"
-Documentation = "https://github.com/VibhavSetlur/research-copilot/blob/main/docs/README.md"
-Repository = "https://github.com/VibhavSetlur/research-copilot"
-Issues = "https://github.com/VibhavSetlur/research-copilot/issues"
-Changelog = "https://github.com/VibhavSetlur/research-copilot/blob/main/docs/CHANGELOG.md"
+Homepage = "https://github.com/VibhavSetlur/Research-OS"
+Documentation = "https://github.com/VibhavSetlur/Research-OS/blob/main/docs/README.md"
+Repository = "https://github.com/VibhavSetlur/Research-OS"
+Issues = "https://github.com/VibhavSetlur/Research-OS/issues"
+Changelog = "https://github.com/VibhavSetlur/Research-OS/blob/main/docs/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["research_copilot*"]
+include = ["research_os*", "research_os*"]
 
 [tool.setuptools.package-data]
-"research_copilot" = [
+"research_os" = [
     "assets/**/*",
 ]
 

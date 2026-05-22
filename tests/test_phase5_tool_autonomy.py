@@ -1,7 +1,7 @@
 import json
 
-from research_copilot.tools.tool_registry import ToolRegistry
-from research_copilot.planning.capability_planner import CapabilityPlanner
+from research_os.tools.tool_registry import ToolRegistry
+from research_os.planning.capability_planner import CapabilityPlanner
 
 def create_mock_llm(response_json):
     def mock_llm_call(prompt: str) -> str:

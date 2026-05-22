@@ -13,6 +13,15 @@ Thank you for your interest in improving Agentic Research OS! This guide will he
 7. **Push to Fork**: Push your branch to your forked repository (`git push origin feature/your-feature-name`).
 8. **Submit a Pull Request**: Open a pull request from your fork's branch to the main repository.
 
+## Architecture Overview
+
+Agentic Research OS has been re-architected as a pure **MCP-Native Research OS**. This means:
+- **The AI IDE is the brain**: Tools like Cursor, Windsurf, or Claude Desktop perform the "thinking," planning, and routing.
+- **This repository is the body**: It provides Hands (tools), Eyes (observability), and Memory (state).
+- **Stateless Execution**: The OS itself does not make autonomous decisions; it relies entirely on the IDE driving the feedback loop via Model Context Protocol (MCP) tool calls.
+
+The workspace is strictly partitioned into `inputs/` (immutable data), `workspace/` (active research branches with state management), and `synthesis/` (compiled final outputs).
+
 ## Development Setup
 
 We recommend using `uv` or `poetry` for dependency management. To set up the environment:
@@ -29,7 +38,9 @@ Before committing, run:
 ```bash
 ruff check .
 ruff format .
-mypy src/research_copilot/
+# Run mypy against the codebase. The project currently uses `research_os`
+# as the package name; an alias package `research_os` is provided for compatibility.
+mypy src/research_os/  # or: mypy src/research_os/
 ```
 
 ## Writing Tests
