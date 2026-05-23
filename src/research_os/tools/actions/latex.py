@@ -108,3 +108,126 @@ def latex_compile(root: Path) -> dict:
         if success
         else "LaTeX compilation failed — see log for details",
     }
+
+
+def create_poster(root: Path) -> dict:
+    """Create a professional LaTeX poster in synthesis/poster.pdf using tikzposter."""
+    synthesis_dir = root / "synthesis"
+    synthesis_dir.mkdir(parents=True, exist_ok=True)
+    poster_tex = synthesis_dir / "poster.tex"
+
+    from research_os.state.state_ledger import ResearchLedger
+    ledger = ResearchLedger(root)
+    state = ledger.get()
+    title = state.get("project", "Research Poster")
+
+    workspace_dir = root / "workspace"
+    figures = []
+    if workspace_dir.exists():
+        for f in workspace_dir.rglob("*.png"):
+            # Copy figure to synthesis dir to avoid complex path issues in LaTeX
+            dest = synthesis_dir / f.name
+            if not dest.exists():
+                import shutil
+                shutil.copy2(f, dest)
+            figures.append(f.name)
+
+    tex_content = r"""\documentclass[20pt, a0paper, portrait]{tikzposter}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+
+\title{""" + title + r"""}
+\author{Autonomous Research System}
+\institute{Research OS}
+
+\usetheme{Board}
+
+\begin{document}
+\maketitle
+
+\begin{columns}
+
+\column{0.5}
+\block{Introduction}{
+    \vspace{1cm}
+    This poster presents the automated findings.
+    \vspace{1cm}
+}
+
+\block{Methods}{
+    \vspace{1cm}
+    \begin{itemize}
+        \item Automated data analysis
+        \item Statistical modeling
+        \item Literature review
+    \end{itemize}
+    \vspace{1cm}
+}
+
+\column{0.5}
+\block{Results}{
+    \vspace{1cm}
+"""
+
+    if figures:
+        tex_content += r"    \begin{center}" + "\n"
+        for fig in figures[:2]:
+            tex_content += f"        \\includegraphics[width=0.8\\linewidth]{{{fig}}}\n"
+            tex_content += r"        \vspace{1cm}" + "\n"
+        tex_content += r"    \end{center}" + "\n"
+    else:
+        tex_content += r"    \textit{No figures generated yet.}" + "\n"
+
+    tex_content += r"""
+    \vspace{1cm}
+}
+
+\block{Conclusions}{
+    \vspace{1cm}
+    Results indicate successful execution of the automated pipeline.
+    \vspace{1cm}
+}
+
+\block{References}{
+    \vspace{1cm}
+    \bibliographystyle{plain}
+    \textit{References will be populated here.}
+    \vspace{1cm}
+}
+
+\end{columns}
+\end{document}
+"""
+    poster_tex.write_text(tex_content)
+
+    pdflatex = shutil.which("pdflatex")
+    if not pdflatex:
+        return {
+            "pdf_path": None,
+            "success": False,
+            "log": "",
+            "warning": "pdflatex not found. Install TeX Live.",
+        }
+
+    log_lines: list[str] = []
+    success = True
+    
+    result = subprocess.run(
+        [pdflatex, "-interaction=nonstopmode", "-halt-on-error", poster_tex.name],
+        cwd=str(synthesis_dir),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    log_lines.append(result.stdout)
+    if result.returncode != 0:
+        success = False
+        log_lines.append("[ERROR] pdflatex run failed")
+
+    pdf_path = poster_tex.with_suffix(".pdf")
+    return {
+        "pdf_path": str(pdf_path.absolute()) if pdf_path.exists() else None,
+        "success": success,
+        "log": "\n".join(log_lines[-50:]),
+        "warning": None if success else "LaTeX compilation failed — see log for details",
+    }

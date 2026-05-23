@@ -6,6 +6,9 @@ WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
+    texlive-latex-extra \
+    texlive-pictures \
+    texlive-science \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Research OS

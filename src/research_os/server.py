@@ -55,6 +55,7 @@ from research_os.tools.actions.interaction import (
     notify_researcher,
     checkpoint_pending,
     checkpoint_approve,
+    session_handoff,
 )
 from research_os.tools.actions.external_mcp import discover_mcp
 from research_os.tools.actions.task import task_monitor, task_kill
@@ -232,6 +233,16 @@ TOOL_DEFINITIONS = {
     },
     "sys.state.summary": {
         "description": "Get a brief summary of the state.",
+        "category": "state",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "sys.state.health": {
+        "description": "Returns current context estimate, paths, and handoff recommendation.",
+        "category": "state",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "sys.session.handoff": {
+        "description": "Creates a structured markdown summary + next step prompt for session handoff.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
@@ -508,6 +519,11 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
+    "tool.poster.create": {
+        "description": "Generate a professional LaTeX poster in synthesis/poster.pdf using tikzposter.",
+        "category": "execution",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
     "tool.data.sample": {
         "description": "Sample data.",
         "category": "execution",
@@ -544,8 +560,13 @@ TOOL_DEFINITIONS = {
                     "type": "string",
                     "enum": ["markdown", "latex", "both"],
                     "description": "Output format for the compiled paper (default: markdown)",
-                }
+                },
+                "section": {
+                    "type": "string",
+                    "description": "Specific section to generate (e.g. abstract, methods, results, discussion). If omitted, generates the full paper.",
+                },
             },
+            "required": [],
         },
     },
 }
@@ -714,11 +735,24 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         )
 
     if name == "sys.state.minimal_context":
-        from research_os.state.state_ledger import StateLedger
+        from research_os.state.state_ledger import ResearchLedger
 
-        ledger = StateLedger(root)
+        ledger = ResearchLedger(root)
         summary = ledger.get_project_summary(max_tokens=450)
         return _text(_success_envelope({"minimal_context": summary}))
+
+    if name == "sys.state.health":
+        from research_os.state.state_ledger import ResearchLedger
+        ledger = ResearchLedger(root)
+        return _text(_success_envelope(ledger.health()))
+
+    if name == "sys.session.handoff":
+        res = session_handoff(root)
+        return (
+            _text(_success_envelope(res))
+            if res["status"] == "success"
+            else _text(_error_envelope(res["message"]))
+        )
 
     if name == "tool.task.create":
         from research_os.tools.actions.task import create_task
@@ -953,8 +987,14 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 
     if name == "tool.env.restore":
         return _text(_success_envelope(env_restore(arguments.get("requirements", ""))))
+
     if name == "tool.latex.compile":
+        from research_os.tools.actions.latex import latex_compile
         return _text(_success_envelope(latex_compile(root)))
+
+    if name == "tool.poster.create":
+        from research_os.tools.actions.latex import create_poster
+        return _text(_success_envelope(create_poster(root)))
 
     if name == "tool.data.sample":
         res = data_sample(
@@ -981,7 +1021,8 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         from research_os.tools.actions.synthesize import synthesize_workspace
 
         fmt = arguments.get("output_format", "markdown")
-        res = synthesize_workspace(root, output_format=fmt)
+        sec = arguments.get("section")
+        res = synthesize_workspace(root, output_format=fmt, section=sec)
         if "error" in res:
             return _text(_error_envelope(res["error"]))
         return _text(_success_envelope(res))

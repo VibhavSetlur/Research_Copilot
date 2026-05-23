@@ -108,26 +108,7 @@ class ResearchLedger:
             "knowledge_graph_path": None,
         }
 
-    def _run_pre_commit_hooks(self, state: dict, action: str, **kwargs) -> dict:
-        """Run pre_ledger_commit hooks synchronously via trigger_sync().
 
-        No nest_asyncio needed — hooks.py handles async/sync normalization.
-        """
-        try:
-            from research_os.runtime.hooks import hook_engine
-            import research_os.runtime.interceptors  # noqa: F401 — registers interceptors
-            import research_os.utils.state_compressor  # noqa: F401
-        except ImportError:
-            try:
-                from .hooks import hook_engine
-                from . import interceptors  # noqa: F401
-                from ..utils import state_compressor  # noqa: F401
-            except ImportError:
-                return state
-
-        return hook_engine.trigger_sync(
-            "pre_ledger_commit", state, action=action, **kwargs
-        )
 
     def get(self) -> dict:
         return self._load()
@@ -136,7 +117,6 @@ class ResearchLedger:
         state = self._load()
         state.update(kwargs)
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
-        state = self._run_pre_commit_hooks(state, "update", **kwargs)
         self._save(state)
         return state
 
@@ -155,7 +135,6 @@ class ResearchLedger:
         state["resumable_from"] = phase
         state["last_checkpoint"] = datetime.now(timezone.utc).isoformat()
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
-        state = self._run_pre_commit_hooks(state, "complete_phase", phase=phase)
         self._save(state)
         return state
 
@@ -505,6 +484,22 @@ class ResearchLedger:
 
         lines.append("")
         return "\n".join(lines)
+
+    def health(self) -> dict:
+        """Returns current context estimate, paths, handoff recommendation."""
+        state = self._load()
+        paths = list(state.get("paths", {}).keys())
+        turns = len(state.get("conversation_turns", []))
+        
+        context_estimate = "high" if turns >= 20 else "medium" if turns >= 10 else "low"
+        recommend_handoff = turns >= 4
+        
+        return {
+            "context_estimate": context_estimate,
+            "active_paths": paths,
+            "handoff_recommendation": recommend_handoff,
+            "message": "Handoff recommended due to conversation length." if recommend_handoff else "Context size is healthy."
+        }
 
     def get_project_summary(self, max_tokens: int = 500) -> str:
         """Return a compact project summary for new conversation injection.

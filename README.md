@@ -24,9 +24,15 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
    In your AI IDE, prompt the agent:
    > "Please scaffold my new project using `sys.workspace.scaffold` with the name 'My First Study'."
 
+   **Agent Rules Setup**: For the AI to follow Research OS conventions, copy the appropriate rules file to your project:
+   - **Cursor**: Copy `templates/.cursor/rules/research-os.mdc` to `.cursor/rules/research-os.mdc`
+   - **Claude Code**: Copy `templates/.claude/rules/research-os.md` to `.claude/rules/research-os.md`
+
 4. **Add Data and Analyze**
    Then drop your data files into `inputs/raw_data/` and ask:
    > "Analyze my data."
+
+   *(Note: For lightweight use, you can install only `research-os[core]` and skip heavy extras if you don't need the full data science stack.)*
 
 ## Architecture
 

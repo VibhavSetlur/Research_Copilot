@@ -104,9 +104,10 @@ class TestProtocolList:
         names = {p["name"] for p in result["protocols"]}
         assert names == {"alpha", "beta", "gamma"}
 
-    def test_list_missing_dir_returns_error(self, tmp_path):
+    def test_list_missing_dir_uses_fallback(self, tmp_path):
         result = list_protocols(tmp_path)
-        assert "error" in result
+        assert "error" not in result
+        assert "protocols" in result
 
     def test_list_protocols_have_required_metadata(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent

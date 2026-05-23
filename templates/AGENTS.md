@@ -1,42 +1,21 @@
 # Research OS Agent Guidelines
 
-When interacting with Research OS workspaces, LLM-based agents (e.g., Cursor, Claude Code, Antigravity, and generic MCP clients) must abide by the following operational constraints to ensure project integrity, provenance tracking, and data safety.
-
-## 1. Golden Rule of Immutability
-**Do not modify files in the `inputs/raw_data/` or `inputs/literature/` directories.**
-These files form the immutable basis of the research.
-Any data cleaning, transformation, or filtering must produce new files inside the current experiment step's `data/` directory (e.g., `workspace/01_experiment_baseline/data/`).
-The ONLY exception is the `inputs/literature_index.yaml` file.
-
-## 2. Mandatory State Logging
-Whenever you make a significant methodological decision (e.g., choosing a statistical test, dropping an outlier, selecting a hyperparameter), you MUST log it using the `tool.log.decision` MCP tool.
-Do not proceed with major analysis steps without logging the decision first.
-
-## 3. Methodological Appends
-If you execute a new analysis script or apply a new technique, you MUST append a one-line summary to `workspace/methods.md` using the `mem.methods.append` tool.
-Example: `Applied SMOTE to balance the training dataset prior to Random Forest training.`
-
-## 4. Analysis Checkpointing
-Append your chronological findings, results, and interim thoughts to `workspace/analysis.md` using the `mem.analysis.log` tool.
-This creates a continuous, readable narrative of the research process.
-
-## 5. Experiment Paths
-Experiments follow numbered chronological steps (`01_experiment_baseline/`, `02_data_preparation/`). Use `sys.path.create` to create the next step. If a path reaches a dead end, use `sys.path.abandon` to rename it (e.g., `02_data_preparation__DEAD_END/`) — files are preserved, not deleted.
-
-## 6. Execution Estimation
-Before executing Python scripts (`tool.python.exec`) that process large datasets (e.g., >1GB), check the `workspace/logs/data_inventory.json` file. If the estimated processing time is high, consider using `tool.data.sample` to run a smaller test first.
-
-## 7. Approval Gates
-If the configuration specifies `supervised` autonomy, you must use `sys.checkpoint.pending` to request approval from the human researcher before executing long-running scripts, modifying core hypotheses, or completing major milestones.
-
-## 8. Checkpoint Usage
-Always create a checkpoint (`sys.checkpoint.create`) before undertaking massive refactoring of scripts or data pipelines. This allows the researcher to rollback (`sys.checkpoint.rollback`) if the analysis goes awry.
-
-## 9. Model-Size Awareness
-If you are operating as a small model (e.g. indicated by `model_profile: small` in the configuration), you MUST load the lightweight protocols from the `protocols/light/` directory. Rely on `sys.state.minimal_context` to stay oriented without blowing out your context window.
-
-## 10. Mandatory Profiling Before Execution
-Never execute a data processing script (`tool.python.exec`) without first checking `workspace/logs/data_inventory.json` for dataset size and estimated runtime. If the runtime is expected to be long or the file is large, always use `tool.data.sample` to develop and verify your logic on a subset of the data first.
-
-## 11. Citation and Fact-Checking Rule
-Every factual claim, literature reference, or established methodology you cite MUST be backed by a `tool.search.*` call (e.g., `tool.search.pubmed`, `tool.search.semantic_scholar`). You must log the retrieved citation or result alongside your claim to ensure provenance. The result of every search call is automatically logged to `workspace/logs/searches.log`.
+1. **Immutability**: Do not modify `inputs/raw_data/` or `inputs/literature/`. Write new data to the current experiment step's `data/` directory.
+2. **State Logging**: Log significant methodological decisions using `tool.log.decision`.
+3. **Methodological Appends**: Append new analysis steps to `workspace/methods.md` using `mem.methods.append`.
+4. **Analysis Checkpointing**: Append chronologically to `workspace/analysis.md` using `mem.analysis.log`.
+5. **Experiment Paths**: Use `sys.path.create` for new steps. Use `sys.path.abandon` for dead ends (preserves files).
+6. **Execution Estimation**: Before running heavy scripts, check `data_inventory.json` and use `tool.data.sample` to test logic first.
+7. **Approval Gates**: In `supervised` mode, use `sys.checkpoint.pending` for major milestones.
+8. **Checkpointing**: Use `sys.checkpoint.create` before massive refactoring.
+9. **Model-Size Awareness**: Small models MUST use protocols from `protocols/light/` and `sys.state.minimal_context`.
+10. **Fact-Checking**: Cite sources via `tool.search.*` calls.
+11. **Autonomy Modes**:
+    - **manual**: Propose actions and wait for PI approval.
+    - **supervised**: Auto-execute routines; pause at key decisions.
+    - **autopilot**: Execute one numbered task per response, end with "Type continue". After 4+ continues, call `sys.session.handoff`.
+12. **Output-Driven Workflow**:
+    - **exploratory/dashboard**: Build interactive dashboards/summaries.
+    - **abstract**: 250-word abstract + key figure.
+    - **poster**: Call `tool.poster.create`.
+    - **paper**: Full IMRAD (section-by-section for complex work via `tool.synthesize section=...`).

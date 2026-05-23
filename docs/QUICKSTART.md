@@ -43,4 +43,4 @@ The AI will use `sys.guidance.get` to read the YAML decision tree, guiding it to
 
 Ask the AI to create an experiment branch when trying a new methodology:
 > "Branch off main to try a non-parametric approach."
-The AI will invoke `sys.branch.create`, isolating the new work while preserving the ledger.
+The AI will invoke `sys.path.create`, isolating the new work while preserving the ledger.

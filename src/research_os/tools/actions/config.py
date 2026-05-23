@@ -77,6 +77,11 @@ def init_config(root: Path) -> Dict[str, Any]:
                 "autonomy_level": "supervised",
                 "notification_preferences": {"on_error": True},
             },
+            "research_goal": {
+                "output_types": ["paper", "poster", "dashboard"],
+                "target_venue": "conference",
+                "poster_dimensions": "36x48",
+            },
             "api_keys": {"firecrawl": "", "semantic_scholar": "", "pubmed": "", "crossref": "", "serpapi": ""},
             "model_profile": "medium",  # small, medium, large
         }

@@ -15,6 +15,8 @@ def get_protocol(name: str, root: Path) -> Dict[str, Any]:
 
         p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
         if not p_file.exists():
+            p_file = Path(__file__).parent.parent.parent / "protocols" / f"{name}.yaml"
+        if not p_file.exists():
             return {"error": "Protocol not found"}
 
         data = yaml.safe_load(p_file.read_text())
@@ -28,6 +30,8 @@ def get_protocol(name: str, root: Path) -> Dict[str, Any]:
 def list_protocols(root: Path) -> Dict[str, Any]:
     try:
         p_dir = root / "src" / "research_os" / "protocols"
+        if not p_dir.exists():
+            p_dir = Path(__file__).parent.parent.parent / "protocols"
         if not p_dir.exists():
             return {"error": "Protocols directory not found"}
         protocols = []
@@ -58,6 +62,8 @@ def list_protocols(root: Path) -> Dict[str, Any]:
 def validate_protocol(name: str, root: Path) -> Dict[str, Any]:
     try:
         p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
+        if not p_file.exists():
+            p_file = Path(__file__).parent.parent.parent / "protocols" / f"{name}.yaml"
         if not p_file.exists():
             return {"error": "Protocol not found"}
 

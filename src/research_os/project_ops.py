@@ -430,7 +430,6 @@ def scaffold_minimal_workspace(
     # Regenerate intake with current file hashes
     regenerate_intake(root, project_name, config_overrides)
 
-    _copy_ai_rules_to_project(root)
     _copy_environment_to_project(root)
     _setup_mcp_configs(root)
     _setup_gitignore(root)
@@ -445,12 +444,6 @@ def _initialize_git(root: Path) -> None:
     if not (root / ".git").exists():
         try:
             subprocess.run(["git", "init"], cwd=root, capture_output=True)
-            subprocess.run(["git", "add", "."], cwd=root, capture_output=True)
-            subprocess.run(
-                ["git", "commit", "-m", "chore: initial research os scaffold"],
-                cwd=root,
-                capture_output=True,
-            )
         except Exception:
             pass
 
@@ -545,25 +538,15 @@ def _setup_mcp_configs(root: Path) -> None:
             json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
         )
 
-    # Windsurf
-    windsurf_dir = root / ".windsurf"
-    windsurf_dir.mkdir(parents=True, exist_ok=True)
-    windsurf_mcp = windsurf_dir / "mcp_config.json"
-    if not windsurf_mcp.exists():
-        windsurf_mcp.write_text(
-            json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
-        )
+
 
     # Claude Desktop
-    claude_dir = Path.home() / ".claude"
-    claude_dir.mkdir(parents=True, exist_ok=True)
-    claude_mcp = claude_dir / "mcp.json"
+    claude_mcp = root / "claude_desktop_config.json"
     if not claude_mcp.exists():
         try:
-            # Read existing config and merge
-            existing = json.loads(claude_mcp.read_text()) if claude_mcp.exists() else {}
-            existing.setdefault("mcpServers", {})["research-os"] = mcp_entry
-            claude_mcp.write_text(json.dumps(existing, indent=2) + "\n")
+            claude_mcp.write_text(
+                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
+            )
         except Exception:
             pass
 

@@ -23,7 +23,7 @@ def checkpoint_pending(
 ) -> Dict[str, Any]:
     # Write pending action to a state file
     try:
-        pending_path = root / ".research" / "pending_approval.txt"
+        pending_path = root / ".os_state" / "pending_approval.txt"
         pending_path.parent.mkdir(parents=True, exist_ok=True)
         pending_path.write_text(description)
         return {
@@ -36,10 +36,25 @@ def checkpoint_pending(
 
 def checkpoint_approve(root: Path) -> Dict[str, Any]:
     try:
-        pending_path = root / ".research" / "pending_approval.txt"
+        pending_path = root / ".os_state" / "pending_approval.txt"
         if pending_path.exists():
             pending_path.unlink()
             return {"status": "success", "message": "Action approved."}
         return {"status": "error", "message": "No pending action found."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def session_handoff(root: Path) -> Dict[str, Any]:
+    try:
+        handoff_path = root / "workspace" / "handoff.md"
+        handoff_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        content = f"# Session Handoff\n\nGenerated at: {now_iso()}\n\n## Summary\n(Please fill in the summary of completed tasks)\n\n## Next Steps\n(Please fill in what needs to be done next)\n\n## Prompt to resume\n```\nResume work from handoff.md. Review the next steps and continue execution.\n```\n"
+        
+        handoff_path.write_text(content)
+        return {
+            "status": "success", 
+            "message": f"Handoff created at {handoff_path.relative_to(root)}. Researcher should start a new chat with the handoff prompt."
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}

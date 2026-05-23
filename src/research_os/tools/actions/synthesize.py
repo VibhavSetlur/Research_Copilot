@@ -6,9 +6,25 @@ from typing import Any
 logger = logging.getLogger("research.tools.synthesize")
 
 
-def synthesize_workspace(root: Path, output_format: str = "markdown") -> dict[str, Any]:
-    """Gather all workspace findings and compile a publication-ready paper."""
+def synthesize_workspace(
+    root: Path, output_format: str = "markdown", section: str | None = None
+) -> dict[str, Any]:
+    """Gather all workspace findings and compile a publication-ready paper or specific section."""
     try:
+        synthesis_dir = root / "synthesis"
+        synthesis_dir.mkdir(parents=True, exist_ok=True)
+
+        if section:
+            section_path = root / "workspace" / f"{section}.md"
+            section_content = section_path.read_text() if section_path.exists() else f"*No {section} recorded.*"
+            dest_md = synthesis_dir / f"{section}.md"
+            dest_md.write_text(section_content)
+            return {
+                "status": "success",
+                "message": f"Generated {section}.md in synthesis/",
+                "path": str(dest_md.relative_to(root)),
+            }
+
         analysis_path = root / "workspace" / "analysis.md"
         methods_path = root / "workspace" / "methods.md"
         citations_path = root / "workspace" / "citations.md"
