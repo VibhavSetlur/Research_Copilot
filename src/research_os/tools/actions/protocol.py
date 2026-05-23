@@ -13,13 +13,27 @@ def get_protocol(name: str, root: Path) -> Dict[str, Any]:
         if name in _PROTOCOL_CACHE:
             return {"content": yaml.dump(_PROTOCOL_CACHE[name])}
 
-        p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
-        if not p_file.exists():
-            p_file = Path(__file__).parent.parent.parent / "protocols" / f"{name}.yaml"
-        if not p_file.exists():
+        p_dir = root / "src" / "research_os" / "protocols"
+        if not p_dir.exists():
+            p_dir = Path(__file__).parent.parent.parent / "protocols"
+            
+        if not p_dir.exists():
+            return {"error": "Protocol directory not found"}
+
+        # Search recursively
+        found_file = None
+        for file in p_dir.rglob(f"{name}.yaml"):
+            # If name doesn't specify light/, avoid matching light/ versions if there are duplicates
+            # but if name starts with light/, let it match.
+            if "light/" not in name and "/light/" in file.as_posix():
+                continue
+            found_file = file
+            break
+            
+        if not found_file:
             return {"error": "Protocol not found"}
 
-        data = yaml.safe_load(p_file.read_text())
+        data = yaml.safe_load(found_file.read_text())
         _PROTOCOL_CACHE[name] = data
         return {"content": yaml.dump(data)}
     except Exception as e:
@@ -35,7 +49,10 @@ def list_protocols(root: Path) -> Dict[str, Any]:
         if not p_dir.exists():
             return {"error": "Protocols directory not found"}
         protocols = []
-        for p in p_dir.glob("*.yaml"):
+        for p in p_dir.rglob("*.yaml"):
+            # skip light directory for list
+            if "light" in p.parts:
+                continue
             try:
                 name = p.stem
                 if name in _PROTOCOL_CACHE:
@@ -61,13 +78,21 @@ def list_protocols(root: Path) -> Dict[str, Any]:
 
 def validate_protocol(name: str, root: Path) -> Dict[str, Any]:
     try:
-        p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
-        if not p_file.exists():
-            p_file = Path(__file__).parent.parent.parent / "protocols" / f"{name}.yaml"
-        if not p_file.exists():
+        p_dir = root / "src" / "research_os" / "protocols"
+        if not p_dir.exists():
+            p_dir = Path(__file__).parent.parent.parent / "protocols"
+            
+        found_file = None
+        for file in p_dir.rglob(f"{name}.yaml"):
+            if "light/" not in name and "/light/" in file.as_posix():
+                continue
+            found_file = file
+            break
+            
+        if not found_file:
             return {"error": "Protocol not found"}
 
-        data = yaml.safe_load(p_file.read_text())
+        data = yaml.safe_load(found_file.read_text())
         expected_outputs = data.get("expected_outputs", [])
 
         checklist = []

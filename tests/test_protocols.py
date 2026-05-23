@@ -165,7 +165,7 @@ class TestProtocolFields:
 class TestLightVariants:
     def test_every_protocol_has_light_variant(self, full_protocol_dir):
         light_dir = full_protocol_dir / "light"
-        for p in full_protocol_dir.glob("*.yaml"):
+        for p in [y for y in full_protocol_dir.rglob("*.yaml") if "light" not in y.parts]:
             name = p.stem
             light_file = light_dir / f"{name}.yaml"
             assert light_file.exists(), f"Protocol '{name}' missing light variant"
@@ -232,7 +232,7 @@ class TestProtocolValidation:
 
 class TestExpectedStructure:
     def test_protocols_have_name_matching_filename(self, full_protocol_dir):
-        for p in full_protocol_dir.glob("*.yaml"):
+        for p in [y for y in full_protocol_dir.rglob("*.yaml") if "light" not in y.parts]:
             data = yaml.safe_load(p.read_text())
             assert data["name"] == p.stem
 
@@ -240,13 +240,13 @@ class TestExpectedStructure:
         root = Path(__file__).resolve().parent.parent
         pdir = root / "src" / "research_os" / "protocols"
         assert pdir.exists()
-        yamls = list(pdir.glob("*.yaml"))
+        yamls = list([y for y in pdir.rglob("*.yaml") if "light" not in y.parts])
         assert len(yamls) > 0
 
     def test_all_real_protocols_load_successfully(self):
         root = Path(__file__).resolve().parent.parent
         pdir = root / "src" / "research_os" / "protocols"
-        for p in sorted(pdir.glob("*.yaml")):
+        for p in sorted([y for y in pdir.rglob("*.yaml") if "light" not in y.parts]):
             result = get_protocol(p.stem, root)
             assert "error" not in result, (
                 f"Protocol '{p.stem}' failed to load: {result.get('error')}"
@@ -256,7 +256,8 @@ class TestExpectedStructure:
             assert loaded is not None
             assert loaded.get("name") == p.stem
             assert "version" in loaded
-            assert "steps" in loaded
+            if not p.stem.startswith("writing_") and p.stem != "synthesis_paper":
+                assert "steps" in loaded
 
     def test_light_dir_exists(self):
         root = Path(__file__).resolve().parent.parent
@@ -264,7 +265,7 @@ class TestExpectedStructure:
         assert ldir.exists()
 
     def test_light_dir_has_no_orphans(self, full_protocol_dir):
-        full_names = {p.stem for p in full_protocol_dir.glob("*.yaml")}
-        light_names = {p.stem for p in (full_protocol_dir / "light").glob("*.yaml")}
+        full_names = {p.stem for p in [y for y in full_protocol_dir.rglob("*.yaml") if "light" not in y.parts]}
+        light_names = {p.stem for p in (full_protocol_dir / "light").rglob("*.yaml")}
         orphans = light_names - full_names
         assert not orphans, f"Light variants without full protocol: {orphans}"

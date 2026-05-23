@@ -1,4 +1,4 @@
-name: writing_synthesis
+name: synthesis_paper
 version: 1.0.0
 section_order: [Methods, Results, Discussion, Abstract, Final]
 instructions: "Use tool.synthesize(section='...'). Small models: one section per session."
