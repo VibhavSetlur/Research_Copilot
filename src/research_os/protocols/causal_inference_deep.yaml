@@ -6,7 +6,7 @@ expected_outputs:
   - "workspace/<path_number>/outputs/figures/causal_dag.png"
   - "workspace/<path_number>/outputs/reports/causal_estimates.json"
   - "workspace/<path_number>/outputs/reports/refutation_results.json"
-_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 03_meta_analysis)."
+_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 02_meta_analysis)."
 prerequisites:
   - "Observational dataset."
   - "Python libraries: dowhy, econml."

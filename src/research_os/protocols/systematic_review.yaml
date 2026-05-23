@@ -7,7 +7,7 @@ expected_outputs:
   - "workspace/<path_number>/outputs/figures/prisma_flow_diagram.png"
   - "workspace/<path_number>/outputs/reports/extracted_data_table.csv"
   - "workspace/<path_number>/outputs/reports/rob_assessment.json"
-_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 03_meta_analysis)."
+_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 02_meta_analysis)."
 prerequisites:
   - "Defined research question (PICO framework)."
   - "Access to academic databases (PubMed, Semantic Scholar)."

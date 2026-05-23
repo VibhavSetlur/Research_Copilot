@@ -180,7 +180,10 @@ TOOL_DEFINITIONS = {
         "category": "workspace",
         "inputSchema": {
             "type": "object",
-            "properties": {"project_name": {"type": "string"}},
+            "properties": {
+                "project_name": {"type": "string"},
+                "git_init": {"type": "boolean", "description": "Initialize a git repository (default: false)"}
+            },
         },
     },
     "sys.file.read": {
@@ -650,7 +653,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.synthesize": {
-        "description": "Compile workspace findings into synthesis/paper.md. Use section param for individual IMRAD sections.",
+        "description": "Compile workspace findings into synthesis/paper.md. For complex papers, call section-by-section: section='methods', section='results', section='discussion', then call without section for final assembly.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -781,7 +784,7 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 
     if name == "sys.workspace.scaffold":
         scaffold_minimal_workspace(
-            root, arguments.get("project_name", "Research Project")
+            root, arguments.get("project_name", "Research Project"), arguments.get("git_init", False)
         )
         _profile_inputs(root)
         return _text(_success_envelope({"scaffolded": True}))
