@@ -11,6 +11,20 @@ httpx>=0.25
 tenacity>=8.2
 # MCP
 mcp>=1.0.0
+# Missing Dependencies
+Pillow
+PyPDF2
+httpx
+importlib-resources
+Jinja2
+matplotlib
+pydantic
+pydantic-settings
+rank-bm25
+requests
+sentence-transformers
+sqlite-vss
+trafilatura
 # Testing
 pytest>=7.0
 pytest-mock>=3.10

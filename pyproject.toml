@@ -19,10 +19,23 @@ dependencies = [
     "numpy>=1.24.0",
     "firecrawl-py>=0.0.15",
     "scholarly>=1.7.11",
-    "bs4>=0.0.2",
+    "beautifulsoup4>=4.12",
     "tenacity>=8.0.0",
     "metapub>=0.5.5",
-    "habanero>=1.2.6"
+    "habanero>=1.2.6",
+    "Pillow",
+    "PyPDF2",
+    "httpx",
+    "importlib-resources",
+    "Jinja2",
+    "matplotlib",
+    "pydantic",
+    "pydantic-settings",
+    "rank-bm25",
+    "requests",
+    "sentence-transformers",
+    "sqlite-vss",
+    "trafilatura"
 ]
 
 [project.urls]
