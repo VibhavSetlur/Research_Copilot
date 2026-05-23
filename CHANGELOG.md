@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **MCP-native research OS**: Model Context Protocol server with 40+ tools for reproducible academic workflows.
-- **10 Guidance Protocols**: `domain_analysis`, `research_design`, `methodology_selection`, `literature_search`, `evidence_synthesis`, `analysis_plan`, `figure_guidelines`, `writing_standards`, `reproducibility`, `audit_and_validation` with both full and `light` variants.
+- **20+ Guidance Protocols** organized into subdirectories (`guidance`, `domain`, `methodology`, `literature`, `writing`, `synthesis`, `visualization`, `audit`, `reproducibility`) with both full and `light` variants for every protocol.
 - **Tool: `sys.guidance.validate`**: Dynamically verifies workspace state against protocol requirements.
 - **Tool: `sys.state.minimal_context`**: Provides a ≤500-token summary tailored for small models.
 - **Tool: `tool.synthesize`**: Gathers workspace findings and compiles `synthesis/paper.md`.

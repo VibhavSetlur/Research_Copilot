@@ -34,5 +34,6 @@
     - If a writing task is complex, split it across multiple chat sessions using `sys.session.handoff`.
     - After writing any MD file, verify it follows the template from the relevant writing protocol using sys.md.validate.
 
-14. Token Budget:
-    - Token usage varies significantly based on data size, model choice, and research complexity. For guidance on optimizing your sessions, see the model-size guide.
+14. Token Budget: Adjust your model_profile in inputs/researcher_config.yaml
+    (small/medium/large). Small models should use protocols/light/ and 
+    sys.state.minimal_context. Medium/large models can use full protocols.

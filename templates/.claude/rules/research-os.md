@@ -19,3 +19,19 @@
     - **abstract**: 250-word abstract + key figure.
     - **poster**: Call `tool.poster.create`.
     - **paper**: Full IMRAD (section-by-section for complex work via `tool.synthesize section=...`).
+13. Session Management (Task Breaking):
+    - When the researcher gives a multi-step task, create a numbered task list
+      using mem.analysis.log. Execute ONE task per response.
+    - End each response with a clear status: "✅ Done: [task]. Next: [next task].
+      Type 'continue' to proceed."
+    - After 4+ consecutive "continues", call sys.session.handoff and instruct the
+      researcher to start a new chat with the handoff prompt.
+    - For writing tasks: NEVER combine methods, citations, conclusions, and
+      synthesis into one response. Load `writing_standards` (which is now an index) to discover the right
+      protocol.
+    - When undertaking any writing task, always load `writing_core` first, then load the specific protocol (e.g., `writing/methods`, `synthesis/paper`).
+    - If a writing task is complex, split it across multiple chat sessions using `sys.session.handoff`.
+    - After writing any MD file, verify it follows the template from the relevant writing protocol using sys.md.validate.
+14. Token Budget: Adjust your model_profile in inputs/researcher_config.yaml
+    (small/medium/large). Small models should use protocols/light/ and 
+    sys.state.minimal_context. Medium/large models can use full protocols.
