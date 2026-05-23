@@ -15,21 +15,37 @@ def synthesize_workspace(
         synthesis_dir.mkdir(parents=True, exist_ok=True)
 
         if section:
-            section_path = root / "workspace" / f"{section}.md"
-            if section_path.exists():
-                section_content = section_path.read_text()
-            else:
+            section = section.lower()
+            if section == "methods":
+                section_path = root / "workspace" / "methods.md"
+                section_content = section_path.read_text() if section_path.exists() else "*No methods recorded.*"
+            elif section == "results":
                 contents = []
                 workspace_dir = root / "workspace"
                 if workspace_dir.exists():
                     for exp_dir in sorted(workspace_dir.iterdir()):
                         if exp_dir.is_dir() and exp_dir.name[:2].isdigit():
+                            conc_md = exp_dir / "conclusions.md"
+                            if conc_md.exists():
+                                contents.append(f"### {exp_dir.name} Conclusions\n\n" + conc_md.read_text())
                             reports_dir = exp_dir / "outputs" / "reports"
                             if reports_dir.exists():
                                 for md_file in sorted(reports_dir.rglob("*.md")):
-                                    if section.lower() in md_file.name.lower() or section.lower() in exp_dir.name.lower() or section.lower() == "results":
-                                        contents.append(f"### {md_file.name}\n\n" + md_file.read_text())
-                section_content = "\n\n".join(contents) if contents else f"*No {section} recorded.*"
+                                    contents.append(f"### {md_file.name}\n\n" + md_file.read_text())
+                section_content = "\n\n".join(contents) if contents else "*No results recorded.*"
+            elif section == "discussion":
+                section_path = root / "workspace" / "discussion.md"
+                contents = [section_path.read_text()] if section_path.exists() else []
+                evidence_table = root / "synthesis" / "evidence_table.md"
+                if evidence_table.exists():
+                    contents.append("### Evidence Table\n\n" + evidence_table.read_text())
+                section_content = "\n\n".join(contents) if contents else "*No discussion recorded.*"
+            else:
+                section_path = root / "workspace" / f"{section}.md"
+                if section_path.exists():
+                    section_content = section_path.read_text()
+                else:
+                    section_content = f"*No {section} recorded.*"
             dest_md = synthesis_dir / f"{section}.md"
             dest_md.write_text(section_content)
             return {

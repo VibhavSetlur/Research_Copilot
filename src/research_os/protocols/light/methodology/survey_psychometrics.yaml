@@ -3,9 +3,9 @@ version: 2.0.0
 schema_version: "1.0"
 description: "Concise checklist for survey psychometrics"
 expected_outputs:
-  - "workspace/<path>/outputs/reports/reliability_metrics.json"
-  - "workspace/<path>/outputs/reports/cfa_results.txt"
-  - "workspace/<path>/outputs/reports/non_response_bias.md"
+  - "workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json"
+  - "workspace/{step_number}_{descriptive_name}/outputs/reports/cfa_results.txt"
+  - "workspace/{step_number}_{descriptive_name}/outputs/reports/non_response_bias.md"
 steps:
   - id: create_experiment_path
     name: "Create Experiment Path"

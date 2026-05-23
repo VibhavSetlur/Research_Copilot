@@ -18,7 +18,7 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
    ```bash
    python -m research_os.server
    ```
-   *(Configure this command in your MCP client like Cursor or Claude Code).*
+   *(Configure this command in your MCP client like Cursor or Claude Code. Note: `sys.workspace.scaffold` will automatically generate MCP configurations for Cursor and Claude Desktop in your project directory!).*
 
 3. **Initialize your Project**
    In your AI IDE, prompt the agent:

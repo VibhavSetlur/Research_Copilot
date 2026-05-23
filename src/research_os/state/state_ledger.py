@@ -547,13 +547,10 @@ class ResearchLedger:
         # Next action
         checkpoints = state.get("checkpoints", {})
         pipeline = [
-            "research_init",
-            "literature_deep",
-            "method_route",
-            "data_scaffold",
-            "execute_analysis",
-            "compile_outputs",
-            "audit_validate",
+            "domain_analysis", "research_design", "methodology_selection",
+            "literature_search", "evidence_synthesis", "analysis_plan",
+            "figure_guidelines", "writing_core", "writing_synthesis",
+            "audit_and_validation",
         ]
         completed = {p for p, s in checkpoints.items() if s == "complete"}
         next_action = next(

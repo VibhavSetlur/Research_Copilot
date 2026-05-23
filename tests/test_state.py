@@ -103,7 +103,7 @@ def test_ledger_returns_default_state_when_no_file(tmp_path):
     ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
     state = ledger.get()
     assert "run_id" in state
-    assert state["phase"] == "research_init"
+    assert state["phase"] == "domain_analysis"
     assert state.get("current_path") == "main"
 
 

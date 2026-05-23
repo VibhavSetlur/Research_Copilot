@@ -3,9 +3,9 @@ version: 2.0.0
 schema_version: "1.0"
 description: "Concise checklist for predictive modelling"
 expected_outputs:
-  - "workspace/<path>/outputs/reports/model_performance.json"
-  - "workspace/<path>/outputs/figures/shap_summary.png"
-  - "workspace/<path>/outputs/figures/calibration_plot.png"
+  - "workspace/{step_number}_{descriptive_name}/outputs/reports/model_performance.json"
+  - "workspace/{step_number}_{descriptive_name}/outputs/figures/shap_summary.png"
+  - "workspace/{step_number}_{descriptive_name}/outputs/figures/calibration_plot.png"
 steps:
   - id: create_experiment_path
     name: "Create Experiment Path"

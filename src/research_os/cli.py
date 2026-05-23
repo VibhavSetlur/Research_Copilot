@@ -269,20 +269,21 @@ def cmd_init(args: argparse.Namespace) -> None:
 def cmd_preflight(args: argparse.Namespace) -> None:
     try:
         root = _project_root()
-        print("=" * 60)
-        print("ENVIRONMENT PREFLIGHT CHECKS")
-        print("=" * 60)
-        print(
-            f"Python Version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        )
-        print(f"Workspace:      {root}")
-        print(
-            f"Config Folder:  {'.os_state/' if (root / '.os_state').exists() else 'MISSING'}"
-        )
-        print(
-            f"Inputs Folder:  {'inputs/' if (root / 'inputs').exists() else 'MISSING'}"
-        )
-        print("Status:         OK")
+        log_dir = root / "workspace" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "preflight.log"
+        
+        with open(log_file, "a") as f:
+            f.write("=" * 60 + "\n")
+            f.write("ENVIRONMENT PREFLIGHT CHECKS\n")
+            f.write("=" * 60 + "\n")
+            f.write(f"Python Version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\n")
+            f.write(f"Workspace:      {root}\n")
+            f.write(f"Config Folder:  {'.os_state/' if (root / '.os_state').exists() else 'MISSING'}\n")
+            f.write(f"Inputs Folder:  {'inputs/' if (root / 'inputs').exists() else 'MISSING'}\n")
+            f.write("Status:         OK\n")
+            
+        print(f"Preflight checks logged to {log_file.relative_to(root)}")
     except Exception as e:
         print(f"Preflight error: {e}")
         sys.exit(1)
