@@ -435,7 +435,6 @@ def scaffold_minimal_workspace(
     _setup_gitignore(root)
     if git_init:
         _initialize_git(root)
-    _run_preflight_checks()
 
 
 def _initialize_git(root: Path) -> None:
@@ -448,44 +447,7 @@ def _initialize_git(root: Path) -> None:
             pass
 
 
-def _run_preflight_checks() -> None:
-    print("=" * 60)
-    print("ENVIRONMENT PREFLIGHT CHECKS")
-    print("=" * 60)
-    import subprocess
-    import sys
 
-    print(
-        f"  [✓] Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    )
-
-    try:
-        docker = subprocess.run(["docker", "--version"], capture_output=True, text=True)
-        if docker.returncode == 0:
-            print(f"  [✓] Docker: {docker.stdout.strip()}")
-        else:
-            print("  [ ] Docker not found.")
-    except Exception:
-        print("  [ ] Docker not found.")
-
-    try:
-        conda = subprocess.run(["conda", "--version"], capture_output=True, text=True)
-        if conda.returncode == 0:
-            print(f"  [✓] Conda: {conda.stdout.strip()}")
-        else:
-            print("  [ ] Conda not found.")
-    except Exception:
-        print("  [ ] Conda not found.")
-
-    try:
-        ollama = subprocess.run(["ollama", "--version"], capture_output=True, text=True)
-        if ollama.returncode == 0:
-            print(f"  [✓] Ollama: {ollama.stdout.strip()}")
-        else:
-            print("  [ ] Ollama not found.")
-    except Exception:
-        print("  [ ] Ollama not found.")
-    print("=" * 60)
 
 
 def _setup_gitignore(root: Path) -> None:
@@ -508,11 +470,7 @@ def _setup_gitignore(root: Path) -> None:
             ".DS_Store\n\n"
             "# Research OS Runtime Cache\n"
             ".os_state/cache/\n"
-            ".os_state/state/\n"
-
-            "# Raw Data (Do not commit massive datasets)\n"
-
-            ".os_state/\n"
+            ".os_state/checkpoints/\n"
             "# Researcher config (contains API keys)\n"
             "inputs/researcher_config.yaml\n"
         )

@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool: `tool.synthesize`**: Gathers workspace findings and compiles `synthesis/paper.md`.
 - **Execution Profiles**: `model_profile` in `researcher_config.yaml` governs tool verbosity and protocol depth.
 - **Task Management**: `sys.task.create`, `sys.task.monitor`, `sys.task.kill` with PID-based tracking.
-- **Template System**: `templates/` with `AGENTS.md`, `mcp_config.json`, `researcher_config.yaml`, Cursor/Windsurf rules.
+- **Template System**: `templates/` with `AGENTS.md`, `mcp_config.json`, `researcher_config.yaml`, Cursor rules.
 - **Comprehensive Tests**: 100+ tests covering state, config, protocols, server, actions, and integration.
 
 ### Changed

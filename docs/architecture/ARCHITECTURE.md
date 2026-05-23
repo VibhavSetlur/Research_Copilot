@@ -67,7 +67,7 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
 
 ### 1. IDE is the Brain, OS is the Body
 
-The IDE (Cursor, Windsurf, Claude Desktop) is the cognitive layer. It:
+The IDE (Cursor, Claude Desktop, Antigravity) is the cognitive layer. It:
 - Understands natural language requests
 - Analyzes intent and plans tool sequences
 - Calls tools in the right order

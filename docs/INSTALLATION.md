@@ -134,24 +134,6 @@ curl -fsSL https://ollama.ai/install.sh | sh
 }
 ```
 
-### Windsurf
-
-1. Open Windsurf → Settings → MCP Servers
-2. Add to your MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "research-os": {
-      "command": "ros",
-      "args": ["start", "--transport", "stdio"],
-      "env": {}
-    }
-  }
-}
-```
-
-3. Restart Windsurf
 
 ### Claude Desktop
 

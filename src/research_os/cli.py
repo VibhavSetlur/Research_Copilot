@@ -162,11 +162,6 @@ def _print_mcp_snippet(project_root: Path) -> None:
         print(f"  │ {line:<73} │")
     print("  └────────────────────────────────────────────────────────────────────┘")
     print()
-    print("  ┌─ Windsurf — paste into .windsurf/mcp_config.json ──────────────────┐")
-    for line in json.dumps({"mcpServers": snippet}, indent=2).splitlines():
-        print(f"  │ {line:<73} │")
-    print("  └────────────────────────────────────────────────────────────────────┘")
-    print()
     print(
         f"  Or run: echo '{json.dumps({'mcpServers': snippet})}' > {project_root / '.cursor' / 'mcp.json'}"
     )

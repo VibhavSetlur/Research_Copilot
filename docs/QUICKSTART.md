@@ -2,7 +2,12 @@
 
 ## 1. Installation
 
-Clone the repository and install the dependencies:
+Install via pip:
+```bash
+pip install research-os
+```
+
+Or for development:
 ```bash
 git clone https://github.com/VibhavSetlur/Research-OS.git
 cd Research-OS

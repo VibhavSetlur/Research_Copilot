@@ -35,8 +35,24 @@ def env_freeze() -> Dict[str, Any]:
         return {"error": str(e), "code": 1}
 
 
+def _get_active_experiment_dir(root: Path) -> Optional[Path]:
+    workspace_dir = root / "workspace"
+    if not workspace_dir.exists():
+        return None
+    active_paths = [
+        p for p in workspace_dir.iterdir()
+        if p.is_dir() and not p.name.endswith("__DEAD_END") and p.name[:2].isdigit() and p.name[2:3] == "_"
+    ]
+    return sorted(active_paths)[-1] if active_paths else None
+
+
 def env_snapshot(root: Path) -> Dict[str, Any]:
-    env_dir = root / "environment"
+    # Determine active experiment path
+    active_path = _get_active_experiment_dir(root)
+    if active_path:
+        env_dir = active_path / "environment"
+    else:
+        env_dir = root / "environment"
     env_dir.mkdir(parents=True, exist_ok=True)
     
     session_data = {"languages": []}
@@ -80,7 +96,13 @@ def env_restore(requirements: str = "", root: Optional[Path] = None) -> Dict[str
     if not root:
         return {"error": "Root path is required for multi-lang restore", "code": 1}
         
-    env_dir = root / "environment"
+    active_path = _get_active_experiment_dir(root)
+    if active_path:
+        env_dir = active_path / "environment"
+        if not (env_dir / "session.yaml").exists() and not (env_dir / "requirements.txt").exists():
+            env_dir = root / "environment"
+    else:
+        env_dir = root / "environment"
     session_file = env_dir / "session.yaml"
     
     if not session_file.exists():
@@ -166,7 +188,7 @@ def env_docker_generate(root: Path) -> Dict[str, Any]:
         
     dockerfile_lines.append("CMD [\"/bin/bash\"]")
     
-    df_path = root / "Dockerfile"
+    df_path = env_dir / "Dockerfile"
     df_path.write_text("\n".join(dockerfile_lines) + "\n")
     
     return {"status": "success", "message": "Dockerfile generated successfully."}

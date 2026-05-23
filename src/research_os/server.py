@@ -402,7 +402,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.statistical_power": {
-        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to workspace/<current_path>/outputs/reports/power_report.md.",
+        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to workspace/<active_path>/outputs/reports/power_report.md. Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -416,7 +416,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.assumptions": {
-        "description": "Re-run assumption checks on the fitted model or residuals. Writes to workspace/<current_path>/outputs/reports/assumption_report.md.",
+        "description": "Re-run assumption checks on the fitted model or residuals. Writes to workspace/<active_path>/outputs/reports/assumption_report.md. Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -425,7 +425,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.figure_quality": {
-        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to workspace/<current_path>/outputs/reports/figure_audit.md.",
+        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to workspace/<active_path>/outputs/reports/figure_audit.md. Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -862,6 +862,15 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             if res["status"] == "success"
             else _text(_error_envelope(res["message"]))
         )
+
+    if name == "tool.synthesize":
+        from research_os.tools.actions.synthesize import synthesize_workspace
+        res = synthesize_workspace(
+            root,
+            output_format=arguments.get("output_format", "markdown"),
+            section=arguments.get("section"),
+        )
+        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
 
     if name == "tool.audit.synthesis":
         from research_os.tools.actions.audit import audit_synthesis

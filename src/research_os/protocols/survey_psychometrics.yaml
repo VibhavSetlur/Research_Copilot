@@ -3,9 +3,10 @@ version: 2.0.0
 description: Scale validation and survey analysis.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/<path>/outputs/reports/reliability_metrics.json"
-  - "workspace/<path>/outputs/reports/cfa_results.txt"
-  - "workspace/<path>/outputs/reports/non_response_bias.md"
+  - "workspace/<path_number>/outputs/reports/reliability_metrics.json"
+  - "workspace/<path_number>/outputs/reports/cfa_results.txt"
+  - "workspace/<path_number>/outputs/reports/non_response_bias.md"
+_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 03_meta_analysis)."
 prerequisites:
   - "Survey responses data."
   - "R with lavaan package or Python equivalent."

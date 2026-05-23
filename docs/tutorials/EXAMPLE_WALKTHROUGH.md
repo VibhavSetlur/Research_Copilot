@@ -6,7 +6,7 @@ This document demonstrates how a researcher and an LLM agent interact using Rese
 
 1. **Researcher**: Opens a terminal in an empty directory `~/Projects/clinical_study`.
 2. **Researcher**: Runs `python -m research_os.server`.
-3. **Researcher**: Opens Cursor/Windsurf and connects it to the MCP server.
+3. **Researcher**: Opens Cursor, Claude Code, or Antigravity and connects it to the MCP server.
 4. **Researcher (in Chat)**: "Initialize the workspace for my new project: Efficacy of Drug X on Hypertension."
 
 ## Step 1: Scaffolding and Profiling

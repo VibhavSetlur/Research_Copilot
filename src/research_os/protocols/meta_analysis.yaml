@@ -3,9 +3,10 @@ version: 2.0.0
 description: Guide for extracting effect sizes, assessing heterogeneity, and performing meta-analysis.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/<path>/outputs/figures/forest_plot.png"
-  - "workspace/<path>/outputs/figures/funnel_plot.png"
-  - "workspace/<path>/outputs/reports/meta_analysis_report.md"
+  - "workspace/<path_number>/outputs/figures/forest_plot.png"
+  - "workspace/<path_number>/outputs/figures/funnel_plot.png"
+  - "workspace/<path_number>/outputs/reports/meta_analysis_report.md"
+_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 03_meta_analysis)."
 decision_tree:
   - "Are studies highly heterogeneous? If yes -> Use random-effects model. If no -> Fixed-effects model."
   - "Is there risk of publication bias? -> Run Egger's test and build funnel plot."

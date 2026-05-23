@@ -6,8 +6,7 @@ structure:
     purpose: Data cleaning, filtering, and feature engineering.
   02_analysis:
     purpose: Statistical modelling and core computations.
-  03_synthesis:
-    purpose: Figure generation, table formatting, and text synthesis.
+  note: "Do NOT create a 03_synthesis step. Synthesis is performed via tool.synthesize into the top-level synthesis/ folder."
 templates:
   boilerplate_readme: '# {Folder_Name}
 
@@ -31,7 +30,7 @@ branching_criteria:
 steps:
 - id: setup_directories
   name: Setup Directories
-  description: Ensure the 01_, 02_, 03_ structure exists.
+  description: Ensure the 01_, 02_ experiment structure exists. Synthesis is handled separately by tool.synthesize.
 - id: write_readmes
   name: Write READMEs
   description: Populate each directory with the boilerplate README.

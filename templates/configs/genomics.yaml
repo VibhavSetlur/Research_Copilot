@@ -1,2 +1,38 @@
-domain: bioinformatics
-protocols: ["machine_learning"]
+# Genomics Research Configuration
+# Copy to: inputs/researcher_config.yaml
+
+researcher:
+  name: ""
+  expertise_level: intermediate
+  field: "bioinformatics"
+  institution: ""
+  orcid: ""
+
+interaction:
+  autonomy_level: supervised
+  checkpoint_frequency: after_each_step
+  notification_preferences:
+    on_step_complete: true
+    on_error: true
+    on_decision_required: true
+    on_long_running_task: true
+    long_running_threshold_seconds: 300
+
+research_goal:
+  output_types: ["paper", "poster"]
+  target_venue: journal
+  poster_dimensions: "36x48"
+
+model_profile: medium
+
+api_keys:
+  firecrawl: ""
+  semantic_scholar: ""
+  pubmed: ""
+  crossref: ""
+  serpapi: ""
+
+external_mcp_servers: []
+
+reporting_standard: MIAME/MINSEQE
+suggested_protocols: ["machine_learning"]

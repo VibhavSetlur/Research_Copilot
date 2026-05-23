@@ -7,10 +7,7 @@ expected_outputs:
   - "workspace/<path>/README.md"
   - "workspace/<path>/scripts/analysis.py"
 structure:
-  "<step_number>_<experiment_name>":
-    purpose: "Self-contained experiment step with scripts, data, and outputs."
-  "03_synthesis":
-    purpose: "Final output generation, table formatting, and text synthesis."
+  note: "Experiments are numbered chronologically (01_, 02_, ...). Synthesis is NOT a workspace step — use tool.synthesize to compile outputs into the top-level synthesis/ folder."
 templates:
   boilerplate_readme: |
     # {Folder_Name}
@@ -29,7 +26,7 @@ branching_criteria:
 steps:
   - id: setup_directories
     name: "Setup Directories"
-    description: "Use sys.path.create to instantiate sequential experiment paths as needed."
+    description: "Use sys.path.create for each experiment step (e.g., 01_experiment_baseline, 02_data_preparation). Do NOT create a synthesis path — synthesis is a top-level folder populated by tool.synthesize."
   - id: write_readmes
     name: "Write READMEs"
     description: "Populate each directory with the boilerplate README."

@@ -3,10 +3,11 @@ version: 2.0.0
 description: Full PRISMA workflow for systematic reviews.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/<path>/outputs/reports/search_strategy.md"
-  - "workspace/<path>/outputs/figures/prisma_flow_diagram.png"
-  - "workspace/<path>/outputs/reports/extracted_data_table.csv"
-  - "workspace/<path>/outputs/reports/rob_assessment.json"
+  - "workspace/<path_number>/outputs/reports/search_strategy.md"
+  - "workspace/<path_number>/outputs/figures/prisma_flow_diagram.png"
+  - "workspace/<path_number>/outputs/reports/extracted_data_table.csv"
+  - "workspace/<path_number>/outputs/reports/rob_assessment.json"
+_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 03_meta_analysis)."
 prerequisites:
   - "Defined research question (PICO framework)."
   - "Access to academic databases (PubMed, Semantic Scholar)."

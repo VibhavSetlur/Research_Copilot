@@ -61,34 +61,6 @@ Cursor will call the tool and display results inline.
 
 ---
 
-## Windsurf
-
-### Setup
-
-1. Open Windsurf → Settings → MCP Servers
-2. Add to your MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "research-os": {
-      "command": "ros",
-      "args": ["start", "--transport", "stdio"],
-      "env": {}
-    }
-  }
-}
-```
-
-3. Restart Windsurf
-
-### Verify
-
-- Check the MCP status indicator in the bottom bar
-- Tools should appear in the agent's tool palette
-
----
-
 ## VS Code (with GitHub OS MCP Preview)
 
 ### Setup
