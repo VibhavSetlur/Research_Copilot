@@ -7,7 +7,7 @@ expected_outputs:
   - "environment/requirements.txt: Frozen environment"
 reproducibility_checklist:
   1: "Are all raw data files immutable and strictly read-only?"
-  2: "Are derived datasets saved separately in data/derived/?"
+  2: "Are derived datasets saved separately in the experiment path's data/ directory?"
   3: "Are all methodological choices logged in methods.md?"
   4: "Is the random seed explicitly set for all stochastic operations?"
   5: "Are all script paths relative to the workspace root?"

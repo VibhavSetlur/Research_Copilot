@@ -3,7 +3,7 @@ version: 2.0.0
 description: Standards for IMRAD structuring, writing style, and tables.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/03_synthesis/draft.md: Draft adhering to budgets and rules"
+  - "synthesis/paper.md: Compiled manuscript adhering to budgets and rules"
 imrad_budgets:
   Abstract: "200-250 words (Background, Methods, Results, Conclusion)"
   Introduction: "500-750 words (Context, Gap, Objective)"

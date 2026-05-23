@@ -402,7 +402,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.statistical_power": {
-        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to workspace/<active_path>/outputs/reports/power_report.md. Writes to the current experiment path's outputs/reports directory.",
+        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -416,7 +416,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.assumptions": {
-        "description": "Re-run assumption checks on the fitted model or residuals. Writes to workspace/<active_path>/outputs/reports/assumption_report.md. Writes to the current experiment path's outputs/reports directory.",
+        "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -425,7 +425,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.figure_quality": {
-        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to workspace/<active_path>/outputs/reports/figure_audit.md. Writes to the current experiment path's outputs/reports directory.",
+        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to the current experiment path's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -515,7 +515,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.python.exec": {
-        "description": "Execute a python script in the workspace. WARNING: Scripts run with the same permissions as the host OS user. For strict sandboxing, run Research OS inside a Docker container.",
+        "description": "Execute a Python script. WARNING: runs with host permissions — use Docker for sandboxing.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -650,7 +650,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.synthesize": {
-        "description": "Gather all workspace findings and compile a publication-ready paper in synthesis/. Combines analysis.md, methods.md, citations, figures, and audit report into synthesis/paper.md.",
+        "description": "Compile workspace findings into synthesis/paper.md. Use section param for individual IMRAD sections.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -763,6 +763,21 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
                     {"name": t_name, "description": t_schema.get("description", "")}
                 )
         return _text(_success_envelope({"tools": matches}))
+
+    if name == "tool.r.exec":
+        from research_os.tools.actions.execution import execute_r_script
+        res = execute_r_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
+        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
+
+    if name == "tool.julia.exec":
+        from research_os.tools.actions.execution import execute_julia_script
+        res = execute_julia_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
+        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
+
+    if name == "tool.bash.exec":
+        from research_os.tools.actions.execution import execute_bash_script
+        res = execute_bash_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
+        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
 
     if name == "sys.workspace.scaffold":
         scaffold_minimal_workspace(

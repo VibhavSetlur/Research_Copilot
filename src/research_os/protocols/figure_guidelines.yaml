@@ -3,7 +3,7 @@ version: 2.0.0
 description: Guidelines for selecting and formatting publication-ready figures.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/03_synthesis/figures/: Generated figures matching guidelines"
+  - "synthesis/figures/: Publication-ready figures compiled by tool.synthesize"
   - "workspace/logs/figures.log"
 chart_chooser:
   comparison:

@@ -29,7 +29,12 @@ def data_sample(
         else:
             return {"error": f"Unknown strategy: {strategy}"}
 
-        out_path = root / f"workspace/data/derived/sampled_{data_path.name}"
+        from research_os.tools.actions.audit import get_current_path
+        current_path = get_current_path(root)
+        if current_path:
+            out_path = root / "workspace" / current_path / "data" / f"sampled_{data_path.name}"
+        else:
+            out_path = root / "workspace" / "logs" / f"sampled_{data_path.name}"
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         if ext == ".csv":

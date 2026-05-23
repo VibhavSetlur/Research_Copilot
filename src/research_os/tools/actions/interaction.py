@@ -46,7 +46,7 @@ def checkpoint_approve(root: Path) -> Dict[str, Any]:
 
 def session_handoff(root: Path) -> Dict[str, Any]:
     try:
-        handoff_path = root / "workspace" / "handoff.md"
+        handoff_path = root / ".os_state" / "handoffs" / f"handoff_{now_iso()}.md"
         handoff_path.parent.mkdir(parents=True, exist_ok=True)
         
         content = f"# Session Handoff\n\nGenerated at: {now_iso()}\n\n## Summary\n(Please fill in the summary of completed tasks)\n\n## Next Steps\n(Please fill in what needs to be done next)\n\n## Prompt to resume\n```\nResume work from handoff.md. Review the next steps and continue execution.\n```\n"

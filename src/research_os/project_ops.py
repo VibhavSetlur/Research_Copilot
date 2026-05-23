@@ -497,7 +497,9 @@ def _setup_mcp_configs(root: Path) -> None:
 
 
     # Claude Desktop
-    claude_mcp = root / "claude_desktop_config.json"
+    claude_dir = root / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    claude_mcp = claude_dir / "mcp.json"
     if not claude_mcp.exists():
         try:
             claude_mcp.write_text(
@@ -533,6 +535,15 @@ def _copy_environment_to_project(root: Path) -> None:
     env_dir = root / "environment"
     env_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        env_assets = importlib_resources.files("research_os.assets.environment")
+        if not list(env_assets.iterdir()):
+            logger.warning("assets/environment directory is empty or missing. Skipping environment copy.")
+            return
+    except Exception as e:
+        logger.warning(f"assets/environment directory is missing. Skipping environment copy: {e}")
+        return
+
     files = [
         "setup.sh",
         "setup_conda.sh",
@@ -542,9 +553,7 @@ def _copy_environment_to_project(root: Path) -> None:
     ]
     for filename in files:
         try:
-            asset_path = (
-                importlib_resources.files("research_os.assets.environment") / filename
-            )
+            asset_path = env_assets / filename
             dest = env_dir / filename
             if not dest.exists():
                 dest.write_text(
