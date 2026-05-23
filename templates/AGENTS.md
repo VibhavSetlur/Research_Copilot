@@ -28,8 +28,10 @@
     - After 4+ consecutive "continues", call sys.session.handoff and instruct the
       researcher to start a new chat with the handoff prompt.
     - For writing tasks: NEVER combine methods, citations, conclusions, and
-      synthesis into one response. Load writing_standards to discover the right
-      protocol, then execute ONE writing protocol per prompt.
+      synthesis into one response. Load `writing_standards` (which is now an index) to discover the right
+      protocol.
+    - When undertaking any writing task, always load `writing_core` first, then load the specific protocol (e.g., `writing/methods`, `synthesis/paper`).
+    - If a writing task is complex, split it across multiple chat sessions using `sys.session.handoff`.
     - After writing any MD file, verify it follows the template from the relevant writing protocol using sys.md.validate.
 
 14. Token Budget:
