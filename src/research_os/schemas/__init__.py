@@ -1,6 +1,6 @@
 """Pydantic schemas for Research OS inter-agent data validation."""
 
-from .research_map_schema import ResearchQuestion, ResearchMap
+from .os_state_map_schema import ResearchQuestion, ResearchMap
 from .literature_schema import PaperEntry, LiteratureCorpus
 from .analysis_schema import StatisticalTest, AnalysisResults
 from .execution_schema import ExecutionResult, ToolStatus, ToolAvailabilityReport

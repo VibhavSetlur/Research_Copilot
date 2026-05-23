@@ -69,7 +69,7 @@ class ExecutionResult:
 
 
 def _find_project_root() -> Path:
-    """Find project root by looking for .research directory."""
+    """Find project root by looking for .os_state directory."""
     from research_os.utils.common import find_project_root
 
     return find_project_root()
@@ -79,7 +79,7 @@ def _load_config(root: Path) -> Dict[str, Any]:
     if yaml is None:
         return {}
     try:
-        with open(root / ".research" / "config.yaml") as f:
+        with open(root / ".os_state" / "config.yaml") as f:
             return yaml.safe_load(f) or {}
     except Exception:
         return {}
@@ -99,7 +99,7 @@ class ResearchExecutor:
             "container_engine", "docker"
         )
         log_default = exec_cfg.get(
-            "executor_log", ".research/cache/execution_log.jsonl"
+            "executor_log", ".os_state/cache/execution_log.jsonl"
         )
         self.log_path = Path(log_path) if log_path else (self.root / log_default)
 
@@ -482,7 +482,7 @@ class TemplateExecutor:
     renders the template and executes the resulting Python script.
 
     Template search order (first match wins):
-      1. ``<project_root>/.research/templates/``  (user overrides)
+      1. ``<project_root>/.os_state/templates/``  (user overrides)
       2. ``<assets_dir>/skills/<category>/templates/``  (bundled)
       3. Any absolute path passed directly.
 
@@ -544,7 +544,7 @@ class TemplateExecutor:
         )
 
         # 1. User override templates.
-        user_dir = self.root / ".research" / "templates"
+        user_dir = self.root / ".os_state" / "templates"
         candidate = user_dir / name
         if candidate.exists():
             return candidate
@@ -647,7 +647,7 @@ class TemplateExecutor:
         """Return all discoverable templates with their paths and placeholders."""
         results: List[Dict[str, str]] = []
         search_dirs: List[Path] = [
-            self.root / ".research" / "templates",
+            self.root / ".os_state" / "templates",
             Path(__file__).parent.parent / "assets" / "skills",
         ]
         for d in search_dirs:

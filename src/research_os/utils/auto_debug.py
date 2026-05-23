@@ -10,9 +10,9 @@ When any Python script fails:
 6. Log all attempts in docs/dead_ends/
 
 Usage:
-    python .research/scripts/utils/auto_debug.py --script scripts/02_analysis.py
-    python .research/scripts/utils/auto_debug.py --script scripts/02_analysis.py --max-attempts 3
-    python .research/scripts/utils/auto_debug.py --script scripts/02_analysis.py --apply-fix <fixed_code_file>
+    python .os_state/scripts/utils/auto_debug.py --script scripts/02_analysis.py
+    python .os_state/scripts/utils/auto_debug.py --script scripts/02_analysis.py --max-attempts 3
+    python .os_state/scripts/utils/auto_debug.py --script scripts/02_analysis.py --apply-fix <fixed_code_file>
 """
 
 import argparse
@@ -448,7 +448,7 @@ def main():
             print("\n  Current function source:")
             print(f"  {bundle['function_source'][:500]}")
         print(
-            f"\n  Then run: python .research/scripts/utils/auto_debug.py --script {script_path} --apply-fix <fixed_file> --fix-func {bundle['failing_function']}"
+            f"\n  Then run: python .os_state/scripts/utils/auto_debug.py --script {script_path} --apply-fix <fixed_file> --fix-func {bundle['failing_function']}"
         )
 
     sys.exit(0 if result["success"] else 1)

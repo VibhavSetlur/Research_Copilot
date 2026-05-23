@@ -2,7 +2,7 @@
 """Tool capability check.
 
 Reads the analysis blueprint, checks required tools against the tool registry,
-and writes a tool availability report to .research/cache/.
+and writes a tool availability report to .os_state/cache/.
 """
 
 import argparse
@@ -22,7 +22,7 @@ from research_os.utils.common import find_project_root, load_yaml, load_json, sa
 
 
 def get_config(root: Path) -> Dict[str, Any]:
-    config = load_yaml(root / ".research" / "config.yaml")
+    config = load_yaml(root / ".os_state" / "config.yaml")
     return config if isinstance(config, dict) else {}
 
 
@@ -97,14 +97,14 @@ def main() -> int:
     config = get_config(root)
     registries = config.get("registries", {}) if isinstance(config, dict) else {}
     tool_registry_path = registries.get(
-        "tool_registry", ".research/domains/tool_registry.json"
+        "tool_registry", ".os_state/domains/tool_registry.json"
     )
     tool_registry = load_json(root / tool_registry_path)
 
     blueprint_path = (
         Path(args.blueprint)
         if args.blueprint
-        else root / ".research" / "cache" / "analysis_blueprint.json"
+        else root / ".os_state" / "cache" / "analysis_blueprint.json"
     )
     blueprint = load_json(blueprint_path)
 
@@ -134,7 +134,7 @@ def main() -> int:
     report_path = (
         Path(args.report)
         if args.report
-        else root / ".research" / "cache" / "tool_availability_report.json"
+        else root / ".os_state" / "cache" / "tool_availability_report.json"
     )
     save_json(report_path, report)
 

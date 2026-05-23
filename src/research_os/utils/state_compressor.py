@@ -107,7 +107,7 @@ def _completed_nodes(
         if not candidate.is_absolute():
             candidate = root / candidate
     else:
-        candidate = root / ".research" / "cache" / "execution_dag.json"
+        candidate = root / ".os_state" / "cache" / "execution_dag.json"
 
     dag = _load_json(candidate)
     nodes = dag.get("nodes", {}) if isinstance(dag, dict) else {}

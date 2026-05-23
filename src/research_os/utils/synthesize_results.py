@@ -344,8 +344,8 @@ def main():
         print(f"WARNING: LLM synthesis failed: {e}")
 
     # 4. Update research map and manifest if requested
-    if args.research_map:
-        map_path = Path(args.research_map)
+    if args.os_state_map:
+        map_path = Path(args.os_state_map)
         if update_research_map(map_path, compiled_results):
             print(f"Research map successfully updated: {map_path}")
 

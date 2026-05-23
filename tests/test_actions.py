@@ -118,13 +118,13 @@ class TestCreateCheckpoint:
     def test_success(self, MockCM, mock_snapshot):
         instance = MockCM.return_value
         instance.save.return_value = Path(
-            "/tmp/.research/checkpoints/manual_20250101_120000.json"
+            "/tmp/.os_state/checkpoints/manual_20250101_120000.json"
         )
 
         res = create_checkpoint("test cp", Path("/tmp"))
         assert res["status"] == "success"
         assert res["checkpoint_id"] == "manual_20250101_120000"
-        MockCM.assert_called_once_with(Path("/tmp/.research/checkpoints"))
+        MockCM.assert_called_once_with(Path("/tmp/.os_state/checkpoints"))
         instance.save.assert_called_once_with(
             phase="manual", data={}, metadata={"description": "test cp"}
         )

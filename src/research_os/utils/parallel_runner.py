@@ -68,7 +68,7 @@ def build_tasks_from_questions(
     questions: List[str], root: Path
 ) -> List[Dict[str, Any]]:
     """Build task list from question IDs by reading the research map."""
-    research_map_path = root / ".research" / "cache" / "research_map.json"
+    research_map_path = root / ".os_state" / "cache" / "research_map.json"
     if not research_map_path.exists():
         research_map_path = root / "03_synthesis" / "research_map.json"
 
@@ -108,7 +108,7 @@ def build_tasks_from_questions(
             q_idx = questions_data.index(matched) + 1
             task = {
                 "id": f"q{q_idx}",
-                "command": f"{sys.executable} .research/scripts/utils/run_analysis.py --question q{q_idx}",
+                "command": f"{sys.executable} .os_state/scripts/utils/run_analysis.py --question q{q_idx}",
                 "output_dir": str(root / "03_synthesis" / "analysis" / f"q{q_idx}"),
                 "log_file": str(
                     root / "03_synthesis" / "analysis" / f"q{q_idx}" / "task.log"

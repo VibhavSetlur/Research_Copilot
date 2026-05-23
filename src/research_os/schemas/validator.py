@@ -139,7 +139,7 @@ def get_schema_for_task(task_name: str) -> Type[BaseModel]:
     Raises:
         ValueError: If no schema is registered for the given task name.
     """
-    from .research_map_schema import ResearchMap, ResearchQuestion
+    from .os_state_map_schema import ResearchMap, ResearchQuestion
     from .literature_schema import LiteratureCorpus, PaperEntry
     from .analysis_schema import AnalysisResults, StatisticalTest
     from .audit_schema import AuditReport, AuditCheck

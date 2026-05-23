@@ -64,7 +64,7 @@ def get_snapshot(root: Optional[Path] = None, max_tokens: int = 800) -> str:
     # Read state ledger
     state = load_json_safe(root / "03_synthesis" / "state_ledger.json")
     if not state:
-        state = load_json_safe(root / ".research" / "cache" / "state.json")
+        state = load_json_safe(root / ".os_state" / "cache" / "state.json")
 
     # Read manifest
     manifest = load_json_safe(root / "03_synthesis" / "manifest.json")

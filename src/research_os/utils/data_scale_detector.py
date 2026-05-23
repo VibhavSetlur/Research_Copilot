@@ -8,7 +8,7 @@ Prevents Out-Of-Memory (OOM) errors by:
 4. Generating code templates for large file processing
 
 Usage:
-    python .research/scripts/utils/data_scale_detector.py
+    python .os_state/scripts/utils/data_scale_detector.py
 
     # Programmatic usage:
     from data_scale_detector import DataScaleDetector
@@ -82,7 +82,7 @@ class DataScaleDetector:
         self.thresholds = self._load_thresholds()
 
     def _load_thresholds(self) -> dict:
-        config_path = self.root / ".research" / "config.yaml"
+        config_path = self.root / ".os_state" / "config.yaml"
         if not config_path.exists():
             return SIZE_THRESHOLDS
 
@@ -298,13 +298,13 @@ final = pd.concat(results)
         """Save the data scale profile to a JSON file.
 
         Args:
-            output_path: Where to save (default: .research/cache/data_scale_profile.json)
+            output_path: Where to save (default: .os_state/cache/data_scale_profile.json)
 
         Returns:
             Path to the saved profile
         """
         if output_path is None:
-            output_path = self.root / ".research" / "cache" / "data_scale_profile.json"
+            output_path = self.root / ".os_state" / "cache" / "data_scale_profile.json"
 
         profile = self.scan()
         profile["constraint_message"] = self.get_constraint_message()

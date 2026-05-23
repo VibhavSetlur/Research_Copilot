@@ -93,7 +93,7 @@ def _format_findings(state: dict) -> str:
 
 def _format_ctm_summary(root: Path) -> str:
     """Summarize the latest CTM if one exists."""
-    ctm_dir = root / ".research" / "cache" / "context_transfer_memos"
+    ctm_dir = root / ".os_state" / "cache" / "context_transfer_memos"
     if not ctm_dir.exists():
         return "  (no CTMs)"
 
@@ -158,7 +158,7 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
             return "ERROR: Not in a Research OS workspace. Run `rcp init` first."
 
     state_path = root / "03_synthesis" / "state_ledger.json"
-    cache_path = root / ".research" / "cache" / "state.json"
+    cache_path = root / ".os_state" / "cache" / "state.json"
 
     state = load_json_safe(state_path)
     if not state:
@@ -204,8 +204,8 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         "",
         "## Instructions",
         "",
-        "1. Read `.research/cache/state.json` for the full structured state",
-        "2. Read the latest CTM from `.research/cache/context_transfer_memos/` if one exists",
+        "1. Read `.os_state/cache/state.json` for the full structured state",
+        "2. Read the latest CTM from `.os_state/cache/context_transfer_memos/` if one exists",
         "3. Read `03_synthesis/state_ledger.json` for the global ledger",
         "4. Load only the skill needed for the next action — do NOT load all skills",
         "5. Continue from the phase indicated above",

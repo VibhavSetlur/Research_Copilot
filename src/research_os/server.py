@@ -792,7 +792,8 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             arguments.get("project_name", "Research Project"),
             git_init=arguments.get("git_init", False),
         )
-        _profile_inputs(root)
+        if (root / ".os_state").exists():
+            _profile_inputs(root)
         return _text(_success_envelope({"scaffolded": True}))
 
     if name == "sys.file.read":
@@ -932,7 +933,7 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
 
     if name == "sys.checkpoint.create":
-        res = create_checkpoint(arguments.get("description", ""), root)
+        res = create_checkpoint(arguments.get("description", "manual"), root)
         return (
             _text(_success_envelope(res))
             if res["status"] == "success"

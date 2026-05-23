@@ -4,9 +4,9 @@
 Every factual claim must be traceable to computed data or a verified citation.
 
 Usage:
-    python .research/scripts/utils/claim_tracer.py --manuscript 03_synthesis/manuscript/research_findings.md
-    python .research/scripts/utils/claim_tracer.py --manuscript ... --data-lineage docs/data_lineage.json
-    python .research/scripts/utils/claim_tracer.py --manuscript ... --citation-report 00_inputs/literature/citation_verification_report.json
+    python .os_state/scripts/utils/claim_tracer.py --manuscript 03_synthesis/manuscript/research_findings.md
+    python .os_state/scripts/utils/claim_tracer.py --manuscript ... --data-lineage docs/data_lineage.json
+    python .os_state/scripts/utils/claim_tracer.py --manuscript ... --citation-report 00_inputs/literature/citation_verification_report.json
 """
 
 import argparse

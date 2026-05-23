@@ -63,13 +63,13 @@ class ResearchCache:
             current = Path.cwd()
             root = None
             for p in [current] + list(current.parents):
-                if (p / ".research").exists():
+                if (p / ".os_state").exists():
                     root = p
                     break
             if not root:
                 root = current
-            self.db_path = root / ".research" / "cache" / "research_cache.db"
-            self.state_path = root / ".research" / "cache" / "state.json"
+            self.db_path = root / ".os_state" / "cache" / "research_cache.db"
+            self.state_path = root / ".os_state" / "cache" / "state.json"
         else:
             self.db_path = db_path
             self.state_path = db_path.parent / "state.json"
@@ -591,7 +591,7 @@ def cmd_ingest(args):
     if not root:
         print("Not in a project root")
         return
-    db_path = root / ".research" / "cache" / "vss.sqlite"
+    db_path = root / ".os_state" / "cache" / "vss.sqlite"
     ingest_file(filepath, db_path)
 
 

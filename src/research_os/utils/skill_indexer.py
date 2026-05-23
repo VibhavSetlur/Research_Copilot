@@ -3,13 +3,13 @@
 Research OS Skill Indexer
 
 Parses all Markdown files in the skills directory and generates a lightweight
-JSON keyword index at .research/cache/skill_index.json.
+JSON keyword index at .os_state/cache/skill_index.json.
 
 The index is used for fast keyword filtering; full BM25 semantic search is
 provided by research_os.utils.context7_lookup.search_skills().
 
 Search priority:
-  1. .research/skills/  (user local overrides)
+  1. .os_state/skills/  (user local overrides)
   2. src/research_os/assets/skills/  (bundled package skills)
 """
 
@@ -246,14 +246,14 @@ def extract_keywords(
 def _find_skills_dirs(project_root: Path) -> List[Path]:
     """Return ordered list of skills directories to index.
 
-    Local user overrides (``<root>/.research/skills``) take precedence.
+    Local user overrides (``<root>/.os_state/skills``) take precedence.
     The bundled package assets (``src/research_os/assets/skills``) are
     included as a fallback so the index always covers the full skill set.
     """
     dirs: List[Path] = []
 
     # 1. User local overrides
-    local = project_root / ".research" / "skills"
+    local = project_root / ".os_state" / "skills"
     if local.exists():
         dirs.append(local)
 
@@ -267,7 +267,7 @@ def _find_skills_dirs(project_root: Path) -> List[Path]:
 
 
 def build_index(project_root: Path) -> Path:
-    cache_dir = project_root / ".research" / "cache"
+    cache_dir = project_root / ".os_state" / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     index_path = cache_dir / "skill_index.json"
 
@@ -406,7 +406,7 @@ def search_skills(query: str, top_k: int = 1) -> List[Dict]:
     current = Path.cwd()
     root = None
     for p in [current] + list(current.parents):
-        if (p / ".research").exists():
+        if (p / ".os_state").exists():
             root = p
             break
     if not root:
@@ -464,12 +464,12 @@ if __name__ == "__main__":
     current = Path.cwd()
     root = None
     for p in [current] + list(current.parents):
-        if (p / ".research").exists():
+        if (p / ".os_state").exists():
             root = p
             break
 
     if not root:
-        print("ERROR: Could not find project root containing .research/")
+        print("ERROR: Could not find project root containing .os_state/")
         sys.exit(1)
 
     build_index(root)

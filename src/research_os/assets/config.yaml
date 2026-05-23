@@ -27,8 +27,8 @@ intent_routing:
 # Knowledge graph (context management)
 knowledge_graph:
   enabled: true
-  storage: ".research/cache/knowledge_graph.pkl"
-  json_export: ".research/cache/knowledge_graph.json"
+  storage: ".os_state/cache/knowledge_graph.pkl"
+  json_export: ".os_state/cache/knowledge_graph.json"
   auto_extract_triplets: true
   max_depth: 3
 
@@ -49,7 +49,7 @@ default_workflow: "quick_exploratory"
 # Multi-agent LLM delegation
 multi_agent:
   enabled: false
-  models_config: ".research/models.yaml"
+  models_config: ".os_state/models.yaml"
   cost_tracking: true
   budget_warning_pct: 0.80
   budget_hard_limit_usd: 50.00
@@ -69,11 +69,11 @@ workspace_dir: "01_workspace"
 scratchpad_dir: "01_workspace/scratchpad"
 lab_notebook: "01_workspace/lab_notebook.md"
 
-# CLI cache (internal working files, stored in .research/)
-cache_dir: ".research/cache"
-cache_research_map: ".research/cache/research_map.json"
-cache_followups: ".research/cache/follow_up_questions.md"
-cache_scan_result: ".research/cache/scan_result.json"
+# CLI cache (internal working files, stored in .os_state/)
+cache_dir: ".os_state/cache"
+cache_research_map: ".os_state/cache/research_map.json"
+cache_followups: ".os_state/cache/follow_up_questions.md"
+cache_scan_result: ".os_state/cache/scan_result.json"
 
 # Experiment and synthesis paths (created by AI during init)
 experiments_dir: "02_experiments"
@@ -95,10 +95,10 @@ final_figures: "03_synthesis/final_figures"
 quality_gates_dir: "03_synthesis/quality_gates"
 data_lineage: "03_synthesis/data_lineage.json"
 
-# Script paths (system scripts in .research/, experiment scripts in 02_experiments/*/scripts/)
+# Script paths (system scripts in .os_state/, experiment scripts in 02_experiments/*/scripts/)
 scripts_dir: "02_experiments/exp_001_baseline/scripts"
-system_scripts: ".research/scripts"
-system_scripts_utils: ".research/scripts/utils"
+system_scripts: ".os_state/scripts"
+system_scripts_utils: ".os_state/scripts/utils"
 
 # File paths (where AI writes final outputs)
 research_map: "02_experiments/exp_001_baseline/outputs/analysis/research_map.json"
@@ -122,8 +122,8 @@ dag_viewer: "03_synthesis/dashboards/dag_viewer.html"
 iteration_registry: "03_synthesis/iteration_registry.json"
 
 # Workflow
-dag_json: ".research/workflow_dag.json"
-dag_mermaid: ".research/workflow_dag.mermaid"
+dag_json: ".os_state/workflow_dag.json"
+dag_mermaid: ".os_state/workflow_dag.mermaid"
 
 # Thresholds
 literature_min_papers: 10
@@ -135,7 +135,7 @@ sensitivity_tests_min: 3
 
 # Reproducibility
 requirements_file: "environment/requirements.txt"
-environment_check_script: ".research/scripts/00_environment_check.py"
+environment_check_script: ".os_state/scripts/00_environment_check.py"
 pin_dependency_versions: true
 
 # Quality gates
@@ -143,9 +143,9 @@ quality_gates_enabled: true
 gate_fail_blocks_pipeline: true
 
 # State ledger & checkpoint system
-state_ledger: ".research/cache/state.json"
-checkpoint_dir: ".research/cache/checkpoints"
-core_dir: ".research/core"
+state_ledger: ".os_state/cache/state.json"
+checkpoint_dir: ".os_state/cache/checkpoints"
+core_dir: ".os_state/core"
 token_budget_limit: 200000
 
 # Data scale thresholds (file size classification for library selection)
@@ -159,13 +159,13 @@ execution:
   supported_runtimes: [python, r, bash, nextflow, snakemake, julia]
   container_engine: "docker"
   container_fallback: "conda"
-  executor_log: ".research/cache/execution_log.jsonl"
+  executor_log: ".os_state/cache/execution_log.jsonl"
 
 # Domain registries
 registries:
-  domain_registry: ".research/domains/domain_registry.json"
-  tool_registry: ".research/domains/tool_registry.json"
-  assumption_registry: ".research/domains/assumption_registry.json"
+  domain_registry: ".os_state/domains/domain_registry.json"
+  tool_registry: ".os_state/domains/tool_registry.json"
+  assumption_registry: ".os_state/domains/assumption_registry.json"
 
 # Container configuration
 containers:
@@ -178,7 +178,7 @@ containers:
     - "03_synthesis"
     - "scripts"
     - "reports"
-  cache_dir: ".research/cache/containers"
+  cache_dir: ".os_state/cache/containers"
 
 # Literature integration
 literature:

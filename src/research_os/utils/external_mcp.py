@@ -157,7 +157,7 @@ class ExternalMCPManager:
         cmd = list(spec["start_cmd"])
         if server_id == "sqlite":
             effective_db = db_path or str(
-                self.root / ".research" / "cache" / "research_cache.db"
+                self.root / ".os_state" / "cache" / "research_cache.db"
             )
             cmd = [c.replace("{db_path}", effective_db) for c in cmd]
         elif server_id == "filesystem":

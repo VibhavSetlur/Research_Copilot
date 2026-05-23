@@ -7,7 +7,7 @@ Maintains a Directed Acyclic Graph (DAG) of all script executions, recording:
 - Iteration branching (e.g., 02_analysis_ITER001.py vs 02_analysis_ITER002.py)
 - Dependencies between script runs
 
-Location: .research/cache/execution_dag.json
+Location: .os_state/cache/execution_dag.json
 
 Usage:
     from dag_manager import ExecutionDAGManager
@@ -38,7 +38,7 @@ class ExecutionDAGManager:
         if project_root is None:
             project_root = find_project_root()
         self.root = project_root
-        self.dag_path = project_root / ".research" / "cache" / "execution_dag.json"
+        self.dag_path = project_root / ".os_state" / "cache" / "execution_dag.json"
         self._ensure_dag_exists()
 
     def _ensure_dag_exists(self) -> None:

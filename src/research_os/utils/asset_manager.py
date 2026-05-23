@@ -39,7 +39,7 @@ class AssetManager:
 
     @staticmethod
     def find_project_root(start: Optional[Path] = None) -> Path:
-        """Find a Research OS workspace without requiring ``.research/``."""
+        """Find a Research OS workspace without requiring ``.os_state/``."""
         p = Path(start or Path.cwd()).resolve()
         markers = (
             ".os_state",

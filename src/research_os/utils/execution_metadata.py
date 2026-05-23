@@ -20,7 +20,7 @@ from research_os.utils.common import find_project_root, load_json_safe
 
 def load_execution_log(root: Optional[Path] = None) -> List[Dict[str, Any]]:
     root = root or find_project_root()
-    log_path = root / ".research" / "cache" / "execution_log.jsonl"
+    log_path = root / ".os_state" / "cache" / "execution_log.jsonl"
     entries = []
     if log_path.exists():
         with open(log_path) as f:
@@ -36,17 +36,17 @@ def load_execution_log(root: Optional[Path] = None) -> List[Dict[str, Any]]:
 
 def load_tool_registry(root: Optional[Path] = None) -> Dict[str, Any]:
     root = root or find_project_root()
-    return load_json_safe(root / ".research" / "domains" / "tool_registry.json")
+    return load_json_safe(root / ".os_state" / "domains" / "tool_registry.json")
 
 
 def load_domain_registry(root: Optional[Path] = None) -> Dict[str, Any]:
     root = root or find_project_root()
-    return load_json_safe(root / ".research" / "domains" / "domain_registry.json")
+    return load_json_safe(root / ".os_state" / "domains" / "domain_registry.json")
 
 
 def load_assumption_registry(root: Optional[Path] = None) -> Dict[str, Any]:
     root = root or find_project_root()
-    return load_json_safe(root / ".research" / "domains" / "assumption_registry.json")
+    return load_json_safe(root / ".os_state" / "domains" / "assumption_registry.json")
 
 
 def get_tool_id_from_entry(entry: Dict[str, Any]) -> Optional[str]:
@@ -140,7 +140,7 @@ def write_analysis_metadata(
     out = (
         Path(output_path)
         if output_path
-        else (root / ".research" / "cache" / "execution_metadata.json")
+        else (root / ".os_state" / "cache" / "execution_metadata.json")
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:

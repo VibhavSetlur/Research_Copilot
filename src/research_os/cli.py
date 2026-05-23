@@ -64,7 +64,7 @@ def _print_tree(path: Path, prefix: str = "", is_root: bool = True) -> None:
         "outputs": "All experiment outputs — reports, figures, artifacts",
         "synthesis": "Final consolidated outputs — paper, abstract, bibliography",
         "environment": "Reproducible environments (requirements.txt, Dockerfile)",
-        ".research": "Internal configuration and cache files (do not edit manually)",
+        ".os_state": "Internal configuration and cache files (do not edit manually)",
         ".os_state": "OS internal state — checkpoints, manifest, ledger",
         "docs": "Project documentation and guides",
     }
@@ -73,7 +73,7 @@ def _print_tree(path: Path, prefix: str = "", is_root: bool = True) -> None:
 
     for i, entry in enumerate(entries):
         if entry.name.startswith(".") and entry.name not in (
-            ".research",
+            ".os_state",
             ".os_state",
             ".cursor",
         ):

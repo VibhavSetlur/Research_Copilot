@@ -181,4 +181,4 @@ cost_tracking:
   enabled: true
   budget_warning_pct: 0.80
   budget_hard_limit_usd: 50.00
-  log_path: ".research/cache/cost_log.jsonl"
+  log_path: ".os_state/cache/cost_log.jsonl"
