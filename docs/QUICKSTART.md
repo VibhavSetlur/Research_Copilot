@@ -39,8 +39,8 @@ To ensure the AI operates correctly, ask it to load a guidance protocol. For exa
 
 The AI will use `sys.guidance.get` to read the YAML decision tree, guiding it to classify the domain, determine reporting standards, and identify pitfalls without you having to explicitly prompt it.
 
-## 5. Experimentation & Branching
+## 5. Experimentation & Chronological Paths
 
-Ask the AI to create an experiment branch when trying a new methodology:
-> "Branch off main to try a non-parametric approach."
+Ask the AI to create a new chronological path when trying a new methodology:
+> "Use sys.path.create to create a new chronological path for trying a non-parametric approach."
 The AI will invoke `sys.path.create`, isolating the new work while preserving the ledger.

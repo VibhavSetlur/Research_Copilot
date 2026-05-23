@@ -509,11 +509,9 @@ def _setup_gitignore(root: Path) -> None:
             "# Research OS Runtime Cache\n"
             ".os_state/cache/\n"
             ".os_state/state/\n"
-            ".os_state/workflow_dag.json\n"
-            ".os_state/workflow_dag.mermaid\n\n"
+
             "# Raw Data (Do not commit massive datasets)\n"
-            "workspace/data/raw/*\n"
-            "!workspace/data/raw/.gitkeep\n"
+
             ".os_state/\n"
             "# Researcher config (contains API keys)\n"
             "inputs/researcher_config.yaml\n"
@@ -565,36 +563,6 @@ def _setup_mcp_configs(root: Path) -> None:
         vscode_mcp.write_text(
             json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
         )
-
-
-def _copy_ai_rules_to_project(root: Path) -> None:
-    """Copy AI agent rules files from templates to the project root."""
-    try:
-        import importlib.resources as importlib_resources
-    except ImportError:
-        import importlib_resources  # type: ignore[no-redef]
-
-    assets = ["AGENTS.md"]
-    for asset_name in assets:
-        try:
-            asset_path = (
-                importlib_resources.files("research_os")
-                / ".."
-                / ".."
-                / "templates"
-                / asset_name
-            )
-            if not asset_path.exists():
-                asset_path = (
-                    Path(__file__).parent.parent.parent / "templates" / asset_name
-                )
-            dest = root / asset_name
-            if not dest.exists() and asset_path.exists():
-                dest.write_text(
-                    asset_path.read_text(encoding="utf-8"), encoding="utf-8"
-                )
-        except Exception:
-            pass
 
 
 def _copy_environment_to_project(root: Path) -> None:

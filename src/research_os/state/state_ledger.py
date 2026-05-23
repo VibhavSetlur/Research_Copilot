@@ -786,7 +786,7 @@ class ResearchLedger:
         if provider != "ollama":
             raise ValueError(
                 f"Unsupported provider '{provider}'. Only 'ollama' is currently supported.\n"
-                "Example: rcp compress --model=ollama/llama3"
+                "Example: research-os compress --model=ollama/llama3"
             )
 
         if not shutil.which("ollama"):
@@ -796,7 +796,7 @@ class ResearchLedger:
             )
 
         db_path = (
-            self._path.parent.parent / ".research" / "cache" / "state_cache.sqlite"
+            self._path.parent.parent / ".os_state" / "cache" / "state_cache.sqlite"
         )
         node_outputs: dict[str, str] = {}
 
