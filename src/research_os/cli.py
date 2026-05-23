@@ -175,7 +175,16 @@ def cmd_init(args: argparse.Namespace) -> None:
         research-os init /home/user/my-project/
         research-os init /home/user/existing-project/ --interactive
     """
-    target_dir = Path(args.directory).resolve()
+    if args.directory is None:
+        if args.name:
+            import re
+            slug = re.sub(r"[^a-zA-Z0-9_-]", "-", args.name.replace(" ", "-")).lower()
+            target_dir = (Path.cwd() / slug).resolve()
+        else:
+            target_dir = Path.cwd()
+    else:
+        target_dir = Path(args.directory).resolve()
+
     project_name = args.name or target_dir.name
 
     has_existing_data = False
@@ -851,7 +860,7 @@ def cmd_env(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rcp",
+        prog="research-os",
         description="Research OS - clean workspace CLI",
     )
     parser.add_argument(
@@ -867,7 +876,7 @@ def build_parser() -> argparse.ArgumentParser:
         "init", help="Initialize a Research OS workspace in a directory"
     )
     p_init.add_argument(
-        "directory", help="Target directory path (e.g. /home/user/my-project/)"
+        "directory", nargs="?", default=None, help="Target directory path (e.g. /home/user/my-project/)"
     )
     p_init.add_argument("--name", help="Project name (defaults to directory name)")
     p_init.add_argument(

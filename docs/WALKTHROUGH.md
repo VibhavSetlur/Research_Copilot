@@ -15,6 +15,7 @@ mkdir air-pollution-research
 cd air-pollution-research
 
 # Initialize the workspace
+# You can optionally provide a --name, otherwise it defaults to the directory name
 research-os init --name "Air Pollution and Respiratory Health"
 
 # Start the MCP Server
