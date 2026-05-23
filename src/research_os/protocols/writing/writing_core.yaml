@@ -1,12 +1,41 @@
 name: writing_core
 version: 1.0.0
-description: Universal writing rules (ALWAYS loaded for any writing task)
+description: "Universal writing rules for all Research OS outputs. MUST be loaded before any task-specific writing protocol."
+schema_version: "1.0"
+trigger: "Always include this protocol when performing any writing task."
+
 rules:
   banned_phrases:
-    - "delve"
-    - "tapestry"
-    - "in conclusion"
-    - "it is important to note"
-  causal_language: "Use 'associated with' instead of 'causes' unless backed by randomized control trials. Avoid definitive claims."
-  number_formatting: "Spell out numbers less than 10; use digits for 10 and above. Always use leading zeros for decimals (0.05)."
-  tense: "Use past tense for Methods and Results. Use present tense for Conclusions and general truths."
+    - "It is important to note that"
+    - "Interestingly,"
+    - "Surprising as it may seem"
+    - "Delve into"
+    - "In this tapestry of"
+    - "As a language model"
+    - "Needless to say"
+    - "It goes without saying"
+    - "As shown above"
+    - "Due to the fact that"
+    - "In order to"
+
+  causal_language:
+    - "Do not use 'causes', 'proof', or 'proves' unless referring to a randomized controlled trial or mathematical proof."
+    - "Use 'associated with', 'correlated with', 'suggests', or 'indicates' for observational data."
+    - "Avoid definitive claims without explicit statistical backing (e.g., p-values, confidence intervals)."
+
+  number_formatting:
+    - "Always report p-values with exactly three decimal places (e.g., p = 0.042, not p < 0.05). If p < 0.001, write p < 0.001."
+    - "Report 95% confidence intervals for all point estimates."
+    - "Use scientific notation for very large or very small numbers (e.g., 3.2e-5)."
+    - "Include units for all numerical values."
+
+  tense_rules:
+    - "Use past tense for methods and results (e.g., 'We analyzed the data')."
+    - "Use present tense for established facts and conclusions (e.g., 'This indicates a significant association')."
+
+steps:
+  - id: verify_core_rules
+    name: "Verify Core Rules"
+    description: |
+      Before finalizing any output, verify that no banned phrases were used, causal language is appropriate, numbers are formatted correctly, and verb tenses are consistent.
+      Call tool.md.validate if applicable.

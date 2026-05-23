@@ -1,4 +1,38 @@
 name: synthesis_paper
 version: 1.0.0
-section_order: [Methods, Results, Discussion, Abstract, Final]
-instructions: "Use tool.synthesize(section='...'). Small models: one section per session."
+description: "Guide to building synthesis/paper.md section-by-section."
+always_include: ["writing_core"]
+schema_version: "1.0"
+
+section_order:
+  1: "Methods"
+  2: "Results"
+  3: "Discussion"
+  4: "Abstract"
+  5: "Final Assembly"
+
+tool_calls: "Use tool.synthesize with section parameter."
+
+sources:
+  - "workspace/methods.md"
+  - "workspace/analysis.md"
+  - "workspace/citations.md"
+  - "workspace/*/conclusions.md"
+  - "workspace/*/outputs/figures/*"
+
+steps:
+  - id: draft_methods
+    name: "Draft Methods Section"
+    description: "Draft Methods."
+  - id: draft_results
+    name: "Draft Results Section"
+    description: "Draft Results."
+  - id: draft_discussion
+    name: "Draft Discussion Section"
+    description: "Draft Discussion."
+  - id: draft_abstract
+    name: "Draft Abstract"
+    description: "Draft Abstract."
+  - id: final_assembly
+    name: "Final Assembly"
+    description: "Combine all sections."

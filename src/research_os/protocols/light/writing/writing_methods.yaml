@@ -1,8 +1,49 @@
 name: writing_methods
 version: 1.0.0
-template: |
-  ## [Step]
-  - Tool: [Name/Version]
-  - Assumptions: [List]
-  - Checksum: [Hash]
-  - Rationale: [Why]
+description: "Guide to documenting research methods."
+always_include: ["writing_core"]
+schema_version: "1.0"
+
+templates:
+  workspace_methods: |
+    ## Step {step_number}: {step_name}
+    - **Dataset Used:** {dataset_name} (sha256: {dataset_hash})
+    - **Algorithm/Method:** {method_name}
+    - **Implementation:** {tool_or_package_name} v{version}
+    - **Key Parameters:** {hyperparameters_or_settings}
+    - **Justification:** {brief_justification}
+    - **Assumptions Checked:** {assumptions_list}
+
+  methods_research: |
+    # Methods Research: {task_or_goal}
+    
+    ## Candidate Methods Evaluated
+    1. **{method_1}**
+       - Pros: {pros}
+       - Cons: {cons}
+       - Documentation: {url}
+    
+    ## Final Selection
+    **Selected Method:** {selected_method}
+    **Reasoning:** {reasoning_with_citation}
+    
+    ## Required Data Format
+    {input_format_details}
+
+rules:
+  checksums:
+    - "Include sha256 checksums."
+
+steps:
+  - id: gather_info
+    name: "Gather Methodology Information"
+    description: "Collect details."
+  - id: write_methods_research
+    name: "Draft Methods Research"
+    description: "Populate methods_research.md."
+  - id: append_workspace_methods
+    name: "Append to Main Methods"
+    description: "Append to methods.md."
+  - id: verify_methods
+    name: "Verify Methods Output"
+    description: "Check templates and checksums."

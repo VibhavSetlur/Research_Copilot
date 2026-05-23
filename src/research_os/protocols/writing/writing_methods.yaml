@@ -1,11 +1,52 @@
 name: writing_methods
 version: 1.0.0
-description: How to write to workspace/methods.md and per-step methods_research.md
-template: |
-  ## [Step Name]
-  - **Tool/Library**: [Name and Version]
-  - **Function**: [Specific function used]
-  - **Assumptions Checked**: [List of assumptions, e.g. normality, independence]
-  - **Data Checksum**: [Checksum of inputs used]
-  - **Rationale**: [Why this method was chosen]
-instructions: "Always include checksums to ensure reproducibility. Explicitly list any statistical assumptions and whether they were verified."
+description: "Guide to documenting research methods, tools, and algorithms in workspace/methods.md and methods_research.md."
+always_include: ["writing_core"]
+schema_version: "1.0"
+
+templates:
+  workspace_methods: |
+    ## Step {step_number}: {step_name}
+    - **Dataset Used:** {dataset_name} (sha256: {dataset_hash})
+    - **Algorithm/Method:** {method_name}
+    - **Implementation:** {tool_or_package_name} v{version}
+    - **Key Parameters:** {hyperparameters_or_settings}
+    - **Justification:** {brief_justification}
+    - **Assumptions Checked:** {assumptions_list}
+
+  methods_research: |
+    # Methods Research: {task_or_goal}
+    
+    ## Candidate Methods Evaluated
+    1. **{method_1}**
+       - Pros: {pros}
+       - Cons: {cons}
+       - Documentation: {url}
+    
+    ## Final Selection
+    **Selected Method:** {selected_method}
+    **Reasoning:** {reasoning_with_citation}
+    
+    ## Required Data Format
+    {input_format_details}
+
+rules:
+  checksums:
+    - "Every dataset referenced MUST include its sha256 checksum to ensure exact reproducibility."
+
+steps:
+  - id: gather_info
+    name: "Gather Methodology Information"
+    description: "Collect details about the tools, parameters, and datasets used in the current step."
+  
+  - id: write_methods_research
+    name: "Draft Methods Research"
+    description: "If choosing a method, populate workspace/{step}/methods_research.md using the methods_research template."
+    
+  - id: append_workspace_methods
+    name: "Append to Main Methods"
+    description: "Append the methodological details to workspace/methods.md using the workspace_methods template."
+    
+  - id: verify_methods
+    name: "Verify Methods Output"
+    description: "Check that all templates are filled correctly and checksums are included for all datasets."
