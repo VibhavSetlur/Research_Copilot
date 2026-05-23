@@ -482,24 +482,66 @@ def _setup_mcp_configs(root: Path, ide: str = "all") -> None:
     if ide in ("all", "cursor"):
         cursor_dir = root / ".cursor"
         cursor_dir.mkdir(parents=True, exist_ok=True)
+
         cursor_mcp = cursor_dir / "mcp.json"
         if not cursor_mcp.exists():
             cursor_mcp.write_text(
-                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
+                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\\n"
             )
+
+        # Copy Cursor rules if they exist
+        rules_dir = cursor_dir / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            from pathlib import Path
+            import shutil
+            src_path = Path(__file__).resolve().parent.parent.parent / "templates" / ".cursor" / "rules" / "research-os.mdc"
+            if src_path.exists():
+                shutil.copy2(src_path, rules_dir / "research-os.mdc")
+        except Exception:
+            pass
 
     # Claude Desktop
     if ide in ("all", "claude"):
         claude_dir = root / ".claude"
         claude_dir.mkdir(parents=True, exist_ok=True)
+
         claude_mcp = claude_dir / "mcp.json"
         if not claude_mcp.exists():
             try:
                 claude_mcp.write_text(
-                    json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
+                    json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\\n"
                 )
             except Exception:
                 pass
+
+        # Copy Claude rules if they exist
+        rules_dir = claude_dir / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            from pathlib import Path
+            import shutil
+            src_path = Path(__file__).resolve().parent.parent.parent / "templates" / ".claude" / "rules" / "research-os.md"
+            if src_path.exists():
+                shutil.copy2(src_path, rules_dir / "research-os.md")
+        except Exception:
+            pass
+
+
+    # Antigravity
+    if ide in ("all", "antigravity"):
+        antigravity_dir = root / ".antigravity"
+        antigravity_dir.mkdir(parents=True, exist_ok=True)
+        rules_dir = antigravity_dir / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            from pathlib import Path
+            import shutil
+            src_path = Path(__file__).resolve().parent.parent.parent / "templates" / ".antigravity" / "rules" / "research-os.md"
+            if src_path.exists():
+                shutil.copy2(src_path, rules_dir / "research-os.md")
+        except Exception:
+            pass
 
     # OpenCode
     if ide in ("all", "opencode"):

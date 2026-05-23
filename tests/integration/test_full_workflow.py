@@ -168,3 +168,52 @@ print("Multi-lang workflow test")
         session_data = json.loads(res[0].text).get("data", {}).get("session", {})
         assert any(lang["name"] == "python" for lang in session_data.get("languages", []))
         assert any(lang["name"] == "R" for lang in session_data.get("languages", []))
+
+def test_project_startup_protocol(workspace_root):
+    root = workspace_root
+    
+    # 1. Initialize project
+    res = _handle_tool_call(
+        "sys.workspace.scaffold", {"project_name": "Test Project"}, root
+    )
+    assert "success" in res[0].text
+    
+    # Write a dummy protocol for project_startup
+    proto_dir = root / "src" / "research_os" / "protocols" / "guidance"
+    proto_dir.mkdir(parents=True, exist_ok=True)
+    proto_content = """name: project_startup
+version: 1.0.0
+description: "First actions after the researcher has placed files in inputs/."
+steps:
+  - id: scan_inputs
+    description: "List all files in inputs/ using sys.file.list."
+  - id: create_baseline_path
+    description: "Create the first experiment path with sys.path.create name='baseline_eda'."
+"""
+    (proto_dir / "project_startup.yaml").write_text(proto_content)
+    
+    # 2. Get the startup protocol
+    res = _handle_tool_call(
+        "sys.guidance.get", {"protocol_name": "project_startup"}, root
+    )
+    assert "success" in res[0].text
+    data = json.loads(res[0].text)
+    
+    content = data.get("data", {}).get("content", "")
+    assert "scan_inputs" in content
+    assert "create_baseline_path" in content
+    
+    # Simulate step 1
+    res = _handle_tool_call(
+        "sys.file.list", {"directory": "inputs/"}, root
+    )
+    assert "success" in res[0].text
+    
+    # Simulate step 2
+    res = _handle_tool_call(
+        "sys.path.create", {"name": "baseline_eda"}, root
+    )
+    assert "success" in res[0].text
+    path_data = json.loads(res[0].text)
+    assert path_data.get("data", {}).get("path_id", "").startswith("01_")
+
