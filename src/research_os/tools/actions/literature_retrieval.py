@@ -15,8 +15,10 @@ _S2_LAST_CALL = 0.0
 
 
 def _get_cache_path(query: str, source: str) -> Path:
+    from research_os.utils.common import find_project_root
     q_hash = hashlib.md5(query.encode()).hexdigest()
-    return Path("workspace") / ".os_state" / "cache" / f"{source}_{q_hash}.json"
+    root = find_project_root()
+    return root / ".os_state" / "cache" / f"{source}_{q_hash}.json"
 
 
 def _read_cache(query: str, source: str) -> List[Dict[str, Any]]:
@@ -31,6 +33,8 @@ def _read_cache(query: str, source: str) -> List[Dict[str, Any]]:
 
 def _write_cache(query: str, source: str, data: List[Dict[str, Any]]):
     path = _get_cache_path(query, source)
+    if not path.parent.parent.exists():
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data))
 

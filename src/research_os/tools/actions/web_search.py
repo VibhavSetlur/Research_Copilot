@@ -14,8 +14,12 @@ logger = logging.getLogger("research.tools.web_search")
 
 
 def _log_error(message: str):
+    from research_os.utils.common import find_project_root
     try:
-        log_path = Path("workspace") / "logs" / "errors.log"
+        root = find_project_root()
+        if not (root / ".os_state").exists():
+            return
+        log_path = root / "workspace" / "logs" / "errors.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             f.write(f"[{now_iso()}] {message}\n")
