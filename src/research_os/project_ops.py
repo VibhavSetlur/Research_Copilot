@@ -634,12 +634,25 @@ def save_artifact(
 ) -> dict:
     """Save a text artifact with required sibling provenance metadata."""
     root = _resolve_root(root)
-    folder = {
-        "figure": "figures",
-        "table": "data/derived",
-        "analysis": "data/derived",
-        "artifact": "data/derived",
-    }.get(artifact_type, "data/derived")
+    from research_os.state import ResearchLedger
+    ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
+    active_step = ledger.get_current_path()
+    
+    if active_step:
+        folder = {
+            "figure": f"{active_step}/outputs/figures",
+            "table": f"{active_step}/outputs/tables",
+            "analysis": f"{active_step}/data",
+            "artifact": f"{active_step}/data",
+        }.get(artifact_type, f"{active_step}/data")
+    else:
+        folder = {
+            "figure": "figures",
+            "table": "data/derived",
+            "analysis": "data/derived",
+            "artifact": "data/derived",
+        }.get(artifact_type, "data/derived")
+
     safe_name = Path(filename).name
     output_path = root / "workspace" / folder / safe_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
