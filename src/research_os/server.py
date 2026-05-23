@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Research OS MCP server v3.0 — Research Guidance Engine"""
+"""Research OS MCP server v0.1.0 — Research Guidance Engine"""
 
 from __future__ import annotations
 

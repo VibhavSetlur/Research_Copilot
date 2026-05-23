@@ -683,7 +683,7 @@ def cmd_log_decision(args: argparse.Namespace) -> None:
         rationale=args.rationale,
         root=_project_root(),
     )
-    print(f"Logged {result['decision_id']} -> {result['path']}")
+    print(f"Logged to {result['path']}")
 
 
 def cmd_save_artifact(args: argparse.Namespace) -> None:

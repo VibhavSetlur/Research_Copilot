@@ -27,8 +27,8 @@ def test_scaffold_workspace():
 
         state = load_state(root)
         assert state["project_name"] == "Test Project"
-        assert state["current_branch"] == "main"
-        assert "main" in state["branches"]
+        assert state["current_path"] == "main"
+        assert "main" in state["paths"]
 
 
 def test_path_create():
@@ -39,17 +39,17 @@ def test_path_create():
         res = create_numbered_experiment(
             root, "data_preparation", hypothesis="Clean data"
         )
-        assert "data_preparation" in res["branch_id"]
-        assert res["branch_id"].startswith("02_")
-        assert (root / "workspace" / res["branch_id"]).exists()
-        assert (root / "workspace" / res["branch_id"] / "data").exists()
-        assert (root / "workspace" / res["branch_id"] / "scripts").exists()
-        assert (root / "workspace" / res["branch_id"] / "README.md").exists()
-        assert (root / "workspace" / res["branch_id"] / "conclusions.md").exists()
+        assert "data_preparation" in res["path_id"]
+        assert res["path_id"].startswith("02_")
+        assert (root / "workspace" / res["path_id"]).exists()
+        assert (root / "workspace" / res["path_id"] / "data").exists()
+        assert (root / "workspace" / res["path_id"] / "scripts").exists()
+        assert (root / "workspace" / res["path_id"] / "README.md").exists()
+        assert (root / "workspace" / res["path_id"] / "conclusions.md").exists()
 
         state = load_state(root)
-        assert res["branch_id"] in state["branches"]
-        assert state["current_branch"] == res["branch_id"]
+        assert res["path_id"] in state["paths"]
+        assert state["current_path"] == res["path_id"]
 
 
 def test_path_create_auto_numbers():
@@ -58,10 +58,10 @@ def test_path_create_auto_numbers():
         scaffold_minimal_workspace(root, "Test")
 
         r1 = create_numbered_experiment(root, "first")
-        assert r1["branch_id"] == "02_first"
+        assert r1["path_id"] == "02_first"
 
         r2 = create_numbered_experiment(root, "second")
-        assert r2["branch_id"] == "03_second"
+        assert r2["path_id"] == "03_second"
 
 
 def test_path_create_unique_per_number():
@@ -70,8 +70,8 @@ def test_path_create_unique_per_number():
         scaffold_minimal_workspace(root, "Test")
         r1 = create_numbered_experiment(root, "test_path")
         r2 = create_numbered_experiment(root, "test_path")
-        assert r1["branch_id"] == "02_test_path"
-        assert r2["branch_id"] == "03_test_path"
+        assert r1["path_id"] == "02_test_path"
+        assert r2["path_id"] == "03_test_path"
         assert r1["experiment_number"] + 1 == r2["experiment_number"]
 
 
@@ -82,8 +82,8 @@ def test_log_decision():
 
         log_decision("Choosing test", "Mann-Whitney U", "Data is skewed", root=root)
 
-        decisions_path = root / "workspace" / "logs" / "decisions.yaml"
-        assert decisions_path.exists()
-        content = decisions_path.read_text()
+        analysis_path = root / "workspace" / "analysis.md"
+        assert analysis_path.exists()
+        content = analysis_path.read_text()
         assert "Mann-Whitney U" in content
         assert "Data is skewed" in content

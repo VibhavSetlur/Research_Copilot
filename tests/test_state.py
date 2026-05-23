@@ -9,7 +9,7 @@ from research_os.project_ops import (
     load_state,
     save_state,
     scaffold_minimal_workspace,
-    create_experiment_branch,
+    create_numbered_experiment,
 )
 from research_os.state.state_ledger import ResearchLedger
 from research_os.tools.actions.checkpoint import (
@@ -34,8 +34,8 @@ def test_default_state_structure():
     """default_state() returns a dict with all expected keys."""
     state = default_state()
     assert state["schema_version"] == "2.0"
-    assert state["current_branch"] == "main"
-    assert "main" in state["branches"]
+    assert state["current_path"] == "main"
+    assert "main" in state["paths"]
     assert "project_id" in state
     assert "created_at" in state
     assert "pipeline_stage" in state
@@ -54,9 +54,9 @@ def test_load_state_returns_default_for_empty_workspace(tmp_path):
     # ResearchLedger._default_state() — different from project_ops.default_state()
     assert "run_id" in state
     assert "phase" in state
-    assert "branches" in state
-    assert "main" in state["branches"]
-    assert state.get("current_branch") == "main"
+    assert "paths" in state
+    assert "main" in state["paths"]
+    assert state.get("current_path") == "main"
 
 
 # ── Load / Save cycle ────────────────────────────────────────────────
@@ -105,7 +105,7 @@ def test_ledger_returns_default_state_when_no_file(tmp_path):
     state = ledger.get()
     assert "run_id" in state
     assert state["phase"] == "research_init"
-    assert state.get("current_branch") == "main"
+    assert state.get("current_path") == "main"
 
 
 def test_ledger_update_persists_values(tmp_path):
@@ -176,147 +176,17 @@ def test_checkpoint_rollback_nonexistent(tmp_path):
     assert result["status"] == "error"
 
 
-# ── Branch operations (via ResearchLedger) ───────────────────────────
+# ── Branch operations (via create_numbered_experiment) ────────────────
 
 
-def test_branch_create_adds_to_state(tmp_path):
-    """branch_state creates a new branch and switches to it."""
+def test_path_create_adds_to_state(tmp_path):
+    """create_numbered_experiment creates a new path and updates state."""
     scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-
-    state = ledger.branch_state("exp_feature", hypothesis="Test hypothesis")
-    assert "exp_feature" in state["branches"]
-    assert state["branches"]["exp_feature"]["hypothesis"] == "Test hypothesis"
-    assert state["current_branch"] == "exp_feature"
-    assert state["branches"]["exp_feature"]["parent_branch"] == "main"
-    assert state["active_branch"] == "exp_feature"
-
-
-def test_branch_create_duplicate_raises(tmp_path):
-    """Creating a branch with an existing name raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("dup")
-    with pytest.raises(ValueError, match="already exists"):
-        ledger.branch_state("dup")
-
-
-def test_branch_switch_updates_current_branch(tmp_path):
-    """switch_branch toggles current_branch and active_branch."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("branch_a")
-    ledger.switch_branch("main")
-    assert ledger.get()["current_branch"] == "main"
-    ledger.switch_branch("branch_a")
-    assert ledger.get()["current_branch"] == "branch_a"
-
-
-def test_branch_switch_nonexistent_raises(tmp_path):
-    """Switching to a branch that does not exist raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    with pytest.raises(ValueError, match="does not exist"):
-        ledger.switch_branch("nonexistent")
-
-
-def test_branch_switch_abandoned_raises(tmp_path):
-    """Switching to an abandoned branch raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("dead_end")
-    ledger.abandon_branch("dead_end", reason="no effect")
-    with pytest.raises(ValueError, match="abandoned"):
-        ledger.switch_branch("dead_end")
-
-
-def test_branch_merge_marks_as_merged(tmp_path):
-    """merge_branch sets status='merged' and switches to target."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("feature_x", hypothesis="New feature")
-    state = ledger.merge_branch("feature_x", target="main", commit_msg="Done")
-    assert state["branches"]["feature_x"]["status"] == "merged"
-    assert state["branches"]["feature_x"]["merge_commit"] is not None
-    assert state["branches"]["feature_x"]["merged_at"] is not None
-    assert state["current_branch"] == "main"
-    assert state["active_branch"] == "main"
-
-
-def test_branch_merge_nonexistent_raises(tmp_path):
-    """Merging a non-existent branch raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    with pytest.raises(ValueError, match="does not exist"):
-        ledger.merge_branch("ghost", target="main")
-
-
-def test_branch_merge_already_merged_raises(tmp_path):
-    """Merging an already-merged branch raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("feature")
-    ledger.merge_branch("feature", target="main")
-    with pytest.raises(ValueError, match="already merged"):
-        ledger.merge_branch("feature", target="main")
-
-
-def test_branch_abandon_sets_status(tmp_path):
-    """abandon_branch marks a branch as abandoned with evaluation."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("dead_end")
-    state = ledger.abandon_branch("dead_end", reason="No effect detected")
-    assert state["branches"]["dead_end"]["status"] == "abandoned"
-    assert state["branches"]["dead_end"]["evaluation"]["decision"] == "abandon"
-    assert (
-        state["branches"]["dead_end"]["evaluation"]["rationale"] == "No effect detected"
-    )
-
-
-def test_branch_abandon_main_raises(tmp_path):
-    """Abandoning the main branch raises ValueError."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    with pytest.raises(ValueError, match="Cannot abandon"):
-        ledger.abandon_branch("main")
-
-
-def test_branch_abandon_switches_to_main(tmp_path):
-    """Abandoning the active branch resets current_branch to main."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("feature")
-    state = ledger.abandon_branch("feature")
-    assert state["current_branch"] == "main"
-    assert state["active_branch"] == "main"
-
-
-def test_branch_list_returns_all_ids(tmp_path):
-    """list_branches returns all branch IDs currently in state."""
-    scaffold_minimal_workspace(tmp_path, "Test")
-    ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.branch_state("b1")
-    ledger.branch_state("b2")
-    branches = ledger.list_branches()
-    branch_ids = [b["branch_id"] for b in branches]
-    assert "main" in branch_ids
-    assert "b1" in branch_ids
-    assert "b2" in branch_ids
-
-
-def test_branch_create_via_project_ops_api(tmp_path):
-    """create_experiment_branch creates a branch and persists it in state."""
-    scaffold_minimal_workspace(tmp_path, "Test_Project")
-    result = create_experiment_branch(
-        "exp_001_test", hypothesis="Test hypothesis", root=tmp_path
-    )
-    assert result["branch_id"] == "exp_001_test"
+    res = create_numbered_experiment(tmp_path, "data_prep", hypothesis="Clean data")
     state = load_state(tmp_path)
-    assert "exp_001_test" in state["branches"]
-    assert state["branches"]["exp_001_test"]["hypothesis"] == "Test hypothesis"
-    assert state["branches"]["exp_001_test"]["parent_branch"] == "main"
-    assert state["current_branch"] == "exp_001_test"
+    assert res["path_id"] in state["paths"]
+    assert state["current_path"] == res["path_id"]
+
 
 
 # ── Nested state operations ──────────────────────────────────────────

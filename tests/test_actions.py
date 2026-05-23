@@ -12,11 +12,6 @@ from research_os.tools.actions.checkpoint import (
     rollback_checkpoint,
     list_checkpoints,
 )
-from research_os.tools.actions.branch import (
-    switch_branch,
-    merge_branches,
-    list_branches,
-)
 from research_os.tools.actions.literature import download_literature
 
 
@@ -215,68 +210,6 @@ class TestListCheckpoints:
         assert res["status"] == "success"
         assert len(res["checkpoints"]) == 1
         assert res["checkpoints"][0]["phase"] == "manual"
-
-
-# ── Branch ────────────────────────────────────────────────────────────────────
-
-
-class TestSwitchBranch:
-    @patch("research_os.state.state_ledger.StateLedger", create=True)
-    def test_success(self, MockLedger, tmp_path):
-        instance = MockLedger.return_value
-        instance.switch_branch.return_value = {
-            "branch_id": "exp1",
-            "active_branch": "exp1",
-        }
-        res = switch_branch("exp1", tmp_path)
-        assert res["branch_id"] == "exp1"
-        instance.switch_branch.assert_called_once_with("exp1")
-
-    @patch("research_os.state.state_ledger.StateLedger", create=True)
-    def test_not_found(self, MockLedger, tmp_path):
-        MockLedger.return_value.switch_branch.side_effect = ValueError(
-            "Branch 'x' does not exist."
-        )
-        res = switch_branch("x", tmp_path)
-        assert res["status"] == "error"
-        assert "does not exist" in res["message"]
-
-
-class TestMergeBranches:
-    @patch("research_os.state.state_ledger.StateLedger", create=True)
-    def test_success(self, MockLedger, tmp_path):
-        instance = MockLedger.return_value
-        instance.merge_branch.return_value = {
-            "status": "merged",
-            "active_branch": "main",
-        }
-        res = merge_branches("feature_x", "main", "Merge feature X", tmp_path)
-        assert res["status"] == "merged"
-        instance.merge_branch.assert_called_once_with(
-            "feature_x", "main", "Merge feature X"
-        )
-
-    @patch("research_os.state.state_ledger.StateLedger", create=True)
-    def test_source_not_found(self, MockLedger, tmp_path):
-        MockLedger.return_value.merge_branch.side_effect = ValueError(
-            "Branch 'x' does not exist."
-        )
-        res = merge_branches("x", "main", "msg", tmp_path)
-        assert res["status"] == "error"
-        assert "does not exist" in res["message"]
-
-
-class TestListBranches:
-    @patch("research_os.project_ops.load_state")
-    def test_success(self, mock_load):
-        mock_load.return_value = {
-            "branches": {"main": {}, "exp1": {}},
-            "current_branch": "main",
-        }
-        res = list_branches(Path("/tmp"))
-        assert res["status"] == "success"
-        assert "main" in res["branches"]
-        assert res["current_branch"] == "main"
 
 
 # ── Literature ────────────────────────────────────────────────────────────────

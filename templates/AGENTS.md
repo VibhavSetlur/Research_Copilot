@@ -1,6 +1,6 @@
 # Research OS Agent Guidelines
 
-When interacting with Research OS workspaces, LLM-based agents (e.g., Cursor, Windsurf, generic MCP clients) must abide by the following operational constraints to ensure project integrity, provenance tracking, and data safety.
+When interacting with Research OS workspaces, LLM-based agents (e.g., Cursor, Claude Code, Antigravity, and generic MCP clients) must abide by the following operational constraints to ensure project integrity, provenance tracking, and data safety.
 
 ## 1. Golden Rule of Immutability
 **Do not modify files in the `inputs/raw_data/` or `inputs/literature/` directories.**

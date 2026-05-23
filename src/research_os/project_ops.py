@@ -161,7 +161,7 @@ def write_state_diff(root: Path, before: dict | None, after: dict) -> None:
 
 def default_state() -> dict:
     return {
-        "schema_version": "2.0",
+        "schema_version": "2.0",  # Internal state format version (independent of package version)
         "project_id": str(uuid.uuid4()),
         "project_name": "Research Project",
         "created_at": now_iso(),
@@ -329,31 +329,35 @@ def scaffold_minimal_workspace(
             "*Each entry has a `verified` flag for the citation_verifier.*\n\n"
         )
 
-    # ── Auto-generate researcher_config.yaml from questionnaire or defaults ──
+    # ── Auto-generate researcher_config.yaml via init_config ──
     researcher_config_path = root / "inputs" / "researcher_config.yaml"
+    research_question = config_overrides.get("research_question", "")
+    domain = config_overrides.get("domain", "general")
+    depth = config_overrides.get("depth", "academic")
     if not researcher_config_path.exists():
-        depth = config_overrides.get("depth", "academic")
-        domain = config_overrides.get("domain", "general")
-        research_question = config_overrides.get("research_question", "")
+        from research_os.tools.actions.config import init_config
 
-        config_lines = [
-            "# Research OS — Researcher Configuration",
-            f'project_id: "{project_name}"',
-            f'research_question: "{research_question}"',
-            f'domain: "{domain}"',
-            'schema_version: "0.1.0"',
-            f'default_depth: "{depth}"',
-            "data_scale_thresholds:",
-            "  medium_mb: 100",
-            "  large_gb: 1",
-            "  massive_gb: 10",
-            "dependency_management:",
-            "  auto_detect: true",
-            '  requirements_file: "environment/requirements.txt"',
-            "quality_gates_enabled: true",
-            "pin_dependency_versions: true",
-        ]
-        researcher_config_path.write_text("\n".join(config_lines) + "\n")
+        init_config(root)
+
+        # Override researcher_config.yaml with project-specific fields
+        researcher_config_path.write_text(
+            "# Research OS — Researcher Configuration\n"
+            f'project_id: "{project_name}"\n'
+            f'research_question: "{research_question}"\n'
+            f'domain: "{domain}"\n'
+            f'default_depth: "{depth}"\n'
+        )
+    else:
+        # Merge project-specific fields if config already exists
+        import yaml as _yaml
+
+        existing = _yaml.safe_load(researcher_config_path.read_text()) or {}
+        existing.setdefault("project_id", project_name)
+        existing["research_question"] = research_question
+        existing["domain"] = domain
+        existing["default_depth"] = depth
+        with open(researcher_config_path, "w") as f:
+            _yaml.dump(existing, f, default_flow_style=False)
 
     # Symlink .os_state into workspace for easier access by scripts
     workspace_os_state = root / "workspace" / ".os_state"
@@ -701,39 +705,28 @@ def log_decision(
     linked_literature: list[str] | None = None,
     root: Path | None = None,
 ) -> dict:
-    """Append a methodological decision to the experiment decisions log."""
+    """Append a methodological decision to workspace/analysis.md."""
     root = _resolve_root(root)
-    path = root / "workspace" / "logs" / "decisions.yaml"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    analysis_path = root / "workspace" / "analysis.md"
+    analysis_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if yaml is not None and path.exists():
-        data = yaml.safe_load(path.read_text()) or {}
-    else:
-        data = {}
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    entry = (
+        f"\n\n### Decision\n"
+        f"- **Date**: {ts}\n"
+        f"- **Context**: {context}\n"
+        f"- **Selected**: {selected}\n"
+        f"- **Rationale**: {rationale}\n"
+    )
+    if options_considered:
+        entry += f"- **Options Considered**: {', '.join(options_considered)}\n"
+    if linked_literature:
+        entry += f"- **Linked Literature**: {', '.join(linked_literature)}\n"
 
-    decisions = data.setdefault("decisions", {})
-    next_idx = len(decisions) + 1
-    decision_id = f"decision_{next_idx:03d}"
-    decisions[decision_id] = {
-        "date": datetime.now(timezone.utc).date().isoformat(),
-        "context": context,
-        "options_considered": options_considered or [],
-        "selected": selected,
-        "rationale": rationale,
-        "linked_literature": linked_literature or [],
-    }
-    data.setdefault("schema_version", "1.0")
-    data.setdefault("created", now_iso())
+    with open(analysis_path, "a") as f:
+        f.write(entry)
 
-    if yaml is not None:
-        path.write_text(yaml.safe_dump(data, sort_keys=False))
-    else:
-        with open(path, "a") as f:
-            f.write(
-                f"\n  {decision_id}:\n    context: {context}\n    selected: {selected}\n    rationale: {rationale}\n"
-            )
-
-    return {"decision_id": decision_id, "path": path.relative_to(root).as_posix()}
+    return {"logged": True, "path": "workspace/analysis.md"}
 
 
 def save_artifact(
