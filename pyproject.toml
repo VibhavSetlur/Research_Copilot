@@ -20,6 +20,7 @@ dependencies = [
     "firecrawl-py>=0.0.15",
     "scholarly>=1.7.11",
     "bs4>=0.0.2",
+    "tenacity>=8.0.0",
     "metapub>=0.5.5",
     "habanero>=1.2.6"
 ]
