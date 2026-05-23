@@ -34,8 +34,21 @@ def synthesize_workspace(
                                     contents.append(f"### {md_file.name}\n\n" + md_file.read_text())
                 section_content = "\n\n".join(contents) if contents else "*No results recorded.*"
             elif section == "discussion":
-                section_path = root / "workspace" / "discussion.md"
-                contents = [section_path.read_text()] if section_path.exists() else []
+                contents = []
+                workspace_dir = root / "workspace"
+                if workspace_dir.exists():
+                    for exp_dir in sorted(workspace_dir.iterdir()):
+                        if exp_dir.is_dir() and exp_dir.name[:2].isdigit():
+                            conc_md = exp_dir / "conclusions.md"
+                            if conc_md.exists():
+                                contents.append(f"### {exp_dir.name} Conclusions\n\n" + conc_md.read_text())
+                            reports_dir = exp_dir / "outputs" / "reports"
+                            if reports_dir.exists():
+                                for md_file in sorted(reports_dir.rglob("*.md")):
+                                    contents.append(f"### {md_file.name}\n\n" + md_file.read_text())
+                citations_path = root / "workspace" / "citations.md"
+                if citations_path.exists():
+                    contents.append("### Citations\n\n" + citations_path.read_text())
                 evidence_table = root / "synthesis" / "evidence_table.md"
                 if evidence_table.exists():
                     contents.append("### Evidence Table\n\n" + evidence_table.read_text())
