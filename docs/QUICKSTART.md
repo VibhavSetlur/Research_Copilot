@@ -4,37 +4,29 @@
 
 Install via pip:
 ```bash
-pip install research-os
+pip install git+https://github.com/VibhavSetlur/Research-OS.git
+
+# For additional features:
+pip install "research-os[web,literature,viz,poster] @ git+https://github.com/VibhavSetlur/Research-OS.git"
 ```
 
-Or for development:
-```bash
-git clone https://github.com/VibhavSetlur/Research-OS.git
-cd Research-OS
-pip install -e .
-```
-
-## 2. Running the MCP Server
-
-Start the Research OS MCP server. The server uses stdio by default for seamless integration with IDEs like Cursor, Claude Desktop, or custom MCP clients.
+## 2. Initialize a Project
 
 ```bash
-python -m research_os.server --workspace /path/to/my/new/project
+mkdir my-research-project
+cd my-research-project
+research-os init --name "My Research Project"
 ```
 
-## 3. Scaffolding a Project
+## 3. Running the MCP Server
 
-Once the server is running and your AI is attached, simply ask your AI:
+Start the Research OS MCP server in your project directory:
 
-> "Initialize a new research project called 'Alzheimers RCT Analysis'."
+```bash
+python -m research_os.server --workspace .
+```
 
-The AI will invoke `sys.workspace.scaffold`, which instantly builds the directory structure:
-- `.os_state/`
-- `docs/`
-- `inputs/`
-- `workspace/`
-- `synthesis/`
-- `environment/`
+Connect your AI IDE (like Cursor or Claude Desktop) to this server command.
 
 ## 4. Triggering the Guidance Engine
 

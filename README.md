@@ -8,31 +8,28 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 
 1. **Install the OS**
    ```bash
-   pip install research-os
+   pip install git+https://github.com/VibhavSetlur/Research-OS.git
    
-   # Or install with all optional tools (like MCP and Dev):
-   pip install research-os[all]
+   # For additional features:
+   pip install "research-os[web,literature,viz,poster] @ git+https://github.com/VibhavSetlur/Research-OS.git"
    ```
 
-2. **Start the MCP Server**
+2. **Initialize your Project**
    ```bash
-   python -m research_os.server
+   mkdir my-research-project
+   cd my-research-project
+   research-os init --name "My Research Project"
    ```
-   *(Configure this command in your MCP client like Cursor or Claude Code. Note: `sys.workspace.scaffold` will automatically generate MCP configurations for Cursor and Claude Desktop in your project directory!).*
 
-3. **Initialize your Project**
-   In your AI IDE, prompt the agent:
-   > "Please scaffold my new project using `sys.workspace.scaffold` with the name 'My First Study'."
-
-   **Agent Rules Setup**: For the AI to follow Research OS conventions, copy the appropriate rules file to your project:
-   - **Cursor**: Copy `templates/.cursor/rules/research-os.mdc` to `.cursor/rules/research-os.mdc`
-   - **Claude Code**: Copy `templates/.claude/rules/research-os.md` to `.claude/rules/research-os.md`
+3. **Start the MCP Server**
+   ```bash
+   python -m research_os.server --workspace .
+   ```
+   *(Configure this command in your MCP client like Cursor or Claude Code)*
 
 4. **Add Data and Analyze**
    Then drop your data files into `inputs/raw_data/` and ask:
    > "Analyze my data."
-
-   *(Note: For lightweight use, you can install only `research-os[core]` and skip heavy extras if you don't need the full data science stack.)*
 
 ## Architecture
 

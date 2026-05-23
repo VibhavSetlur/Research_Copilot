@@ -21,7 +21,9 @@ from research_os.project_ops import (
     scaffold_minimal_workspace,
 )
 from research_os.utils.asset_manager import AssetManager
-from research_os.utils.manuscript_compiler import cmd_compile
+
+def cmd_compile(args) -> None:
+    print("Compile command is deprecated or missing manuscript_compiler.")
 
 # All valid depth values — quick/standard/deep are user-facing aliases;
 

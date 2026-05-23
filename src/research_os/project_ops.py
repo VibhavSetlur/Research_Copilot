@@ -432,6 +432,7 @@ def scaffold_minimal_workspace(
     regenerate_intake(root, project_name, config_overrides)
 
     _copy_environment_to_project(root)
+    _copy_agents_md(root)
     _setup_mcp_configs(root, ide)
     _setup_gitignore(root)
     if git_init:
@@ -448,7 +449,34 @@ def _initialize_git(root: Path) -> None:
             pass
 
 
+def _copy_agents_md(root: Path) -> None:
+    """Copy AGENTS.md template to project root."""
+    dest = root / "AGENTS.md"
+    if dest.exists():
+        return
+    
+    # Try to find it in the repository structure if running from source
+    try:
+        src_path = Path(__file__).resolve().parent.parent.parent / "templates" / "AGENTS.md"
+        if src_path.exists():
+            import shutil
+            shutil.copy2(src_path, dest)
+            return
+    except Exception:
+        pass
 
+    # Try looking in package assets if packaged
+    try:
+        try:
+            import importlib.resources as importlib_resources
+        except ImportError:
+            import importlib_resources  # type: ignore[no-redef]
+        
+        asset_path = importlib_resources.files("research_os.assets") / "AGENTS.md"
+        if asset_path.exists(): # type: ignore
+            dest.write_text(asset_path.read_text(encoding="utf-8"), encoding="utf-8") # type: ignore
+    except Exception:
+        pass
 
 
 def _setup_gitignore(root: Path) -> None:

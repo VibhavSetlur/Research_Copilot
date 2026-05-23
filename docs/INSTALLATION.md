@@ -14,60 +14,23 @@ Step-by-step installation instructions for macOS, Linux, and Windows WSL, with e
 
 ## Installation
 
-### macOS
+### macOS / Linux / Windows WSL
 
 ```bash
 # 1. Install Python 3.10+ (if not already installed)
-brew install python@3.11
+# For macOS: brew install python@3.11
+# For Linux/WSL: sudo apt install python3.11 python3.11-venv python3-pip
 
-# 2. Clone the repository
-git clone https://github.com/VibhavSetlur/research-os.git
-cd research-os
+# 2. Install Research OS
+pip install git+https://github.com/VibhavSetlur/Research-OS.git
 
-# 3. Install with all dependencies
-pip install -e .[all]
+# For additional features:
+pip install "research-os[web,literature,viz,poster] @ git+https://github.com/VibhavSetlur/Research-OS.git"
 
-# 4. Verify installation
-ros doctor
-```
-
-### Linux (Ubuntu/Debian)
-
-```bash
-# 1. Install Python 3.10+ (if not already installed)
-sudo apt update
-sudo apt install python3.11 python3.11-venv python3-pip
-
-# 2. Clone the repository
-git clone https://github.com/VibhavSetlur/research-os.git
-cd research-os
-
-# 3. Install with all dependencies
-pip install -e .[all]
-
-# 4. Verify installation
-ros doctor
-```
-
-### Windows WSL
-
-```bash
-# 1. Install WSL2 (if not already installed)
-wsl --install
-
-# 2. Inside WSL, install Python 3.10+
-sudo apt update
-sudo apt install python3.11 python3.11-venv python3-pip
-
-# 3. Clone the repository
-git clone https://github.com/VibhavSetlur/research-os.git
-cd research-os
-
-# 4. Install with all dependencies
-pip install -e .[all]
-
-# 5. Verify installation
-ros doctor
+# 3. Create and initialize a project
+mkdir my-research-project
+cd my-research-project
+research-os init --name "My Research Project"
 ```
 
 ---
@@ -128,8 +91,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "name": "research-os",
   "type": "command",
-  "command": "ros",
-  "args": ["start", "--transport", "stdio"],
+  "command": "python",
+  "args": ["-m", "research_os.server", "--transport", "stdio"],
   "cwd": "/absolute/path/to/your/research-project"
 }
 ```
@@ -145,9 +108,10 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "mcpServers": {
     "research-os": {
-      "command": "ros",
+      "command": "python",
       "args": [
-        "start",
+        "-m",
+        "research_os.server",
         "--transport",
         "stdio",
         "--workspace",
@@ -169,8 +133,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "servers": {
     "research-os": {
-      "command": "ros",
-      "args": ["start", "--transport", "stdio"],
+      "command": "python",
+      "args": ["-m", "research_os.server", "--transport", "stdio"],
       "env": {}
     }
   }
@@ -188,10 +152,10 @@ After installation and MCP configuration, verify everything works:
 
 ```bash
 # Check Research OS installation
-ros doctor
+research-os doctor
 
 # Test MCP server manually
-echo '{"jsonrpc":"2.0","id":1,"method":"list_tools"}' | ros start --transport stdio
+echo '{"jsonrpc":"2.0","id":1,"method":"list_tools"}' | python -m research_os.server --transport stdio
 ```
 
 In your IDE, you should see:
@@ -203,7 +167,7 @@ In your IDE, you should see:
 
 ## Troubleshooting
 
-### `ros: command not found`
+### `research-os: command not found`
 
 Ensure the installation directory is on your PATH:
 ```bash
@@ -214,7 +178,7 @@ export PATH=$PATH:~/.local/bin
 ### MCP tools not appearing in IDE
 
 - Restart the IDE
-- Verify `ros start --transport stdio` works in a terminal
+- Verify `python -m research_os.server --transport stdio` works in a terminal
 - Check the IDE's MCP output panel for error messages
 
 ### `pdflatex not found`
@@ -245,7 +209,7 @@ The `inputs/` directory is write-protected by design. Use `workspace/` for all d
 
 After installation:
 
-1. Initialize a research project: `ros init ~/my-research-project/`
+1. Initialize a research project: `research-os init ~/my-research-project/`
 2. Add your data to `inputs/raw_data/`
 3. Start researching in your IDE using MCP tools
 4. Read `docs/ITERATIVE_RESEARCH_GUIDE.md` to learn about branching and state management

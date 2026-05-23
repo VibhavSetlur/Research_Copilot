@@ -31,42 +31,32 @@ from research_os.project_ops import (
     log_decision,
 )
 
-from research_os.tools.actions.web_search import search_web, scrape_web
-from research_os.tools.actions.environment import (
-    package_install,
-)
-from research_os.tools.actions.checkpoint import (
-    create_checkpoint,
-    rollback_checkpoint,
-    list_checkpoints,
-)
-from research_os.tools.actions.path import create_path, abandon_path, list_paths
-from research_os.tools.actions.literature import download_literature
-from research_os.tools.actions.config import (
-    get_config,
-    set_config,
-    init_config,
-    validate_config,
-)
-from research_os.tools.actions.interaction import (
-    notify_researcher,
-    checkpoint_pending,
-    checkpoint_approve,
-    session_handoff,
-)
-from research_os.tools.actions.external_mcp import discover_mcp
-from research_os.tools.actions.task import task_monitor, task_kill
-from research_os.tools.actions.search import (
-    search_semantic_scholar,
-    search_pubmed,
-    search_crossref,
-)
-from research_os.tools.actions.protocol import (
-    load_protocol,
-    list_protocols,
-    validate_protocol,
-)
-from research_os.tools.actions.profiling import _profile_inputs
+
+class _MissingDependency:
+    def __init__(self, name):
+        self.name = name
+    def __call__(self, *args, **kwargs):
+        raise RuntimeError(f"Optional dependency missing for {self.name}. Please install required extras.")
+
+def _lazy_import(module_name, names):
+    try:
+        mod = __import__(module_name, fromlist=names)
+        return [getattr(mod, name) for name in names]
+    except ImportError:
+        return [_MissingDependency(name) for name in names]
+
+search_web, scrape_web = _lazy_import("research_os.tools.actions.web_search", ["search_web", "scrape_web"])
+package_install, = _lazy_import("research_os.tools.actions.environment", ["package_install"])
+create_checkpoint, rollback_checkpoint, list_checkpoints = _lazy_import("research_os.tools.actions.checkpoint", ["create_checkpoint", "rollback_checkpoint", "list_checkpoints"])
+create_path, abandon_path, list_paths = _lazy_import("research_os.tools.actions.path", ["create_path", "abandon_path", "list_paths"])
+download_literature, = _lazy_import("research_os.tools.actions.literature", ["download_literature"])
+get_config, set_config, init_config, validate_config = _lazy_import("research_os.tools.actions.config", ["get_config", "set_config", "init_config", "validate_config"])
+notify_researcher, checkpoint_pending, checkpoint_approve, session_handoff = _lazy_import("research_os.tools.actions.interaction", ["notify_researcher", "checkpoint_pending", "checkpoint_approve", "session_handoff"])
+discover_mcp, = _lazy_import("research_os.tools.actions.external_mcp", ["discover_mcp"])
+task_monitor, task_kill = _lazy_import("research_os.tools.actions.task", ["task_monitor", "task_kill"])
+search_semantic_scholar, search_pubmed, search_crossref = _lazy_import("research_os.tools.actions.search", ["search_semantic_scholar", "search_pubmed", "search_crossref"])
+load_protocol, list_protocols, validate_protocol = _lazy_import("research_os.tools.actions.protocol", ["load_protocol", "list_protocols", "validate_protocol"])
+_profile_inputs, = _lazy_import("research_os.tools.actions.profiling", ["_profile_inputs"])
 
 try:
     from mcp.server import Server
