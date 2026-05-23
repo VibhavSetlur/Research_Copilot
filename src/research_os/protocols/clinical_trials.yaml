@@ -3,10 +3,10 @@ version: 2.0.0
 description: CONSORT guidelines for clinical trials.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/<path_number>/outputs/figures/participant_flow.png"
-  - "workspace/<path_number>/outputs/reports/efficacy_results.json"
-  - "workspace/<path_number>/outputs/reports/adverse_events_table.md"
-_output_path_note: "<path_number> is the numbered experiment directory created by sys.path.create (e.g., 02_meta_analysis)."
+  - "workspace/{step_number}_{descriptive_name}/outputs/reports/randomisation_check.md"
+  - "workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png"
+  - "workspace/{step_number}_{descriptive_name}/outputs/tables/adverse_events.csv"
+_output_path_note: "{step_number}_{descriptive_name} is created by sys.path.create. Example names: 02_randomisation_checks, 03_efficacy_analysis_path_1."
 prerequisites:
   - "Trial registry number and protocol."
   - "Raw clinical trial data."
