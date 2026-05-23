@@ -182,7 +182,11 @@ TOOL_DEFINITIONS = {
             "type": "object",
             "properties": {
                 "project_name": {"type": "string"},
-                "git_init": {"type": "boolean", "description": "Initialize a git repository (default: false)"}
+                "git_init": {
+                    "type": "boolean",
+                    "description": "Initialize a git repository (default: false)",
+                    "default": False,
+                },
             },
         },
     },
@@ -294,7 +298,7 @@ TOOL_DEFINITIONS = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "sys.path.create": {
-        "description": "Create a numbered experiment path in workspace/.",
+        "description": "Create the next numbered experiment folder with a unique descriptive name (format: {step_number}_{descriptor}). Optionally append _path_{N} to start a new research track.",
         "category": "workspace",
         "inputSchema": {
             "type": "object",
@@ -405,7 +409,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.statistical_power": {
-        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to the current experiment path's outputs/reports directory.",
+        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -419,7 +423,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.assumptions": {
-        "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment path's outputs/reports directory.",
+        "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -428,7 +432,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "tool.audit.figure_quality": {
-        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to the current experiment path's outputs/reports directory.",
+        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
             "type": "object",
@@ -784,7 +788,9 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 
     if name == "sys.workspace.scaffold":
         scaffold_minimal_workspace(
-            root, arguments.get("project_name", "Research Project"), arguments.get("git_init", False)
+            root,
+            arguments.get("project_name", "Research Project"),
+            git_init=arguments.get("git_init", False),
         )
         _profile_inputs(root)
         return _text(_success_envelope({"scaffolded": True}))
