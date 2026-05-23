@@ -19,12 +19,12 @@ templates:
     **Scripts**: {List of scripts with brief descriptions}
 
     '
-branching_criteria:
-  fork_when:
+path_creation_criteria:
+  create_new_path_when:
   - Testing a high-risk data transformation (e.g., massive outlier removal).
   - Trying an alternative, unproven model architecture.
   - Conducting a separate sensitivity analysis that might disrupt the main flow.
-  continue_when:
+  continue_in_path_when:
   - Adding standard robustness checks.
   - Fixing bugs in the current script.
 steps:
@@ -34,7 +34,6 @@ steps:
 - id: write_readmes
   name: Write READMEs
   description: Populate each directory with the boilerplate README.
-- id: evaluate_branching
-  name: Evaluate Branching
-  description: Review branching criteria to decide if current plan requires a new
-    branch.
+- id: evaluate_path_creation
+  name: Evaluate Path Creation
+  description: Review path creation criteria to decide if a new chronological path is needed.
