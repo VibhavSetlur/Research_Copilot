@@ -92,7 +92,6 @@ class TestProtocolLoading:
 
 class TestProtocolList:
     def test_list_all_protocols(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         result = list_protocols()
         names = {p["name"] for p in result}
         assert names == {"alpha", "beta", "gamma"}
@@ -101,7 +100,6 @@ class TestProtocolList:
         pass
 
     def test_list_protocols_have_required_metadata(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         result = list_protocols()
         for p in result:
             assert "name" in p
@@ -112,7 +110,6 @@ class TestProtocolFields:
     REQUIRED_FIELDS = {"name", "version", "description", "steps"}
 
     def test_each_protocol_has_required_fields(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         result = list_protocols()
         for entry in result:
             loaded = yaml.safe_load(
@@ -124,7 +121,6 @@ class TestProtocolFields:
                 )
 
     def test_description_is_non_empty(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         result = list_protocols()
         for entry in result:
             assert entry["summary"], (
@@ -132,7 +128,6 @@ class TestProtocolFields:
             )
 
     def test_steps_is_a_list(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         for entry in list_protocols():
             loaded = yaml.safe_load(
                 (full_protocol_dir / f"{entry['name']}.yaml").read_text()
@@ -141,7 +136,6 @@ class TestProtocolFields:
             assert len(loaded["steps"]) > 0
 
     def test_each_step_has_id_name_description(self, full_protocol_dir):
-        root = full_protocol_dir.parent.parent.parent
         for entry in list_protocols():
             loaded = yaml.safe_load(
                 (full_protocol_dir / f"{entry['name']}.yaml").read_text()

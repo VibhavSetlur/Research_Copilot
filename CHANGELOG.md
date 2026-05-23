@@ -38,3 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contradictory architecture documentation referencing non-existent tools.
 - Duplicate documentation files in `docs/` root vs `docs/architecture/`.
 - `safety.py` autonomous-agent remnants contradicting MCP-native philosophy.
+- Fixed duplicate `workspace/` prefixes in fallback paths within `save_artifact`.
+- Updated `_setup_mcp_configs` to accept an optional `ide` parameter.
+- Removed legacy autonomous-agent pipeline phases (`method_route`, `execute_analysis`, etc.) from `registry.json`.
+- Fixed broken Quickstart links in `README.md`.

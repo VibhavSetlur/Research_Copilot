@@ -809,9 +809,9 @@
       "agents": [
         "domain_analysis",
         "policy_economist",
-        "data_scaffold",
-        "execute_analysis",
-        "compile_outputs"
+        "analysis_plan",
+        "evidence_synthesis",
+        "writing_synthesis"
       ],
       "branching": [
         {
@@ -828,8 +828,8 @@
       "agents": [
         "domain_analysis",
         "literature_search",
-        "compile_outputs",
-        "audit_validate"
+        "writing_synthesis",
+        "audit_and_validation"
       ],
       "iteration_support": {
         "enabled": true,
@@ -851,7 +851,7 @@
             ],
             "after_iteration": [
               "return to literature_search with expanded search",
-              "proceed to compile_outputs"
+              "proceed to writing_synthesis"
             ]
           }
         ]
@@ -865,7 +865,7 @@
         {
           "after": "literature_search",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to literature_search or compile_outputs"
+          "then": "run research_iterate \u2192 return to literature_search or writing_synthesis"
         }
       ],
       "notes": [
@@ -880,10 +880,10 @@
       "agents": [
         "domain_analysis",
         "bioinformatics_scout",
-        "data_scaffold",
-        "execute_analysis",
+        "analysis_plan",
+        "evidence_synthesis",
         "genomics_auditor",
-        "compile_outputs"
+        "writing_synthesis"
       ],
       "branching": [
         {
@@ -901,19 +901,19 @@
         "domain_analysis",
         "literature_search",
         "methodology_scout",
-        "method_route",
-        "data_scaffold",
-        "execute_analysis",
+        "methodology_selection",
+        "analysis_plan",
+        "evidence_synthesis",
         "replication_validator",
-        "compile_outputs",
-        "audit_validate"
+        "writing_synthesis",
+        "audit_and_validation"
       ],
       "iteration_support": {
         "enabled": true,
         "agent": "research_iterate",
         "loop_points": [
           {
-            "after": "method_route",
+            "after": "methodology_selection",
             "trigger": "no valid identification strategy found",
             "options": [
               {
@@ -924,12 +924,12 @@
               }
             ],
             "after_iteration": [
-              "return to method_route with new strategy",
+              "return to methodology_selection with new strategy",
               "downgrade to associational if no strategy works"
             ]
           },
           {
-            "after": "execute_analysis",
+            "after": "evidence_synthesis",
             "trigger": "refutation tests failed or results unexpected",
             "options": [
               {
@@ -949,7 +949,7 @@
               }
             ],
             "after_iteration": [
-              "return to execute_analysis with new method",
+              "return to evidence_synthesis with new method",
               "downgrade to associational if causal claim unsupported",
               "proceed to replication_validator"
             ]
@@ -958,19 +958,19 @@
       },
       "branching": [
         {
-          "after": "method_route",
+          "after": "methodology_selection",
           "if": "no_identification_strategy",
           "then": "halt \u2014 causal inference not possible with this data"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "refutation_tests == failed",
           "then": "report as associational, not causal"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to execute_analysis or compile_outputs"
+          "then": "run research_iterate \u2192 return to evidence_synthesis or writing_synthesis"
         }
       ],
       "notes": [
@@ -985,10 +985,10 @@
       "description": "Intake \u2192 route \u2192 data \u2192 analysis \u2192 report. Skips deep literature and audit.",
       "agents": [
         "domain_analysis",
-        "method_route",
-        "data_scaffold",
-        "execute_analysis",
-        "compile_outputs"
+        "methodology_selection",
+        "analysis_plan",
+        "evidence_synthesis",
+        "writing_synthesis"
       ],
       "zero_shot_path": {
         "enabled": true,
@@ -1011,9 +1011,9 @@
         ],
         "max_runtime": "2 min",
         "bypass_agents": [
-          "method_route",
-          "data_scaffold",
-          "execute_analysis"
+          "methodology_selection",
+          "analysis_plan",
+          "evidence_synthesis"
         ],
         "notes": "Zero-shot path runs ONLY when user query matches trigger phrases. Skips the full pipeline and delivers immediate descriptive results with one auto-selected visualization. Does NOT generate a manuscript."
       },
@@ -1024,23 +1024,23 @@
           "on_fail": "halt \u2014 fix failed checks before proceeding"
         },
         {
-          "after": "method_route",
-          "gate": "method_route",
+          "after": "methodology_selection",
+          "gate": "methodology_selection",
           "on_fail": "revise analysis plan"
         },
         {
-          "after": "data_scaffold",
-          "gate": "data_scaffold",
+          "after": "analysis_plan",
+          "gate": "analysis_plan",
           "on_fail": "fix data pipeline"
         },
         {
-          "after": "execute_analysis",
-          "gate": "execute_analysis",
+          "after": "evidence_synthesis",
+          "gate": "evidence_synthesis",
           "on_fail": "complete analysis for all questions"
         },
         {
-          "after": "compile_outputs",
-          "gate": "compile_outputs",
+          "after": "writing_synthesis",
+          "gate": "writing_synthesis",
           "on_fail": "complete all manuscript sections"
         }
       ],
@@ -1049,7 +1049,7 @@
         "agent": "research_iterate",
         "loop_points": [
           {
-            "after": "execute_analysis",
+            "after": "evidence_synthesis",
             "trigger": "user requests investigation, method change, or exploration",
             "options": [
               {
@@ -1069,8 +1069,8 @@
               }
             ],
             "after_iteration": [
-              "return to execute_analysis with new method",
-              "proceed to compile_outputs if satisfied"
+              "return to evidence_synthesis with new method",
+              "proceed to writing_synthesis if satisfied"
             ]
           }
         ]
@@ -1082,18 +1082,18 @@
           "then": "halt \u2014 see follow_up_questions.md"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "finding == inconclusive",
           "then": "label as exploratory only"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to execute_analysis or compile_outputs"
+          "then": "run research_iterate \u2192 return to evidence_synthesis or writing_synthesis"
         }
       ],
       "notes": [
-        "Results are preliminary. Run audit_validate before formal use.",
+        "Results are preliminary. Run audit_and_validation before formal use.",
         "Use research_iterate at any point to explore, pivot, or investigate.",
         "Quality gates checked between phases \u2014 run 'research validate <phase>'"
       ]
@@ -1105,10 +1105,10 @@
       "agents": [
         "domain_analysis",
         "clinical_biostatistician",
-        "data_scaffold",
-        "execute_analysis",
+        "analysis_plan",
+        "evidence_synthesis",
         "fda_compliance_auditor",
-        "compile_outputs"
+        "writing_synthesis"
       ],
       "branching": [
         {
@@ -1126,14 +1126,14 @@
         "domain_analysis",
         "literature_search",
         "methodology_scout",
-        "method_route",
+        "methodology_selection",
         "generate_preregistration",
-        "data_scaffold",
-        "execute_analysis",
+        "analysis_plan",
+        "evidence_synthesis",
         "replication_validator",
-        "compile_outputs",
+        "writing_synthesis",
         "reviewer2_critic",
-        "audit_validate"
+        "audit_and_validation"
       ],
       "quality_gates": [
         {
@@ -1147,8 +1147,8 @@
           "on_fail": "expand literature search or document why minimum not met"
         },
         {
-          "after": "method_route",
-          "gate": "method_route",
+          "after": "methodology_selection",
+          "gate": "methodology_selection",
           "on_fail": "revise analysis plan \u2014 each question needs a valid method"
         },
         {
@@ -1157,13 +1157,13 @@
           "on_fail": "complete pre-registration before proceeding to analysis"
         },
         {
-          "after": "data_scaffold",
-          "gate": "data_scaffold",
+          "after": "analysis_plan",
+          "gate": "analysis_plan",
           "on_fail": "fix data pipeline \u2014 ensure lineage is recorded"
         },
         {
-          "after": "execute_analysis",
-          "gate": "execute_analysis",
+          "after": "evidence_synthesis",
+          "gate": "evidence_synthesis",
           "on_fail": "complete analysis for all questions before proceeding"
         },
         {
@@ -1172,8 +1172,8 @@
           "on_fail": "fix replication issues before proceeding"
         },
         {
-          "after": "compile_outputs",
-          "gate": "compile_outputs",
+          "after": "writing_synthesis",
+          "gate": "writing_synthesis",
           "on_fail": "complete all manuscript sections"
         },
         {
@@ -1182,8 +1182,8 @@
           "on_fail": "address critical reviewer2 findings or add to limitations"
         },
         {
-          "after": "audit_validate",
-          "gate": "audit_validate",
+          "after": "audit_and_validation",
+          "gate": "audit_and_validation",
           "on_fail": "remediate audit failures and re-run"
         }
       ],
@@ -1203,7 +1203,7 @@
               "trigger": "severe_confounding",
               "iteration_type": "variable_change",
               "description": "Add identified confounders as control variables",
-              "on_success": "re-run execute_analysis \u2192 reviewer2_critic",
+              "on_success": "re-run evidence_synthesis \u2192 reviewer2_critic",
               "on_failure": "append to manuscript limitations section"
             },
             {
@@ -1239,12 +1239,12 @@
               }
             ],
             "after_iteration": [
-              "return to method_route with updated plan",
-              "proceed to data_scaffold"
+              "return to methodology_selection with updated plan",
+              "proceed to analysis_plan"
             ]
           },
           {
-            "after": "execute_analysis",
+            "after": "evidence_synthesis",
             "trigger": "user requests investigation, method change, or robustness check",
             "options": [
               {
@@ -1270,12 +1270,12 @@
               }
             ],
             "after_iteration": [
-              "return to execute_analysis with new method",
+              "return to evidence_synthesis with new method",
               "proceed to replication_validator if satisfied"
             ]
           },
           {
-            "after": "audit_validate",
+            "after": "audit_and_validation",
             "trigger": "audit reveals issue needing investigation",
             "options": [
               {
@@ -1286,7 +1286,7 @@
               }
             ],
             "after_iteration": [
-              "return to audit_validate",
+              "return to audit_and_validation",
               "proceed if resolved"
             ]
           }
@@ -1309,17 +1309,17 @@
           "then": "timestamp and lock pre-registration \u2014 no method changes allowed without documented deviation"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "primary_finding == not_supported",
           "then": "report null finding honestly"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to execute_analysis or compile_outputs"
+          "then": "run research_iterate \u2192 return to evidence_synthesis or writing_synthesis"
         },
         {
-          "after": "audit_validate",
+          "after": "audit_and_validation",
           "if": "verdict == FAIL",
           "then": "remediate and re-run audit"
         },
@@ -1336,13 +1336,13 @@
       ],
       "feedback": [
         {
-          "from": "execute_analysis",
-          "to": "method_route",
+          "from": "evidence_synthesis",
+          "to": "methodology_selection",
           "when": "assumption violation not in analysis plan"
         },
         {
-          "from": "audit_validate",
-          "to": "compile_outputs",
+          "from": "audit_and_validation",
+          "to": "writing_synthesis",
           "when": "reporting incomplete"
         }
       ],
@@ -1363,10 +1363,10 @@
       "agents": [
         "domain_analysis",
         "quant_strategist",
-        "data_scaffold",
-        "execute_analysis",
+        "analysis_plan",
+        "evidence_synthesis",
         "risk_manager",
-        "compile_outputs"
+        "writing_synthesis"
       ],
       "branching": [
         {
@@ -1382,18 +1382,18 @@
       "description": "Intake \u2192 route \u2192 data \u2192 ML pipeline \u2192 report \u2192 audit",
       "agents": [
         "domain_analysis",
-        "method_route",
-        "data_scaffold",
-        "execute_analysis",
-        "compile_outputs",
-        "audit_validate"
+        "methodology_selection",
+        "analysis_plan",
+        "evidence_synthesis",
+        "writing_synthesis",
+        "audit_and_validation"
       ],
       "iteration_support": {
         "enabled": true,
         "agent": "research_iterate",
         "loop_points": [
           {
-            "after": "execute_analysis",
+            "after": "evidence_synthesis",
             "trigger": "model performance needs improvement or user wants to explore alternatives",
             "options": [
               {
@@ -1413,22 +1413,22 @@
               }
             ],
             "after_iteration": [
-              "return to execute_analysis with new model",
-              "proceed to compile_outputs if performance adequate"
+              "return to evidence_synthesis with new model",
+              "proceed to writing_synthesis if performance adequate"
             ]
           }
         ]
       },
       "branching": [
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "model_generalization == poor",
           "then": "report train vs test performance honestly"
         },
         {
-          "after": "execute_analysis",
+          "after": "evidence_synthesis",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to execute_analysis or compile_outputs"
+          "then": "run research_iterate \u2192 return to evidence_synthesis or writing_synthesis"
         }
       ],
       "notes": [

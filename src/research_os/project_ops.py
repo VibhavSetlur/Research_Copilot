@@ -252,6 +252,7 @@ def scaffold_minimal_workspace(
     project_name: str,
     config_overrides: dict | None = None,
     git_init: bool = False,
+    ide: str = "all",
 ) -> None:
     """Create the unified workspace directory structure and .os_state config.
 
@@ -431,7 +432,7 @@ def scaffold_minimal_workspace(
     regenerate_intake(root, project_name, config_overrides)
 
     _copy_environment_to_project(root)
-    _setup_mcp_configs(root)
+    _setup_mcp_configs(root, ide)
     _setup_gitignore(root)
     if git_init:
         _initialize_git(root)
@@ -476,7 +477,7 @@ def _setup_gitignore(root: Path) -> None:
         )
 
 
-def _setup_mcp_configs(root: Path) -> None:
+def _setup_mcp_configs(root: Path, ide: str = "all") -> None:
     """Generate default MCP configuration for popular AI IDEs."""
     import sys as _sys
 
@@ -485,39 +486,43 @@ def _setup_mcp_configs(root: Path) -> None:
         "args": ["-m", "research_os.server", "--transport", "stdio"],
     }
 
+    ide = ide.lower()
+
     # Cursor
-    cursor_dir = root / ".cursor"
-    cursor_dir.mkdir(parents=True, exist_ok=True)
-    cursor_mcp = cursor_dir / "mcp.json"
-    if not cursor_mcp.exists():
-        cursor_mcp.write_text(
-            json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
-        )
-
-
-
-    # Claude Desktop
-    claude_dir = root / ".claude"
-    claude_dir.mkdir(parents=True, exist_ok=True)
-    claude_mcp = claude_dir / "mcp.json"
-    if not claude_mcp.exists():
-        try:
-            claude_mcp.write_text(
+    if ide in ("all", "cursor"):
+        cursor_dir = root / ".cursor"
+        cursor_dir.mkdir(parents=True, exist_ok=True)
+        cursor_mcp = cursor_dir / "mcp.json"
+        if not cursor_mcp.exists():
+            cursor_mcp.write_text(
                 json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
             )
-        except Exception:
-            pass
+
+    # Claude Desktop
+    if ide in ("all", "claude"):
+        claude_dir = root / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        claude_mcp = claude_dir / "mcp.json"
+        if not claude_mcp.exists():
+            try:
+                claude_mcp.write_text(
+                    json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
+                )
+            except Exception:
+                pass
 
     # OpenCode
-    opencode_json = root / "opencode.json"
-    if not opencode_json.exists():
-        opencode_json.write_text(
-            json.dumps({"mcp": {"research-os": mcp_entry}}, indent=2) + "\n"
-        )
+    if ide in ("all", "opencode"):
+        opencode_json = root / "opencode.json"
+        if not opencode_json.exists():
+            opencode_json.write_text(
+                json.dumps({"mcp": {"research-os": mcp_entry}}, indent=2) + "\n"
+            )
 
     # VS Code OS
-    vscode_dir = root / ".vscode"
-    vscode_dir.mkdir(parents=True, exist_ok=True)
+    if ide in ("all", "vscode"):
+        vscode_dir = root / ".vscode"
+        vscode_dir.mkdir(parents=True, exist_ok=True)
     vscode_mcp = vscode_dir / "mcp.json"
     if not vscode_mcp.exists():
         vscode_mcp.write_text(
@@ -647,11 +652,11 @@ def save_artifact(
         }.get(artifact_type, f"{active_step}/data")
     else:
         folder = {
-            "figure": "figures",
-            "table": "data/derived",
-            "analysis": "data/derived",
-            "artifact": "data/derived",
-        }.get(artifact_type, "data/derived")
+            "figure": "outputs/figures",
+            "table": "outputs/tables",
+            "analysis": "data",
+            "artifact": "data",
+        }.get(artifact_type, "data")
 
     safe_name = Path(filename).name
     output_path = root / "workspace" / folder / safe_name

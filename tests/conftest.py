@@ -1,7 +1,6 @@
 """Global test fixtures — ensures tests never touch the real filesystem."""
 import pytest
 from pathlib import Path
-from unittest import mock
 
 @pytest.fixture(autouse=True)
 def _isolate_find_project_root(request, monkeypatch, tmp_path):

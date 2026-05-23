@@ -183,6 +183,11 @@ TOOL_DEFINITIONS = {
                     "description": "Initialize a git repository (default: false)",
                     "default": False,
                 },
+                "ide": {
+                    "type": "string",
+                    "description": "Which IDE to generate MCP config for (all, cursor, claude, opencode, vscode). Default: all",
+                    "default": "all",
+                },
             },
         },
     },
@@ -796,6 +801,7 @@ def _handle_sys_workspace_scaffold(name: str, arguments: dict, root: Path) -> li
             root,
             arguments.get("project_name", "Research Project"),
             git_init=arguments.get("git_init", False),
+            ide=arguments.get("ide", "all"),
         )
         if (root / ".os_state").exists() and (root / "workspace").exists():
             _profile_inputs(root)
