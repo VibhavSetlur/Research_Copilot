@@ -1,0 +1,27 @@
+name: survey_psychometrics
+version: 2.0.0
+description: Scale validation and survey analysis.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/02_analysis/reliability_metrics.json"
+  - "workspace/02_analysis/cfa_results.txt"
+  - "workspace/03_synthesis/non_response_bias.md"
+prerequisites:
+  - "Survey responses data."
+  - "R with lavaan package or Python equivalent."
+steps:
+  - id: scale_validation
+    name: "Scale Validation"
+    description: "Calculate Cronbach's alpha, McDonald's omega, and perform Confirmatory Factor Analysis (CFA)."
+  - id: sampling_weights
+    name: "Apply Sampling Weights"
+    description: "Calculate and apply weights to adjust for complex survey designs."
+  - id: non_response_bias
+    name: "Non-Response Bias Analysis"
+    description: "Compare early vs late responders or responders vs known population margins."
+  - id: reporting
+    name: "Reporting Standards"
+    description: "Format outputs to comply with STROBE guidelines for cross-sectional studies."
+checkpoints:
+  - "Verify model fit indices (CFI, TLI, RMSEA) for CFA."
+  - "Ensure weights sum to population size or sample size appropriately."

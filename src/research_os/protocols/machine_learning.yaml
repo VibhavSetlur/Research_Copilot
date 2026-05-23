@@ -1,0 +1,33 @@
+name: machine_learning
+version: 2.0.0
+description: TRIPOD-compliant workflow for predictive modelling.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/02_analysis/model_performance.json"
+  - "workspace/03_synthesis/shap_summary.png"
+  - "workspace/03_synthesis/calibration_plot.png"
+prerequisites:
+  - "Cleaned dataset."
+  - "Python libraries: scikit-learn, xgboost, shap."
+decision_tree:
+  - "Is the dataset imbalanced? -> Use stratified splitting and consider SMOTE or class weights."
+  - "Are there non-linear relationships? -> Prefer tree-based models over linear models."
+steps:
+  - id: data_splitting
+    name: "Data Splitting"
+    description: "Perform stratified train/validation/test splits."
+  - id: feature_engineering
+    name: "Feature Engineering"
+    description: "Impute missing values, scale features, and encode categoricals."
+  - id: model_selection
+    name: "Model Selection & Tuning"
+    description: "Select algorithms and perform hyperparameter tuning using cross-validation."
+  - id: performance_metrics
+    name: "Calculate Performance Metrics"
+    description: "Evaluate AUROC, AUPRC, Brier score, and calibration."
+  - id: model_interpretation
+    name: "Model Interpretation"
+    description: "Generate SHAP or LIME explanations for feature importance."
+checkpoints:
+  - "Ensure no data leakage between train and test sets."
+  - "Verify calibration of probabilities."

@@ -168,9 +168,12 @@ docs/
 
 ```
 environment/
+├── session.yaml         # Multi-language pinned environment manifest
 ├── requirements.txt     # Python dependencies
-├── Dockerfile           # Container definition
-└── conda_env.yaml       # Conda environment spec
+├── renv.lock            # R dependencies
+├── Project.toml         # Julia dependencies
+├── environment.yml      # Conda environment spec
+└── Dockerfile           # Auto-generated container definition
 ```
 
 ---

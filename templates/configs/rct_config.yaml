@@ -1,0 +1,4 @@
+research_goal:
+  output_types: ["paper", "poster"]
+reporting_standard: consort
+protocols: ["clinical_trials"]

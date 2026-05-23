@@ -45,3 +45,58 @@ def data_sample(
     except Exception as e:
         logger.error(f"Data sample failed: {e}")
         return {"status": "error", "message": str(e)}
+
+def data_convert(filepath: str, output_format: str, root: Path) -> Dict[str, Any]:
+    try:
+        p = root / filepath
+        if not p.exists() or not p.is_file():
+            return {"status": "error", "message": f"File not found: {filepath}"}
+            
+        ext = p.suffix.lower()
+        output_format = output_format.lower()
+        if output_format.startswith("."):
+            output_format = output_format[1:]
+            
+        out_path = p.with_suffix(f".{output_format}")
+        
+        # Load data
+        if ext == ".csv":
+            df = pd.read_csv(p)
+        elif ext == ".parquet":
+            df = pd.read_parquet(p)
+        elif ext == ".feather":
+            df = pd.read_feather(p)
+        elif ext == ".rds":
+            try:
+                import pyreadr
+                result = pyreadr.read_r(str(p))
+                df = next(iter(result.values())) # get first dataframe
+            except ImportError:
+                return {"status": "error", "message": "pyreadr package is required to read .rds files."}
+        else:
+            return {"status": "error", "message": f"Unsupported input format: {ext}"}
+            
+        # Save data
+        if output_format == "csv":
+            df.to_csv(out_path, index=False)
+        elif output_format == "parquet":
+            df.to_parquet(out_path, index=False)
+        elif output_format == "feather":
+            df.to_feather(out_path)
+        elif output_format == "rds":
+            try:
+                import pyreadr
+                pyreadr.write_rds(str(out_path), df)
+            except ImportError:
+                return {"status": "error", "message": "pyreadr package is required to write .rds files."}
+        else:
+            return {"status": "error", "message": f"Unsupported output format: {output_format}"}
+            
+        return {
+            "status": "success",
+            "message": f"Converted to {output_format}",
+            "filepath": str(out_path.relative_to(root))
+        }
+    except Exception as e:
+        logger.error(f"Data conversion failed: {e}")
+        return {"status": "error", "message": str(e)}

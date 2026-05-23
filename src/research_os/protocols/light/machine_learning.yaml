@@ -1,0 +1,15 @@
+name: machine_learning
+version: 2.0.0
+schema_version: "1.0"
+description: "Concise checklist for predictive modelling"
+steps:
+  - id: data_splitting
+    name: "Data Splitting"
+  - id: feature_engineering
+    name: "Feature Engineering"
+  - id: model_selection
+    name: "Model Selection & Tuning"
+  - id: performance_metrics
+    name: "Calculate Performance Metrics"
+  - id: model_interpretation
+    name: "Model Interpretation"

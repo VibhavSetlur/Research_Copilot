@@ -1,0 +1,2 @@
+reporting_standard: strobe
+protocols: ["causal_inference_deep"]

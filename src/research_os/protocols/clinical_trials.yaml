@@ -1,0 +1,30 @@
+name: clinical_trials
+version: 2.0.0
+description: CONSORT guidelines for clinical trials.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/03_synthesis/participant_flow.png"
+  - "workspace/02_analysis/efficacy_results.json"
+  - "workspace/03_synthesis/adverse_events_table.md"
+prerequisites:
+  - "Trial registry number and protocol."
+  - "Raw clinical trial data."
+steps:
+  - id: randomisation_checks
+    name: "Randomisation Checks"
+    description: "Verify baseline characteristics are balanced between arms."
+  - id: blinding_assessment
+    name: "Blinding Assessment"
+    description: "Assess success of blinding if applicable."
+  - id: participant_flow
+    name: "Participant Flow Diagram"
+    description: "Generate CONSORT flow diagram detailing enrollment, allocation, follow-up, and analysis."
+  - id: missing_data
+    name: "Handle Missing Data"
+    description: "Apply multiple imputation (MICE) and perform sensitivity analysis."
+  - id: adverse_events
+    name: "Adverse Events Reporting"
+    description: "Tabulate adverse events by arm and severity."
+checkpoints:
+  - "Ensure intent-to-treat (ITT) analysis is primary."
+  - "Check that all protocol-specified outcomes are reported."

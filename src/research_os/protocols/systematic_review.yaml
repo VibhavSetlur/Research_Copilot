@@ -1,0 +1,34 @@
+name: systematic_review
+version: 2.0.0
+description: Full PRISMA workflow for systematic reviews.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/01_data_prep/search_strategy.md"
+  - "workspace/03_synthesis/prisma_flow_diagram.png"
+  - "workspace/03_synthesis/extracted_data_table.csv"
+  - "workspace/03_synthesis/rob_assessment.json"
+prerequisites:
+  - "Defined research question (PICO framework)."
+  - "Access to academic databases (PubMed, Semantic Scholar)."
+steps:
+  - id: search_strategy
+    name: "Search Strategy Creation"
+    description: "Formulate boolean queries and execute database querying."
+  - id: deduplication
+    name: "Deduplication"
+    description: "Apply deduplication algorithm to combined search results."
+  - id: screening
+    name: "Title/Abstract & Full-Text Screening"
+    description: "Screen records based on inclusion/exclusion criteria. Track counts for PRISMA."
+  - id: data_extraction
+    name: "Data Extraction"
+    description: "Extract study characteristics into a standardized table."
+  - id: rob_assessment
+    name: "Risk of Bias Assessment"
+    description: "Perform ROB-2 (RCTs) or ROBINS-I (observational) assessment."
+  - id: prisma_diagram
+    name: "Generate PRISMA Diagram"
+    description: "Create a PRISMA flow diagram summarizing the screening process."
+checkpoints:
+  - "Ensure inclusion/exclusion criteria were applied consistently."
+  - "Verify PRISMA counts match total retrieved."

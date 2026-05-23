@@ -1,5 +1,6 @@
 import json
 import pytest
+from unittest import mock
 from research_os.server import _handle_tool_call
 
 
@@ -115,3 +116,55 @@ References
         )
         > 0
     )
+
+def test_multi_lang_workflow_and_env(workspace_root):
+    root = workspace_root
+    
+    # Write a dummy R script
+    script_content = """
+print("Multi-lang workflow test")
+"""
+    _handle_tool_call(
+        "sys.file.write",
+        {"filepath": "workspace/analysis.R", "content": script_content},
+        root,
+    )
+    
+    # Run the R script with a mock to avoid needing real R
+    with mock.patch("shutil.which", return_value="/usr/bin/Rscript"), \
+         mock.patch("subprocess.run") as mock_run:
+        
+        mock_res = mock.MagicMock()
+        mock_res.returncode = 0
+        mock_res.stdout = "Multi-lang workflow test\n"
+        mock_res.stderr = ""
+        mock_run.return_value = mock_res
+        
+        res = _handle_tool_call(
+            "tool.r.exec", {"script_path": "workspace/analysis.R"}, root
+        )
+        assert "success" in res[0].text
+    
+    # Test snapshot environment
+    # Let's mock subprocess.run for pip freeze
+    with mock.patch("subprocess.run") as mock_run_pip:
+        mock_res = mock.MagicMock()
+        mock_res.returncode = 0
+        mock_res.stdout = "numpy==1.21.0\n"
+        mock_run_pip.return_value = mock_res
+        
+        # Write dummy renv.lock to simulate R project
+        (root / "renv.lock").write_text('{"R": {"Version": "4.1.0"}}')
+        
+        res = _handle_tool_call("sys.env.snapshot", {}, root)
+        assert "success" in res[0].text
+        
+        # Verify snapshot files
+        env_dir = root / "environment"
+        assert (env_dir / "requirements.txt").exists()
+        assert (env_dir / "renv.lock").exists()
+        assert (env_dir / "session.yaml").exists()
+        
+        session_data = json.loads(res[0].text).get("data", {}).get("session", {})
+        assert any(lang["name"] == "python" for lang in session_data.get("languages", []))
+        assert any(lang["name"] == "R" for lang in session_data.get("languages", []))

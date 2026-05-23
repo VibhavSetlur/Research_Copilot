@@ -38,3 +38,10 @@ steps:
   - id: evaluate_branching
     name: "Evaluate Branching"
     description: "Review branching criteria to decide if current plan requires a new branch."
+multi_language_workflow:
+  description: "Guidelines for orchestrating workflows that span multiple programming languages."
+  best_practices:
+    - "Use tool.data.convert to seamlessly pass data between Python, R, and Julia (e.g., convert .csv to .feather or .rds)."
+    - "Keep language-specific scripts isolated but run them sequentially within the same experiment directory."
+    - "Example: Run data preprocessing in R (tool.r.exec), save output as .feather, then run ML models in Python (tool.python.exec)."
+    - "Use sys.env.snapshot to capture all environments (pip, renv, Pkg) simultaneously after the experiment is configured."

@@ -401,6 +401,47 @@ TOOL_DEFINITIONS = {
             "required": ["paper_path"],
         },
     },
+    "tool.audit.statistical_power": {
+        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "effect_size": {"type": "number"},
+                "alpha": {"type": "number"},
+                "n": {"type": "number"}
+            },
+            "required": ["filepath", "alpha", "n"],
+        },
+    },
+    "tool.audit.assumptions": {
+        "description": "Re-run assumption checks on the fitted model or residuals.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"filepath": {"type": "string"}},
+            "required": ["filepath"],
+        },
+    },
+    "tool.audit.figure_quality": {
+        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars).",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"filepath": {"type": "string"}},
+            "required": ["filepath"],
+        },
+    },
+    "tool.audit.reproducibility_full": {
+        "description": "Run a full reproducibility check using Docker.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        },
+    },
     "mem.analysis.log": {
         "description": "Append to workspace/analysis.md",
         "category": "memory",
@@ -482,6 +523,42 @@ TOOL_DEFINITIONS = {
             "required": ["script_path"],
         },
     },
+    "tool.r.exec": {
+        "description": "Execute an R script in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool.julia.exec": {
+        "description": "Execute a Julia script in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool.bash.exec": {
+        "description": "Execute a Bash script in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
+            },
+            "required": ["script_path"],
+        },
+    },
     "tool.package.install": {
         "description": "Install Python packages.",
         "category": "execution",
@@ -491,8 +568,13 @@ TOOL_DEFINITIONS = {
             "required": ["packages"],
         },
     },
+    "sys.env.snapshot": {
+        "description": "Snapshot current multi-language environment (Python, R, Julia).",
+        "category": "execution",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
     "tool.env.freeze": {
-        "description": "Freeze current environment.",
+        "description": "Freeze current environment (Deprecated, use sys.env.snapshot).",
         "category": "execution",
         "inputSchema": {"type": "object", "properties": {}},
     },
@@ -504,11 +586,16 @@ TOOL_DEFINITIONS = {
             "properties": {
                 "requirements": {
                     "type": "string",
-                    "description": "Requirements format text",
+                    "description": "Requirements format text"
                 }
             },
-            "required": ["requirements"],
+            "required": [],
         },
+    },
+    "sys.env.docker.generate": {
+        "description": "Generates a Dockerfile to run all snapshotted environments.",
+        "category": "execution",
+        "inputSchema": {"type": "object", "properties": {}},
     },
     "tool.latex.compile": {
         "description": "Compile paper.tex in the synthesis directory to PDF using pdflatex and bibtex.",
@@ -535,6 +622,18 @@ TOOL_DEFINITIONS = {
                 "strategy": {"type": "string"},
             },
             "required": ["filepath", "n_rows", "strategy"],
+        },
+    },
+    "tool.data.convert": {
+        "description": "Convert data between common formats (CSV, RDS, Feather, Parquet).",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string", "description": "Input file path"},
+                "output_format": {"type": "string", "description": "Desired output format (e.g. csv, rds, feather, parquet)"}
+            },
+            "required": ["filepath", "output_format"],
         },
     },
     "tool.log.decision": {
@@ -774,6 +873,31 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             else _text(_error_envelope(res["message"]))
         )
 
+    if name == "tool.audit.statistical_power":
+        from research_os.tools.actions.audit import audit_power
+        
+        effect_size = arguments.get("effect_size", 0.5)
+        res = audit_power(arguments["filepath"], effect_size, arguments["alpha"], arguments["n"], root)
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
+
+    if name == "tool.audit.assumptions":
+        from research_os.tools.actions.audit import audit_assumptions
+        
+        res = audit_assumptions(arguments["filepath"], root)
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
+
+    if name == "tool.audit.figure_quality":
+        from research_os.tools.actions.audit import audit_figure
+        
+        res = audit_figure(arguments["filepath"], root)
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
+
+    if name == "tool.audit.reproducibility_full":
+        from research_os.tools.actions.audit import audit_reproducibility_full
+        
+        res = audit_reproducibility_full(root)
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
+
     if name == "sys.checkpoint.create":
         res = create_checkpoint(arguments.get("description", ""), root)
         return (
@@ -969,6 +1093,21 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             )
         )
 
+    if name in ("tool.r.exec", "tool.julia.exec", "tool.bash.exec"):
+        from research_os.tools.actions.execution import execute_r_script, execute_julia_script, execute_bash_script
+        
+        timeout = arguments.get("timeout", 300)
+        script_path = arguments["script_path"]
+        
+        if name == "tool.r.exec":
+            res = execute_r_script(script_path, root, timeout)
+        elif name == "tool.julia.exec":
+            res = execute_julia_script(script_path, root, timeout)
+        else:
+            res = execute_bash_script(script_path, root, timeout)
+            
+        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
+
     if name == "tool.package.install":
         packages = arguments["packages"]
         # Verify in a sub-process
@@ -981,12 +1120,20 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
                     f.write(f"{pkg}\n")
         return _text(_success_envelope(res))
 
-    if name == "tool.env.freeze":
-        res = env_freeze()
-        return _text(_success_envelope(res))
+    if name in ("tool.env.freeze", "sys.env.snapshot"):
+        from research_os.tools.actions.environment import env_snapshot
+        res = env_snapshot(root)
+        return _text(_success_envelope(res)) if res.get("status") == "success" else _text(_error_envelope(res.get("message", "Error")))
 
     if name == "tool.env.restore":
-        return _text(_success_envelope(env_restore(arguments.get("requirements", ""))))
+        from research_os.tools.actions.environment import env_restore
+        res = env_restore(arguments.get("requirements", ""), root)
+        return _text(_success_envelope(res)) if res.get("status") != "error" and res.get("code", 0) == 0 else _text(_error_envelope(res.get("error", "Error")))
+
+    if name == "sys.env.docker.generate":
+        from research_os.tools.actions.environment import env_docker_generate
+        res = env_docker_generate(root)
+        return _text(_success_envelope(res)) if res.get("status") == "success" else _text(_error_envelope(res.get("message", "Error")))
 
     if name == "tool.latex.compile":
         from research_os.tools.actions.latex import latex_compile
@@ -997,8 +1144,22 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         return _text(_success_envelope(create_poster(root)))
 
     if name == "tool.data.sample":
+        from research_os.tools.actions.data import data_sample
         res = data_sample(
             arguments["filepath"], arguments["n_rows"], arguments["strategy"], root
+        )
+        return (
+            _text(_success_envelope(res))
+            if res["status"] == "success"
+            else _text(
+                _error_envelope(res.get("message", res.get("error", "Unknown error")))
+            )
+        )
+
+    if name == "tool.data.convert":
+        from research_os.tools.actions.data import data_convert
+        res = data_convert(
+            arguments["filepath"], arguments["output_format"], root
         )
         return (
             _text(_success_envelope(res))

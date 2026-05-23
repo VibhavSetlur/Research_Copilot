@@ -1,0 +1,13 @@
+name: survey_psychometrics
+version: 2.0.0
+schema_version: "1.0"
+description: "Concise checklist for survey psychometrics"
+steps:
+  - id: scale_validation
+    name: "Scale Validation"
+  - id: sampling_weights
+    name: "Apply Sampling Weights"
+  - id: non_response_bias
+    name: "Non-Response Bias Analysis"
+  - id: reporting
+    name: "Reporting Standards"

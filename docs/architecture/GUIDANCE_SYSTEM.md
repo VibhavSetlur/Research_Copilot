@@ -20,6 +20,12 @@ Located in `src/research_os/protocols/`:
 8. **`figure_guidelines.yaml`**: Best practices for publication-ready visual styling.
 9. **`reproducibility.yaml`**: Enforces pinned dependencies, random seeds, and checksums.
 10. **`audit_and_validation.yaml`**: The final check before a paper is compiled.
+11. **`meta_analysis.yaml`**: Guide for extracting effect sizes from heterogeneous studies, assessing heterogeneity, and building forest/funnel plots.
+12. **`systematic_review.yaml`**: Full PRISMA workflow, including search strategy, deduplication, screening, and risk-of-bias assessment.
+13. **`machine_learning.yaml`**: TRIPOD-compliant workflow for predictive modeling, cross-validation, and interpretation.
+14. **`clinical_trials.yaml`**: CONSORT guidelines for randomization, blinding, participant flow, and missing data.
+15. **`survey_psychometrics.yaml`**: Scale validation, sampling weights, and non-response bias analysis.
+16. **`causal_inference_deep.yaml`**: DoWhy-based causal analysis, DAG creation, backdoor identification, and estimation.
 
 ## How the AI uses them
 

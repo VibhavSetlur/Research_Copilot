@@ -1,0 +1,15 @@
+name: causal_inference_deep
+version: 2.0.0
+schema_version: "1.0"
+description: "Concise checklist for causal inference"
+steps:
+  - id: dag_creation
+    name: "DAG Creation"
+  - id: identification
+    name: "Identification"
+  - id: estimation
+    name: "Estimation"
+  - id: refutation
+    name: "Refutation Tests"
+  - id: evalue
+    name: "E-value Calculation"

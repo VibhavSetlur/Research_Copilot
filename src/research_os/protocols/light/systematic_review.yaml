@@ -1,0 +1,17 @@
+name: systematic_review
+version: 2.0.0
+schema_version: "1.0"
+description: "Concise checklist for systematic reviews"
+steps:
+  - id: search_strategy
+    name: "Search Strategy Creation"
+  - id: deduplication
+    name: "Deduplication"
+  - id: screening
+    name: "Title/Abstract & Full-Text Screening"
+  - id: data_extraction
+    name: "Data Extraction"
+  - id: rob_assessment
+    name: "Risk of Bias Assessment"
+  - id: prisma_diagram
+    name: "Generate PRISMA Diagram"

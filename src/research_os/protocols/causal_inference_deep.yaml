@@ -1,0 +1,32 @@
+name: causal_inference_deep
+version: 2.0.0
+description: DoWhy-based causal analysis and DAG creation.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/02_analysis/causal_dag.png"
+  - "workspace/02_analysis/causal_estimates.json"
+  - "workspace/02_analysis/refutation_results.json"
+prerequisites:
+  - "Observational dataset."
+  - "Python libraries: dowhy, econml."
+decision_tree:
+  - "Are there unobserved confounders? -> Use instrumental variables if available, or compute E-values."
+steps:
+  - id: dag_creation
+    name: "DAG Creation"
+    description: "Define causal graph and identify backdoor/frontdoor paths. (Integration with DAGitty)"
+  - id: identification
+    name: "Identification"
+    description: "Identify the causal estimand using backdoor or instrumental variable criteria."
+  - id: estimation
+    name: "Estimation"
+    description: "Estimate the causal effect using methods like IPW, Double Machine Learning (DML), or matching."
+  - id: refutation
+    name: "Refutation Tests"
+    description: "Perform robustness checks: placebo treatment, random common cause, subset data."
+  - id: evalue
+    name: "E-value Calculation"
+    description: "Calculate E-value to quantify robustness to unmeasured confounding."
+checkpoints:
+  - "Verify covariate balance after matching or weighting."
+  - "Ensure refutation tests do not significantly alter the estimate."

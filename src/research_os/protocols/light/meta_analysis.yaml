@@ -1,0 +1,15 @@
+name: meta_analysis
+version: 2.0.0
+schema_version: "1.0"
+description: "Concise checklist for meta-analysis"
+steps:
+  - id: extract_effect_sizes
+    name: "Extract Effect Sizes"
+  - id: assess_heterogeneity
+    name: "Assess Heterogeneity"
+  - id: perform_meta_analysis
+    name: "Perform Meta-Analysis"
+  - id: generate_plots
+    name: "Generate Plots"
+  - id: test_publication_bias
+    name: "Test Publication Bias"

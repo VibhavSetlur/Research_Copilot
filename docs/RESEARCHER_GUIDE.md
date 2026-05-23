@@ -90,3 +90,50 @@ default_depth: "academic"
 ```
 
 The AI may ask you to supply missing values (research question, domain, depth). Answer naturally — the AI will fill the config and regenerate `inputs/intake.md`.
+
+## Domain-Specific Config Templates
+
+To quickstart your project with predefined reporting standards and protocols, you can use one of the ready-made templates located in `templates/configs/`. 
+
+Available templates:
+- `rct_config.yaml`
+- `epidemiology_observational.yaml`
+- `nlp_benchmark.yaml`
+- `genomics.yaml`
+- `economic_panel.yaml`
+
+To use a template, simply copy it to your inputs directory:
+```bash
+cp templates/configs/rct_config.yaml inputs/researcher_config.yaml
+```
+
+## Advanced Quality Audits
+
+Research OS now includes automated quality audit tools to verify the statistical integrity and reproducibility of your research before synthesis:
+- **`tool.audit.statistical_power`**: Computes post-hoc power for tests and warns if power < 0.8.
+- **`tool.audit.assumptions`**: Re-runs assumption checks (Shapiro-Wilk, Levene, etc.) on model outputs.
+- **`tool.audit.figure_quality`**: Validates DPI, colorblind-friendliness, labels, and error bars.
+- **`tool.audit.reproducibility_full`**: Runs a full Docker-based reproducibility check comparing checksums.
+
+## Using Multiple Languages
+
+Research OS supports orchestrating workflows across multiple languages (Python, R, Julia, Bash) natively within the same workspace.
+
+### Executing Scripts
+Instead of running everything in Python, use the language-specific executor tools:
+- `tool.python.exec` for Python scripts.
+- `tool.r.exec` for R scripts.
+- `tool.julia.exec` for Julia scripts.
+- `tool.bash.exec` for shell scripts.
+
+### Sharing Data
+To pass data between languages in the same step, use `tool.data.convert`. It efficiently converts tabular data between formats like `.csv`, `.parquet`, `.rds`, and `.feather` allowing you to read/write native formats for each language.
+
+### Environment Snapshots
+Pinning dependencies for multi-language projects is fully automated via `sys.env.snapshot`. This single tool will scan the workspace and save:
+- `requirements.txt` (via pip)
+- `renv.lock` (for R)
+- `Project.toml` (for Julia)
+- `environment.yml` (for conda)
+
+To guarantee ultimate reproducibility, you can then call `sys.env.docker.generate` to create a `Dockerfile` that contains instructions to install all saved runtimes and pinned packages.

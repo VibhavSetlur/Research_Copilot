@@ -1,0 +1,33 @@
+name: meta_analysis
+version: 2.0.0
+description: Guide for extracting effect sizes, assessing heterogeneity, and performing meta-analysis.
+schema_version: "1.0"
+expected_outputs:
+  - "workspace/03_synthesis/forest_plot.png"
+  - "workspace/03_synthesis/funnel_plot.png"
+  - "workspace/03_synthesis/meta_analysis_results.json"
+decision_tree:
+  - "Are studies highly heterogeneous? If yes -> Use random-effects model. If no -> Fixed-effects model."
+  - "Is there risk of publication bias? -> Run Egger's test and build funnel plot."
+prerequisites:
+  - "Extracted effect sizes and variances/standard errors from primary studies."
+  - "Python libraries: statsmodels, PyMARE, or R packages: metafor."
+steps:
+  - id: extract_effect_sizes
+    name: "Extract Effect Sizes"
+    description: "Standardize effect sizes across heterogeneous studies (e.g., Cohen's d, Odds Ratios)."
+  - id: assess_heterogeneity
+    name: "Assess Heterogeneity"
+    description: "Compute I² and Q-test statistics to evaluate between-study variance."
+  - id: perform_meta_analysis
+    name: "Perform Meta-Analysis"
+    description: "Run fixed or random-effects meta-analysis using PyMARE or R's metafor via tool.python.exec/tool.r.exec."
+  - id: generate_plots
+    name: "Generate Plots"
+    description: "Create forest plots for effect sizes and funnel plots for publication bias."
+  - id: test_publication_bias
+    name: "Test Publication Bias"
+    description: "Perform Egger's test or trim-and-fill method."
+checkpoints:
+  - "Verify that all standard errors are positive."
+  - "Confirm I² interpretation is documented."
