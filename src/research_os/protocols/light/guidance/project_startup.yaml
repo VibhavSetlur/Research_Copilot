@@ -1,0 +1,22 @@
+name: project_startup
+version: 1.0.0
+description: "First actions after the researcher has placed files in inputs/."
+steps:
+  - id: scan_inputs
+    description: "sys.file.list inputs/, read notes, profile raw data."
+  - id: domain_analysis
+    description: "Load domain/domain_analysis. Classify domain, note pitfalls."
+  - id: research_design
+    description: "Load domain/research_design. Write docs/research_question.md and hypotheses.md."
+  - id: create_baseline_path
+    description: "sys.path.create name='baseline_eda'."
+  - id: methods_research
+    description: "Research EDA methods. Write to 01_baseline_eda/methods_research.md."
+  - id: run_eda
+    description: "Write and execute EDA script in 01_baseline_eda. Save outputs."
+  - id: conclude_baseline
+    description: "Write conclusions.md using writing/conclusions."
+  - id: update_logs
+    description: "mem.analysis.log and writing/methods."
+  - id: suggest_next
+    description: "Summarise and suggest 2-3 next steps."
