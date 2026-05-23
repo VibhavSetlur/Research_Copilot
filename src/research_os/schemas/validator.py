@@ -156,11 +156,6 @@ def get_schema_for_task(task_name: str) -> Type[BaseModel]:
         "audit_check": AuditCheck,
         "research_state": ResearchState,
         "token_budget": TokenBudget,
-        # Legacy aliases
-        "research_init": ResearchMap,
-        "literature_deep": LiteratureCorpus,
-        "execute_analysis": AnalysisResults,
-        "audit_validate": AuditReport,
     }
 
     if task_name not in schema_map:

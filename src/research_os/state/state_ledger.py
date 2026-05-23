@@ -80,7 +80,7 @@ class ResearchLedger:
         return {
             "run_id": str(uuid.uuid4()),
             "project": "",
-            "phase": "research_init",
+            "phase": "domain_analysis",
             "step": 0,
             "checkpoints": {},
             "active_hypotheses": [],

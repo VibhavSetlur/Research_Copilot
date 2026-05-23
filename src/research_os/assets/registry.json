@@ -807,7 +807,7 @@
       "name": "Policy Evaluation (Quasi-Experimental)",
       "description": "Intake \u2192 Identification Strategy \u2192 Estimation \u2192 Robustness Checks",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "policy_economist",
         "data_scaffold",
         "execute_analysis",
@@ -826,8 +826,8 @@
       "name": "Systematic Review",
       "description": "Intake \u2192 deep literature \u2192 synthesize \u2192 report \u2192 audit",
       "agents": [
-        "research_init",
-        "literature_deep",
+        "domain_analysis",
+        "literature_search",
         "compile_outputs",
         "audit_validate"
       ],
@@ -836,7 +836,7 @@
         "agent": "research_iterate",
         "loop_points": [
           {
-            "after": "literature_deep",
+            "after": "literature_search",
             "trigger": "gaps found in literature coverage or synthesis needs refinement",
             "options": [
               {
@@ -850,7 +850,7 @@
               }
             ],
             "after_iteration": [
-              "return to literature_deep with expanded search",
+              "return to literature_search with expanded search",
               "proceed to compile_outputs"
             ]
           }
@@ -858,14 +858,14 @@
       },
       "branching": [
         {
-          "after": "literature_deep",
+          "after": "literature_search",
           "if": "paper_count < 10",
           "then": "halt \u2014 too few papers for systematic review"
         },
         {
-          "after": "literature_deep",
+          "after": "literature_search",
           "if": "user requests iteration",
-          "then": "run research_iterate \u2192 return to literature_deep or compile_outputs"
+          "then": "run research_iterate \u2192 return to literature_search or compile_outputs"
         }
       ],
       "notes": [
@@ -878,7 +878,7 @@
       "name": "Genomics Analysis Pipeline",
       "description": "Intake FASTQ \u2192 QC \u2192 Alignment \u2192 Differential Expression \u2192 Audit",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "bioinformatics_scout",
         "data_scaffold",
         "execute_analysis",
@@ -898,8 +898,8 @@
       "name": "Causal Investigation",
       "description": "Intake \u2192 literature \u2192 route \u2192 data \u2192 causal analysis \u2192 audit with causal language check",
       "agents": [
-        "research_init",
-        "literature_deep",
+        "domain_analysis",
+        "literature_search",
         "methodology_scout",
         "method_route",
         "data_scaffold",
@@ -984,7 +984,7 @@
       "name": "Quick Exploratory",
       "description": "Intake \u2192 route \u2192 data \u2192 analysis \u2192 report. Skips deep literature and audit.",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "method_route",
         "data_scaffold",
         "execute_analysis",
@@ -1019,8 +1019,8 @@
       },
       "quality_gates": [
         {
-          "after": "research_init",
-          "gate": "research_init",
+          "after": "domain_analysis",
+          "gate": "domain_analysis",
           "on_fail": "halt \u2014 fix failed checks before proceeding"
         },
         {
@@ -1077,7 +1077,7 @@
       },
       "branching": [
         {
-          "after": "research_init",
+          "after": "domain_analysis",
           "if": "feasibility == stop",
           "then": "halt \u2014 see follow_up_questions.md"
         },
@@ -1103,7 +1103,7 @@
       "name": "Clinical Trial Analysis (SAP driven)",
       "description": "Intake \u2192 SAP Design \u2192 Stratification \u2192 Survival Analysis \u2192 Compliance Audit",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "clinical_biostatistician",
         "data_scaffold",
         "execute_analysis",
@@ -1123,8 +1123,8 @@
       "name": "Full Publication",
       "description": "Intake \u2192 literature \u2192 route \u2192 data \u2192 analysis \u2192 manuscript \u2192 audit",
       "agents": [
-        "research_init",
-        "literature_deep",
+        "domain_analysis",
+        "literature_search",
         "methodology_scout",
         "method_route",
         "generate_preregistration",
@@ -1137,13 +1137,13 @@
       ],
       "quality_gates": [
         {
-          "after": "research_init",
-          "gate": "research_init",
+          "after": "domain_analysis",
+          "gate": "domain_analysis",
           "on_fail": "halt \u2014 fix failed checks before proceeding"
         },
         {
-          "after": "literature_deep",
-          "gate": "literature_deep",
+          "after": "literature_search",
+          "gate": "literature_search",
           "on_fail": "expand literature search or document why minimum not met"
         },
         {
@@ -1228,7 +1228,7 @@
         "agent": "research_iterate",
         "loop_points": [
           {
-            "after": "literature_deep",
+            "after": "literature_search",
             "trigger": "literature reveals gap in analysis plan",
             "options": [
               {
@@ -1294,12 +1294,12 @@
       },
       "branching": [
         {
-          "after": "research_init",
+          "after": "domain_analysis",
           "if": "feasibility == stop",
           "then": "halt \u2014 see follow_up_questions.md"
         },
         {
-          "after": "research_init",
+          "after": "domain_analysis",
           "if": "feasibility == caution",
           "then": "proceed \u2014 review follow_up_questions.md"
         },
@@ -1361,7 +1361,7 @@
       "name": "Financial Strategy Backtesting",
       "description": "Intake prices \u2192 Strategy Design \u2192 Walk-Forward Validation \u2192 Risk Audit",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "quant_strategist",
         "data_scaffold",
         "execute_analysis",
@@ -1381,7 +1381,7 @@
       "name": "Predictive Modeling",
       "description": "Intake \u2192 route \u2192 data \u2192 ML pipeline \u2192 report \u2192 audit",
       "agents": [
-        "research_init",
+        "domain_analysis",
         "method_route",
         "data_scaffold",
         "execute_analysis",

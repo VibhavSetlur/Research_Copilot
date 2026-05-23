@@ -44,7 +44,7 @@ def list_protocols(light: bool = False) -> list[dict]:
             with open(yaml_file) as f:
                 data = yaml.safe_load(f)
             summary = data.get("description", "")
-        except:
+        except Exception:
             summary = ""
         protocols.append({"name": name, "summary": summary})
     return protocols

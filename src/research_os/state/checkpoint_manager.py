@@ -192,13 +192,16 @@ class CheckpointManager:
         # Determine pending actions based on phase
         phase = cp.get("phase", "unknown")
         phase_next = {
-            "research_init": "literature_deep",
-            "literature_deep": "method_route",
-            "method_route": "data_scaffold",
-            "data_scaffold": "execute_analysis",
-            "execute_analysis": "compile_outputs",
-            "compile_outputs": "audit_validate",
-            "audit_validate": "complete",
+            "domain_analysis": "research_design",
+            "research_design": "methodology_selection",
+            "methodology_selection": "literature_search",
+            "literature_search": "evidence_synthesis",
+            "evidence_synthesis": "analysis_plan",
+            "analysis_plan": "figure_guidelines",
+            "figure_guidelines": "writing_core",
+            "writing_core": "writing_synthesis",
+            "writing_synthesis": "audit_and_validation",
+            "audit_and_validation": "complete",
         }
         pending = [phase_next.get(phase, "complete")]
 

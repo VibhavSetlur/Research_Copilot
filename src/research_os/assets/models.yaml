@@ -31,7 +31,7 @@ models:
     cost_per_1m_output: 15.00
 
   # Literature review — needs massive context window for reading many papers
-  literature_deep:
+  literature_search:
     provider: "google"
     model: "gemini-2.5-pro"
     api_key_env: "GOOGLE_API_KEY"
@@ -160,9 +160,9 @@ local:
 
 # Routing rules — automatic model selection based on task characteristics
 routing_rules:
-  # If task involves reading > 50 documents, use literature_deep model
-  - condition: "document_count > 50"
-    route_to: "literature_deep"
+  # If task involves reading > 50 documents, use literature_search model
+  - condition: "task.type == 'literature_review' and len(task.documents) > 50"
+    route_to: "literature_search"
   
   # If task involves complex causal inference reasoning, use methodology_scout
   - condition: "task_type == 'causal_inference'"
