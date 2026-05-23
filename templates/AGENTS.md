@@ -5,7 +5,7 @@ When interacting with Research OS workspaces, LLM-based agents (e.g., Cursor, Wi
 ## 1. Golden Rule of Immutability
 **Do not modify files in the `inputs/raw_data/` or `inputs/literature/` directories.**
 These files form the immutable basis of the research.
-Any data cleaning, transformation, or filtering must produce new files in `workspace/data/derived/`.
+Any data cleaning, transformation, or filtering must produce new files inside the current experiment step's `data/` directory (e.g., `workspace/01_experiment_baseline/data/`).
 The ONLY exception is the `inputs/literature_index.yaml` file.
 
 ## 2. Mandatory State Logging
@@ -20,9 +20,8 @@ Example: `Applied SMOTE to balance the training dataset prior to Random Forest t
 Append your chronological findings, results, and interim thoughts to `workspace/analysis.md` using the `mem.analysis.log` tool.
 This creates a continuous, readable narrative of the research process.
 
-## 5. Experiment Branching
-If you are about to try a risky, alternative, or exploratory analysis path, use `sys.branch.create` to spin up a new experiment workspace. Do not overwrite the main workspace for speculative testing.
-Once the experiment is proven successful, you may use `sys.branch.merge` to bring the findings back to the main branch.
+## 5. Experiment Paths
+Experiments follow numbered chronological steps (`01_experiment_baseline/`, `02_data_preparation/`). Use `sys.path.create` to create the next step. If a path reaches a dead end, use `sys.path.abandon` to rename it (e.g., `02_data_preparation__DEAD_END/`) — files are preserved, not deleted.
 
 ## 6. Execution Estimation
 Before executing Python scripts (`tool.python.exec`) that process large datasets (e.g., >1GB), check the `workspace/logs/data_inventory.json` file. If the estimated processing time is high, consider using `tool.data.sample` to run a smaller test first.
@@ -40,4 +39,4 @@ If you are operating as a small model (e.g. indicated by `model_profile: small` 
 Never execute a data processing script (`tool.python.exec`) without first checking `workspace/logs/data_inventory.json` for dataset size and estimated runtime. If the runtime is expected to be long or the file is large, always use `tool.data.sample` to develop and verify your logic on a subset of the data first.
 
 ## 11. Citation and Fact-Checking Rule
-Every factual claim, literature reference, or established methodology you cite MUST be backed by a `tool.search.*` call (e.g., `tool.search.pubmed`, `tool.search.semantic_scholar`). You must log the retrieved citation or result alongside your claim to ensure provenance.
+Every factual claim, literature reference, or established methodology you cite MUST be backed by a `tool.search.*` call (e.g., `tool.search.pubmed`, `tool.search.semantic_scholar`). You must log the retrieved citation or result alongside your claim to ensure provenance. The result of every search call is automatically logged to `workspace/logs/searches.log`.

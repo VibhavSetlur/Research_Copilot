@@ -42,18 +42,62 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 
 ## Workspace File Tree
 ```text
-workspace/
-├── .os_state/
-│   └── state_ledger.json
-├── inputs/
-│   ├── literature/
-│   └── raw_data/
-├── methodology/
-│   └── protocols/
-├── src/
-├── synthesis/
-└── workspace_logs/
-    └── analysis.md
+<user-project>/
+├── AGENTS.md                       # AI agent instructions
+├── README.md                       # Auto-generated project overview
+├── .cursor/rules/research-os.mdc   # Cursor-specific rules
+├── .os_state/                      # INTERNAL — OS state
+│   ├── state_ledger.yaml           # Source of truth
+│   ├── manifest.json               # Full file inventory with checksums
+│   ├── checkpoints/                # Workspace snapshots
+│   └── cache/                      # API response cache
+├── docs/                           # Human-written research docs
+│   ├── research_question.md
+│   ├── hypotheses.md
+│   └── glossary.md
+├── inputs/                         # IMMUTABLE — researcher provided
+│   ├── researcher_config.yaml      # Researcher preferences & API keys
+│   ├── raw_data/                   # Source data (or symlinks)
+│   ├── literature/                 # PDFs
+│   ├── context/                    # Notes, past results, text files
+│   ├── intake.md                   # Auto-generated research brief
+│   └── literature_index.yaml       # Filename → citation key mapping
+├── workspace/                      # ACTIVE — iterative experiments
+│   ├── methods.md                  # Append-only method log
+│   ├── analysis.md                 # Chronological log + Mermaid workflow
+│   ├── citations.md                # Running bibliography with verified flags
+│   ├── workflow.mermaid            # Auto-updated workflow diagram
+│   ├── workflow.png                # Rendered diagram
+│   ├── logs/                       # Execution logs
+│   │   ├── searches.log            # Every web search logged (JSON lines)
+│   │   ├── state_changes.log       # Before/after state diffs
+│   │   ├── notifications.log       # Researcher notifications
+│   │   ├── data_inventory.json     # Auto-profiled data inventory
+│   │   └── 01_baseline.log         # Per-step execution logs
+│   ├── 01_experiment_baseline/
+│   │   ├── README.md               # Goal, hypotheses, outcomes
+│   │   ├── conclusions.md          # Key findings, bugs, routing decisions
+│   │   ├── methods_research.md     # AI's research into methods for this step
+│   │   ├── data/                   # Derived data
+│   │   ├── scripts/                # Versioned (01_load_v1.py, 02_eda_v1.py)
+│   │   ├── outputs/
+│   │   │   ├── reports/
+│   │   │   ├── figures/
+│   │   │   ├── tables/
+│   │   │   └── dashboards/
+│   │   └── environment/            # Pinned dependencies
+│   ├── 02_data_preparation/
+│   │   └── ... (same structure)
+│   └── .os_state/                  # Symlink to root .os_state/
+├── synthesis/                      # FINAL — populated on completion
+│   ├── abstract.md
+│   ├── paper.tex / paper.pdf
+│   ├── references.bib
+│   ├── workflow_diagram.png
+│   └── supplementary/
+└── environment/                    # Global environment
+    ├── requirements.txt
+    └── Dockerfile
 ```
 
 ## Value Proposition
@@ -61,11 +105,11 @@ workspace/
 Why use Research OS?
 - **Immutability First:** Your raw data (`inputs/raw_data/`) is strictly write-protected. All transformations are safely saved as derived data.
 - **Methodological Provenance:** Every critical decision, applied method, and statistical result is atomically logged via strict append-only decision logging.
-- **Isolated Experimentation:** Try risky analyses safely by spinning up a branch (`sys.branch.create`), without polluting your main findings.
+- **Chronological Experiment Paths:** Experiments run as numbered consecutive steps (`01_experiment_baseline/`, `02_data_preparation/`). Abandoned paths are renamed (e.g., `__DEAD_END__`) rather than deleted, preserving full history.
 - **Model-Size Adaptability:** Supports `small`, `medium`, and `large` LLM profiles to optimize token economy and context window limits.
 
 ## Documentation
-- **Manuals**: [Researcher Guide (Operational Manual)](docs/manuals/RESEARCHER_GUIDE.md) - Learn how to run your first project.
+- **Manuals**: [Researcher Guide (Operational Manual)](docs/RESEARCHER_GUIDE.md) - Learn how to run your first project.
 - **Tutorials**: [Quickstart](docs/tutorials/QUICKSTART.md), [Example Walkthrough](docs/tutorials/EXAMPLE_WALKTHROUGH.md)
 - **Architecture**: [AI Integration](docs/architecture/AI_INTEGRATION.md), [Guidance System](docs/architecture/GUIDANCE_SYSTEM.md)
 - **Templates**: [Agents Guide](templates/AGENTS.md) - Strict rules for LLM agents operating in this workspace.
@@ -76,7 +120,7 @@ Why use Research OS?
 To help you navigate this repository:
 - `src/research_os/server.py` - Core MCP server and tool definitions.
 - `src/research_os/protocols/` - The YAML-based methodology guidelines.
-- `src/research_os/tools/` - Implementation of all OS actions (search, literature, branch, etc.).
+- `src/research_os/tools/` - Implementation of all OS actions (search, path creation, literature, etc.).
 - `src/research_os/state/` - State ledger and checkpoint logic.
 - `templates/` - Default rules and guides to feed to agents.
 

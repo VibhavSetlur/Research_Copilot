@@ -1,0 +1,8 @@
+{
+  "mcp": {
+    "research-os": {
+      "command": "python",
+      "args": ["-m", "research_os.server", "--transport", "stdio"]
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger("research.tools.branch")
@@ -35,7 +35,6 @@ def merge_branches(
 ) -> Dict[str, Any]:
     try:
         from research_os.state.state_ledger import StateLedger
-        import subprocess
 
         ledger = StateLedger(root)
         result = ledger.merge_branch(source, target, message)

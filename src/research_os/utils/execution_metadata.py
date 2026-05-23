@@ -35,17 +35,17 @@ def load_execution_log(root: Optional[Path] = None) -> List[Dict[str, Any]]:
 
 
 def load_tool_registry(root: Optional[Path] = None) -> Dict[str, Any]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     return load_json_safe(root / ".research" / "domains" / "tool_registry.json")
 
 
 def load_domain_registry(root: Optional[Path] = None) -> Dict[str, Any]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     return load_json_safe(root / ".research" / "domains" / "domain_registry.json")
 
 
 def load_assumption_registry(root: Optional[Path] = None) -> Dict[str, Any]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     return load_json_safe(root / ".research" / "domains" / "assumption_registry.json")
 
 
@@ -78,7 +78,7 @@ def enrich_entry_with_tool_metadata(
 def build_analysis_metadata(
     root: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     execution_log = load_execution_log(root)
     tool_registry = load_tool_registry(root)
     domain_registry = load_domain_registry(root)
@@ -135,7 +135,7 @@ def write_analysis_metadata(
     output_path: Optional[str] = None,
     root: Optional[Path] = None,
 ) -> str:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     metadata = build_analysis_metadata(root)
     out = (
         Path(output_path)
@@ -149,7 +149,7 @@ def write_analysis_metadata(
 
 
 def get_analysis_pipeline_summary(root: Optional[Path] = None) -> Dict[str, Any]:
-    root = root or _find_project_root()
+    root = root or find_project_root()
     metadata = build_analysis_metadata(root)
     sm = metadata["summary"]
     return {

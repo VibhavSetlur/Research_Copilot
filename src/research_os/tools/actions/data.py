@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Any
 from pathlib import Path
 import pandas as pd
-import numpy as np
 
 logger = logging.getLogger("research.tools.data")
 

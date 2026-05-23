@@ -309,3 +309,23 @@ class TestDownloadLiterature:
         )
         assert res["status"] == "error"
         assert "paywall" in res["message"].lower()
+
+
+def test_all_action_imports_resolve():
+    """Verify every action module is importable and exposes expected callables."""
+    import research_os.tools.actions as actions
+
+    module = actions
+    assert module is not None
+
+    from research_os.tools.actions.web_search import search_web
+    from research_os.tools.actions.checkpoint import (
+        create_checkpoint,
+    )
+    from research_os.tools.actions.protocol import get_protocol
+    from research_os.tools.actions.search import search_pubmed
+
+    assert callable(search_web)
+    assert callable(get_protocol)
+    assert callable(search_pubmed)
+    assert callable(create_checkpoint)

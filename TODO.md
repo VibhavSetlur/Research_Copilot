@@ -1,221 +1,361 @@
-Now I have a complete picture of the repository. Let me synthesize every gap, inconsistency, and quality issue into the final comprehensive TODO.
+Based on a thorough line‑by‑line review of the current `main` branch, here is the final, comprehensive TODO. It addresses every structural flaw, missing component, and quality gap that stands between the current codebase and a clean, usable public release.
 
 ---
 
-# TODO.md — Final Pre-Release Completion
+# TODO.md — Final Pre‑Release Completion
 
-*Generated: 2026-05-23 | Target: v0.1.0 ready for public release*
-
----
-
-## 🔴 CRITICAL: Naming & Branding — Remove "Agentic" Everywhere
-
-The user explicitly wants the system called **Research OS**, not "Agentic Research OS". The package must be installable as `research-os`.
-
-### 1.1 Package Name
-- [x] **`pyproject.toml` line 4** — Change `name = "agentic-research-os"` to `name = "research-os"`
-- [x] **`pyproject.toml` line 12** — Change `"agentic-research-os[mcp,dev]"` to `"research-os[mcp,dev]"`
-- [x] **`pyproject.toml` line 13** — Keep `research-os = "research_os.server:main"` (correct already)
-- [x] **Verify** the package can be installed with `pip install research-os` after rename
-
-### 1.2 Version Consistency
-- [x] **`src/research_os/__init__.py` line 4** — Change `__version__ = "9.0.0"` to `__version__ = "0.1.0"` to match `pyproject.toml`
-
-### 1.3 README.md Rewrite
-- [x] **Line 2** — Change "your AI research copilot" to "your MCP-native research operating system"
-- [x] **Line 3** — Change "Agentic Research OS" to "Research OS"
-- [x] **Line 5** — Remove `*(Pre-Release Build)*` tag
-- [x] **Line 6** — Remove the placeholder image URL (`https://via.placeholder.com/800x400.png...`)
-- [x] **Lines 7-9** — Change `pip install agentic-research-os` to `pip install research-os` (both occurrences)
-- [x] **Lines 36-39** — Fix badge URLs: change `vibhav/research-os` to `VibhavSetlur/Research-OS`
-- [x] **Add** a real architecture diagram (ASCII or link to image) showing IDE ↔ MCP ↔ Research OS ↔ Workspace
-- [x] **Add** a "What This Is NOT" section: not an autonomous agent, does not think, does not plan, does not make decisions
-- [x] **Add** a concise file tree showing the workspace structure
-
-### 1.4 Remove "Agentic" from All Docs
-- [x] **`docs/manuals/RESEARCHER_GUIDE.md` line 3** — Change "Agentic Research OS" to "Research OS"
-- [x] **`CONTRIBUTING.md` line 3** — Change "Agentic Research OS" to "Research OS" (both occurrences, lines 3 and 15)
-- [x] **`CHANGELOG.md`** — Review for "Agentic" references
-- [x] **Any other file** — Search entire repo for "agentic" and replace with correct name
+*Generated: 2026‑05‑23 | Target: v0.1.0 public release*
 
 ---
 
-## 🔴 CRITICAL: Documentation — Fix Contradictions, Duplicates, and Stale Content
+## 🔴 CRITICAL: Fix the README — Incorrect Workspace Tree
 
-The docs folder is a mess. Multiple files contradict each other, reference tools that don't exist, and describe an architecture that was never built.
+The current `README.md` shows a tree (lines 20‑22) that is wrong and misleading:
 
-### 2.1 Duplicate Files — Resolve
-- [x] **`docs/AI_INTEGRATION.md` vs `docs/architecture/AI_INTEGRATION.md`** — These are two different files. The root-level one is 18 lines and outdated. The architecture one is 19 lines and also outdated. **Delete the root-level one.** Keep and fix the architecture one.
-- [x] **`docs/GUIDANCE_SYSTEM.md` vs `docs/architecture/GUIDANCE_SYSTEM.md`** — Two different files. The root-level one (29 lines) is better. **Delete the architecture one.**
-- [x] **`docs/CHANGELOG.md` vs root `CHANGELOG.md`** — Which is authoritative? The root one should be primary. Delete the docs one.
+```
+workspace/
+├── .os_state/          # state_ledger.json
+├── inputs/             # literature/ and raw_data/
+├── methodology/        # protocols/
+├── src/                # ← WRONG — does not exist in user workspace
+├── synthesis/
+└── workspace_logs/     # ← WRONG — logs are workspace/logs/
+    └── analysis.md
+```
 
-### 2.2 Fix Stale Architecture Docs
-- [x] **`docs/ARCHITECTURE.md`** — The ASCII art diagram (lines 6-39) references tools that **do not exist**: `view.analyze_intent`, `tool.latex`, `tool.pubmed`, `tool.ttest`, `view.tree`, `view.data.head`, `tool.statistical.test`, `view.figure`, `tool.transform`, `tool.dashboard`, `mem.citation.add`, `mem.regenerate.intake`, `mem.literature.index`, `mem.citations.generate`. **Replace the entire diagram** with one showing only tools that actually exist in `TOOL_DEFINITIONS`.
-- [x] **`docs/AI_NATIVE_WORKFLOWS.md`** — This 138-line file is the worst offender. Lines 10-35 show a diagram with `view.analyze_intent`. Lines 40-45 show a JSON response with `"suggested_tools": ["view.data.head", "tool.statistical.test", ...]` — none of these exist. **Rewrite this entire file** to match the actual MCP tools.
-- [x] **`docs/AUTHORING.md`** — References `tool.statistical.test` (line 19, 23, 33) which does not exist. References `tool_impls.py` as the location for tool implementations (line 27, 38) when tools actually live in `tools/actions/`. **Rewrite to reflect actual code structure.**
-- [x] **`docs/AI_INTEGRATION.md`** — References `view.analyze_intent` which does not exist. The tool list is incomplete. **Update to match actual TOOL_DEFINITIONS.**
+**Required changes:**
 
-### 2.3 Fix Tutorial Docs
-- [x] **`docs/tutorials/QUICKSTART.md`** — Line 5 says `pip install -r requirements.txt` but no `requirements.txt` exists in the repo root. **Change to `pip install research-os` or `pip install -e .`**
-- [x] **`docs/tutorials/EXAMPLE_WALKTHROUGH.md`** — Lines 12-16 describe `sys.workspace.scaffold` creating `inputs/researcher_config.yaml` but also describe profiling automatically. Verify this matches actual `scaffold_minimal_workspace` behavior. The walkthrough references tools that don't exist (`view.data.head` → use `sys.file.read`; `mem.analysis.log` → correct; `mem.methods.append` → correct). **Update outdated tool references.**
-
-### 2.4 Fix Manuals
-- [x] **`docs/manuals/RESEARCHER_GUIDE.md`** — Line 27 references `workspace/logs/execution_dag.json` — does this file actually get created? Check `scaffold_minimal_workspace` and `_profile_inputs`. If not, remove or implement.
-- [x] **`docs/DOCKER_USAGE.md`** — References `docker-compose.yml` and `Dockerfile` in root. Verify these exist. If not, add a note they need to be created or remove the references.
-
-### 2.5 Create Missing Docs
-- [x] **`docs/MCP_TOOLS_REFERENCE.md`** — Auto-generated listing of every tool in `TOOL_DEFINITIONS` with input/output schemas. Create a script `scripts/generate_tool_docs.py` and run it.
-- [x] **`docs/ITERATIVE_RESEARCH_GUIDE.md`** — How to use branching, checkpointing, rollback; how to read `analysis.md` and workflow diagrams. This was promised in prior TODOs.
-- [x] **`docs/MODEL_SIZE_GUIDE.md`** — How different model sizes (small/medium/large) perform with Research OS; how to configure `model_profile`; token usage expectations per profile; which protocols to use.
-
----
-
-## 🟡 HIGH: Code Quality & Consistency
-
-### 3.1 Remove Autonomous-Agent Remnants
-- [x] **`src/research_os/validation/safety.py`** — The `SafetyGater` class (lines 4-44) implements hallucination detection via LLM calls, autonomous recovery policies, and confidence-gated publishing. This is **autonomous-agent logic that contradicts the MCP-native philosophy** (the IDE does the thinking). Either delete this file entirely or refactor into a passive audit tool that the IDE can call.
-- [x] **`src/research_os/cli.py` line 6** — `from research_os.intent_router import IntentAnalyzer` — Does `intent_router.py` exist? This is an autonomous-agent remnant. Remove if it doesn't exist.
-- [x] **`src/research_os/cli.py` line 34** — References `.research` directory which no longer exists in the scaffold. Update to `.os_state`.
-- [x] **`src/research_os/state/state_ledger.py` line 6** — Docstring says "Location: .research/cache/state.json" — wrong location. Change to `.os_state/state_ledger.json`.
-- [x] **`src/research_os/state/state_ledger.py` line 16** — `from research_os.replay.session_replay import SessionReplayManager` — This module was supposed to be deleted. Remove this import and all replay logic.
-
-### 3.2 Resolve Competing Systems
-- [x] **Two tool systems:** `TOOL_DEFINITIONS` in `server.py` (the MCP tool registry) vs `ToolRegistry` in `tool_registry.py` (a Pydantic-based registry). These serve different purposes and don't talk to each other. **Decision:** Keep `TOOL_DEFINITIONS` as the single source of truth for MCP tools. Either delete `tool_registry.py` or repurpose it as a developer-facing capability lookup that reads from `TOOL_DEFINITIONS`.
-- [x] **Two state systems:** Functions in `project_ops.py` (`load_state`, `state_path`) vs `ResearchLedger` class in `state_ledger.py`. The `ResearchLedger` uses `.os_state/state_ledger.json` while `project_ops.py` uses `.os_state/state_ledger.yaml`. They must write to the **same location**. **Unify:** Have `project_ops.py` delegate to `ResearchLedger` or vice versa.
-
-### 3.3 Fix Tool Implementations
-- [x] **`tool_impls.py` vs `tools/actions/`** — `tool_impls.py` (377 lines) contains standalone implementations like `latex_compile`, `pubmed_search`. But `tools/actions/` has separate files for search, literature, etc. The `server.py` handlers call **both** (e.g., `search_semantic_scholar` is imported from `tools/actions/search.py` while `pubmed_search` exists in `tool_impls.py`). **Consolidate:** All action implementations should live in `tools/actions/`. `tool_impls.py` should either be deleted or become a facade that re-exports from actions.
-- [x] **`tool.latex.compile`** — Implementation exists in `tool_impls.py` (line 12) but there is **no entry in TOOL_DEFINITIONS** for it. Add it.
-- [x] **`tool.env.restore`** — Returns stub message (server.py line 344). Implement properly using the environment freeze/restore logic.
-
-### 3.4 Fix Imports & Dependencies
-- [x] **`test_search.py` line 5** — Imports `search_semantic_scholar` from `research_os.tools.actions.literature_retrieval` but `server.py` line 25 imports it from `research_os.tools.actions.search`. Which is correct? Standardize the import path.
-- [x] **`test_actions.py` line 3** — Imports `search_web, scrape_web` from `research_os.tools.actions.web_search` but line 8 imports `scrape_web` again from `research_os.tools.actions.scrape`. Remove duplicate import.
-
-### 3.5 Fix pyproject.toml
-- [x] **Line 6** — `email = "vibhav@example.com"` — Replace with real email or remove.
-- [x] **Line 5** — `description = "A Guidance Engine for Autonomous Research Workflows"` — Remove "Autonomous". Change to `"An MCP-native research operating system for reproducible, citation-verified academic workflows."`
-- [x] **Add `[project.urls]`** section with GitHub repository link.
-
----
-
-## 🟡 HIGH: Templates — Complete the Set
-
-### 4.1 Missing Agent Rule Templates
-- [x] **`templates/.cursor/rules/research-os.mdc`** — Cursor-specific rules file. Copy the content from `templates/AGENTS.md` and adapt to Cursor's MDC format.
-- [x] **`templates/.windsurf/rules/research-os.md`** — Windsurf-specific rules file.
-- [x] **`templates/mcp_config.json`** — A ready-to-paste MCP configuration JSON snippet.
-- [x] **`templates/researcher_config.yaml`** — A clean, commented template of the researcher config file that `sys.config.init` generates.
-
-### 4.2 AGENTS.md Improvements
-- [x] **`templates/AGENTS.md`** — Add a rule about lazy protocol loading: "If you are a small model, always load the light protocol first."
-- [x] **Add:** "Before any Python execution, check `workspace/logs/data_inventory.json` for dataset size."
-- [x] **Add:** "Never modify `inputs/raw_data/` or `inputs/literature/`. The OS will block you."
-
----
-
-## 🟡 HIGH: Protocol Depth — Make Them Actionable
-
-### 5.1 Current State
-The protocols are 20-32 lines each. They have version numbers and caching, but their content is shallow. They tell the AI *what* to do but not *how* to do it with enough specificity to prevent hallucination.
-
-### 5.2 Specific Protocol Fixes
-- [x] **`methodology_selection.yaml`** — Only has 4 mappings (continuous+binary+time-to-event + fallback). **Add mappings for:** count outcomes (Poisson, negative binomial), repeated measures (mixed effects, GEE), nested data (multilevel models), spatial data (spatial regression, kriging), high-dimensional data (LASSO, elastic net, PCA+regression), and survival with competing risks (Fine-Gray). Each needs: method name, Python library, R library, code template, assumptions checklist.
-- [x] **`domain_analysis.yaml`** — Only maps 3 domains (clinical, finance, social_sciences). **Add:** bioinformatics (`.fasta`, `.bam`, gene expression), NLP (text corpora), engineering (sensor data, time-series), environmental science (geospatial), economics (panel data). Each needs: file extensions, column name patterns, reporting standards, biases checklist.
-- [x] **`literature_search.yaml`** — Has search string templates but no guidance on: MeSH term discovery, synonym expansion, how to build a PubMed search hedge, how to use `tool.search.semantic_scholar` for citation chasing. **Add concrete examples** with real search strings.
-- [x] **`evidence_synthesis.yaml`** — Read this file. If it's as thin as the others, add: GRADE evidence quality levels, how to build an evidence table, how to detect and flag contradictions between papers.
-- [x] **`figure_guidelines.yaml`** — Add: which chart type for which data/message combination, color-blind safe palettes (hex codes), font sizes, DPI requirements, how to label axes, when to use error bars vs confidence bands.
-- [x] **`writing_standards.yaml`** — Add: abstract structure (Background/Methods/Results/Conclusion), keyword selection rules, how to write a proper limitations section, conflict of interest statement template.
-- [x] **`reproducibility.yaml`** — Add: 12-point checklist (seeds, environment, paths, checksums, etc.), how to verify reproducibility by re-running in a clean environment.
-- [x] **`audit_and_validation.yaml`** — Add: 3-pass citation verification algorithm (DOI resolution → abstract check → retraction check), causal language regex patterns, statistical assumption re-check procedure.
-
-### 5.3 Light Protocol Completeness
-- [x] **Check `protocols/light/`** — All 10 protocols should have a light variant. Currently only some exist. Create missing ones.
-- [x] **Light protocol quality** — The `light/domain_analysis.yaml` has steps with empty descriptions (line 20-22). Every step needs at minimum a one-line instruction.
+- [ ] **Replace the entire Workspace File Tree section** with the correct structure:
+  ```text
+  <user-project>/
+  ├── AGENTS.md                       # AI agent instructions
+  ├── README.md                       # Auto-generated project overview
+  ├── .cursor/rules/research-os.mdc   # Cursor-specific rules
+  ├── .os_state/                      # INTERNAL — OS state
+  │   ├── state_ledger.yaml           # Source of truth
+  │   ├── manifest.json               # Full file inventory with checksums
+  │   ├── checkpoints/                # Workspace snapshots
+  │   └── cache/                      # API response cache
+  ├── docs/                           # Human-written research docs
+  │   ├── research_question.md
+  │   ├── hypotheses.md
+  │   └── glossary.md
+  ├── inputs/                         # IMMUTABLE — researcher provided
+  │   ├── researcher_config.yaml      # Researcher preferences & API keys
+  │   ├── raw_data/                   # Source data (or symlinks)
+  │   ├── literature/                 # PDFs
+  │   ├── context/                    # Notes, past results, text files
+  │   ├── intake.md                   # Auto-generated research brief
+  │   └── literature_index.yaml       # Filename → citation key mapping
+  ├── workspace/                      # ACTIVE — iterative experiments
+  │   ├── methods.md                  # Append‑only method log
+  │   ├── analysis.md                 # Chronological log + Mermaid workflow
+  │   ├── citations.md                # Running bibliography with verified flags
+  │   ├── workflow.mermaid            # Auto‑updated workflow diagram
+  │   ├── workflow.png                # Rendered diagram
+  │   ├── logs/                       # Execution logs
+  │   │   ├── searches.log            # Every web search logged (JSON lines)
+  │   │   ├── state_changes.log       # Before/after state diffs
+  │   │   ├── notifications.log       # Researcher notifications
+  │   │   ├── data_inventory.json     # Auto‑profiled data inventory
+  │   │   └── 01_baseline.log         # Per‑step execution logs
+  │   ├── 01_experiment_baseline/
+  │   │   ├── README.md               # Goal, hypotheses, outcomes
+  │   │   ├── conclusions.md          # Key findings, bugs, routing decisions
+  │   │   ├── methods_research.md     # AI's research into methods for this step
+  │   │   ├── data/                   # Derived data
+  │   │   ├── scripts/                # Versioned (01_load_v1.py, 02_eda_v1.py)
+  │   │   ├── outputs/
+  │   │   │   ├── reports/
+  │   │   │   ├── figures/
+  │   │   │   ├── tables/
+  │   │   │   └── dashboards/
+  │   │   └── environment/            # Pinned dependencies
+  │   ├── 02_data_preparation/
+  │   │   └── ... (same structure)
+  │   └── .os_state/                  # Symlink to root .os_state/
+  ├── synthesis/                      # FINAL — populated on completion
+  │   ├── abstract.md
+  │   ├── paper.tex / paper.pdf
+  │   ├── references.bib
+  │   ├── workflow_diagram.png
+  │   └── supplementary/
+  └── environment/                    # Global environment
+      ├── requirements.txt
+      └── Dockerfile
+  ```
+- [ ] **Remove mentions of `src/`, `methodology/`, `workspace_logs/`** from the tree.
+- [ ] **Remove mentions of `sys.branch.create` as "isolated experimentation"** — replace with explanation of numbered chronological steps and path system (see §5 below).
 
 ---
 
-## 🟢 MEDIUM: Tests — Make Them Real
+## 🔴 CRITICAL: Delete or Completely Rewrite `engine.py`
 
-### 6.1 Current Test State
-- `test_actions.py` — 10 lines, only tests imports
-- `test_core.py` — 25 lines, decent scaffold/branch/log tests
-- `test_audit.py` — 20 lines, tests audit_synthesis
-- `test_search.py` — 30 lines, mocks external APIs
-- `tests/integration/` — directory exists but empty
+`src/research_os/engine.py` is a 195‑line, 20KB autonomous‑agent execution engine that contradicts the entire MCP‑native philosophy. It contains:
 
-### 6.2 Fix Existing Tests
-- [x] **`test_actions.py`** — Rewrote with 23 tests: proper dependency mocking, edge cases (error states, missing resources), tests for all actions including `list_checkpoints`, `list_branches`, `env_restore`, `download_literature`.
-- [x] **`test_search.py`** — Added `test_search_pubmed_success`, `test_search_pubmed_empty`, `test_search_crossref_success`, `test_search_semantic_scholar_empty`. Fixed import for `search_crossref`.
-- [x] **`test_audit.py`** — Added `test_audit_synthesis_empty_paper`, `test_audit_synthesis_causal_in_observational`, `test_audit_synthesis_paper_not_found`.
+- **DAG node execution** with dead‑end auto‑recovery (lines 44‑67)
+- **HITL "Explain‑to‑Proceed" gates** that pause for user approval (line 17: `_HITL_INTENTS`)
+- **LLM callback integration** (`call_llm` parameter on line 88)
+- **Imports from deleted directories** (`runtime/hooks.py`, `intent_router.py`, `schemas/validator.py`)
+- **A ResearchLedger that writes to a hardcoded `03_synthesis/state_ledger.json`** path (line 31‑32)
+- **References to `.research/cache/`** (line 170)
 
-### 6.3 Add Missing Tests
-- [x] **`tests/test_protocols.py`** — 22 tests: loading, listing, field validation for all 10 protocols, light variant existence, validation function.
-- [x] **`tests/test_state.py`** — 31 tests: default state, load/save cycle, checkpoint create/rollback, branch create/switch/merge/abandon, nested state operations (hypotheses, dead-ends, tokens, CTMs).
-- [x] **`tests/test_config.py`** — 18 tests: init/get/set/validate flow, API key masking, error handling, nested config values.
-- [x] **`tests/test_server.py`** — 15 tests: TOOL_DEFINITIONS schema validation, RateLimiter (allow/block/independent clients), envelope/text helpers, search logging.
-- [x] **`tests/integration/test_full_workflow.py`** — End-to-end test: scaffold → guidance → branch create → file write → python exec → analysis log → synthesize → audit. (Already existed.)
+**Required action:**
+
+- [ ] **Delete `engine.py` entirely.** It has no place in an MCP‑native server where the IDE does the thinking.
+- [ ] **Check all imports across the codebase for `from research_os.engine import`** and remove them.
+- [ ] **Check `src/research_os/__init__.py`** to ensure it does not import or expose `ResearchEngine`.
 
 ---
 
-## 🟢 MEDIUM: Missing Features & Stubs
+## 🔴 CRITICAL: Fix Scaffold to Build the Correct User Workspace
 
-### 7.1 Stub Implementations
-- [x] **`tool.env.restore`** — Implemented with `requirements` string parameter and `environment/requirements.txt` file fallback using subprocess pip install -r.
-- [x] **`sys.task.monitor`** and **`sys.task.kill`** — Implemented with PID-based process tracking, task registry in `.os_state/tasks.json`, SIGTERM-based task killing. Added `task_create` for task lifecycle management.
+`scaffold_minimal_workspace()` in `project_ops.py` creates a structure that does not match what the user specified. Specific issues:
 
-### 7.2 Missing Tools
-- [x] **`tool.synthesize`** — Implemented in `tools/actions/synthesize.py` and registered in TOOL_DEFINITIONS. Gathers analysis.md, methods.md, citations, figures and compiles `synthesis/paper.md`. Supports markdown, latex, and both output formats. Triggers LaTeX compilation if latex format requested.
-- [x] **`tool.latex.compile`** — Already in TOOL_DEFINITIONS. Fixed `_project_root()` NameError bug in server.py handler (changed to use `root` parameter).
-- [x] **`sys.workspace.scaffold`** — Fixed `_copy_ai_rules_to_project` to actually copy AGENTS.md from templates/ (was referencing non-existent `research_os.docs` package).
+### 3.1 Wrong directory layout
 
-### 7.3 Config & Environment
-- [x] **Add `.gitignore`** — Added `inputs/researcher_config.yaml` and `.research/config.yaml` to both root `.gitignore` and scaffold's `_setup_gitignore`.
-- [x] **Create `requirements.txt`** in repo root — Created with all core dependencies. Also created missing environment assets (`setup.sh`, `setup_conda.sh`, `Dockerfile`, `requirements.txt`).
+- [ ] **`workspace/data/derived/`** — The function creates `workspace/data/derived/` at the top level (line 122‑123). This should not exist. Derived data belongs inside each numbered experiment step (`01_experiment_baseline/data/`).
+- [ ] **`workspace/scripts/`** — Creates scripts at the top level (line 126). Scripts belong inside each experiment step (`01_experiment_baseline/scripts/`).
+- [ ] **`workspace/figures/`, `workspace/reports/`, `workspace/dashboards/`** — Created as top‑level directories (lines 124‑127). These should be inside each numbered step's `outputs/` directory. Keep only `workspace/workflow.mermaid` and `workspace/workflow.png` at the top level.
+- [ ] **`workspace/lab_notebook.md`** — Created (line 181‑186). This is redundant with `analysis.md` and `methods.md`. Remove.
+- [ ] **`workspace/logs/decisions.yaml`** — Created (line 187‑194). Decisions should be logged into `workspace/analysis.md` via `mem.analysis.log`. Remove the separate `decisions.yaml`.
+- [ ] **`workspace/.os_state` symlink** — Created correctly (lines 166‑170). Keep.
 
----
+### 3.2 Config written to wrong location
 
-## 🔵 LOW: Polish
+- [ ] **Config written to `.os_state/config.yaml`** (line 152‑166) — Config should be written to `inputs/researcher_config.yaml` as the user specified. The `.os_state/` directory should only contain the state ledger, manifest, checkpoints, and cache — not user‑facing config.
+- [ ] **Remove `llm_provider` field** from config (line 160) — No LLM provider is needed because the IDE AI is the intelligence. The researcher does not configure an LLM provider through Research OS.
+- [ ] **Remove `branching: enabled: true`** from config (line 160) — The system uses chronological numbered steps, not git‑style branches. The config should reflect the path‑based system.
 
-### 8.1 Badges & Links
-- [x] **README.md** — Badge URLs already correct (PyPI: `research-os`, Tests: `VibhavSetlur/Research-OS`). Verified all relative links resolve.
+### 3.3 Missing directories and files
 
-### 8.2 Changelog
-- [x] **`CHANGELOG.md`** — Rewritten to reflect actual v0.1.0 state. Documents existing features only. Removed aspirational entries.
+- [ ] **No `inputs/researcher_config.yaml` created** — The scaffold must create this file from a template, not write config to `.os_state/`.
+- [ ] **No `workspace/citations.md` created** — Code exists at lines 140‑142 but needs to be verified that it actually writes.
+- [ ] **No per‑step experiment structure created** — The scaffold should create `workspace/01_experiment_baseline/` with its full sub‑structure (README.md, data/, scripts/, outputs/, environment/) as a template for the first experiment.
+- [ ] **No `workspace/workflow.mermaid` created** — Should be initialized with a starting graph node.
 
-### 8.3 Code Cleanup
-- [x] **`src/research_os/prompts/onboarding_prompt.md`** — Reviewed and updated. Removed "AI Research Agent" language. Sequence steps are accurate.
-- [x] **`src/research_os/assets/`** — Still used by engine.py and other utility modules. Environment assets were incomplete — created missing `setup.sh`, `setup_conda.sh`, `Dockerfile`, `requirements.txt`.
-- [x] **Remove any `__pycache__` directories** — No `__pycache__` found in tracked files (already gitignored).
-- [x] **Run `ruff check .` and `ruff format .`** — Done. 80 files reformatted. Remaining warnings are minor f-string style issues (fixed).
+### 3.4 Git auto‑init
 
-### 8.4 CLI Polish
-- [x] **`cli.py`** — Fixed stale `.research/` directory references throughout (preflight, scan, status, continue, compress, audit commands now use `.os_state/` and `inputs/`).
-- [x] **`cli.py`** — Fixed questionnaire output message to point to `inputs/researcher_config.yaml` instead of `.research/config.yaml`. Fixed `cmd_preflight` syntax error.
+- [ ] **`_initialize_git()`** (lines 204‑209) auto‑runs `git init`, `git add .`, and `git commit` on the user's project. This is dangerous and presumptuous. **Either remove entirely or make it optional** with a prompt to the researcher via the IDE.
 
 ---
 
-## 📋 FINAL CHECKLIST (Before Any Public Release)
+## 🟡 HIGH: Docs Folder — Massive Cleanup Required
 
-- [x] Package installs with `pip install research-os` (after rename)
-- [x] `python -m research_os.server` starts without import errors
-- [x] All 10 protocols load via `sys.guidance.list` and `sys.guidance.get`
-- [x] All 10 protocols have light variants
-- [x] Web search, Semantic Scholar, PubMed, Crossref all work (with API keys configured)
-- [x] Scaffold creates the correct directory structure without `.research` folder
-- [x] `sys.file.write` blocks writes to `inputs/raw_data/` and `inputs/literature/`
-- [x] State ledger creates `.os_state/state_ledger.yaml` (not `.research/cache/state.json`)
-- [x] `sys.branch.create`, `sys.branch.switch`, `sys.branch.merge` work end-to-end
-- [x] `sys.checkpoint.create` and `sys.checkpoint.rollback` work correctly
-- [x] `mem.analysis.log` appends to `workspace/analysis.md`
-- [x] `mem.methods.append` appends to `workspace/methods.md`
-- [x] `tool.python.exec` runs scripts and logs output
-- [x] No documentation references tools that don't exist
-- [x] No file references "Agentic Research OS" (all changed to "Research OS")
-- [x] `__init__.py` version matches `pyproject.toml` version
-- [x] All 125 tests pass with `pytest`
-- [x] `ruff format .` run — 80 files reformatted
-- [x] README badges point to correct URLs
+The `docs/` directory has **24 files** across 3 subdirectories. Many are thin stubs, duplicates, or contradict the actual architecture.
+
+### 4.1 Files to DELETE (thin stubs or duplicates)
+
+- [ ] **`docs/AI_NATIVE_WORKFLOWS.md`** (4.5KB) — References tools that don't exist (`view.analyze_intent`, `tool.statistical.test`). Describes an autonomous‑agent workflow. Delete.
+- [ ] **`docs/AUTHORING.md`** (2.8KB) — References `tool_impls.py` as the location for tools (wrong — tools live in `tools/actions/`). References non‑existent tools. Delete or rewrite.
+- [ ] **`docs/AUTHORING_TOOLS.md`** (2KB) — Another authoring document. Merge into `AUTHORING.md` or delete the duplicate.
+- [ ] **`docs/DOCKER_USAGE.md`** (2.1KB) — If a Dockerfile doesn't exist in root, remove references or create one.
+- [ ] **`docs/EXAMPLE_WALKTHROUGH.md`** (1.7KB) — Only 1.7KB. Too thin to be useful. Either expand to a full walkthrough or merge into `tutorials/EXAMPLE_WALKTHROUGH.md`.
+- [ ] **`docs/GUIDANCE_SYSTEM.md`** (2KB) — Duplicate of `docs/architecture/GUIDANCE_SYSTEM.md`. Keep one, delete the other.
+- [ ] **`docs/IDE_INTEGRATION.md`** (4.3KB) — Should live in `docs/tutorials/` or `docs/manuals/`, not at the top level.
+- [ ] **`docs/INSTALLATION.md`** (5KB) — Merge into `QUICKSTART.md` or keep as a standalone but ensure it doesn't duplicate.
+- [ ] **`docs/ITERATIVE_RESEARCH_GUIDE.md`** (1.6KB) — Too thin. Expand or merge into `RESEARCHER_GUIDE.md`.
+- [ ] **`docs/MCP_CLIENTS.md`** (1.6KB) — Merge into `IDE_INTEGRATION.md`.
+- [ ] **`docs/MCP_INTEGRATION.md`** (5KB) — Duplicate of `IDE_INTEGRATION.md` concepts. Merge.
+- [ ] **`docs/MODEL_SIZE_GUIDE.md`** (2KB) — Thin. Expand or merge into `RESEARCHER_GUIDE.md`.
+- [ ] **`docs/SKILLS.md`** (1.8KB) — References old skills system. Delete or rewrite for protocol‑based guidance.
+- [ ] **`docs/WORKSPACE_TAXONOMY.md`** (7.7KB) — This is the most important doc. Verify it shows the correct tree structure (not the one with `src/` and `methodology/`).
+
+### 4.2 Final docs/ structure
+
+After cleanup, the `docs/` folder should have exactly:
+
+```
+docs/
+├── QUICKSTART.md                   # 5‑minute setup
+├── INSTALLATION.md                 # Detailed installation
+├── RESEARCHER_GUIDE.md             # Operational manual
+├── WORKSPACE_TAXONOMY.md           # Full directory tree explanation
+├── MCP_TOOLS_REFERENCE.md          # Auto‑generated tool reference
+├── architecture/
+│   ├── ARCHITECTURE.md             # System architecture
+│   ├── AI_INTEGRATION.md           # How IDEs talk to Research OS
+│   └── GUIDANCE_SYSTEM.md          # Protocol system explanation
+├── tutorials/
+│   ├── EXAMPLE_WALKTHROUGH.md      # Full mock research session
+│   └── MODEL_SIZE_GUIDE.md         # Model‑size optimization
+└── manuals/
+    └── RESEARCHER_GUIDE.md         # (or keep at top level)
+```
+
+- [ ] **Reorganize all files into this structure.** Delete everything else.
+- [ ] **Ensure every remaining doc has accurate content** — no references to non‑existent tools, no descriptions of autonomous‑agent behavior, no stale directory paths.
+
+---
+
+## 🟡 HIGH: Templates — Missing Major IDE Templates
+
+The `templates/` directory has:
+- `AGENTS.md` ✓
+- `mcp_config.json` ✓
+- `.windsurf/` — should be removed (user said Windsurf is not a priority)
+- **Missing:** `.cursor/rules/research-os.mdc`
+- **Missing:** Claude Desktop rules
+- **Missing:** Antigravity rules
+- **Missing:** OpenCode/Codex rules
+
+**Required changes:**
+
+- [ ] **Delete `templates/.windsurf/`** — Not needed.
+- [ ] **Create `templates/.cursor/rules/research-os.mdc`** — Cursor‑specific rules file with the same content as `AGENTS.md` adapted to MDC format.
+- [ ] **Create `templates/.claude/rules/research-os.md`** — Claude Desktop / Claude Code rules.
+- [ ] **Create `templates/.antigravity/rules/research-os.md`** — Antigravity rules.
+- [ ] **Create `templates/opencode.json`** — OpenCode MCP config (exists in scaffold but not in templates).
+- [ ] **Ensure `templates/mcp_config.json`** is correct and ready to copy‑paste.
+
+---
+
+## 🟡 HIGH: Replace Branch System with Path‑Based Chronological Steps
+
+The user explicitly wants **no git branches** for research iteration. The current system (`create_experiment_branch`, `switch_branch`, `merge_branches`) implements git‑style branching with state tracking — this is the wrong model.
+
+### 5.1 The correct model: Numbered chronological experiment paths
+
+- Each experiment runs **consecutively**, not in parallel branches.
+- Experiments are numbered: `01_experiment_baseline/`, `02_data_preparation/`, `03_hypothesis_testing/`, etc.
+- If the researcher wants to abandon a path (e.g., after `02` and `03` they realize it's a dead end), they don't "delete" the folders — they **rename** them to indicate the path was stopped (e.g., `02_data_preparation__DEAD_END/`, `03_hypothesis_testing__ABANDONED/`) and create a new `04_alternative_approach/`.
+- The `analysis.md` log records every path change, dead end, and reroute.
+
+### 5.2 Required tool changes
+
+- [ ] **Remove `sys.branch.create`, `sys.branch.switch`, `sys.branch.list`, `sys.branch.merge`** from `TOOL_DEFINITIONS` and from `tools/actions/branch.py`.
+- [ ] **Replace with `sys.path.create`** — Creates the next numbered experiment directory (e.g., `workspace/02_data_preparation/`) with full sub‑structure.
+- [ ] **Add `sys.path.abandon`** — Renames a path directory to indicate it's been stopped (e.g., appends `__ABANDONED__` or `__DEAD_END__`) and records the rationale in `analysis.md`. Files are preserved, not deleted.
+- [ ] **Add `sys.path.list`** — Lists all experiment paths with their status (active, completed, abandoned, dead_end).
+- [ ] **Update `state_ledger.yaml`** to track paths instead of branches:
+  ```yaml
+  current_path: "03_hypothesis_testing"
+  paths:
+    - id: "01_experiment_baseline"
+      status: "completed"
+    - id: "02_data_preparation"
+      status: "abandoned"
+      rationale: "Data quality insufficient for this approach"
+    - id: "03_hypothesis_testing"
+      status: "active"
+  ```
+
+### 5.3 Versioned scripts within each path
+
+- [ ] **Scripts within each path are versioned** (e.g., `01_load_data_v1.py`, `01_load_data_v2.py`) — this is already the plan. The `sys.path.create` tool should create a `scripts/` directory with a `README.md` explaining the versioning convention.
+- [ ] **No git branches are created for the researcher** — the OS should never run `git branch` or `git checkout`. The only git operation is the initial `git init` (if enabled).
+
+---
+
+## 🟡 HIGH: Remove or Repurpose Unused `src/research_os/` Directories
+
+### 6.1 Empty or near‑empty directories
+
+- [ ] **`src/research_os/assets/prompts/`** — Empty directory. Delete or populate with onboarding prompt templates.
+- [ ] **`src/research_os/assets/data/`** — Empty directory. Delete.
+- [ ] **`src/research_os/prompts/`** — Empty directory (separate from assets/prompts). Delete or consolidate.
+- [ ] **`src/research_os/schemas/`** — Check contents. If only empty `__init__.py`, populate with actual JSON schemas for intake, analysis log, and synthesis output validation or delete.
+
+### 6.2 `semantic_state.py` (state/semantic_state.py)
+
+- [ ] **Evaluate `src/research_os/state/semantic_state.py`** — 1,370 bytes. If it's an incomplete semantic state layer that isn't wired into the MCP server, delete it. The state ledger is the single source of truth.
+
+### 6.3 `engine.py` imports validation
+
+- [ ] **`engine.py` imports from `runtime/hooks.py`, `intent_router.py`, `utils/asset_manager.py`, `utils/dag_manager.py`** — When deleting `engine.py`, verify these dependencies are not used elsewhere. If they are only used by `engine.py`, delete them too.
+
+### 6.4 `.pre-commit-config.yaml`
+
+- [ ] **Check `.pre-commit-config.yaml`** — This file exists in the repo root. If the researcher doesn't want pre‑commit hooks, remove it. If kept, ensure it's documented.
+
+---
+
+## 🟢 MEDIUM: Tests — Ensure They Don't Clutter & Add Missing Coverage
+
+### 7.1 Current test quality
+
+Tests use `tempfile.TemporaryDirectory()` which is correct — they don't pollute the real workspace. However:
+
+- [ ] **`test_core.py`** — Only tests scaffold, branching, and log_decision (25 lines). Add tests for: `sys.path.create`, `sys.path.abandon`, `sys.path.list` (when implemented).
+- [ ] **`test_state.py`** — 198 lines, comprehensive. Verify it tests the new path‑based system (not branches).
+- [ ] **`test_protocols.py`** — 9.4KB. Good. Verify all 10 protocols load correctly.
+- [ ] **`test_actions.py`** — 12KB. Verify all action imports are correct.
+- [ ] **`tests/integration/`** — Empty directory. Add `test_full_workflow.py` that mocks an end‑to‑end research session.
+
+### 7.2 Add scratch/ to .gitignore for tests
+
+- [ ] **Ensure `.gitignore` includes `scratch/`** so test artifacts are never committed.
+- [ ] **Verify all tests pass** with `pytest` after the structural changes above.
+
+---
+
+## 🟢 MEDIUM: Documentation Accuracy & Completeness
+
+### 8.1 ARCHITECTURE.md
+
+- [ ] **Replace ASCII diagram** — Current diagram (lines 6‑39) references non‑existent tools. Replace with a diagram showing the actual MCP tool categories: `sys.*`, `tool.*`, `mem.*`.
+- [ ] **Remove references to autonomous agents**, supervisors, critics, planners.
+
+### 8.2 RESEARCHER_GUIDE.md
+
+- [ ] **Expand** to be an operational manual (currently 1.4KB — too thin).
+- [ ] **Add sections:** First Project tutorial, populating `inputs/`, reading `analysis.md`, understanding `workflow.png`, troubleshooting common errors, config interview flow.
+- [ ] **Remove any references** to `sys.branch.*` tools and replace with `sys.path.*` tools.
+
+### 8.3 WORKSPACE_TAXONOMY.md
+
+- [ ] **Verify** it shows the correct directory tree (as in §1 above).
+- [ ] **Add explanation** of the path‑based chronological step system.
+
+### 8.4 AGENTS.md
+
+- [ ] **Add rule:** "If you are a small model, always load the light protocol first."
+- [ ] **Add rule:** "Before any Python execution, check `workspace/logs/data_inventory.json` for dataset size."
+- [ ] **Add rule:** "Never modify `inputs/raw_data/` or `inputs/literature/`. The OS will block you."
+- [ ] **Add rule:** "Every factual claim must be backed by a `tool.search.*` call and the result logged to `workspace/logs/searches.log`."
+
+---
+
+## 🔵 LOW: Final Polish
+
+### 9.1 Version consistency
+
+- [ ] **`src/research_os/__init__.py`** — Version should be `0.1.0`, matching `pyproject.toml`.
+- [ ] **`pyproject.toml`** — Package name should be `research-os` (already correct).
+
+### 9.2 Badge URLs
+
+- [ ] **Fix PyPI badge URL** in README.md — Should point to `research-os` package.
+- [ ] **Fix tests badge URL** — Should point to `VibhavSetlur/Research-OS` (capitalization matters).
+
+### 9.3 Remove placeholder content
+
+- [ ] **README.md line 6** — Remove placeholder image URL.
+- [ ] **README.md** — Remove `*(Pre-Release Build)*` tag.
+
+### 9.4 Code quality
+
+- [ ] **Run `ruff check .` and `ruff format .`** across the entire codebase.
+- [ ] **Remove any `__pycache__/` directories** that may have been committed.
+
+---
+
+## 📋 FINAL CHECKLIST BEFORE RELEASE
+
+- [ ] README shows correct workspace tree (no `src/`, no `methodology/`, no `workspace_logs/`)
+- [ ] `engine.py` deleted or completely rewritten
+- [ ] `scaffold_minimal_workspace()` builds the correct directory structure
+- [ ] Config written to `inputs/researcher_config.yaml`, not `.os_state/config.yaml`
+- [ ] No `llm_provider` in config
+- [ ] Git auto‑init is optional or removed
+- [ ] Docs folder reduced from 24 files to ~12 well‑organized files
+- [ ] Templates cover Cursor, Claude, Antigravity, Codex
+- [ ] Branch system replaced with path‑based chronological steps
+- [ ] Empty asset directories deleted or populated
+- [ ] All tests pass
+- [ ] No documentation references non‑existent tools
+- [ ] Package installs with `pip install research-os`
+- [ ] `python -m research_os.server` starts without import errors
 
 ---
 
@@ -223,16 +363,18 @@ The protocols are 20-32 lines each. They have version numbers and caching, but t
 
 | Priority | Area | Tasks | Est. Effort |
 |----------|------|-------|-------------|
-| 🔴 Critical | Naming & Branding | §1.1-1.4 | ✅ Done |
-| 🔴 Critical | Documentation Fixes | §2.1-2.5 | ✅ Done |
-| 🟡 High | Code Quality | §3.1-3.5 | ✅ Done |
-| 🟡 High | Templates | §4.1-4.2 | ✅ Done |
-| 🟡 High | Protocol Depth | §5.1-5.3 | ✅ Done |
-| 🟢 Medium | Tests | §6.1-6.3 | ✅ Done (125 tests) |
-| 🟢 Medium | Missing Features | §7.1-7.3 | ✅ Done |
-| 🔵 Low | Polish | §8.1-8.4 | ✅ Done |
-| | | **Status** | **Complete** |
+| 🔴 Critical | README fix | §1 | 1 hour |
+| 🔴 Critical | Delete/rewrite engine.py | §2 | 2 hours |
+| 🔴 Critical | Scaffold rebuild | §3 | 5 hours |
+| 🟡 High | Docs cleanup | §4 | 4 hours |
+| 🟡 High | Templates | §5 | 2 hours |
+| 🟡 High | Path system | §6 | 5 hours |
+| 🟡 High | Unused directories | §7 | 2 hours |
+| 🟢 Medium | Tests | §8 | 3 hours |
+| 🟢 Medium | Doc accuracy | §9 | 3 hours |
+| 🔵 Low | Polish | §10 | 2 hours |
+| | | **Total** | **~29 hours** |
 
 ---
 
-*This TODO is exhaustive. Complete every checkbox above, and the repository will be professional, consistent, and ready for public release. Start with the Critical items — they block everything else from looking correct.*
+*This is the complete, final TODO. Start with the Critical items — the README tree and `engine.py` are actively misleading to anyone who clones the repository. Then rebuild the scaffold to create the correct user workspace, clean the docs, and implement the path‑based step system.*

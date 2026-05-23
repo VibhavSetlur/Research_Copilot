@@ -1,4 +1,3 @@
-import pytest
 import json
 from unittest.mock import patch, MagicMock
 from research_os.tools.actions.web_search import search_web

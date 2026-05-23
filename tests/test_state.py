@@ -1,6 +1,5 @@
 """Tests for state ledger operations — checkpoints, branches, load/save."""
 
-import json
 from pathlib import Path
 
 import pytest

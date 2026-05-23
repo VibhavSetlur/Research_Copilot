@@ -7,14 +7,16 @@ Every Research OS project follows a strict, reproducible directory structure. Th
 ## Top-Level Structure
 
 ```
-project/
-├── inputs/          # IMMUTABLE — original data (read-only by tools)
-├── workspace/       # Active research area
-├── synthesis/       # Final paper outputs
-├── docs/            # Research documentation
-├── environment/     # Reproducible environments
-├── .os_state/       # Internal state (DO NOT EDIT)
-└── .research/       # Cache and configuration
+<user-project>/
+├── AGENTS.md                # AI agent instructions
+├── README.md                # Auto-generated project overview
+├── .cursor/rules/           # Cursor-specific rules
+├── .os_state/               # INTERNAL — OS state (DO NOT EDIT)
+├── docs/                    # Research documentation
+├── inputs/                  # IMMUTABLE — original data (read-only by tools)
+├── workspace/               # Active research area
+├── synthesis/               # Final paper outputs
+└── environment/             # Reproducible environments
 ```
 
 ---
@@ -58,16 +60,18 @@ The core research area. All analysis happens here.
 
 ```
 workspace/
-├── 01_exploration/          # Numbered experiment folders
+├── 01_experiment_baseline/  # Numbered experiment directories
 │   ├── README.md            # Goal, methods, outcomes, next-step decision
 │   ├── conclusions.md       # Key findings and next steps
-│   ├── data/                # Experiment-specific data
-│   ├── scripts/             # Analysis scripts
-│   └── outputs/
-│       ├── figures/         # Publication-ready figures
-│       ├── reports/         # Analysis reports
-│       └── dashboards/      # Interactive dashboards
-├── 02_causal_model/         # Next experiment (created by sys.branch.create)
+│   ├── data/                # Experiment-specific derived data
+│   ├── scripts/             # Versioned analysis scripts (01_load_v1.py, ...)
+│   ├── outputs/
+│   │   ├── figures/         # Publication-ready figures
+│   │   ├── reports/         # Analysis reports
+│   │   ├── tables/          # Summary tables
+│   │   └── dashboards/      # Interactive dashboards
+│   └── environment/         # Pinned dependencies
+├── 02_data_preparation/     # Next experiment (created by sys.path.create)
 │   └── ...
 ├── analysis.md              # Chronological log + Mermaid workflow diagram
 ├── methods.md               # Append-only method registry
@@ -75,15 +79,19 @@ workspace/
 ├── workflow.mermaid         # Auto-updated state diagram
 ├── workflow.png             # Rendered diagram (if mmdc installed)
 ├── logs/
+│   ├── searches.log         # Every web search logged (JSON lines)
 │   ├── state_changes.log    # Before/after diffs of state ledger
-│   └── ...                  # Execution logs
-├── figures/                 # Shared workspace-level figures
-└── dashboards/              # Shared dashboards
+│   ├── notifications.log    # Researcher notifications
+│   ├── data_inventory.json  # Auto-profiled data inventory
+│   └── ...                  # Per-step execution logs
+└── .os_state/               # Symlink to root .os_state/
 ```
 
 ### Numbered Experiment Folders (`01_`, `02_`, ...)
 
-Created by `sys.branch.create`. Each folder is a self-contained step.
+Created by `sys.path.create`. Each folder is a self-contained step.
+
+**Path-based chronological system:** Experiments run consecutively, not in parallel branches. Each gets an auto-incrementing number (`01_experiment_baseline/`, `02_data_preparation/`, `03_hypothesis_testing/`). If a path reaches a dead end, use `sys.path.abandon` to rename it with a `__DEAD_END__` or `__ABANDONED__` suffix — files are preserved, not deleted. The `analysis.md` log records every path change and reroute.
 
 **`README.md`** contains:
 - **Goal**: What this experiment aims to discover
@@ -113,7 +121,7 @@ Append-only. Every tool that runs a statistical test, data transformation, or li
 ## 2026-05-22 14:03:00
 - **Method**: Welch t-test
   - **Parameters**: equal_var=False, alpha=0.05
-  - **Tool**: tool.statistical.test
+  - **Tool**: tool.search.semantic_scholar / manual
   - **Citation**: student1908
 ```
 
@@ -175,39 +183,24 @@ Managed entirely by Research OS. Manual edits may corrupt the state machine.
 ```
 .os_state/
 ├── state_ledger.yaml      # Primary source of truth (YAML)
-├── state_ledger.json      # JSON backup for compatibility
-├── manifest.json          # Workspace manifest
+├── manifest.json          # Workspace manifest with file checksums
 ├── checkpoints/           # Workspace snapshots (created by sys.checkpoint)
 │   ├── before_model_training/
 │   │   └── checkpoint_manifest.json
 │   └── ...
-└── replay_logs/           # Session replay for audit
+└── cache/                 # API response cache
 ```
 
 ### `state_ledger.yaml`
 
 The single source of truth. Contains:
 - `project_id`, `project_name`
-- `current_branch`, `step`, `pipeline_stage`
-- `branches`: all branches with status, hypothesis, creation time
+- `current_path`, `step`, `pipeline_stage`
+- `paths`: all experiment paths with status, hypothesis, creation time
 - `checkpoint_history`: ordered list of snapshots
 - `updated_at`: ISO timestamp of last change
 
 Updated atomically (temp file + rename) after every tool execution. Before/after diffs logged to `workspace/logs/state_changes.log`.
-
----
-
-## `.research/` — Cache
-
-```
-.research/
-├── config.yaml            # User configuration
-├── cache/                 # Disk cache (SQLite, skill index, etc.)
-│   ├── scratchpad.txt     # IDE scratchpad
-│   ├── state_cache.sqlite
-│   └── skill_index.json
-└── assets/                # Bundled assets (templates, rules, etc.)
-```
 
 ---
 
@@ -216,7 +209,7 @@ Updated atomically (temp file + rename) after every tool execution. Before/after
 | Rule | Enforcement |
 |------|-------------|
 | `inputs/` is immutable | `WriteProtectedError` at tool level |
-| Experiments are numbered `01_`, `02_`, ... | `sys.branch.create` auto-numbers |
+| Experiments are numbered `01_`, `02_`, ... | `sys.path.create` auto-numbers |
 | Every experiment has a `README.md` | Created by `create_numbered_experiment()` |
 | `methods.md` is append-only | `mem.methods.append` appends, never overwrites |
 | `analysis.md` contains Mermaid diagram | `sys.analysis.log` updates diagram + log |

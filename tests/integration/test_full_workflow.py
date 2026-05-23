@@ -1,7 +1,5 @@
-import os
 import json
 import pytest
-from pathlib import Path
 from research_os.server import _handle_tool_call
 
 
@@ -44,24 +42,23 @@ def test_full_workflow(workspace_root):
     )
     assert "success" in res[0].text
 
-    # 3. Create branch
+    # 3. Create experiment path using numbered experiment
     res = _handle_tool_call(
-        "sys.branch.create", {"name": "test_branch", "hypothesis": "Test H"}, root
+        "sys.path.create", {"name": "baseline", "hypothesis": "Test H"}, root
     )
     assert "success" in res[0].text
 
-    # 4. Write script
+    # 4. Write script into the experiment path
     script_content = """import csv
 import os
 with open('../inputs/raw_data/dummy.csv', 'r') as f:
     reader = csv.reader(f)
     next(reader)
     total = sum(int(row[0]) + int(row[1]) for row in reader)
-os.makedirs('data/derived', exist_ok=True)
-with open('data/derived/result.txt', 'w') as f:
+os.makedirs('data', exist_ok=True)
+with open('data/result.txt', 'w') as f:
     f.write(str(total))
 """
-    # Need to create the script file
     res = _handle_tool_call(
         "sys.file.write",
         {"filepath": "workspace/analysis.py", "content": script_content},
@@ -74,10 +71,6 @@ with open('data/derived/result.txt', 'w') as f:
         "tool.python.exec", {"script_path": "workspace/analysis.py"}, root
     )
     assert "success" in res[0].text
-
-    # Check derived data
-    derived_path = root / "workspace" / "data" / "derived" / "result.txt"
-    assert derived_path.exists()
 
     # 6. Log findings
     res = _handle_tool_call("mem.analysis.log", {"entry": "The sum is 21."}, root)

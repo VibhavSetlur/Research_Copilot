@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Any
 from pathlib import Path
-import re
 
 logger = logging.getLogger("research.tools.audit")
 

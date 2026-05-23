@@ -242,6 +242,21 @@ class TestExpectedStructure:
         yamls = list(pdir.glob("*.yaml"))
         assert len(yamls) > 0
 
+    def test_all_real_protocols_load_successfully(self):
+        root = Path(__file__).resolve().parent.parent
+        pdir = root / "src" / "research_os" / "protocols"
+        for p in sorted(pdir.glob("*.yaml")):
+            result = get_protocol(p.stem, root)
+            assert "error" not in result, (
+                f"Protocol '{p.stem}' failed to load: {result.get('error')}"
+            )
+            assert "content" in result
+            loaded = yaml.safe_load(result["content"])
+            assert loaded is not None
+            assert loaded.get("name") == p.stem
+            assert "version" in loaded
+            assert "steps" in loaded
+
     def test_light_dir_exists(self):
         root = Path(__file__).resolve().parent.parent
         ldir = root / "src" / "research_os" / "protocols" / "light"

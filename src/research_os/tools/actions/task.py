@@ -1,8 +1,6 @@
 import logging
 import os
 import signal
-import subprocess
-import sys
 import json
 from typing import Dict, Any, Optional
 from pathlib import Path

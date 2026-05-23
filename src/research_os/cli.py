@@ -151,7 +151,6 @@ def _print_mcp_snippet(project_root: Path) -> None:
     """Print the MCP JSON snippet that users paste into their IDE."""
     import sys as _sys
 
-    server_cmd = f"{_sys.executable} -m research_os.server"
     snippet = {
         "research-os": {
             "command": _sys.executable,
@@ -440,23 +439,13 @@ def cmd_workflow(args: argparse.Namespace) -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    from research_os.engine import ResearchEngine
-
-    root = _project_root()
-    engine = ResearchEngine(root, hitl_enabled=False)
-    print("=" * 60)
-    print("RESEARCH OS - RUN")
-    print("=" * 60)
-    print(f"Query: {args.query}")
-    print("Booting engine...\n")
-    result = engine.route_and_execute(args.query, depth=args.depth or "academic")
-    print(f"\nRun completed with status: {result.get('status', 'unknown')}")
+    print("The `run` command (autonomous execution engine) has been removed.")
+    print("Research OS is an MCP-native server — the IDE provides the intelligence.")
 
 
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Run comprehensive pre-flight checks and output READY / NOT READY status."""
     import os
-    import subprocess
     from research_os.config import settings
 
     print("=" * 60)
@@ -753,13 +742,10 @@ def cmd_continue(args: argparse.Namespace) -> None:
     if args.approve:
         ledger.update(phase="running", hitl_pending=None)
         print("Plan approved. Resuming workflow...")
-        from research_os.engine import ResearchEngine
-
-        engine = ResearchEngine(root, hitl_enabled=False)
-        query = pending.get("query", "")
-        depth = pending.get("depth", "academic")
-        result = engine.route_and_execute(query, depth=depth)
-        print(f"Resume status: {result.get('status', 'completed')}")
+        print("The autonomous execution engine has been removed.")
+        print(
+            "Research OS is an MCP-native server — the IDE provides the intelligence."
+        )
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:

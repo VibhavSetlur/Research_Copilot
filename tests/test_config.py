@@ -1,7 +1,6 @@
 import pytest
 import yaml
 import os
-from pathlib import Path
 
 from research_os.tools.actions.config import (
     init_config,

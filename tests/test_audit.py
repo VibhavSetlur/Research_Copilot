@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from research_os.tools.actions.audit import audit_synthesis
 
 

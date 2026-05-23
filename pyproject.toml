@@ -45,5 +45,11 @@ all = [
 [project.scripts]
 research-os = "research_os.server:main"
 
+[tool.ruff.lint]
+per-file-ignores = { "src/research_os/server.py" = ["E402"], "src/research_os/state/state_ledger.py" = ["E402"], "src/research_os/tools/actions/citation_verifier.py" = ["E402"], "src/research_os/utils/executor.py" = ["E402"], "src/research_os/utils/parallel_runner.py" = ["E402"], "src/research_os/utils/skill_indexer.py" = ["E402"] }
+
+[tool.pytest.ini_options]
+norecursedirs = ["scratch", "scripts", ".git", "templates"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/research_os"]

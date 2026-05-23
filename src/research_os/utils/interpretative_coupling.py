@@ -312,7 +312,7 @@ def generate_figure_interpretation(state: dict, *args, **kwargs) -> dict:
     if not figure_path:
         return state
 
-    project_root = _find_project_root()
+    project_root = find_project_root()
     coupler = InterpretativeCoupler(project_root)
 
     try:

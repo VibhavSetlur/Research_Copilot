@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import os
@@ -27,16 +26,6 @@ def _resolve_root(root: Path | None = None) -> Path:
     if not r:
         raise ValueError("Could not find project root containing .os_state/")
     return r
-
-
-EXPERIMENT_SUBDIRS = [
-    "scripts",
-    "outputs",
-    "outputs/figures",
-    "outputs/tables",
-    "outputs/artifacts",
-    "outputs/analysis",
-]
 
 
 def slugify(value: str, fallback: str = "branch") -> str:
@@ -121,8 +110,6 @@ def _compute_state_diff(before: dict, after: dict) -> list[str]:
 
     added = after_branches - before_branches
     removed = before_branches - after_branches
-    common = before_branches & after_branches
-
     if before.get("current_branch") != after.get("current_branch"):
         lines.append(
             f"  branch switch: {before.get('current_branch')} → {after.get('current_branch')}"
@@ -281,7 +268,10 @@ def write_readme(path: Path, title: str, body: str) -> None:
 
 
 def scaffold_minimal_workspace(
-    root: Path, project_name: str, config_overrides: dict | None = None
+    root: Path,
+    project_name: str,
+    config_overrides: dict | None = None,
+    git_init: bool = False,
 ) -> None:
     """Create the unified workspace directory structure and .os_state config.
 
@@ -323,12 +313,6 @@ def scaffold_minimal_workspace(
     directories = {
         "workspace": "Active experimentation area — iterative research lives here",
         "workspace/logs": "Execution logs and provenance records",
-        "workspace/data": "Derived and processed datasets",
-        "workspace/data/derived": "Cleaned, transformed, and processed data files",
-        "workspace/figures": "300-DPI publication-ready figures and visualizations",
-        "workspace/reports": "Markdown analysis reports per experiment step",
-        "workspace/dashboards": "Interactive HTML dashboards",
-        "workspace/scripts": "Numbered analysis scripts (01_load.py, 02_eda.py, ...)",
         "synthesis": "Final consolidated outputs — paper, abstract, bibliography",
         "environment": "Reproducible environments (requirements.txt, Dockerfile)",
     }
@@ -365,56 +349,31 @@ def scaffold_minimal_workspace(
             "*Each entry has a `verified` flag for the citation_verifier.*\n\n"
         )
 
-    # Generate strict mplstyle for figures
-    mplstyle_path = root / "workspace" / "figures" / "research_style.mplstyle"
-    if not mplstyle_path.exists():
-        mplstyle_path.write_text(
-            "figure.dpi: 300\n"
-            "savefig.dpi: 300\n"
-            "axes.titlesize: 14\n"
-            "axes.labelsize: 12\n"
-            "axes.prop_cycle: cycler('color', ['440154', '414487', '2a788e', '22a884', '7ad151', 'fde725'])\n"
-            "font.family: sans-serif\n"
-            "font.sans-serif: Arial, Helvetica, sans-serif\n"
-            "lines.linewidth: 2\n"
-            "axes.grid: True\n"
-            "grid.alpha: 0.3\n"
-        )
-
-    # ── Auto-generate config.yaml from questionnaire or defaults ──
-    os_state_dir = root / ".os_state"
-    os_state_dir.mkdir(parents=True, exist_ok=True)
-    config_path = os_state_dir / "config.yaml"
-    if not config_path.exists():
+    # ── Auto-generate researcher_config.yaml from questionnaire or defaults ──
+    researcher_config_path = root / "inputs" / "researcher_config.yaml"
+    if not researcher_config_path.exists():
         depth = config_overrides.get("depth", "academic")
         domain = config_overrides.get("domain", "general")
-        provider = config_overrides.get("provider", "openai")
         research_question = config_overrides.get("research_question", "")
 
         config_lines = [
-            "# Research OS — Project Configuration",
+            "# Research OS — Researcher Configuration",
             f'project_id: "{project_name}"',
             f'research_question: "{research_question}"',
             f'domain: "{domain}"',
             'schema_version: "10.0.0"',
             f'default_depth: "{depth}"',
-            'default_workflow: "quick_exploratory"',
-            f'llm_provider: "{provider}"',
-            "branching:",
-            "  enabled: true",
             "data_scale_thresholds:",
             "  medium_mb: 100",
             "  large_gb: 1",
             "  massive_gb: 10",
-            "execution:",
-            "  supported_runtimes: [python, r, bash]",
             "dependency_management:",
             "  auto_detect: true",
             '  requirements_file: "environment/requirements.txt"',
             "quality_gates_enabled: true",
             "pin_dependency_versions: true",
         ]
-        config_path.write_text("\n".join(config_lines) + "\n")
+        researcher_config_path.write_text("\n".join(config_lines) + "\n")
 
     # Symlink .os_state into workspace for easier access by scripts
     workspace_os_state = root / "workspace" / ".os_state"
@@ -436,7 +395,7 @@ def scaffold_minimal_workspace(
             f"- Domain: {domain}\n"
             f"- Depth: {depth}\n\n"
             "## Research Question\n\n"
-            f"{rq if rq else '(Set your research question in .os_state/config.yaml)'}\n\n"
+            f"{rq if rq else '(Set your research question in inputs/researcher_config.yaml)'}\n\n"
             "## Input Files\n\n"
             "- Place raw data in `inputs/raw_data/`\n"
             "- Place literature PDFs in `inputs/literature/`\n"
@@ -445,31 +404,53 @@ def scaffold_minimal_workspace(
             f"- Date: {datetime.now(timezone.utc).date().isoformat()}\n"
         )
 
-    notebook = root / "workspace" / "lab_notebook.md"
-    if not notebook.exists():
-        notebook.parent.mkdir(parents=True, exist_ok=True)
-        notebook.write_text(
-            f"# Lab Notebook - {project_name}\n\n"
-            "> Append-only chronological record of research thoughts and AI actions.\n\n"
-            f"## {datetime.now(timezone.utc).date().isoformat()}\n"
-            "- Initialized clean Research OS workspace.\n"
+    # ── Initialize workflow.mermaid ──
+    workflow_mermaid = root / "workspace" / "workflow.mermaid"
+    if not workflow_mermaid.exists():
+        workflow_mermaid.write_text(
+            "graph TD\n"
+            "    init[Initialize Project]:::complete\n"
+            "    classDef complete fill:#d4edda,stroke:#28a745\n"
         )
 
-    baseline_decisions = root / "workspace" / "logs" / "decisions.yaml"
-    if not baseline_decisions.exists():
-        baseline_decisions.write_text(
-            "schema_version: '1.0'\n"
-            "experiment_id: main\n"
-            "parent_experiment: null\n"
-            f"created: {now_iso()}\n"
-            "input_data_hashes: {}\n"
-            "decisions:\n"
-            "  decision_001:\n"
-            f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
-            "    context: Clean workspace initialized from packaged Research OS assets.\n"
-            "    selected: Unified workspace directory structure.\n"
-            "    rationale: Keeps user workspace strictly unified while preserving provenance.\n"
-            "    linked_literature: []\n"
+    # ── Create first numbered experiment step (01_experiment_baseline) ──
+    experiment_dir = root / "workspace" / "01_experiment_baseline"
+    if not experiment_dir.exists():
+        for sub in [
+            "data",
+            "scripts",
+            "outputs/reports",
+            "outputs/figures",
+            "outputs/tables",
+            "outputs/dashboards",
+            "environment",
+        ]:
+            (experiment_dir / sub).mkdir(parents=True, exist_ok=True)
+        readme = experiment_dir / "README.md"
+        readme.write_text(
+            f"# Experiment: 01_experiment_baseline\n\n"
+            f"*Created: {now_iso()}*\n\n"
+            "## Goal\n\n"
+            "*(Define the goal of this baseline experiment)*\n\n"
+            "## Input Data\n\n"
+            "- *(List input files used)*\n\n"
+            "## Methods Used\n\n"
+            "- *(List statistical methods, transforms, models)*\n\n"
+            "## Expected Output\n\n"
+            "- *(Describe expected outputs)*\n\n"
+            "## Actual Output\n\n"
+            "- *(Describe actual results after execution)*\n\n"
+            "## Next-Step Decision\n\n"
+            "- *(proceed / branch / dead-end)*\n"
+        )
+        conclusions = experiment_dir / "conclusions.md"
+        conclusions.write_text(
+            f"# 01_experiment_baseline — Conclusions\n\n"
+            f"*Created: {now_iso()}*\n\n"
+            "## Summary\n\n"
+            "*(Summarize key findings here after analysis.)*\n\n"
+            "## Next Steps\n\n"
+            "*(Describe what to do next — proceed or abandon.)*\n"
         )
 
     manifest = {
@@ -495,7 +476,8 @@ def scaffold_minimal_workspace(
     _copy_environment_to_project(root)
     _setup_mcp_configs(root)
     _setup_gitignore(root)
-    _initialize_git(root)
+    if git_init:
+        _initialize_git(root)
     _run_preflight_checks()
 
 
@@ -591,7 +573,6 @@ def _setup_mcp_configs(root: Path) -> None:
     """Generate default MCP configuration for popular AI IDEs."""
     import sys as _sys
 
-    server_cmd = f"{_sys.executable} -m research_os.server --transport stdio"
     mcp_entry = {
         "command": _sys.executable,
         "args": ["-m", "research_os.server", "--transport", "stdio"],
@@ -950,7 +931,7 @@ def regenerate_intake(
     project_name = project_name or state.get("project_name", "Research OS Project")
 
     # Determine domain and depth from config
-    config_path = root / ".os_state" / "config.yaml"
+    config_path = root / "inputs" / "researcher_config.yaml"
     domain = config_overrides.get("domain", "general")
     depth = config_overrides.get("depth", "academic")
     if config_path.exists() and yaml:
@@ -993,7 +974,7 @@ def regenerate_intake(
         "",
         "## Research Question",
         "",
-        f"{config_overrides.get('research_question', '(Set in .os_state/config.yaml)')}",
+        f"{config_overrides.get('research_question', '(Set in inputs/researcher_config.yaml)')}",
         "",
         "## Keywords",
         "",
@@ -1081,8 +1062,9 @@ EXPERIMENT_SUBDIRS = [
     "scripts",
     "outputs/reports",
     "outputs/figures",
+    "outputs/tables",
     "outputs/dashboards",
-    ".meta",
+    "environment",
 ]
 
 
@@ -1252,9 +1234,7 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
 
     # workflow_diagram.png auto-generation
     import shutil
-    from research_os.project_ops import render_workflow_diagram
 
-    diagram_result = render_workflow_diagram(root)
     workflow_png_path = root / "workspace" / "workflow.png"
     synthesis_diagram_path = synthesis_dir / "workflow_diagram.png"
     if workflow_png_path.exists():

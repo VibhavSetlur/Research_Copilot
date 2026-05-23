@@ -1,12 +1,10 @@
 import logging
 import json
-import os
-from typing import Dict, Any, List
+from typing import Dict, Any
 from tenacity import (
     retry,
     wait_exponential,
     stop_after_attempt,
-    retry_if_exception_type,
 )
 from research_os.config import settings
 from pathlib import Path
@@ -104,8 +102,6 @@ def search_web(query: str, limit: int = 5) -> Dict[str, Any]:
 
 def scrape_web(url: str) -> Dict[str, Any]:
     try:
-        import urllib.request
-
         try:
             import trafilatura
         except ImportError:

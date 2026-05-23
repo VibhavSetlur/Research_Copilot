@@ -490,7 +490,7 @@ def enforce_semantic_taxonomy(state: dict, *args, **kwargs) -> dict:
     if not generated_file:
         return state
 
-    project_root = _find_project_root()
+    project_root = find_project_root()
     enforcer = SemanticFilesystemEnforcer(project_root)
 
     try:

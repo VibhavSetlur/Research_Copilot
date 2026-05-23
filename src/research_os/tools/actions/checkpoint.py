@@ -1,8 +1,6 @@
-import shutil
 import zipfile
-import tempfile
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger("research.tools.checkpoint")
@@ -50,10 +48,8 @@ def create_checkpoint(description: str, root: Path) -> Dict[str, Any]:
 
 
 def rollback_checkpoint(checkpoint_id: str, root: Path) -> Dict[str, Any]:
-    from research_os.state.checkpoint_manager import CheckpointManager
 
     try:
-        cm = CheckpointManager(root / ".research" / "checkpoints")
         files = list((root / ".research" / "checkpoints").glob(f"{checkpoint_id}.json"))
         if not files:
             return {

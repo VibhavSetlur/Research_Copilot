@@ -4,21 +4,17 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -66,7 +62,7 @@ from research_os.tools.actions.interaction import (
     checkpoint_approve,
 )
 from research_os.tools.actions.external_mcp import discover_mcp
-from research_os.tools.actions.task import task_monitor, task_kill, task_create
+from research_os.tools.actions.task import task_monitor, task_kill
 from research_os.tools.actions.data import data_sample
 from research_os.tools.actions.search import (
     search_semantic_scholar,
@@ -947,15 +943,6 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
         p = root / arguments["script_path"]
         if not p.exists() or not p.is_file():
             return _text(_error_envelope("Script not found"))
-
-        try:
-            inventory_path = root / "workspace" / "logs" / "data_inventory.json"
-            if inventory_path.exists():
-                with open(inventory_path, "r") as f:
-                    inv = json.load(f)
-                est_sec = inv.get("estimated_processing_time_seconds", 0)
-        except Exception:
-            pass
 
         # Determine step for logging
         step_name = p.stem
