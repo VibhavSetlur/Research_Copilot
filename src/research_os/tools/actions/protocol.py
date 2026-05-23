@@ -1,117 +1,105 @@
-from typing import Dict, Any
+import logging
 from pathlib import Path
 import yaml
-import logging
+from typing import Dict, Any
 
 logger = logging.getLogger("research.tools.protocol")
 
-_PROTOCOL_CACHE: Dict[str, Dict[str, Any]] = {}
+PROTOCOLS_DIR = Path(__file__).parent.parent.parent / "protocols"
+LIGHT_DIR = PROTOCOLS_DIR / "light"
 
+def _find_protocol_file(name: str, light: bool = False) -> Path | None:
+    base = LIGHT_DIR if light else PROTOCOLS_DIR
+    if "/" in name:
+        rel_path = name + ".yaml"
+        candidate = base / rel_path
+        return candidate if candidate.exists() else None
+    else:
+        # search recursively for name.yaml
+        for yaml_file in base.rglob("*.yaml"):
+            if yaml_file.stem == name:
+                return yaml_file
+        return None
 
-def get_protocol(name: str, root: Path) -> Dict[str, Any]:
+def load_protocol(name: str, light: bool = False) -> dict:
+    file = _find_protocol_file(name, light)
+    if not file:
+        raise FileNotFoundError(f"Protocol {name} not found")
+    with open(file) as f:
+        return yaml.safe_load(f)
+
+def list_protocols(light: bool = False) -> list[dict]:
+    base = LIGHT_DIR if light else PROTOCOLS_DIR
+    protocols = []
+    for yaml_file in base.rglob("*.yaml"):
+        # We need to correctly relative the file to base
+        # But if we use light=False, base=PROTOCOLS_DIR. It will also iterate over PROTOCOLS_DIR / "light"!
+        # We should skip the light directory if light=False
+        if not light and "light" in yaml_file.parts:
+            continue
+            
+        rel = yaml_file.relative_to(base).with_suffix("")
+        name = str(rel).replace("\\", "/")
+        try:
+            with open(yaml_file) as f:
+                data = yaml.safe_load(f)
+            summary = data.get("description", "")
+        except:
+            summary = ""
+        protocols.append({"name": name, "summary": summary})
+    return protocols
+
+def validate_protocol(name: str, root: Path = None) -> Dict[str, Any]:
     try:
-        if name in _PROTOCOL_CACHE:
-            return {"content": yaml.dump(_PROTOCOL_CACHE[name])}
-
-        p_dir = root / "src" / "research_os" / "protocols"
-        if not p_dir.exists():
-            p_dir = Path(__file__).parent.parent.parent / "protocols"
-            
-        if not p_dir.exists():
-            return {"error": "Protocol directory not found"}
-
-        # Search recursively
-        found_file = None
-        for file in p_dir.rglob(f"{name}.yaml"):
-            # If name doesn't specify light/, avoid matching light/ versions if there are duplicates
-            # but if name starts with light/, let it match.
-            if "light/" not in name and "/light/" in file.as_posix():
-                continue
-            found_file = file
-            break
-            
-        if not found_file:
-            return {"error": "Protocol not found"}
-
-        data = yaml.safe_load(found_file.read_text())
-        _PROTOCOL_CACHE[name] = data
-        return {"content": yaml.dump(data)}
-    except Exception as e:
-        logger.error(f"Get protocol failed: {e}")
-        return {"error": str(e)}
-
-
-def list_protocols(root: Path) -> Dict[str, Any]:
-    try:
-        p_dir = root / "src" / "research_os" / "protocols"
-        if not p_dir.exists():
-            p_dir = Path(__file__).parent.parent.parent / "protocols"
-        if not p_dir.exists():
-            return {"error": "Protocols directory not found"}
-        protocols = []
-        for p in p_dir.rglob("*.yaml"):
-            # skip light directory for list
-            if "light" in p.parts:
-                continue
-            try:
-                name = p.stem
-                if name in _PROTOCOL_CACHE:
-                    data = _PROTOCOL_CACHE[name]
-                else:
-                    data = yaml.safe_load(p.read_text())
-                    _PROTOCOL_CACHE[name] = data
-
-                protocols.append(
-                    {
-                        "name": name,
-                        "description": data.get("description", ""),
-                        "version": data.get("version", "1.0.0"),
-                    }
-                )
-            except Exception:
-                pass
-        return {"protocols": protocols}
-    except Exception as e:
-        logger.error(f"List protocols failed: {e}")
-        return {"error": str(e)}
-
-
-def validate_protocol(name: str, root: Path) -> Dict[str, Any]:
-    try:
-        p_dir = root / "src" / "research_os" / "protocols"
-        if not p_dir.exists():
-            p_dir = Path(__file__).parent.parent.parent / "protocols"
-            
-        found_file = None
-        for file in p_dir.rglob(f"{name}.yaml"):
-            if "light/" not in name and "/light/" in file.as_posix():
-                continue
-            found_file = file
-            break
-            
-        if not found_file:
-            return {"error": "Protocol not found"}
-
-        data = yaml.safe_load(found_file.read_text())
+        data = load_protocol(name)
         expected_outputs = data.get("expected_outputs", [])
 
         checklist = []
         all_passed = True
 
-        for output in expected_outputs:
-            path_str = output.split(":")[0].strip()
-            item_path = root / path_str
-            passed = item_path.exists()
-            if not passed:
-                all_passed = False
-            checklist.append({"item": output, "passed": passed})
+        if root:
+            for item in expected_outputs:
+                if ":" in item:
+                    path_str = item.split(":")[0].strip()
+                else:
+                    path_str = item.strip()
+                
+                # Simple wildcard matching for workspace/*/
+                if "workspace/*/" in path_str:
+                    workspace_dir = root / "workspace"
+                    if not workspace_dir.exists():
+                        checklist.append({"item": path_str, "status": "fail"})
+                        all_passed = False
+                        continue
+                    
+                    found = False
+                    for child in workspace_dir.iterdir():
+                        if child.is_dir() and child.name[:2].isdigit():
+                            candidate = child / path_str.split("workspace/*/")[1]
+                            if candidate.exists():
+                                found = True
+                                break
+                    if found:
+                        checklist.append({"item": path_str, "status": "pass"})
+                    else:
+                        checklist.append({"item": path_str, "status": "fail"})
+                        all_passed = False
+                else:
+                    p = root / path_str
+                    if p.exists():
+                        checklist.append({"item": path_str, "status": "pass"})
+                    else:
+                        checklist.append({"item": path_str, "status": "fail"})
+                        all_passed = False
 
         return {
-            "status": "success",
             "protocol": name,
-            "all_passed": all_passed,
             "checklist": checklist,
+            "all_passed": all_passed,
+            "expected_count": len(expected_outputs),
         }
+    except FileNotFoundError:
+        return {"error": "Protocol not found"}
     except Exception as e:
         logger.error(f"Validate protocol failed: {e}")
         return {"error": str(e)}

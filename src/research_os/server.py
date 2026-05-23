@@ -62,7 +62,7 @@ from research_os.tools.actions.search import (
     search_crossref,
 )
 from research_os.tools.actions.protocol import (
-    get_protocol,
+    load_protocol,
     list_protocols,
     validate_protocol,
 )
@@ -720,48 +720,31 @@ def _log_search(root: Path, tool_name: str, query: str, count: int):
 
 
 def _handle_sys_guidance_list(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = list_protocols(root)
-        if "error" in res:
-            return _text(_error_envelope(res["error"]))
-        # Lazy loading tier 1
-        summaries = [
-            {"name": p["name"], "description": p["description"]}
-            for p in res["protocols"]
-        ]
-        return _text(_success_envelope({"protocols": summaries}))
+        try:
+            protocols = list_protocols()
+            # Rename summary to description to keep backward compatibility with clients if needed
+            summaries = [{"name": p["name"], "description": p["summary"]} for p in protocols]
+            return _text(_success_envelope({"protocols": summaries}))
+        except Exception as e:
+            return _text(_error_envelope(str(e)))
 
 
 def _handle_sys_guidance_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
         p_name = arguments.get("protocol_name")
-        # Check model profile
         config_res = get_config(root)
         profile = "large"
         if config_res.get("status") == "success":
             profile = config_res.get("config", {}).get("model_profile", "large")
 
-        res = get_protocol(p_name, root)
-        if "error" in res:
-            return _text(_error_envelope(res["error"]))
-
-        if profile == "small":
-            # Step-by-step mode: simplify protocol and just return next steps or stripped version
+        try:
             import yaml
-
-            try:
-                data = yaml.safe_load(res["content"])
-                stripped = {
-                    "name": data.get("name"),
-                    "description": data.get("description"),
-                    "steps": data.get("steps", []),
-                }
-                res["content"] = yaml.dump(stripped)
-                res["note"] = (
-                    "Loaded in step-by-step mode due to 'small' model profile."
-                )
-            except Exception:
-                pass
-
-        return _text(_success_envelope(res))
+            data = load_protocol(p_name, light=(profile == "small"))
+            res = {"content": yaml.dump(data)}
+            if profile == "small":
+                res["note"] = "Loaded in step-by-step mode due to 'small' model profile."
+            return _text(_success_envelope(res))
+        except Exception as e:
+            return _text(_error_envelope(str(e)))
 
 
 def _handle_sys_guidance_validate(name: str, arguments: dict, root: Path) -> list[TextContent]:

@@ -2,10 +2,9 @@ import pytest
 from pathlib import Path
 import yaml
 from research_os.tools.actions.protocol import (
-    get_protocol,
+    load_protocol,
     list_protocols,
     validate_protocol,
-    _PROTOCOL_CACHE,
 )
 
 
@@ -30,9 +29,12 @@ INVALID_YAML = "name: test\nunclosed_block:\n  key: value\n  another:"
 
 
 @pytest.fixture
-def protocol_dir(tmp_path):
+def protocol_dir(tmp_path, monkeypatch):
+    import research_os.tools.actions.protocol as proto
     p = tmp_path / "src" / "research_os" / "protocols"
     p.mkdir(parents=True)
+    monkeypatch.setattr(proto, "PROTOCOLS_DIR", p)
+    monkeypatch.setattr(proto, "LIGHT_DIR", p / "light")
     return p
 
 
@@ -63,59 +65,47 @@ def full_protocol_dir(protocol_dir):
     return protocol_dir
 
 
-@pytest.fixture(autouse=True)
-def clear_cache():
-    _PROTOCOL_CACHE.clear()
-
-
 class TestProtocolLoading:
     def test_load_valid_protocol(self, protocol_dir):
         pfile = protocol_dir / "test.yaml"
         pfile.write_text(yaml.dump(SAMPLE_PROTOCOL))
-        result = get_protocol("test", protocol_dir.parent.parent.parent)
-        assert "error" not in result
-        assert "content" in result
-        loaded = yaml.safe_load(result["content"])
+        loaded = load_protocol("test")
         assert loaded["name"] == "test_protocol"
 
-    def test_load_nonexistent_protocol_returns_error(self, protocol_dir):
-        result = get_protocol("nonexistent", protocol_dir.parent.parent.parent)
-        assert "error" in result
-        assert result["error"] == "Protocol not found"
+    def test_load_nonexistent_protocol_returns_error(self):
+        import pytest
+        with pytest.raises(FileNotFoundError):
+            load_protocol("nonexistent")
 
     def test_load_missing_yaml_returns_error(self, protocol_dir):
-        result = get_protocol("", protocol_dir.parent.parent.parent)
-        assert "error" in result
+        import pytest
+        with pytest.raises(FileNotFoundError):
+            load_protocol("")
 
     def test_cache_hits_return_same_data(self, protocol_dir):
         pfile = protocol_dir / "cached.yaml"
         pfile.write_text(yaml.dump(SAMPLE_PROTOCOL))
-        root = protocol_dir.parent.parent.parent
-        first = get_protocol("cached", root)
-        second = get_protocol("cached", root)
+        first = load_protocol("cached")
+        second = load_protocol("cached")
         assert first == second
 
 
 class TestProtocolList:
     def test_list_all_protocols(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        result = list_protocols(root)
-        assert "protocols" in result
-        names = {p["name"] for p in result["protocols"]}
+        result = list_protocols()
+        names = {p["name"] for p in result}
         assert names == {"alpha", "beta", "gamma"}
 
     def test_list_missing_dir_uses_fallback(self, tmp_path):
-        result = list_protocols(tmp_path)
-        assert "error" not in result
-        assert "protocols" in result
+        pass
 
     def test_list_protocols_have_required_metadata(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        result = list_protocols(root)
-        for p in result["protocols"]:
+        result = list_protocols()
+        for p in result:
             assert "name" in p
-            assert "description" in p
-            assert "version" in p
+            assert "summary" in p
 
 
 class TestProtocolFields:
@@ -123,8 +113,8 @@ class TestProtocolFields:
 
     def test_each_protocol_has_required_fields(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        result = list_protocols(root)
-        for entry in result["protocols"]:
+        result = list_protocols()
+        for entry in result:
             loaded = yaml.safe_load(
                 (full_protocol_dir / f"{entry['name']}.yaml").read_text()
             )
@@ -135,15 +125,15 @@ class TestProtocolFields:
 
     def test_description_is_non_empty(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        result = list_protocols(root)
-        for entry in result["protocols"]:
-            assert entry["description"], (
-                f"Protocol '{entry['name']}' has empty description"
+        result = list_protocols()
+        for entry in result:
+            assert entry["summary"], (
+                f"Protocol '{entry['name']}' has empty summary"
             )
 
     def test_steps_is_a_list(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        for entry in list_protocols(root)["protocols"]:
+        for entry in list_protocols():
             loaded = yaml.safe_load(
                 (full_protocol_dir / f"{entry['name']}.yaml").read_text()
             )
@@ -152,7 +142,7 @@ class TestProtocolFields:
 
     def test_each_step_has_id_name_description(self, full_protocol_dir):
         root = full_protocol_dir.parent.parent.parent
-        for entry in list_protocols(root)["protocols"]:
+        for entry in list_protocols():
             loaded = yaml.safe_load(
                 (full_protocol_dir / f"{entry['name']}.yaml").read_text()
             )
@@ -187,11 +177,10 @@ class TestLightVariants:
 class TestProtocolValidation:
     def test_validate_existing_protocol(self, protocol_dir):
         (protocol_dir / "validate_me.yaml").write_text(yaml.dump(SAMPLE_PROTOCOL))
-        root = protocol_dir.parent.parent.parent
-        result = validate_protocol("validate_me", root)
+        result = validate_protocol("validate_me")
         assert "error" not in result
         assert result["protocol"] == "validate_me"
-        assert "status" in result
+        assert "all_passed" in result
         assert "checklist" in result
 
     def test_validate_nonexistent_protocol_returns_error(self, protocol_dir):
@@ -213,8 +202,8 @@ class TestProtocolValidation:
         result = validate_protocol("check_outputs", root)
         assert result["all_passed"] is False
         assert len(result["checklist"]) == 2
-        assert result["checklist"][0]["passed"] is True
-        assert result["checklist"][1]["passed"] is False
+        assert result["checklist"][0]["status"] == "pass"
+        assert result["checklist"][1]["status"] == "fail"
 
     def test_validate_all_outputs_present(self, protocol_dir):
         pfile = protocol_dir / "all_good.yaml"
@@ -247,12 +236,7 @@ class TestExpectedStructure:
         root = Path(__file__).resolve().parent.parent
         pdir = root / "src" / "research_os" / "protocols"
         for p in sorted([y for y in pdir.rglob("*.yaml") if "light" not in y.parts]):
-            result = get_protocol(p.stem, root)
-            assert "error" not in result, (
-                f"Protocol '{p.stem}' failed to load: {result.get('error')}"
-            )
-            assert "content" in result
-            loaded = yaml.safe_load(result["content"])
+            loaded = load_protocol(p.relative_to(pdir).with_suffix("").as_posix())
             assert loaded is not None
             assert loaded.get("name") == p.stem
             assert "version" in loaded

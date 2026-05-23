@@ -14,23 +14,22 @@ def validate_md_template(filepath: str, protocol_name: str, root: Path) -> Dict[
             
         content = p.read_text()
         
-        from research_os.server import get_protocol
-        
-        protocol_res = get_protocol(protocol_name, root)
-        if "error" in protocol_res:
-            return {"status": "error", "message": f"Could not load protocol {protocol_name}: {protocol_res['error']}"}
-            
-        protocol = yaml.safe_load(protocol_res["content"])
+        from research_os.tools.actions.protocol import load_protocol
+        try:
+            protocol = load_protocol(protocol_name)
+        except Exception as e:
+            return {"status": "error", "message": f"Could not load protocol {protocol_name}: {e}"}
         
         # 2. Check for unfilled placeholders {placeholder}
         placeholders = re.findall(r'\{[^{}]+\}', content)
         
         # 4. Check banned phrases from writing_core.yaml
         banned_phrases = []
-        core_res = get_protocol("writing_core", root)
-        if "error" not in core_res:
-            core_proto = yaml.safe_load(core_res["content"])
+        try:
+            core_proto = load_protocol("writing_core")
             banned_phrases = core_proto.get("rules", {}).get("banned_phrases", [])
+        except Exception:
+            core_proto = {}
             
         found_banned = []
         lower_content = content.lower()

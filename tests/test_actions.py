@@ -258,13 +258,11 @@ def test_all_action_imports_resolve():
     assert module is not None
 
     from research_os.tools.actions.web_search import search_web
-    from research_os.tools.actions.checkpoint import (
-        create_checkpoint,
-    )
-    from research_os.tools.actions.protocol import get_protocol
+    from research_os.tools.actions.checkpoint import create_checkpoint
+    from research_os.tools.actions.protocol import load_protocol
     from research_os.tools.actions.search import search_pubmed
 
     assert callable(search_web)
-    assert callable(get_protocol)
+    assert callable(load_protocol)
     assert callable(search_pubmed)
     assert callable(create_checkpoint)
