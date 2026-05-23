@@ -1,6 +1,5 @@
 import pytest
 from unittest import mock
-from pathlib import Path
 from research_os.tools.actions.execution import execute_r_script, execute_julia_script, execute_bash_script
 
 @pytest.fixture

@@ -330,7 +330,7 @@ def generate_figure_interpretation(state: dict, *args, **kwargs) -> dict:
                 stat_results,
                 research_question,
                 hypothesis,
-                branch_id,
+                path_id,
             )
             state["interpretation_generated"] = str(interp_path)
             logger.info("Interpretation generated for: %s", figure_path)

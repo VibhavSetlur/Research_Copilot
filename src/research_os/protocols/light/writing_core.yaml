@@ -1,0 +1,6 @@
+name: writing_core
+universal_rules:
+  style: "Academic English. No emojis, em-dashes. Past tense for completed actions."
+  banned_phrases: ["prove", "very", "interestingly"]
+  causal_language: "Avoid in observational context (e.g. use 'associated with')."
+  numbers_and_units: "p to 3 decimals, include units."

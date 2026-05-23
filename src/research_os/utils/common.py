@@ -202,9 +202,9 @@ _DEFAULT_CONFIG = {
     "cache_research_map": ".os_state/cache/research_map.json",
     "cache_followups": ".os_state/cache/follow_up_questions.md",
     "docs_dir": "docs",
-    "reports_dir": "03_synthesis",
-    "research_map": "03_synthesis/research_map.json",
-    "follow_up_questions": "03_synthesis/follow_up_questions.md",
+    "reports_dir": "synthesis",
+    "research_map": "synthesis/research_map.json",
+    "follow_up_questions": "synthesis/follow_up_questions.md",
     "manifest": "docs/manifest.json",
     "iteration_registry": "docs/iterations/registry.json",
     "research_log": "docs/research_log.md",
@@ -218,15 +218,15 @@ _DEFAULT_CONFIG = {
     "literature_corpus": "00_inputs/literature/literature_corpus.json",
     "evidence_matrix": "00_inputs/literature/evidence_matrix.md",
     "bibliography": "00_inputs/literature/bibliography.bib",
-    "analysis_plan": "03_synthesis/analysis_plan.md",
-    "full_audit": "03_synthesis/audit/full_audit_report.md",
-    "manuscript_findings": "03_synthesis/manuscript/research_findings.md",
-    "key_findings": "03_synthesis/key_findings.md",
-    "executive_summary": "03_synthesis/executive_summary.md",
-    "layman_summary": "03_synthesis/layman_summary.md",
+    "analysis_plan": "synthesis/analysis_plan.md",
+    "full_audit": "synthesis/audit/full_audit_report.md",
+    "manuscript_findings": "synthesis/manuscript/research_findings.md",
+    "key_findings": "synthesis/key_findings.md",
+    "executive_summary": "synthesis/executive_summary.md",
+    "layman_summary": "synthesis/layman_summary.md",
     "preregistration_dir": "00_inputs/literature",
-    "reviewer2_critique": "03_synthesis/audit/reviewer2_critique.md",
-    "dag_viewer": "03_synthesis/dag_viewer.html",
+    "reviewer2_critique": "synthesis/audit/reviewer2_critique.md",
+    "dag_viewer": "synthesis/dag_viewer.html",
     "requirements_file": "environment/requirements.txt",
     "environment_check_script": ".os_state/scripts/00_environment_check.py",
     "quality_gates_enabled": True,
@@ -450,7 +450,7 @@ def load_state(root: Optional[Path] = None) -> dict:
         root = find_project_root()
         if root is None:
             return {}
-    state_path = root / "03_synthesis" / "state_ledger.json"
+    state_path = root / "synthesis" / "state_ledger.json"
     return load_json(state_path)
 
 
@@ -463,5 +463,5 @@ def save_state(data: dict, root: Optional[Path] = None) -> None:
     """
     if root is None:
         root = require_project_root()
-    state_path = root / "03_synthesis" / "state_ledger.json"
+    state_path = root / "synthesis" / "state_ledger.json"
     save_json_atomic(state_path, data)

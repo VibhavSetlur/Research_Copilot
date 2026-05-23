@@ -23,7 +23,7 @@ def execute_r_script(script_path: str, root: Path, timeout: int = 300) -> Dict[s
         return {"status": "error", "message": f"Script not found at {script_path}"}
         
     # Pin R environment via renv if detected
-    env_vars = None
+    # env_vars = None
     if (root / "environment" / "renv.lock").exists() or (p.parent / "renv.lock").exists():
         # renv automatically activates if .Rprofile exists, but we can set RENV_PATHS_ROOT if needed
         pass

@@ -1,70 +1,9 @@
 name: writing_standards
-version: 2.0.0
-schema_version: '1.0'
-imrad_budgets:
-  Abstract: 200-250 words (Background, Methods, Results, Conclusion)
-  Introduction: 500-750 words (Context, Gap, Objective)
-  Methods: 750-1000 words (Design, Sample, Measures, Analysis)
-  Results: 500-800 words (Primary findings, Secondary findings, Sensitivities)
-  Discussion: 1000-1500 words (Summary, Context, Limitations, Conclusion)
-writing_rules:
-  do_this:
-  - State the direction and magnitude of effects.
-  - Use past tense for completed actions.
-  not_that:
-  - Do not repeat all table numbers in the text.
-  - Do not use 'prove' (use 'suggest' or 'indicate').
-  causal_language:
-    avoid_if_observational:
-    - caused
-    - led to
-    - resulted in
-    - impacted
-    - determined
-    use_instead:
-    - was associated with
-    - was correlated with
-    - predicted
-  keywords:
-    selection_rules:
-    - Select 3-5 keywords.
-    - Do not duplicate words from the title.
-    - Use Medical Subject Headings (MeSH) if applicable.
-  limitations:
-    structure: 'Always include: 1) Identification of the limitation, 2) How it might
-      have affected the results, 3) Why the study is still valid despite it.'
-templates:
-  apa_table: 'Table 1
-
-    Descriptive Statistics
-
-    ---------------------------------------------------
-
-    Variable          M         SD        N
-
-    ---------------------------------------------------
-
-    Age               35.2      4.1       120
-
-    ---------------------------------------------------
-
-    Note. M = Mean, SD = Standard Deviation.
-
-    '
-  conflict_of_interest: 'Conflict of Interest Statement:
-
-    The authors declare that the research was conducted in the absence of any commercial
-    or financial relationships that could be construed as a potential conflict of
-    interest.
-
-    '
-steps:
-- id: check_word_budgets
-  name: Check Word Budgets
-  description: Ensure each section falls within the allocated word count.
-- id: enforce_rules
-  name: Enforce Writing Rules
-  description: Scan the text to replace causal language in observational studies.
-- id: format_tables
-  name: Format Tables
-  description: Apply the APA table template to all data summaries.
+writing_protocols:
+  writing_core: "Universal rules."
+  writing_methods: "For methods.md."
+  writing_citations: "For citations.md."
+  writing_analysis_log: "For analysis.md log."
+  writing_conclusions: "For per-step conclusions.md."
+  writing_synthesis: "For final manuscript."
+  writing_readme: "For README.md updates."

@@ -54,17 +54,23 @@ class TestEnvFreeze:
 
 class TestEnvRestore:
     @patch("subprocess.run")
-    def test_success(self, mock_run):
+    def test_success(self, mock_run, tmp_path):
+        env_dir = tmp_path / "environment"
+        env_dir.mkdir(parents=True)
+        (env_dir / "requirements.txt").write_text("requests==2.31.0")
         mock_run.return_value = MagicMock(returncode=0, stdout="installed", stderr="")
-        res = env_restore("requests==2.31.0")
+        res = env_restore("requests==2.31.0", root=tmp_path)
         assert res["code"] == 0
         args, _ = mock_run.call_args
         assert "-r" in args[0]
 
     @patch("subprocess.run")
-    def test_error(self, mock_run):
+    def test_error(self, mock_run, tmp_path):
+        env_dir = tmp_path / "environment"
+        env_dir.mkdir(parents=True)
+        (env_dir / "requirements.txt").write_text("requests==2.31.0")
         mock_run.side_effect = Exception("restore failed")
-        res = env_restore("requests==2.31.0")
+        res = env_restore("requests==2.31.0", root=tmp_path)
         assert res["code"] == 1
         assert "restore failed" in res["error"]
 

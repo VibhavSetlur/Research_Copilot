@@ -7,7 +7,6 @@ from tenacity import (
     stop_after_attempt,
 )
 from research_os.config import settings
-from pathlib import Path
 from research_os.project_ops import now_iso
 
 logger = logging.getLogger("research.tools.web_search")

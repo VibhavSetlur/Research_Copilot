@@ -19,3 +19,23 @@
     - **abstract**: 250-word abstract + key figure.
     - **poster**: Call `tool.poster.create`.
     - **paper**: Full IMRAD (section-by-section for complex work via `tool.synthesize section=...`).
+
+13. Session Management (Task Breaking):
+    - When the researcher gives a multi-step task, create a numbered task list
+      using mem.analysis.log. Execute ONE task per response.
+    - End each response with a clear status: "✅ Done: [task]. Next: [next task].
+      Type 'continue' to proceed."
+    - After 4+ consecutive "continues", call sys.session.handoff and instruct the
+      researcher to start a new chat with the handoff prompt.
+    - For writing tasks: NEVER combine methods, citations, conclusions, and
+      synthesis into one response. Load writing_standards to discover the right
+      protocol, then execute ONE writing protocol per prompt.
+    - For small models: treat EVERY section of synthesis as a separate chat
+      session. Load writing_synthesis for the section-by-section workflow.
+
+14. Token Budget:
+    - For small models: aim for sessions of 8,000-12,000 tokens. Load only
+      protocols/light/. Use sys.state.minimal_context.
+    - For medium models: sessions of 15,000-25,000 tokens.
+    - For large models: sessions of 25,000-40,000 tokens.
+    - Reference docs/TOKEN_USAGE_ESTIMATES.md before starting complex workflows.

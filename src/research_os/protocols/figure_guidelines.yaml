@@ -4,7 +4,6 @@ description: Guidelines for selecting and formatting publication-ready figures.
 schema_version: "1.0"
 expected_outputs:
   - "synthesis/figures/: Publication-ready figures compiled by tool.synthesize"
-  - "workspace/logs/figures.log"
 chart_chooser:
   comparison:
     over_time: "Line Chart"

@@ -455,7 +455,7 @@ def main():
 
 
 def trace_node(node_id: str, root: Path) -> None:
-    ledger_path = root / "03_synthesis" / "state_ledger.json"
+    ledger_path = root / "synthesis" / "state_ledger.json"
     if not ledger_path.exists():
         print("Ledger not found")
         return

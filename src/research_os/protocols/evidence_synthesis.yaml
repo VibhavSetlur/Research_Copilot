@@ -3,8 +3,8 @@ version: 2.0.0
 description: Synthesise findings, build evidence tables, and detect contradictions.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/03_synthesis/evidence_table.md"
-  - "workspace/03_synthesis/contradictions.md"
+  - "synthesis/evidence_table.md"
+  - "synthesis/contradictions.md"
 templates:
   evidence_table_apa: |
     | Author(s) & Year | Study Design | Sample Size | Key Findings | GRADE Strength |
@@ -17,7 +17,7 @@ grade_system:
   very_low: "Case series, expert opinion, or studies with severe flaws."
 automated_contradiction_detector:
   rule: "Extract the primary outcome direction (positive, negative, null) for each paper. If Paper A asserts positive and Paper B asserts negative/null for the same relationship, flag as a contradiction."
-  action: "Log all flagged contradictions in workspace/03_synthesis/contradictions.md and prompt for potential reasons (e.g., different populations, dosages, or timeframes)."
+  action: "Log all flagged contradictions in synthesis/contradictions.md and prompt for potential reasons (e.g., different populations, dosages, or timeframes)."
 steps:
   - id: build_evidence_table
     name: "Build Evidence Table"

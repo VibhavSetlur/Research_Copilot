@@ -20,7 +20,7 @@ automated_contradiction_detector:
   rule: Extract the primary outcome direction (positive, negative, null) for each
     paper. If Paper A asserts positive and Paper B asserts negative/null for the same
     relationship, flag as a contradiction.
-  action: Log all flagged contradictions in workspace/03_synthesis/contradictions.md
+  action: Log all flagged contradictions in workspace/synthesis/contradictions.md
     and prompt for potential reasons (e.g., different populations, dosages, or timeframes).
 steps:
 - id: build_evidence_table

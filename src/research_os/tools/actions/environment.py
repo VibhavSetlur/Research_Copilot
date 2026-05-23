@@ -1,9 +1,7 @@
 import subprocess
 import sys
 import logging
-import os
 import shutil
-import tempfile
 import yaml
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -93,54 +91,58 @@ def env_snapshot(root: Path) -> Dict[str, Any]:
 
 
 def env_restore(requirements: str = "", root: Optional[Path] = None) -> Dict[str, Any]:
-    if not root:
-        return {"error": "Root path is required for multi-lang restore", "code": 1}
-        
-    active_path = _get_active_experiment_dir(root)
-    if active_path:
-        env_dir = active_path / "environment"
-        if not (env_dir / "session.yaml").exists() and not (env_dir / "requirements.txt").exists():
+    try:
+        if not root:
+            return {"error": "Root path is required for multi-lang restore", "code": 1}
+            
+        active_path = _get_active_experiment_dir(root)
+        if active_path:
+            env_dir = active_path / "environment"
+            if not (env_dir / "session.yaml").exists() and not (env_dir / "requirements.txt").exists():
+                env_dir = root / "environment"
+        else:
             env_dir = root / "environment"
-    else:
-        env_dir = root / "environment"
-    session_file = env_dir / "session.yaml"
-    
-    if not session_file.exists():
-        # Fallback to old behavior
-        req_file = env_dir / "requirements.txt"
-        if req_file.exists():
-            res = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], capture_output=True, text=True)
-            return {"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode}
-        return {"error": "No session.yaml or requirements.txt found", "code": 1}
+        session_file = env_dir / "session.yaml"
         
-    session_data = yaml.safe_load(session_file.read_text())
-    logs = []
-    has_error = False
-    
-    for lang in session_data.get("languages", []):
-        if lang["name"] == "python" and lang["manager"] == "pip":
+        if not session_file.exists():
+            # Fallback to old behavior
             req_file = env_dir / "requirements.txt"
             if req_file.exists():
                 res = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], capture_output=True, text=True)
+                return {"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode}
+            return {"error": "No session.yaml or requirements.txt found", "code": 1}
+            
+        session_data = yaml.safe_load(session_file.read_text())
+        logs = []
+        has_error = False
+        
+        for lang in session_data.get("languages", []):
+            if lang["name"] == "python" and lang["manager"] == "pip":
+                req_file = env_dir / "requirements.txt"
+                if req_file.exists():
+                    res = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], capture_output=True, text=True)
+                    logs.append(res.stdout)
+                    if res.returncode != 0:
+                        has_error = True
+            elif lang["name"] == "R" and lang["manager"] == "renv":
+                res = subprocess.run(["Rscript", "-e", "renv::restore()"], cwd=str(root), capture_output=True, text=True)
                 logs.append(res.stdout)
                 if res.returncode != 0:
                     has_error = True
-        elif lang["name"] == "R" and lang["manager"] == "renv":
-            res = subprocess.run(["Rscript", "-e", "renv::restore()"], cwd=str(root), capture_output=True, text=True)
-            logs.append(res.stdout)
-            if res.returncode != 0:
-                has_error = True
-        elif lang["name"] == "julia" and lang["manager"] == "Pkg":
-            res = subprocess.run(["julia", "--project=" + str(env_dir), "-e", "using Pkg; Pkg.instantiate()"], capture_output=True, text=True)
-            logs.append(res.stdout)
-            if res.returncode != 0:
-                has_error = True
-                
-    return {
-        "status": "error" if has_error else "success",
-        "stdout": "\n".join(logs),
-        "code": 1 if has_error else 0
-    }
+            elif lang["name"] == "julia" and lang["manager"] == "Pkg":
+                res = subprocess.run(["julia", "--project=" + str(env_dir), "-e", "using Pkg; Pkg.instantiate()"], capture_output=True, text=True)
+                logs.append(res.stdout)
+                if res.returncode != 0:
+                    has_error = True
+                    
+        return {
+            "status": "error" if has_error else "success",
+            "stdout": "\n".join(logs),
+            "code": 1 if has_error else 0
+        }
+    except Exception as e:
+        logger.error(f"Env restore failed: {e}")
+        return {"error": str(e), "code": 1}
 
 
 def env_docker_generate(root: Path) -> Dict[str, Any]:
@@ -156,7 +158,7 @@ def env_docker_generate(root: Path) -> Dict[str, Any]:
     
     if session_file.exists():
         session_data = yaml.safe_load(session_file.read_text())
-        langs = [l["name"] for l in session_data.get("languages", [])]
+        langs = [lang["name"] for lang in session_data.get("languages", [])]
         
         if "R" in langs:
             dockerfile_lines.extend([

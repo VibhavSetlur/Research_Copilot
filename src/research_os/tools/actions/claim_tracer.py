@@ -4,7 +4,7 @@
 Every factual claim must be traceable to computed data or a verified citation.
 
 Usage:
-    python .os_state/scripts/utils/claim_tracer.py --manuscript 03_synthesis/manuscript/research_findings.md
+    python .os_state/scripts/utils/claim_tracer.py --manuscript synthesis/manuscript/research_findings.md
     python .os_state/scripts/utils/claim_tracer.py --manuscript ... --data-lineage docs/data_lineage.json
     python .os_state/scripts/utils/claim_tracer.py --manuscript ... --citation-report 00_inputs/literature/citation_verification_report.json
 """
@@ -179,7 +179,7 @@ def trace_statistical_claim(
     }
 
     # Look for analysis result files
-    analysis_dir = root / "03_synthesis" / "analysis"
+    analysis_dir = root / "synthesis" / "analysis"
     if analysis_dir.exists():
         for q_dir in analysis_dir.iterdir():
             if q_dir.is_dir():
@@ -426,7 +426,7 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        help="Output report path (default: 03_synthesis/audit/claim_trace_report.json)",
+        help="Output report path (default: synthesis/audit/claim_trace_report.json)",
     )
     args = parser.parse_args()
 
@@ -459,7 +459,7 @@ def main():
     output_path = (
         Path(args.output)
         if args.output
-        else root / "03_synthesis" / "audit" / "claim_trace_report.json"
+        else root / "synthesis" / "audit" / "claim_trace_report.json"
     )
     if not output_path.is_absolute():
         output_path = root / output_path

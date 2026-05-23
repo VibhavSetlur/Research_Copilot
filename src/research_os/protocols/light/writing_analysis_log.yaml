@@ -1,0 +1,6 @@
+name: writing_analysis_log
+analysis_log_entry_format:
+  template: |
+    [{timestamp}] **{step_name} — {status}**
+    - **Key result:** {one_line_quantitative_summary}
+    - **Decision:** {next_action_decision}

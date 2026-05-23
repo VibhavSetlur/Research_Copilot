@@ -8,7 +8,7 @@ Pass 3: Retraction check (CrossRef retraction notices)
 Usage:
     python .os_state/scripts/utils/citation_verifier.py --bibliography 00_inputs/literature/bibliography.bib
     python .os_state/scripts/utils/citation_verifier.py --corpus 00_inputs/literature/literature_corpus.json
-    python .os_state/scripts/utils/citation_verifier.py --manuscript 03_synthesis/manuscript/research_findings.md
+    python .os_state/scripts/utils/citation_verifier.py --manuscript synthesis/manuscript/research_findings.md
 """
 
 import argparse

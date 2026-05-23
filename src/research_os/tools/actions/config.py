@@ -84,6 +84,11 @@ def init_config(root: Path) -> Dict[str, Any]:
             },
             "api_keys": {"firecrawl": "", "semantic_scholar": "", "pubmed": "", "crossref": "", "serpapi": ""},
             "model_profile": "medium",  # small, medium, large
+            "writing_preferences": {
+                "citation_style": "apa",  # apa, vancouver, nature
+                "default_reporting_standard": "strobe",  # strobe, consort, prisma, apa, none
+                "auto_apply_writing_core": True,  # Always load writing_core for writing tasks
+            },
         }
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(config_path, "w") as f:

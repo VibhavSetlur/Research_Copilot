@@ -538,10 +538,10 @@ def _copy_environment_to_project(root: Path) -> None:
     try:
         env_assets = importlib_resources.files("research_os.assets.environment")
         if not list(env_assets.iterdir()):
-            logger.warning("assets/environment directory is empty or missing. Skipping environment copy.")
+            print("assets/environment directory is empty or missing. Skipping environment copy.")
             return
     except Exception as e:
-        logger.warning(f"assets/environment directory is missing. Skipping environment copy: {e}")
+        print(f"assets/environment directory is missing. Skipping environment copy: {e}")
         return
 
     files = [

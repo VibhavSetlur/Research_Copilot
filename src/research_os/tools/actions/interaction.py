@@ -44,12 +44,46 @@ def checkpoint_approve(root: Path) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def session_handoff(root: Path) -> Dict[str, Any]:
+def session_handoff(
+    root: Path,
+    state: Dict[str, Any] = None,
+    last_step: str = "Unknown",
+    last_writing_task: str = "None",
+    next_writing_task: str = "Unknown",
+    next_protocol: str = "writing_core",
+    completed_summary: str = "Summary of completed tasks",
+    specific_next_action: str = "Determine next steps"
+) -> Dict[str, Any]:
+    if state is None:
+        state = {}
     try:
         handoff_path = root / ".os_state" / "handoffs" / f"handoff_{now_iso()}.md"
         handoff_path.parent.mkdir(parents=True, exist_ok=True)
         
-        content = f"# Session Handoff\n\nGenerated at: {now_iso()}\n\n## Summary\n(Please fill in the summary of completed tasks)\n\n## Next Steps\n(Please fill in what needs to be done next)\n\n## Prompt to resume\n```\nResume work from handoff.md. Review the next steps and continue execution.\n```\n"
+        content = f"""# Session Handoff
+Generated at: {now_iso()}
+
+## Current State
+- Current path: {state.get('current_path', 'default')}
+- Last completed step: {last_step}
+
+## Writing Status
+- Last writing task: {last_writing_task}
+- Next writing task: {next_writing_task}
+- Protocol to load: {next_protocol}
+
+## Summary
+{completed_summary}
+
+## Next Steps
+1. Load protocol: {next_protocol}
+2. {specific_next_action}
+
+## Prompt to Resume
+```
+Load protocol {next_protocol}. Review the current state below and continue execution.
+```
+"""
         
         handoff_path.write_text(content)
         return {

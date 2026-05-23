@@ -18,7 +18,7 @@ Taxonomy:
   02_experiments/<exp>/outputs/artifacts/   — Models/data chunks plus .meta.yaml sidecars
   02_experiments/<exp>/decisions.yaml       — Experiment assumption ledger
 
-  03_synthesis/           — Manuscript, final figures, global methods, audit
+  synthesis/           — Manuscript, final figures, global methods, audit
 
 Usage (as interceptor):
     from semantic_filesystem import enforce_semantic_taxonomy
@@ -69,7 +69,7 @@ SEMANTIC_TAXONOMY = {
     },
     "method_doc": {
         "pattern": r".*(method|methodology|approach).*\.(md|json)$",
-        "destination": "03_synthesis/",
+        "destination": "synthesis/",
         "writable": True,
         "description": "Methodological documentation",
     },
@@ -117,13 +117,13 @@ SEMANTIC_TAXONOMY = {
     },
     "manuscript": {
         "pattern": r".*(manuscript|draft|section|paper).*\.(md|tex|docx)$",
-        "destination": "03_synthesis/manuscript/",
+        "destination": "synthesis/manuscript/",
         "writable": True,
         "description": "Draft manuscript sections",
     },
     "rebuttal": {
         "pattern": r".*(rebuttal|response|reviewer).*\.(md|json)$",
-        "destination": "03_synthesis/audit/",
+        "destination": "synthesis/audit/",
         "writable": True,
         "description": "Reviewer 2 rebuttal memos",
     },

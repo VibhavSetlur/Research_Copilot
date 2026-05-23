@@ -313,7 +313,7 @@ def main():
                 print(f"Successfully merged data lineage for branch: {winning_branch}")
                 from research_os.state.state_ledger import ResearchLedger
 
-                ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+                ledger = ResearchLedger(root / "synthesis" / "state_ledger.json")
                 ledger.update(
                     winning_branch_name=winning_branch,
                     winning_artifacts_data_path=winning_data_path,

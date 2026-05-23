@@ -498,7 +498,12 @@ class ResearchLedger:
             "context_estimate": context_estimate,
             "active_paths": paths,
             "handoff_recommendation": recommend_handoff,
-            "message": "Handoff recommended due to conversation length." if recommend_handoff else "Context size is healthy."
+            "message": "Handoff recommended due to conversation length." if recommend_handoff else "Context size is healthy.",
+            "writing_queue": state.get("writing_queue", {
+                "pending_tasks": ["methods_log", "citations_update", "analysis_log"],
+                "next_task": "methods_log",
+                "recommended_protocol": "writing_methods"
+            })
         }
 
     def get_project_summary(self, max_tokens: int = 500) -> str:

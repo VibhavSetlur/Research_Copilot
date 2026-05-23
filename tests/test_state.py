@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pytest
 
 from research_os.project_ops import (
     default_state,

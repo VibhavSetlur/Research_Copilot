@@ -62,12 +62,12 @@ def get_snapshot(root: Optional[Path] = None, max_tokens: int = 800) -> str:
             return json.dumps({"error": "Not in a Research OS workspace"})
 
     # Read state ledger
-    state = load_json_safe(root / "03_synthesis" / "state_ledger.json")
+    state = load_json_safe(root / "synthesis" / "state_ledger.json")
     if not state:
         state = load_json_safe(root / ".os_state" / "cache" / "state.json")
 
     # Read manifest
-    manifest = load_json_safe(root / "03_synthesis" / "manifest.json")
+    manifest = load_json_safe(root / "synthesis" / "manifest.json")
 
     # Read last 3 iteration files
     iterations_dir = root / "docs" / "iterations"
@@ -86,7 +86,7 @@ def get_snapshot(root: Optional[Path] = None, max_tokens: int = 800) -> str:
             )
 
     # Read key findings
-    key_findings = load_text_safe(root / "03_synthesis" / "key_findings.md")
+    key_findings = load_text_safe(root / "synthesis" / "key_findings.md")
     key_findings = compress_to_tokens(key_findings, 200)
 
     # Build snapshot

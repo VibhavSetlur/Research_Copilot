@@ -157,7 +157,7 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         if root is None:
             return "ERROR: Not in a Research OS workspace. Run `rcp init` first."
 
-    state_path = root / "03_synthesis" / "state_ledger.json"
+    state_path = root / "synthesis" / "state_ledger.json"
     cache_path = root / ".os_state" / "cache" / "state.json"
 
     state = load_json_safe(state_path)
@@ -206,7 +206,7 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         "",
         "1. Read `.os_state/cache/state.json` for the full structured state",
         "2. Read the latest CTM from `.os_state/cache/context_transfer_memos/` if one exists",
-        "3. Read `03_synthesis/state_ledger.json` for the global ledger",
+        "3. Read `synthesis/state_ledger.json` for the global ledger",
         "4. Load only the skill needed for the next action — do NOT load all skills",
         "5. Continue from the phase indicated above",
         "6. If a CTM exists, read its `immediate_goals` and `open_questions` first",

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from research_os.utils.asset_manager import AssetManager
 

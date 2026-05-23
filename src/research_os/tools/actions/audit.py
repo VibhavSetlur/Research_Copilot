@@ -164,7 +164,7 @@ def audit_reproducibility_full(root: Path) -> Dict[str, Any]:
     try:
         import docker
         
-        client = docker.from_env()
+        docker.from_env()
         # In a real implementation this would build the image from the Dockerfile, run it, and check checksums
         
         report = {

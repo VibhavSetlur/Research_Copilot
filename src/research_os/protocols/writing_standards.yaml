@@ -1,49 +1,29 @@
 name: writing_standards
-version: 2.0.0
-description: Standards for IMRAD structuring, writing style, and tables.
+version: 3.0.0
+description: Index protocol for all writing tasks. Load this first to discover which specific writing protocol to use.
 schema_version: "1.0"
-expected_outputs:
-  - "synthesis/paper.md: Compiled manuscript adhering to budgets and rules"
-imrad_budgets:
-  Abstract: "200-250 words (Background, Methods, Results, Conclusion)"
-  Introduction: "500-750 words (Context, Gap, Objective)"
-  Methods: "750-1000 words (Design, Sample, Measures, Analysis)"
-  Results: "500-800 words (Primary findings, Secondary findings, Sensitivities)"
-  Discussion: "1000-1500 words (Summary, Context, Limitations, Conclusion)"
-writing_rules:
-  do_this:
-    - "State the direction and magnitude of effects."
-    - "Use past tense for completed actions."
-  not_that:
-    - "Do not repeat all table numbers in the text."
-    - "Do not use 'prove' (use 'suggest' or 'indicate')."
-  causal_language:
-    avoid_if_observational: ["caused", "led to", "resulted in", "impacted", "determined"]
-    use_instead: ["was associated with", "was correlated with", "predicted"]
-  keywords:
-    selection_rules: ["Select 3-5 keywords.", "Do not duplicate words from the title.", "Use Medical Subject Headings (MeSH) if applicable."]
-  limitations:
-    structure: "Always include: 1) Identification of the limitation, 2) How it might have affected the results, 3) Why the study is still valid despite it."
-templates:
-  apa_table: |
-    Table 1
-    Descriptive Statistics
-    ---------------------------------------------------
-    Variable          M         SD        N
-    ---------------------------------------------------
-    Age               35.2      4.1       120
-    ---------------------------------------------------
-    Note. M = Mean, SD = Standard Deviation.
-  conflict_of_interest: |
-    Conflict of Interest Statement:
-    The authors declare that the research was conducted in the absence of any commercial or financial relationships that could be construed as a potential conflict of interest.
+
+# This protocol delegates to task-specific writing protocols.
+# Load writing_core for universal rules, then the task-specific protocol.
+
+writing_protocols:
+  writing_core: "Universal rules: style, banned phrases, causal language, number formatting. ALWAYS load first."
+  writing_methods: "For writing to workspace/methods.md and per-step methods_research.md."
+  writing_citations: "For managing workspace/citations.md entries and citation verification."
+  writing_analysis_log: "For structured entries to workspace/analysis.md via mem.analysis.log."
+  writing_conclusions: "For per-step conclusions.md after each experiment."
+  writing_synthesis: "For building the final manuscript section-by-section into synthesis/."
+  writing_readme: "For updating project and per-step README files."
+
+how_to_use:
+  - step: "Identify the writing task (methods, citations, analysis log, conclusions, synthesis, or readme)."
+  - step: "Load writing_core for universal rules."
+  - step: "Load the task-specific protocol listed above."
+  - step: "Follow the template in the task-specific protocol exactly."
+  - step: "For small models: handle ONE writing task per chat response. Call sys.session.handoff between tasks."
+
+expected_outputs: []
 steps:
-  - id: check_word_budgets
-    name: "Check Word Budgets"
-    description: "Ensure each section falls within the allocated word count."
-  - id: enforce_rules
-    name: "Enforce Writing Rules"
-    description: "Scan the text to replace causal language in observational studies."
-  - id: format_tables
-    name: "Format Tables"
-    description: "Apply the APA table template to all data summaries."
+  - id: discover_task
+    name: "Discover Writing Task"
+    description: "Identify which writing protocol is needed and load it alongside writing_core."

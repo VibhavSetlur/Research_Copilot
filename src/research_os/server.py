@@ -34,10 +34,7 @@ from research_os.project_ops import (
 from research_os.tools.actions.web_search import search_web, scrape_web
 from research_os.tools.actions.environment import (
     package_install,
-    env_freeze,
-    env_restore,
 )
-from research_os.tools.actions.latex import latex_compile
 from research_os.tools.actions.checkpoint import (
     create_checkpoint,
     rollback_checkpoint,
@@ -59,7 +56,6 @@ from research_os.tools.actions.interaction import (
 )
 from research_os.tools.actions.external_mcp import discover_mcp
 from research_os.tools.actions.task import task_monitor, task_kill
-from research_os.tools.actions.data import data_sample
 from research_os.tools.actions.search import (
     search_semantic_scholar,
     search_pubmed,

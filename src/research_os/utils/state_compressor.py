@@ -24,7 +24,7 @@ def _project_root() -> Path:
 
 def _state_path(root: Optional[Path] = None) -> Path:
     root = root or _project_root()
-    return root / "03_synthesis" / "state_ledger.json"
+    return root / "synthesis" / "state_ledger.json"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -67,7 +67,7 @@ def _resolve_project_brief(state: dict[str, Any], root: Path) -> dict[str, str]:
 
     for candidate in (
         root / "project_brief.md",
-        root / "03_synthesis" / "project_brief.md",
+        root / "synthesis" / "project_brief.md",
         root / "inputs" / "project_brief.md",
         root / "docs" / "project_brief.md",
         root / "context" / "project_brief.md",

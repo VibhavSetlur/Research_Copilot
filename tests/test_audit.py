@@ -78,12 +78,11 @@ def test_audit_synthesis_paper_not_found(workspace_root):
     assert res["status"] == "error"
     assert "not found" in res["message"].lower()
 
-from research_os.tools.actions.audit import audit_power, audit_assumptions, audit_figure, audit_reproducibility_full
-import unittest.mock as mock
+from research_os.tools.actions.audit import audit_power, audit_assumptions, audit_figure, audit_reproducibility_full  # noqa: E402
+import unittest.mock as mock  # noqa: E402
 
 def test_audit_power_success(workspace_root):
     # Mocking statsmodels inside the test
-    import sys
     mock_smp = mock.MagicMock()
     mock_smp.tt_ind_solve_power.return_value = 0.85
     

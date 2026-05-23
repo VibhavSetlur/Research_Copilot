@@ -24,7 +24,7 @@ class ManuscriptSection:
 class ManuscriptCompiler:
     def __init__(self, root: Optional[Path] = None):
         self.root = root or find_project_root()
-        self.sections_dir = self.root / "03_synthesis" / "sections"
+        self.sections_dir = self.root / "synthesis" / "sections"
         self.output_dir = self.root / "workspace" / "manuscript"
         self.figures_dir = self.root / "workspace" / "figures"
 

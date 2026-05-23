@@ -28,6 +28,11 @@ research_goal:
 
 model_profile: "medium"
 
+writing_preferences:
+  citation_style: "apa"
+  default_reporting_standard: "strobe"
+  auto_apply_writing_core: true
+
 api_keys:
   firecrawl: ""
   semantic_scholar: ""

@@ -7,7 +7,7 @@ structure:
     purpose: Data cleaning, filtering, feature engineering.
   02_analysis:
     purpose: Statistical modelling, core computations.
-  note: "Do NOT create a 03_synthesis step. Synthesis is handled by tool.synthesize into the top‑level synthesis/ folder. Step folders are named {step_number}_{descriptor} (e.g., 01_data_prep). Path tracking adds _path_N when starting a new research track."
+  note: "Do NOT create a synthesis step. Synthesis is handled by tool.synthesize into the top‑level synthesis/ folder. Step folders are named {step_number}_{descriptor} (e.g., 01_data_prep). Path tracking adds _path_N when starting a new research track."
 
 templates:
   boilerplate_readme: '# {folder_name} **Objective**: {description} **Inputs**: {list} **Outputs**: {list} **Scripts**: {list} '

@@ -70,7 +70,7 @@ def build_tasks_from_questions(
     """Build task list from question IDs by reading the research map."""
     research_map_path = root / ".os_state" / "cache" / "research_map.json"
     if not research_map_path.exists():
-        research_map_path = root / "03_synthesis" / "research_map.json"
+        research_map_path = root / "synthesis" / "research_map.json"
 
     if not research_map_path.exists():
         print("ERROR: Research map not found. Run 'research scan' first.")
@@ -109,9 +109,9 @@ def build_tasks_from_questions(
             task = {
                 "id": f"q{q_idx}",
                 "command": f"{sys.executable} .os_state/scripts/utils/run_analysis.py --question q{q_idx}",
-                "output_dir": str(root / "03_synthesis" / "analysis" / f"q{q_idx}"),
+                "output_dir": str(root / "synthesis" / "analysis" / f"q{q_idx}"),
                 "log_file": str(
-                    root / "03_synthesis" / "analysis" / f"q{q_idx}" / "task.log"
+                    root / "synthesis" / "analysis" / f"q{q_idx}" / "task.log"
                 ),
             }
             tasks.append(task)
@@ -321,7 +321,7 @@ def main():
                 lock.release()
 
     # Save results for synthesizer pick up
-    results_path = root / "03_synthesis" / "analysis" / "parallel_results.json"
+    results_path = root / "synthesis" / "analysis" / "parallel_results.json"
     results_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(results_path, "w") as f:

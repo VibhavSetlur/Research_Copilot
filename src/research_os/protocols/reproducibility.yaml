@@ -4,7 +4,7 @@ description: Checklist and instructions to ensure full reproducibility.
 schema_version: "1.0"
 expected_outputs:
   - "workspace/methods.md: Appended reproducibility verification"
-  - "environment/requirements.txt: Frozen environment"
+  - "workspace/{step_number}_{descriptive_name}/environment/requirements.txt: Frozen environment per step"
 reproducibility_checklist:
   1: "Are all raw data files immutable and strictly read-only?"
   2: "Are derived datasets saved separately in the experiment path's data/ directory?"
@@ -20,7 +20,7 @@ reproducibility_checklist:
   12: "Are dependencies restricted to stable, version-pinned releases?"
 instructions:
   freeze_environment:
-    command: "pip freeze > environment/requirements.txt"
+    command: "pip freeze > workspace/{step_number}_{descriptive_name}/environment/requirements.txt"
   relative_paths:
     rule: "Never use absolute paths like /home/user/... Always use paths starting with inputs/ or workspace/."
   random_seeds:

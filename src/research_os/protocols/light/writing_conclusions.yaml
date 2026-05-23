@@ -1,0 +1,8 @@
+name: writing_conclusions
+conclusions_format:
+  template: |
+    # {step_name} — Conclusions
+    ## Key Findings
+    1. {finding_1_with_number}
+    ## Routing Decision
+    - **Next Step:** {next_step_name}
