@@ -4,7 +4,7 @@
 Single source of truth for every pipeline run. Replaces fragmented
 manifest/registry/log files with one authoritative object.
 
-Location: .research/cache/state.json
+Location: .os_state/state_ledger.json
 """
 
 import json
@@ -36,8 +36,6 @@ class ResearchLedger:
             state_path = root / ".os_state" / "state_ledger.json"
         self._path = Path(state_path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        from research_os.replay.session_replay import SessionReplayManager
-        self.replay_manager = SessionReplayManager(self._path.parent / "replay_logs")
 
     def _load(self) -> dict:
         if self._path.exists():
@@ -48,13 +46,8 @@ class ResearchLedger:
     def _save(self, data: dict) -> None:
         """Atomic write: write to temp file, then rename to avoid corruption."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        
-        if hasattr(self, 'replay_manager'):
-            self.replay_manager.capture_snapshot("ledger_save", data)
-            
-        fd, tmp_path = tempfile.mkstemp(
-            dir=str(self._path.parent), suffix=".tmp"
-        )
+
+        fd, tmp_path = tempfile.mkstemp(dir=str(self._path.parent), suffix=".tmp")
         try:
             with os.fdopen(fd, "w") as f:
                 json.dump(data, f, indent=2, default=str, sort_keys=True)
@@ -70,7 +63,13 @@ class ResearchLedger:
             fd2, tmp2 = tempfile.mkstemp(dir=str(self._path.parent), suffix=".tmp")
             try:
                 with os.fdopen(fd2, "w") as f:
-                    yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+                    yaml.dump(
+                        data,
+                        f,
+                        default_flow_style=False,
+                        sort_keys=False,
+                        allow_unicode=True,
+                    )
                 os.replace(tmp2, str(yaml_path))
             except Exception:
                 if os.path.exists(tmp2):
@@ -167,7 +166,12 @@ class ResearchLedger:
         self._save(state)
         return state
 
-    def add_hypothesis(self, hypothesis_id: str, status: str = "testing", effect: Optional[float] = None) -> dict:
+    def add_hypothesis(
+        self,
+        hypothesis_id: str,
+        status: str = "testing",
+        effect: Optional[float] = None,
+    ) -> dict:
         state = self._load()
         hypotheses = state.get("active_hypotheses", [])
         for h in hypotheses:
@@ -194,17 +198,21 @@ class ResearchLedger:
 
     def add_error(self, error: str) -> dict:
         state = self._load()
-        state.setdefault("errors", []).append({
-            "message": error,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        state.setdefault("errors", []).append(
+            {
+                "message": error,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save(state)
         return state
 
     def track_tokens(self, used: int, limit: Optional[int] = None) -> dict:
         state = self._load()
-        budget = state.get("token_budget", {"used": 0, "remaining": 200000, "limit": 200000})
+        budget = state.get(
+            "token_budget", {"used": 0, "remaining": 200000, "limit": 200000}
+        )
         if limit is not None:
             budget["limit"] = limit
         budget["used"] = used
@@ -318,9 +326,16 @@ class ResearchLedger:
                 os.unlink(tmp_path)
             raise
 
-    def add_dag_node(self, node_id: str, script_path: str, input_files: list,
-                     output_files: list, depends_on: list = None,
-                     iteration_id: str = None, status: str = "complete") -> dict:
+    def add_dag_node(
+        self,
+        node_id: str,
+        script_path: str,
+        input_files: list,
+        output_files: list,
+        depends_on: list = None,
+        iteration_id: str = None,
+        status: str = "complete",
+    ) -> dict:
         """Add a node to the execution DAG.
 
         Args:
@@ -369,7 +384,7 @@ class ResearchLedger:
 
         dag["nodes"][node_id] = node
 
-        for dep in (depends_on or []):
+        for dep in depends_on or []:
             if dep in dag["nodes"]:
                 dag["edges"].append({"from": dep, "to": node_id})
 
@@ -419,6 +434,7 @@ class ResearchLedger:
     def _compute_file_hash(file_path: Path) -> str:
         """Compute SHA-256 hash of a file."""
         import hashlib
+
         sha256 = hashlib.sha256()
         try:
             with open(file_path, "rb") as f:
@@ -489,8 +505,16 @@ class ResearchLedger:
         active = state.get("current_branch", state.get("active_branch", "main"))
         for bid, b in branches.items():
             marker = "▶" if bid == active else " "
-            status_icon = "✓" if b.get("status") == "merged" else ("✗" if b.get("status") == "abandoned" else "○")
-            parent = f" (from: {b.get('parent_branch', 'main')})" if b.get("parent_branch") and b.get("parent_branch") != "main" else ""
+            status_icon = (
+                "✓"
+                if b.get("status") == "merged"
+                else ("✗" if b.get("status") == "abandoned" else "○")
+            )
+            parent = (
+                f" (from: {b.get('parent_branch', 'main')})"
+                if b.get("parent_branch") and b.get("parent_branch") != "main"
+                else ""
+            )
             lines.append(f"    {marker} {status_icon} {bid}{parent}")
             if b.get("hypothesis"):
                 lines.append(f"      Hypothesis: {b['hypothesis']}")
@@ -543,10 +567,19 @@ class ResearchLedger:
 
         # Next action
         checkpoints = state.get("checkpoints", {})
-        pipeline = ["research_init", "literature_deep", "method_route", "data_scaffold",
-                    "execute_analysis", "compile_outputs", "audit_validate"]
+        pipeline = [
+            "research_init",
+            "literature_deep",
+            "method_route",
+            "data_scaffold",
+            "execute_analysis",
+            "compile_outputs",
+            "audit_validate",
+        ]
         completed = {p for p, s in checkpoints.items() if s == "complete"}
-        next_action = next((p for p in pipeline if p not in completed), "research_iterate")
+        next_action = next(
+            (p for p in pipeline if p not in completed), "research_iterate"
+        )
         lines.append(f"Next action: {next_action}")
 
         summary = "\n".join(lines)
@@ -557,7 +590,7 @@ class ResearchLedger:
             for sep in (". ", "\n"):
                 idx = truncated.rfind(sep)
                 if idx > 0:
-                    return truncated[:idx + 1]
+                    return truncated[: idx + 1]
             return truncated + "..."
         return summary
 
@@ -601,10 +634,12 @@ class ResearchLedger:
         plan = state.get("current_plan", {})
         if not plan:
             return f"Active Intent: {intent}\nNo plan active."
-        
+
         workflow = plan.get("workflow_name", "unknown")
         steps = plan.get("workflow_steps", [])
-        return f"Active Intent: {intent}\nWorkflow: {workflow}\nSteps: {', '.join(steps)}"
+        return (
+            f"Active Intent: {intent}\nWorkflow: {workflow}\nSteps: {', '.join(steps)}"
+        )
 
     def branch_state(
         self,
@@ -652,7 +687,9 @@ class ResearchLedger:
         if branch_id in branches:
             raise ValueError(f"Branch '{branch_id}' already exists. Use a unique name.")
 
-        parent_branch = parent or state.get("current_branch", state.get("active_branch", "main"))
+        parent_branch = parent or state.get(
+            "current_branch", state.get("active_branch", "main")
+        )
         if parent_branch not in branches:
             raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
 
@@ -699,7 +736,9 @@ class ResearchLedger:
         branches = state.get("branches", {})
 
         if branch_id not in branches:
-            raise ValueError(f"Branch '{branch_id}' does not exist. Available: {list(branches.keys())}")
+            raise ValueError(
+                f"Branch '{branch_id}' does not exist. Available: {list(branches.keys())}"
+            )
 
         if branches[branch_id].get("status") == "abandoned":
             raise ValueError(f"Branch '{branch_id}' has been abandoned.")
@@ -713,7 +752,9 @@ class ResearchLedger:
         logger.info("Switched branch from '%s' to '%s'", old_branch, branch_id)
         return state
 
-    def merge_branch(self, branch_id: str, target: str = "main", commit_msg: str = "") -> dict:
+    def merge_branch(
+        self, branch_id: str, target: str = "main", commit_msg: str = ""
+    ) -> dict:
         """Merge a branch into the target branch.
 
         Args:
@@ -809,17 +850,19 @@ class ResearchLedger:
 
         result = []
         for bid, b in branches.items():
-            result.append({
-                "branch_id": bid,
-                "parent": b.get("parent_branch", "main"),
-                "status": b.get("status", "unknown"),
-                "hypothesis": b.get("hypothesis", ""),
-                "active": bid == active,
-                "created_at": b.get("created_at", ""),
-                "workspace_prefix": b.get("workspace_prefix", ""),
-                "experiment_dir": b.get("experiment_dir", ""),
-                "data_hashes": b.get("data_hashes", {}),
-            })
+            result.append(
+                {
+                    "branch_id": bid,
+                    "parent": b.get("parent_branch", "main"),
+                    "status": b.get("status", "unknown"),
+                    "hypothesis": b.get("hypothesis", ""),
+                    "active": bid == active,
+                    "created_at": b.get("created_at", ""),
+                    "workspace_prefix": b.get("workspace_prefix", ""),
+                    "experiment_dir": b.get("experiment_dir", ""),
+                    "data_hashes": b.get("data_hashes", {}),
+                }
+            )
         return result
 
     def snapshot_workspace(self, checkpoint_id: str, root: Path | None = None) -> dict:
@@ -840,13 +883,23 @@ class ResearchLedger:
                     continue
                 # Skip large binary / data artifacts
                 ext = f.suffix.lower()
-                if ext in (".csv", ".parquet", ".feather", ".pkl", ".joblib", ".h5", ".hdf5"):
-                    manifest.append({
-                        "path": str(f.relative_to(root)),
-                        "size": f.stat().st_size,
-                        "sha256": "ref_only",
-                        "skipped": True,
-                    })
+                if ext in (
+                    ".csv",
+                    ".parquet",
+                    ".feather",
+                    ".pkl",
+                    ".joblib",
+                    ".h5",
+                    ".hdf5",
+                ):
+                    manifest.append(
+                        {
+                            "path": str(f.relative_to(root)),
+                            "size": f.stat().st_size,
+                            "sha256": "ref_only",
+                            "skipped": True,
+                        }
+                    )
                     continue
                 rel = f.relative_to(root)
                 dest = ckpt_dir / rel
@@ -855,11 +908,13 @@ class ResearchLedger:
                     os.link(f, dest)
                 except OSError:
                     shutil.copy2(f, dest)
-                manifest.append({
-                    "path": str(rel),
-                    "size": f.stat().st_size,
-                    "sha256": "hardlinked",
-                })
+                manifest.append(
+                    {
+                        "path": str(rel),
+                        "size": f.stat().st_size,
+                        "sha256": "hardlinked",
+                    }
+                )
 
         (ckpt_dir / "checkpoint_manifest.json").write_text(
             json.dumps(manifest, indent=2, default=str) + "\n"
@@ -922,16 +977,23 @@ class ResearchLedger:
 
         # Log rollback event in state
         state = self._load()
-        state.setdefault("rollback_history", []).append({
-            "checkpoint_id": checkpoint_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "backup_id": backup_id,
-            "files_restored": restored,
-        })
+        state.setdefault("rollback_history", []).append(
+            {
+                "checkpoint_id": checkpoint_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "backup_id": backup_id,
+                "files_restored": restored,
+            }
+        )
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save(state)
 
-        logger.info("Rollback to '%s' complete — %d files restored (backup: %s)", checkpoint_id, restored, backup_id)
+        logger.info(
+            "Rollback to '%s' complete — %d files restored (backup: %s)",
+            checkpoint_id,
+            restored,
+            backup_id,
+        )
         return {
             "checkpoint_id": checkpoint_id,
             "backup_id": backup_id,
@@ -950,7 +1012,9 @@ class ResearchLedger:
         }
         """
         state = self._load()
-        bid = branch_id or state.get("current_branch", state.get("active_branch", "main"))
+        bid = branch_id or state.get(
+            "current_branch", state.get("active_branch", "main")
+        )
         branches = state.get("branches", {})
 
         if bid not in branches:
@@ -968,7 +1032,9 @@ class ResearchLedger:
             "manuscript": f"02_experiments/{prefix}/outputs/manuscript/",
         }
 
-    def compress_ledger(self, model: str = "ollama/llama3", dry_run: bool = False) -> dict:
+    def compress_ledger(
+        self, model: str = "ollama/llama3", dry_run: bool = False
+    ) -> dict:
         """Compress completed DAG node outputs using a local model.
 
         Feeds each completed checkpoint's output to the local model one-by-one
@@ -1006,12 +1072,15 @@ class ResearchLedger:
                 "Install it from https://ollama.com and pull a model: ollama pull llama3"
             )
 
-        db_path = self._path.parent.parent / ".research" / "cache" / "state_cache.sqlite"
+        db_path = (
+            self._path.parent.parent / ".research" / "cache" / "state_cache.sqlite"
+        )
         node_outputs: dict[str, str] = {}
 
         # Load raw outputs from SQLite cache if available.
         if db_path.exists():
             import sqlite3
+
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             try:
@@ -1029,7 +1098,12 @@ class ResearchLedger:
                 node_outputs[phase] = str(status)
 
         if not node_outputs:
-            return {"compressed_nodes": 0, "original_chars": 0, "compressed_chars": 0, "savings_pct": 0.0}
+            return {
+                "compressed_nodes": 0,
+                "original_chars": 0,
+                "compressed_chars": 0,
+                "savings_pct": 0.0,
+            }
 
         total_original = sum(len(v) for v in node_outputs.values())
         compressed: dict[str, str] = {}
@@ -1054,7 +1128,9 @@ class ResearchLedger:
                 )
                 summary = result.stdout.strip() or raw_output[:200]
             except subprocess.TimeoutExpired:
-                logger.warning("Timeout compressing node %s — keeping original.", node_id)
+                logger.warning(
+                    "Timeout compressing node %s — keeping original.", node_id
+                )
                 summary = raw_output[:200]
             except Exception as exc:
                 logger.warning("Error compressing node %s: %s", node_id, exc)
@@ -1066,13 +1142,15 @@ class ResearchLedger:
         total_compressed = sum(len(v) for v in compressed.values())
         savings_pct = (
             round((1.0 - total_compressed / total_original) * 100, 1)
-            if total_original > 0 else 0.0
+            if total_original > 0
+            else 0.0
         )
 
         if not dry_run:
             # Rewrite SQLite cache with compressed outputs.
             if db_path.exists():
                 import sqlite3
+
                 conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 for node_id, summary in compressed.items():
@@ -1084,14 +1162,16 @@ class ResearchLedger:
                 conn.close()
 
             # Record compression event in ledger.
-            state.setdefault("compression_history", []).append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "model": model,
-                "nodes_compressed": len(compressed),
-                "original_chars": total_original,
-                "compressed_chars": total_compressed,
-                "savings_pct": savings_pct,
-            })
+            state.setdefault("compression_history", []).append(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "model": model,
+                    "nodes_compressed": len(compressed),
+                    "original_chars": total_original,
+                    "compressed_chars": total_compressed,
+                    "savings_pct": savings_pct,
+                }
+            )
             state["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save(state)
             print(f"\nCompression complete. Context savings: ~{savings_pct}%")
@@ -1102,4 +1182,3 @@ class ResearchLedger:
             "compressed_chars": total_compressed,
             "savings_pct": savings_pct,
         }
-

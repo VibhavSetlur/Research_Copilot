@@ -4,6 +4,7 @@ This is a lightweight, safe scaffold used by the larger plan. It performs
 extension-based detection and writes a JSON manifest consumed by downstream
 phases. Parsers are lazy-checked via importlib.
 """
+
 from pathlib import Path
 import json
 import importlib.util
@@ -12,24 +13,99 @@ from research_os.project_ops import _resolve_root
 
 FORMAT_REGISTRY = {
     # tabular
-    ".csv": {"format": "CSV", "pandera_applicable": True, "domain_hint": "general", "parser": "pandas"},
-    ".tsv": {"format": "TSV", "pandera_applicable": True, "domain_hint": "general", "parser": "pandas"},
-    ".parquet": {"format": "PARQUET", "pandera_applicable": True, "domain_hint": "general", "parser": "pyarrow"},
-    ".xlsx": {"format": "XLSX", "pandera_applicable": True, "domain_hint": "general", "parser": "openpyxl"},
-    ".json": {"format": "JSON_TABLE", "pandera_applicable": True, "domain_hint": "general", "parser": "json"},
+    ".csv": {
+        "format": "CSV",
+        "pandera_applicable": True,
+        "domain_hint": "general",
+        "parser": "pandas",
+    },
+    ".tsv": {
+        "format": "TSV",
+        "pandera_applicable": True,
+        "domain_hint": "general",
+        "parser": "pandas",
+    },
+    ".parquet": {
+        "format": "PARQUET",
+        "pandera_applicable": True,
+        "domain_hint": "general",
+        "parser": "pyarrow",
+    },
+    ".xlsx": {
+        "format": "XLSX",
+        "pandera_applicable": True,
+        "domain_hint": "general",
+        "parser": "openpyxl",
+    },
+    ".json": {
+        "format": "JSON_TABLE",
+        "pandera_applicable": True,
+        "domain_hint": "general",
+        "parser": "json",
+    },
     # typesetting
-    ".tex": {"format": "LATEX", "pandera_applicable": False, "domain_hint": "manuscript", "parser": "tex"},
-    ".typ": {"format": "TYPST", "pandera_applicable": False, "domain_hint": "manuscript", "parser": "typst"},
+    ".tex": {
+        "format": "LATEX",
+        "pandera_applicable": False,
+        "domain_hint": "manuscript",
+        "parser": "tex",
+    },
+    ".typ": {
+        "format": "TYPST",
+        "pandera_applicable": False,
+        "domain_hint": "manuscript",
+        "parser": "typst",
+    },
     # genomics
-    ".fastq": {"format": "FASTQ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
-    ".fastq.gz": {"format": "FASTQ_GZ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
-    ".fq": {"format": "FASTQ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "Bio"},
-    ".bam": {"format": "BAM", "pandera_applicable": False, "domain_hint": "genomics", "parser": "pysam"},
-    ".vcf": {"format": "VCF", "pandera_applicable": False, "domain_hint": "genomics", "parser": "cyvcf2"},
-    ".vcf.gz": {"format": "VCF_GZ", "pandera_applicable": False, "domain_hint": "genomics", "parser": "cyvcf2"},
+    ".fastq": {
+        "format": "FASTQ",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "Bio",
+    },
+    ".fastq.gz": {
+        "format": "FASTQ_GZ",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "Bio",
+    },
+    ".fq": {
+        "format": "FASTQ",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "Bio",
+    },
+    ".bam": {
+        "format": "BAM",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "pysam",
+    },
+    ".vcf": {
+        "format": "VCF",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "cyvcf2",
+    },
+    ".vcf.gz": {
+        "format": "VCF_GZ",
+        "pandera_applicable": False,
+        "domain_hint": "genomics",
+        "parser": "cyvcf2",
+    },
     # neuro
-    ".nii": {"format": "NIFTI", "pandera_applicable": False, "domain_hint": "neuroimaging", "parser": "nibabel"},
-    ".nii.gz": {"format": "NIFTI_GZ", "pandera_applicable": False, "domain_hint": "neuroimaging", "parser": "nibabel"},
+    ".nii": {
+        "format": "NIFTI",
+        "pandera_applicable": False,
+        "domain_hint": "neuroimaging",
+        "parser": "nibabel",
+    },
+    ".nii.gz": {
+        "format": "NIFTI_GZ",
+        "pandera_applicable": False,
+        "domain_hint": "neuroimaging",
+        "parser": "nibabel",
+    },
 }
 
 
@@ -47,7 +123,15 @@ def detect_format(filepath: str) -> Dict[str, Any]:
         entry = FORMAT_REGISTRY[suffix_chain].copy()
     else:
         ext = p.suffix.lower()
-        entry = FORMAT_REGISTRY.get(ext, {"format": "UNKNOWN", "pandera_applicable": False, "domain_hint": None, "parser": None})
+        entry = FORMAT_REGISTRY.get(
+            ext,
+            {
+                "format": "UNKNOWN",
+                "pandera_applicable": False,
+                "domain_hint": None,
+                "parser": None,
+            },
+        )
 
     parser = entry.get("parser")
     entry["parser_available"] = _lazy_has_module(parser) if parser else False
@@ -62,7 +146,9 @@ def route_file(filepath: str) -> Dict[str, Any]:
     return info
 
 
-def scan_directory(dirpath: str, out_path: str = "workspace/data_format_manifest.json") -> Dict[str, Any]:
+def scan_directory(
+    dirpath: str, out_path: str = "workspace/data_format_manifest.json"
+) -> Dict[str, Any]:
     base = Path(dirpath)
     manifest = {"files": [], "tabular_count": 0, "non_tabular_count": 0}
     if not base.exists():
@@ -81,7 +167,7 @@ def scan_directory(dirpath: str, out_path: str = "workspace/data_format_manifest
         out = resolved_root / out_path
     except Exception:
         out = Path(out_path)
-        
+
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(manifest, indent=2))
     return manifest

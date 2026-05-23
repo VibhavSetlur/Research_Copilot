@@ -24,7 +24,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from tenacity import RetryError, retry, retry_if_exception, stop_after_attempt, wait_exponential
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 
 logger = logging.getLogger("research.citation_verifier")
@@ -49,7 +55,9 @@ def _is_retryable_api_error(exc: Exception) -> bool:
     reraise=False,
 )
 def _url_get_with_backoff(url: str, timeout: int = 15) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "ResearchOS/1.0 (mailto:research@os.local)"})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "ResearchOS/1.0 (mailto:research@os.local)"}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
@@ -63,10 +71,12 @@ def _timeout_tagged_citation(citation: dict) -> str:
 def _api_timeout_result(source: str) -> dict:
     return {"status": "api_timeout", "error": f"{source} API timed out after 3 retries"}
 
+
 class CitationNotFoundError(Exception):
     def __init__(self, message, identifier):
         super().__init__(message)
         self.identifier = identifier
+
 
 class CitationRetractedError(Exception):
     def __init__(self, message, identifier):
@@ -92,7 +102,9 @@ def url_get(url: str, timeout: int = 15) -> Optional[str]:
         if getattr(exc, "last_attempt", None) is not None:
             last_exc = exc.last_attempt.exception()
         if last_exc is not None and _is_retryable_api_error(last_exc):
-            raise APITimeoutError(f"API request failed after 3 retries: {url}") from last_exc
+            raise APITimeoutError(
+                f"API request failed after 3 retries: {url}"
+            ) from last_exc
         return None
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
@@ -115,19 +127,27 @@ def url_get_json(url: str, timeout: int = 15) -> Optional[dict]:
 
 # ── Pass 1: Existence Check ──────────────────────────────────────────────
 
+
 def verify_crossref(doi: str) -> dict:
     """Verify a DOI via CrossRef API."""
     url = f"https://api.crossref.org/works/{doi}"
     try:
         data = url_get_json(url)
     except APITimeoutError as exc:
-        return {**_api_timeout_result("CrossRef"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
+        return {
+            **_api_timeout_result("CrossRef"),
+            "citation_tag": "[UNVERIFIED - API TIMEOUT]",
+            "error": str(exc),
+        }
     if data is None:
         return {"status": "not_found", "error": "CrossRef API returned no data"}
 
     message = data.get("message", {})
     title = message.get("title", [""])[0]
-    authors = [a.get("given", "") + " " + a.get("family", "") for a in message.get("author", [])]
+    authors = [
+        a.get("given", "") + " " + a.get("family", "")
+        for a in message.get("author", [])
+    ]
     year = None
     date_parts = message.get("published-print", message.get("published-online", {}))
     if "date-parts" in date_parts and date_parts["date-parts"]:
@@ -148,7 +168,11 @@ def verify_arxiv(arxiv_id: str) -> dict:
     try:
         raw = url_get(url)
     except APITimeoutError as exc:
-        return {**_api_timeout_result("arXiv"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
+        return {
+            **_api_timeout_result("arXiv"),
+            "citation_tag": "[UNVERIFIED - API TIMEOUT]",
+            "error": str(exc),
+        }
     if raw is None:
         return {"status": "not_found", "error": "arXiv API returned no data"}
 
@@ -178,7 +202,11 @@ def verify_pubmed(pmid: str) -> dict:
     try:
         raw = url_get(fetch_url)
     except APITimeoutError as exc:
-        return {**_api_timeout_result("PubMed"), "citation_tag": "[UNVERIFIED - API TIMEOUT]", "error": str(exc)}
+        return {
+            **_api_timeout_result("PubMed"),
+            "citation_tag": "[UNVERIFIED - API TIMEOUT]",
+            "error": str(exc),
+        }
     if raw is None:
         return {"status": "not_found", "error": "PubMed API returned no data"}
 
@@ -206,12 +234,18 @@ def pass1_existence(identifier: str, identifier_type: str) -> dict:
     elif identifier_type == "pubmed":
         return verify_pubmed(identifier)
     else:
-        return {"status": "skipped", "error": f"Unknown identifier type: {identifier_type}"}
+        return {
+            "status": "skipped",
+            "error": f"Unknown identifier type: {identifier_type}",
+        }
 
 
 # ── Pass 2: Content Verification ─────────────────────────────────────────
 
-def fetch_semantic_scholar_abstract(identifier: str, identifier_type: str) -> Optional[str]:
+
+def fetch_semantic_scholar_abstract(
+    identifier: str, identifier_type: str
+) -> Optional[str]:
     """Fetch abstract from Semantic Scholar API."""
     if identifier_type == "doi":
         url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{identifier}?fields=title,abstract,authors,year"
@@ -235,7 +269,10 @@ def pass2_content(abstract: Optional[str], claim: str) -> dict:
     heuristic check. The agent should re-run this with LLM verification.
     """
     if abstract is None:
-        return {"status": "no_abstract", "justification": "No abstract available for content verification"}
+        return {
+            "status": "no_abstract",
+            "justification": "No abstract available for content verification",
+        }
 
     abstract_lower = abstract.lower()
     claim_lower = claim.lower()
@@ -267,12 +304,18 @@ def pass2_content(abstract: Optional[str], claim: str) -> dict:
 
 # ── Pass 3: Retraction Check ─────────────────────────────────────────────
 
+
 def check_crossref_retraction(doi: str) -> dict:
     """Check if a DOI has been retracted via CrossRef."""
     url = f"https://api.crossref.org/works/{doi}"
     data = url_get_json(url)
     if data is None:
-        return {"status": "unknown", "source": "crossref", "retraction_date": None, "retraction_reason": None}
+        return {
+            "status": "unknown",
+            "source": "crossref",
+            "retraction_date": None,
+            "retraction_reason": None,
+        }
 
     message = data.get("message", {})
     update_types = message.get("update-type", [])
@@ -280,7 +323,11 @@ def check_crossref_retraction(doi: str) -> dict:
 
     for ut, ul in zip(update_types, update_labels):
         if "retraction" in ut.lower() or "retraction" in ul.lower():
-            date = message.get("update-to", [{}])[0].get("update-date", {}).get("date-parts", [[None]])
+            date = (
+                message.get("update-to", [{}])[0]
+                .get("update-date", {})
+                .get("date-parts", [[None]])
+            )
             return {
                 "status": "retracted",
                 "source": "crossref",
@@ -297,7 +344,12 @@ def check_crossref_retraction(doi: str) -> dict:
             "retraction_reason": "CrossRef is-retracted flag",
         }
 
-    return {"status": "clear", "source": "crossref", "retraction_date": None, "retraction_reason": None}
+    return {
+        "status": "clear",
+        "source": "crossref",
+        "retraction_date": None,
+        "retraction_reason": None,
+    }
 
 
 def pass3_retraction(doi: str) -> dict:
@@ -307,6 +359,7 @@ def pass3_retraction(doi: str) -> dict:
 
 # ── Bibliography Parsing ─────────────────────────────────────────────────
 
+
 def parse_bibtex(path: Path) -> list[dict]:
     """Parse a BibTeX file and extract citations."""
     citations = []
@@ -315,7 +368,9 @@ def parse_bibtex(path: Path) -> list[dict]:
     except FileNotFoundError:
         return citations
 
-    entries = re.split(r"@(?:article|inproceedings|book|misc|techreport|conference)\{", content)
+    entries = re.split(
+        r"@(?:article|inproceedings|book|misc|techreport|conference)\{", content
+    )
     for entry in entries[1:]:
         lines = entry.strip().split("\n")
         citation_key = lines[0].strip().rstrip(",") if lines else ""
@@ -342,16 +397,22 @@ def parse_bibtex(path: Path) -> list[dict]:
                 pubmed_id = line.split("=", 1)[-1].strip().strip("{}\"'")
 
         identifier = doi or arxiv_id or pubmed_id
-        identifier_type = "doi" if doi else ("arxiv" if arxiv_id else ("pubmed" if pubmed_id else "unknown"))
+        identifier_type = (
+            "doi"
+            if doi
+            else ("arxiv" if arxiv_id else ("pubmed" if pubmed_id else "unknown"))
+        )
 
-        citations.append({
-            "key": citation_key,
-            "identifier": identifier,
-            "identifier_type": identifier_type,
-            "title": title,
-            "author": author,
-            "year": year,
-        })
+        citations.append(
+            {
+                "key": citation_key,
+                "identifier": identifier,
+                "identifier_type": identifier_type,
+                "title": title,
+                "author": author,
+                "year": year,
+            }
+        )
 
     return citations
 
@@ -372,17 +433,23 @@ def parse_literature_corpus(path: Path) -> list[dict]:
             arxiv_id = paper.get("arxiv_id", paper.get("arxiv", ""))
             pubmed_id = paper.get("pmid", paper.get("pubmed_id", ""))
             identifier = doi or arxiv_id or pubmed_id
-            identifier_type = "doi" if doi else ("arxiv" if arxiv_id else ("pubmed" if pubmed_id else "unknown"))
-            citations.append({
-                "key": paper.get("id", paper.get("citation_key", "")),
-                "identifier": identifier,
-                "identifier_type": identifier_type,
-                "title": paper.get("title", ""),
-                "author": ", ".join(paper.get("authors", [])),
-                "year": paper.get("year", ""),
-                "abstract": paper.get("abstract", ""),
-                "claims": paper.get("claims", []),
-            })
+            identifier_type = (
+                "doi"
+                if doi
+                else ("arxiv" if arxiv_id else ("pubmed" if pubmed_id else "unknown"))
+            )
+            citations.append(
+                {
+                    "key": paper.get("id", paper.get("citation_key", "")),
+                    "identifier": identifier,
+                    "identifier_type": identifier_type,
+                    "title": paper.get("title", ""),
+                    "author": ", ".join(paper.get("authors", [])),
+                    "year": paper.get("year", ""),
+                    "abstract": paper.get("abstract", ""),
+                    "claims": paper.get("claims", []),
+                }
+            )
     return citations
 
 
@@ -398,37 +465,44 @@ def extract_dois_from_manuscript(path: Path) -> list[dict]:
     dois = re.findall(doi_pattern, content)
 
     for doi in set(dois):
-        citations.append({
-            "key": f"manuscript_doi_{hashlib.md5(doi.encode()).hexdigest()[:8]}",
-            "identifier": doi,
-            "identifier_type": "doi",
-            "title": "",
-            "author": "",
-            "year": "",
-        })
+        citations.append(
+            {
+                "key": f"manuscript_doi_{hashlib.md5(doi.encode()).hexdigest()[:8]}",
+                "identifier": doi,
+                "identifier_type": "doi",
+                "title": "",
+                "author": "",
+                "year": "",
+            }
+        )
 
     arxiv_pattern = r"(?:arXiv[:\s]+)?(\d{4}\.\d{4,5}(?:v\d+)?)\b"
     arxiv_ids = re.findall(arxiv_pattern, content)
     for aid in set(arxiv_ids):
-        citations.append({
-            "key": f"manuscript_arxiv_{hashlib.md5(aid.encode()).hexdigest()[:8]}",
-            "identifier": aid,
-            "identifier_type": "arxiv",
-            "title": "",
-            "author": "",
-            "year": "",
-        })
+        citations.append(
+            {
+                "key": f"manuscript_arxiv_{hashlib.md5(aid.encode()).hexdigest()[:8]}",
+                "identifier": aid,
+                "identifier_type": "arxiv",
+                "title": "",
+                "author": "",
+                "year": "",
+            }
+        )
 
     return citations
 
 
 # ── Main Verification Pipeline ───────────────────────────────────────────
 
+
 def verify_citation(citation: dict, delay: float = 0.5) -> dict:
     """Run all three passes on a single citation."""
     identifier = citation.get("identifier", "")
     identifier_type = citation.get("identifier_type", "unknown")
-    citation_label = f"{citation.get('author', 'Unknown')}, {citation.get('year', 'N/A')}"
+    citation_label = (
+        f"{citation.get('author', 'Unknown')}, {citation.get('year', 'N/A')}"
+    )
     timeout_seen = False
 
     if not identifier or identifier_type == "unknown":
@@ -437,8 +511,16 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
             "identifier": identifier,
             "identifier_type": identifier_type,
             "pass_1": {"status": "skipped", "error": "No valid identifier"},
-            "pass_2": {"status": "skipped", "justification": "No identifier for content check"},
-            "pass_3": {"status": "unknown", "source": "none", "retraction_date": None, "retraction_reason": None},
+            "pass_2": {
+                "status": "skipped",
+                "justification": "No identifier for content check",
+            },
+            "pass_3": {
+                "status": "unknown",
+                "source": "none",
+                "retraction_date": None,
+                "retraction_reason": None,
+            },
             "overall_status": "unverified",
         }
 
@@ -449,18 +531,25 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
         pass1_result = pass1_existence(identifier, identifier_type)
     except APITimeoutError as exc:
         timeout_seen = True
-        pass1_result = {**_api_timeout_result(identifier_type.title()), "error": str(exc)}
+        pass1_result = {
+            **_api_timeout_result(identifier_type.title()),
+            "error": str(exc),
+        }
     pass1_result["claimed_title"] = citation.get("title", "")
     pass1_result["claimed_year"] = citation.get("year", "")
 
     if pass1_result.get("title") and citation.get("title"):
-        pass1_result["title_match"] = _fuzzy_match(pass1_result["title"], citation["title"])
+        pass1_result["title_match"] = _fuzzy_match(
+            pass1_result["title"], citation["title"]
+        )
     else:
         pass1_result["title_match"] = None
 
     if pass1_result.get("year") and citation.get("year"):
         try:
-            pass1_result["year_match"] = str(pass1_result["year"]) == str(citation["year"])
+            pass1_result["year_match"] = str(pass1_result["year"]) == str(
+                citation["year"]
+            )
         except (ValueError, TypeError):
             pass1_result["year_match"] = None
     else:
@@ -476,9 +565,15 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
             pass2_result = pass2_content(abstract, claim_text)
         except APITimeoutError as exc:
             timeout_seen = True
-            pass2_result = {**_api_timeout_result("Semantic Scholar"), "justification": str(exc)}
+            pass2_result = {
+                **_api_timeout_result("Semantic Scholar"),
+                "justification": str(exc),
+            }
     else:
-        pass2_result = {"status": "skipped", "justification": "Pass 1 failed, skipping content check"}
+        pass2_result = {
+            "status": "skipped",
+            "justification": "Pass 1 failed, skipping content check",
+        }
 
     # Pass 3
     if identifier_type == "doi":
@@ -486,16 +581,30 @@ def verify_citation(citation: dict, delay: float = 0.5) -> dict:
             pass3_result = pass3_retraction(identifier)
         except APITimeoutError as exc:
             timeout_seen = True
-            pass3_result = {**_api_timeout_result("CrossRef retraction"), "retraction_reason": str(exc)}
+            pass3_result = {
+                **_api_timeout_result("CrossRef retraction"),
+                "retraction_reason": str(exc),
+            }
     else:
-        pass3_result = {"status": "unknown", "source": "none", "retraction_date": None, "retraction_reason": None}
+        pass3_result = {
+            "status": "unknown",
+            "source": "none",
+            "retraction_date": None,
+            "retraction_reason": None,
+        }
 
     # Overall status
     if pass3_result["status"] == "retracted":
         overall = "retracted"
-    elif pass1_result["status"] == "verified" and pass2_result.get("status") in ("supported",) and pass3_result["status"] == "clear":
+    elif (
+        pass1_result["status"] == "verified"
+        and pass2_result.get("status") in ("supported",)
+        and pass3_result["status"] == "clear"
+    ):
         overall = "verified"
-    elif pass1_result["status"] == "verified" and pass2_result.get("status") == "partial":
+    elif (
+        pass1_result["status"] == "verified" and pass2_result.get("status") == "partial"
+    ):
         overall = "partial"
     elif pass1_result["status"] == "verified":
         overall = "verified"
@@ -525,11 +634,15 @@ def _fuzzy_match(title1: str, title2: str, threshold: float = 0.7) -> bool:
     return len(t1 & t2) / len(t1 | t2) >= threshold
 
 
-def run_verification(citations: list[dict], output_path: Path, delay: float = 0.5) -> dict:
+def run_verification(
+    citations: list[dict], output_path: Path, delay: float = 0.5
+) -> dict:
     """Run full three-pass verification on a list of citations."""
     results = []
     for i, citation in enumerate(citations):
-        print(f"  [{i+1}/{len(citations)}] Verifying: {citation.get('key', citation.get('identifier', 'unknown'))}")
+        print(
+            f"  [{i + 1}/{len(citations)}] Verifying: {citation.get('key', citation.get('identifier', 'unknown'))}"
+        )
         result = verify_citation(citation, delay=delay)
         results.append(result)
 
@@ -538,7 +651,12 @@ def run_verification(citations: list[dict], output_path: Path, delay: float = 0.
         "unverified": sum(1 for r in results if r["overall_status"] == "unverified"),
         "retracted": sum(1 for r in results if r["overall_status"] == "retracted"),
         "partial_match": sum(1 for r in results if r["overall_status"] == "partial"),
-        "not_found": sum(1 for r in results if r["overall_status"] == "unverified" and r["pass_1"].get("status") == "not_found"),
+        "not_found": sum(
+            1
+            for r in results
+            if r["overall_status"] == "unverified"
+            and r["pass_1"].get("status") == "not_found"
+        ),
     }
 
     total = len(results)
@@ -608,33 +726,48 @@ def replace_with_verified(citation: dict) -> dict:
     res = verify_citation(citation)
     status = res["overall_status"]
     identifier = citation.get("identifier")
-    
+
     if status == "retracted":
-        raise CitationRetractedError(f"Citation retracted: {res['pass_3'].get('retraction_reason')}", identifier)
-    
+        raise CitationRetractedError(
+            f"Citation retracted: {res['pass_3'].get('retraction_reason')}", identifier
+        )
+
     id_type = citation.get("identifier_type")
     bibtex = ""
     if id_type == "doi" and status not in ("unverified", "not_found"):
-        bibtex = url_get(f"https://api.crossref.org/works/{identifier}/transform/application/x-bibtex")
-    
+        bibtex = url_get(
+            f"https://api.crossref.org/works/{identifier}/transform/application/x-bibtex"
+        )
+
     if not bibtex:
         title = res["pass_1"].get("title", citation.get("title", "Unknown Title"))
         if status in ("unverified", "not_found"):
             title = f"[UNVERIFIED] {title}"
         year = res["pass_1"].get("year", citation.get("year", "Unknown Year"))
-        authors = " and ".join(res["pass_1"].get("authors", [citation.get("author", "Unknown Author")]))
-        key = f"ref_{str(identifier).replace('/', '_').replace('.', '_')}" if identifier else "ref_unknown"
+        authors = " and ".join(
+            res["pass_1"].get("authors", [citation.get("author", "Unknown Author")])
+        )
+        key = (
+            f"ref_{str(identifier).replace('/', '_').replace('.', '_')}"
+            if identifier
+            else "ref_unknown"
+        )
         bibtex = f"@article{{{key},\n  title={{{title}}},\n  author={{{authors}}},\n  year={{{year}}},\n  url={{{identifier}}}\n}}"
 
     return {
-        "status": "replaced" if status not in ("unverified", "not_found") else "fallback",
+        "status": "replaced"
+        if status not in ("unverified", "not_found")
+        else "fallback",
         "bibtex": bibtex,
         "doi": identifier if id_type == "doi" else None,
         "verified_title": res["pass_1"].get("title"),
         "verified_year": res["pass_1"].get("year"),
     }
 
-def build_verified_bibliography(citations: list[dict], output_bib: Path, delay: float = 0.5) -> dict:
+
+def build_verified_bibliography(
+    citations: list[dict], output_bib: Path, delay: float = 0.5
+) -> dict:
     replaced = 0
     failed = 0
     retracted = 0
@@ -657,51 +790,83 @@ def build_verified_bibliography(citations: list[dict], output_bib: Path, delay: 
     output_bib.parent.mkdir(parents=True, exist_ok=True)
     with open(output_bib, "w") as f:
         f.write("\n\n".join(filter(None, bib_entries)))
-    
+
     return {
         "total": len(citations),
         "replaced": replaced,
         "failed": failed,
         "retracted": retracted,
-        "bib_path": str(output_bib)
+        "bib_path": str(output_bib),
     }
+
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(description="Citation Verification Pipeline")
-    parser.add_argument("--bibliography", type=str, help="Path to BibTeX bibliography file")
+    parser.add_argument(
+        "--bibliography", type=str, help="Path to BibTeX bibliography file"
+    )
     parser.add_argument("--corpus", type=str, help="Path to literature corpus JSON")
-    parser.add_argument("--manuscript", type=str, help="Path to manuscript markdown file")
-    parser.add_argument("--output", type=str, help="Output report path (default: 00_inputs/literature/citation_verification_report.json)")
-    parser.add_argument("--delay", type=float, default=0.5, help="Delay between API calls in seconds")
+    parser.add_argument(
+        "--manuscript", type=str, help="Path to manuscript markdown file"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        help="Output report path (default: 00_inputs/literature/citation_verification_report.json)",
+    )
+    parser.add_argument(
+        "--delay", type=float, default=0.5, help="Delay between API calls in seconds"
+    )
     args = parser.parse_args()
 
     root = find_project_root()
     citations = []
 
     if args.bibliography:
-        path = Path(args.bibliography) if Path(args.bibliography).is_absolute() else root / args.bibliography
+        path = (
+            Path(args.bibliography)
+            if Path(args.bibliography).is_absolute()
+            else root / args.bibliography
+        )
         citations.extend(parse_bibtex(path))
         print(f"Parsed {len(citations)} citations from BibTeX")
 
     if args.corpus:
-        path = Path(args.corpus) if Path(args.corpus).is_absolute() else root / args.corpus
+        path = (
+            Path(args.corpus) if Path(args.corpus).is_absolute() else root / args.corpus
+        )
         corpus_citations = parse_literature_corpus(path)
         citations.extend(corpus_citations)
-        print(f"Parsed {len(corpus_citations)} citations from corpus (total: {len(citations)})")
+        print(
+            f"Parsed {len(corpus_citations)} citations from corpus (total: {len(citations)})"
+        )
 
     if args.manuscript:
-        path = Path(args.manuscript) if Path(args.manuscript).is_absolute() else root / args.manuscript
+        path = (
+            Path(args.manuscript)
+            if Path(args.manuscript).is_absolute()
+            else root / args.manuscript
+        )
         manuscript_citations = extract_dois_from_manuscript(path)
         citations.extend(manuscript_citations)
-        print(f"Extracted {len(manuscript_citations)} citations from manuscript (total: {len(citations)})")
+        print(
+            f"Extracted {len(manuscript_citations)} citations from manuscript (total: {len(citations)})"
+        )
 
     if not citations:
-        print("ERROR: No citations found. Provide --bibliography, --corpus, or --manuscript")
+        print(
+            "ERROR: No citations found. Provide --bibliography, --corpus, or --manuscript"
+        )
         sys.exit(1)
 
-    output_path = Path(args.output) if args.output else root / "00_inputs" / "literature" / "citation_verification_report.json"
+    output_path = (
+        Path(args.output)
+        if args.output
+        else root / "00_inputs" / "literature" / "citation_verification_report.json"
+    )
     if not output_path.is_absolute():
         output_path = root / output_path
 

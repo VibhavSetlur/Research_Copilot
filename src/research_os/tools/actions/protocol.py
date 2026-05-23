@@ -7,21 +7,23 @@ logger = logging.getLogger("research.tools.protocol")
 
 _PROTOCOL_CACHE: Dict[str, Dict[str, Any]] = {}
 
+
 def get_protocol(name: str, root: Path) -> Dict[str, Any]:
     try:
         if name in _PROTOCOL_CACHE:
-             return {"content": yaml.dump(_PROTOCOL_CACHE[name])}
-             
+            return {"content": yaml.dump(_PROTOCOL_CACHE[name])}
+
         p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
         if not p_file.exists():
-             return {"error": "Protocol not found"}
-             
+            return {"error": "Protocol not found"}
+
         data = yaml.safe_load(p_file.read_text())
         _PROTOCOL_CACHE[name] = data
         return {"content": yaml.dump(data)}
     except Exception as e:
         logger.error(f"Get protocol failed: {e}")
         return {"error": str(e)}
+
 
 def list_protocols(root: Path) -> Dict[str, Any]:
     try:
@@ -33,47 +35,52 @@ def list_protocols(root: Path) -> Dict[str, Any]:
             try:
                 name = p.stem
                 if name in _PROTOCOL_CACHE:
-                     data = _PROTOCOL_CACHE[name]
+                    data = _PROTOCOL_CACHE[name]
                 else:
-                     data = yaml.safe_load(p.read_text())
-                     _PROTOCOL_CACHE[name] = data
-                     
-                protocols.append({
-                    "name": name,
-                    "description": data.get("description", ""),
-                    "version": data.get("version", "1.0.0")
-                })
+                    data = yaml.safe_load(p.read_text())
+                    _PROTOCOL_CACHE[name] = data
+
+                protocols.append(
+                    {
+                        "name": name,
+                        "description": data.get("description", ""),
+                        "version": data.get("version", "1.0.0"),
+                    }
+                )
             except Exception:
                 pass
         return {"protocols": protocols}
     except Exception as e:
-          logger.error(f"List protocols failed: {e}")
-          return {"error": str(e)}
+        logger.error(f"List protocols failed: {e}")
+        return {"error": str(e)}
+
 
 def validate_protocol(name: str, root: Path) -> Dict[str, Any]:
     try:
         p_file = root / "src" / "research_os" / "protocols" / f"{name}.yaml"
         if not p_file.exists():
-             return {"error": "Protocol not found"}
-             
+            return {"error": "Protocol not found"}
+
         data = yaml.safe_load(p_file.read_text())
         expected_outputs = data.get("expected_outputs", [])
-        
+
         checklist = []
         all_passed = True
-        
+
         for output in expected_outputs:
             path_str = output.split(":")[0].strip()
             item_path = root / path_str
             passed = item_path.exists()
             if not passed:
-                 all_passed = False
-            checklist.append({
-                "item": output,
-                "passed": passed
-            })
-            
-        return {"status": "success", "protocol": name, "all_passed": all_passed, "checklist": checklist}
+                all_passed = False
+            checklist.append({"item": output, "passed": passed})
+
+        return {
+            "status": "success",
+            "protocol": name,
+            "all_passed": all_passed,
+            "checklist": checklist,
+        }
     except Exception as e:
         logger.error(f"Validate protocol failed: {e}")
         return {"error": str(e)}

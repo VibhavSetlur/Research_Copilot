@@ -170,7 +170,9 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
     branches = state.get("branches", {})
     active_branch = state.get("current_branch", state.get("active_branch", "main"))
     branch_info = branches.get(active_branch, {})
-    experiment_dir = branch_info.get("experiment_dir", "02_experiments/exp_001_baseline")
+    experiment_dir = branch_info.get(
+        "experiment_dir", "02_experiments/exp_001_baseline"
+    )
 
     prompt_parts = [
         "# Context Restoration — Research OS",
@@ -217,7 +219,7 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         f"- **Token budget**: {budget.get('used', 0):,} / {budget.get('limit', 200000):,} used",
         f"- **Resumable from**: {state.get('resumable_from', 'none')}",
         "",
-        f"---",
+        "---",
         f"Generated: {now_iso()}",
     ]
 

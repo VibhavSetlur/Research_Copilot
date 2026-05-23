@@ -1,3 +1,6 @@
+name: research_design
+version: 2.0.0
+schema_version: '1.0'
 decision_tree:
   flowchart:
     q1:
@@ -16,26 +19,25 @@ decision_tree:
       question: Is time a factor (before/after)?
       true: Longitudinal / Difference-in-Differences (DiD)
       false: Cohort Study
-description: Select the appropriate research design and compute sample size justification.
-name: research_design
 sample_size_justification:
   formulae:
-    binary_outcome:
+    continuous_outcome:
+      description: Using Cohen's d for comparing two means.
+      power: 0.8
       alpha: 0.05
+      formula: n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2
+      example: "For d=0.5, n \u2248 64 per group."
+    binary_outcome:
       description: Comparing two proportions.
+      power: 0.8
+      alpha: 0.05
       formula: n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - p2)
         )^2
-      power: 0.8
-    continuous_outcome:
-      alpha: 0.05
-      description: Using Cohen's d for comparing two means.
-      example: "For d=0.5, n \u2248 64 per group."
-      formula: n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2
-      power: 0.8
-schema_version: '1.0'
 steps:
 - id: traverse_flowchart
   name: Traverse Design Flowchart
+  description: Answer the flowchart questions to determine the correct research design.
 - id: calculate_sample_size
   name: Calculate Sample Size
-version: 2.0.0
+  description: Use the provided formulae to compute and justify the required sample
+    size, given power=0.8 and alpha=0.05.

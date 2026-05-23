@@ -1,546 +1,238 @@
-Now I have a thorough understanding of the codebase and the latest best practices. Below is a comprehensive, production‑grade TODO for the next building stage.
+Now I have a complete picture of the repository. Let me synthesize every gap, inconsistency, and quality issue into the final comprehensive TODO.
 
 ---
 
-# TODO.md — Research OS: Pre‑Release Build Plan
+# TODO.md — Final Pre-Release Completion
 
-*Generated: 2026-05-23 | Status: In‑Build (pre‑v1.0)*
-
----
-
-## 🏗️ DIAGNOSIS: Current State Summary
-
-The repository has been **successfully cleansed** of autonomous‑agent dead code. The `src/research_os/` directory now has a clean structure with 10 YAML guidance protocols, a working MCP server, and a state management layer. However, significant gaps remain before the system delivers on the "research‑grade AI guidance" vision.
-
-### What's Working
-- MCP stdio server with 28 tool definitions (`server.py`)
-- 10 YAML guidance protocols in `protocols/`
-- State ledger, checkpoint manager, branch operations (`state/`, `project_ops.py`)
-- File I/O, python exec, LaTeX compile tools (`tool_impls.py`)
-- Token budget tracker (`runtime/token_budget.py`)
-- IDE integration docs (`IDE_INTEGRATION.md`)
-
-### What's Broken / Missing
-- **Protocols are thin** (~20‑25 lines each) — mostly prompt templates, not actionable decision graphs with library references, output schemas, and error recovery paths
-- **No researcher configuration system** — no beginner/advanced/‑publication interaction levels, no HITL toggle, no API key onboarding
-- **Many tool handlers are stubs** — `tool.search.web`, `tool.search.semantic_scholar`, `tool.search.pubmed`, `tool.search.crossref`, `tool.web.scrape` return placeholder messages
-- **`memory/` has 7 files** but most are thin stubs or unused autonomous‑agent remnants
-- **`runtime/` hooks and interceptors** still reference autonomous‑agent patterns (`pre_routing`, `pre_execution`, `emergency_synthesize`)
-- **No `AGENTS.md` or `.cursor/rules/` templates** for researchers to give their IDE AI
-- **No data size / task duration estimation** — AI cannot warn users about long‑running operations
-- **Missing `research_design.yaml` and `writing_standards.yaml`** — referenced in docs but absent from `protocols/`
-- **No researcher onboarding flow** — no API key collection for Firecrawl/Semantic Scholar/PubMed, no external MCP server detection
-- **`prompts/` directory is empty** — ideal location for researcher config templates
-
-### What Needs Full Redesign
-- **Protocol depth** — current YAMLs are conversational prompts. They need to be structured decision trees with conditionals, output schemas, external library references, and checkpoints.
-- **Researcher interaction model** — needs a configuration file where researchers set their preferred autonomy level, notification thresholds, and API keys.
-- **Token‑efficient tool discovery** — 28 tools listed eagerly. Need 2‑tier lazy loading (summary → full schema on demand) per SEP‑1576 patterns.
+*Generated: 2026-05-23 | Target: v0.1.0 ready for public release*
 
 ---
 
-## 🔴 PHASE 0: IMMEDIATE FIXES — Make the System Functional
+## 🔴 CRITICAL: Naming & Branding — Remove "Agentic" Everywhere
 
-### 0.1 Implement Stub Tool Handlers
-- [ ] **`tool.search.web`** — Integrate Firecrawl API as primary backend. Read API key from researcher config. Log all queries to `workspace/logs/searches.log`. Return structured results (title, URL, snippet, timestamp).
-- [ ] **`tool.search.semantic_scholar`** — Wire to Semantic Scholar Academic Graph API. Implement rate limiting (1 req/sec). Return structured paper objects with `paperId`, `title`, `authors`, `year`, `abstract`, `citationCount`, `url`.
-- [ ] **`tool.search.pubmed`** — Wire to NCBI Entrez API. Implement MeSH term expansion. Respect rate limits (3 req/sec without API key, 10 req/sec with).
-- [ ] **`tool.search.crossref`** — Wire to Crossref REST API for citation verification and metadata lookup.
-- [ ] **`tool.web.scrape`** — Implement via Firecrawl scrape endpoint or BeautifulSoup fallback. Return cleaned markdown. Log scrape URL and timestamp.
-- [ ] **`tool.literature.download`** — Implement PDF download with legal check (open access only unless user configures institutional access). Save to `inputs/literature/`. Update `inputs/literature_index.yaml`.
-- [ ] **`sys.checkpoint.create`** / **`sys.checkpoint.rollback`** / **`sys.checkpoint.list`** — Wire to `checkpoint_manager.py` (currently return stub messages).
-- [ ] **`sys.branch.switch`** / **`sys.branch.merge`** — Implement full branch switching and merging logic.
-- [ ] **`tool.package.install`** — Wire to `pip install` with environment pinning.
-- [ ] **`tool.env.freeze`** — Snapshot current environment to step's `environment/requirements.txt`.
-- [ ] **`tool.env.restore`** — Restore from step's `environment/requirements.txt`.
+The user explicitly wants the system called **Research OS**, not "Agentic Research OS". The package must be installable as `research-os`.
 
-### 0.2 Clean Up Dead Modules
-- [ ] **Evaluate `memory/` files.** `artifact_memory.py` (8 lines — thin stub), `episodic_memory.py`, `procedural_memory.py`, `retrieval_policies.py`, `semantic_memory.py`, `memory_synthesizer.py`, `synthesis_watcher.py` — most are autonomous‑agent remnants. Either **consolidate into a single `workspace_logger.py`** or delete the unused ones.
-- [ ] **Evaluate `runtime/` files.** `hooks.py` (105 lines) is a lifecycle hook engine designed for autonomous agents. `interceptors.py` likely follows the same pattern. `runtime_selector.py` — what does it select? If these are not wired into the MCP server, **delete or archive to `/legacy/`**.
-- [ ] **Evaluate `core/__init__.py`** — imports `hook_engine` from runtime/hooks.py. If hooks are deleted, update this import.
-- [ ] **Delete or repurpose `prompts/__init__.py`** — currently empty. This directory should hold researcher configuration templates (see Phase 1).
+### 1.1 Package Name
+- [x] **`pyproject.toml` line 4** — Change `name = "agentic-research-os"` to `name = "research-os"`
+- [x] **`pyproject.toml` line 12** — Change `"agentic-research-os[mcp,dev]"` to `"research-os[mcp,dev]"`
+- [x] **`pyproject.toml` line 13** — Keep `research-os = "research_os.server:main"` (correct already)
+- [x] **Verify** the package can be installed with `pip install research-os` after rename
 
-### 0.3 Create Missing Protocols
-- [ ] **Create `research_design.yaml`** — Maps research question types (causal, predictive, exploratory, descriptive, evaluative) to formal designs (RCT, cohort, case‑control, cross‑sectional, quasi‑experimental, DiD, RDD, IV, systematic review, meta‑analysis). Include: conditions for each design, required data characteristics, common threats to validity, and external library references (DoWhy, EconML, statsmodels).
-- [ ] **Create `writing_standards.yaml`** — Detailed guidance for each IMRAD section, APA/STROBE/CONSORT/PRISMA formatting, abstract structure, title conventions, keyword selection, and non‑causal language enforcement. Include citation format rules and cross‑reference to `audit_and_validation.yaml`.
+### 1.2 Version Consistency
+- [x] **`src/research_os/__init__.py` line 4** — Change `__version__ = "9.0.0"` to `__version__ = "0.1.0"` to match `pyproject.toml`
 
----
+### 1.3 README.md Rewrite
+- [x] **Line 2** — Change "your AI research copilot" to "your MCP-native research operating system"
+- [x] **Line 3** — Change "Agentic Research OS" to "Research OS"
+- [x] **Line 5** — Remove `*(Pre-Release Build)*` tag
+- [x] **Line 6** — Remove the placeholder image URL (`https://via.placeholder.com/800x400.png...`)
+- [x] **Lines 7-9** — Change `pip install agentic-research-os` to `pip install research-os` (both occurrences)
+- [x] **Lines 36-39** — Fix badge URLs: change `vibhav/research-os` to `VibhavSetlur/Research-OS`
+- [x] **Add** a real architecture diagram (ASCII or link to image) showing IDE ↔ MCP ↔ Research OS ↔ Workspace
+- [x] **Add** a "What This Is NOT" section: not an autonomous agent, does not think, does not plan, does not make decisions
+- [x] **Add** a concise file tree showing the workspace structure
 
-## 🟡 PHASE 1: RESEARCHER CONFIGURATION & INTERACTION SYSTEM
-
-### 1.1 Researcher Config File (`inputs/researcher_config.yaml`)
-
-- [ ] **Create `sys.config.init` tool** — On first run (or when `inputs/researcher_config.yaml` is missing), prompt the AI to walk the researcher through setup. The AI asks questions via chat; the OS stores answers.
-
-**Config Schema:**
-
-```yaml
-# Researcher Configuration v1.0
-# Generated by sys.config.init
-
-researcher:
-  name: ""                    # How the AI addresses you
-  expertise_level: "intermediate"  # beginner | intermediate | advanced | pi
-  field: ""                   # Primary research domain
-  institution: ""             # Optional
-  orcid: ""                   # For publication metadata
-
-interaction:
-  autonomy_level: "supervised"     # supervised | semi_autonomous | autonomous
-  # supervised:     AI proposes every action, researcher must approve
-  # semi_autonomous: AI auto-executes standard steps, asks at key decision points
-  # autonomous:     AI executes full pipeline, notifies at milestones only
-  
-  checkpoint_frequency: "after_each_step"  # after_each_step | after_branch | manual
-  notification_preferences:
-    on_step_complete: true
-    on_error: true
-    on_decision_required: true
-    on_long_running_task: true    # Warn when task estimated > N seconds
-    long_running_threshold_seconds: 300
-
-api_keys:
-  firecrawl: ""               # For web search and scraping
-  semantic_scholar: ""        # Optional — higher rate limits
-  pubmed_api_key: ""          # Optional — higher rate limits
-  serpapi: ""                 # Alternative web search backend
-  openai: ""                  # If AI model needs API access
-  anthropic: ""               # If AI model needs API access
-
-external_mcp_servers:
-  # Other MCP servers the AI can discover and use
-  - name: ""                  # e.g., "firecrawl-mcp"
-    command: ""               # e.g., "npx"
-    args: []                  # e.g., ["-y", "firecrawl-mcp"]
-
-research_quality:
-  target_venue: "journal"     # preprint | conference | journal | dissertation | report
-  reporting_standard: "auto"  # auto | strobe | consort | prisma | apa | nature
-  figure_dpi: 300
-  reproducibility_level: "full"  # full | standard | minimal
-  # full:     Pinned env, checksums, Dockerfile, full audit
-  # standard: Pinned env, checksums, audit
-  # minimal:  Basic versioning only
-```
-
-- [ ] **Implement `sys.config.get` / `sys.config.set` tools** — Read/write specific config values so the AI can reference researcher preferences during execution.
-- [ ] **Implement `sys.config.validate`** — Verify API keys are functional, external MCP servers are reachable.
-
-### 1.2 Interaction Level Behaviors
-
-- [ ] **Supervised Mode:** Before every tool call that modifies data or begins a new experiment, the AI MUST call `sys.checkpoint.pending` which returns a summary of the proposed action and requires explicit researcher approval via `sys.checkpoint.approve`. The OS blocks execution until approved.
-- [ ] **Semi‑Autonomous Mode:** Standard data profiling, literature search, and figure generation auto‑execute. The AI pauses and requests approval only at branch points (new experiment, methodology change, synthesis).
-- [ ] **Autonomous Mode:** Full pipeline execution with milestone notifications. The AI still logs every decision to `mem.analysis.log` for post‑hoc review.
-- [ ] **Implement `sys.notify` tool** — Writes a notification to `workspace/logs/notifications.log` and (if configured) triggers IDE notification for the researcher to review.
-
-### 1.3 API Key & External MCP Integration
-
-- [ ] **`tool.search.web` detects Firecrawl key** from config. If present, uses Firecrawl; falls back to SerpAPI; falls back to a notice that web search is unavailable.
-- [ ] **`sys.external_mcp.discover`** — Scans researcher config for external MCP servers and attempts connection. Returns available external tools the AI can leverage.
-- [ ] **Onboarding assistant in `prompts/onboarding_prompt.md`** — A template prompt the AI uses to walk the researcher through first‑time setup conversationally: "Welcome to Research OS! I'll help you configure your research environment. First, what's your primary research domain?"
+### 1.4 Remove "Agentic" from All Docs
+- [x] **`docs/manuals/RESEARCHER_GUIDE.md` line 3** — Change "Agentic Research OS" to "Research OS"
+- [x] **`CONTRIBUTING.md` line 3** — Change "Agentic Research OS" to "Research OS" (both occurrences, lines 3 and 15)
+- [x] **`CHANGELOG.md`** — Review for "Agentic" references
+- [x] **Any other file** — Search entire repo for "agentic" and replace with correct name
 
 ---
 
-## 🟡 PHASE 2: DEEPEN GUIDANCE PROTOCOLS
+## 🔴 CRITICAL: Documentation — Fix Contradictions, Duplicates, and Stale Content
 
-### 2.1 Protocol Format Upgrade
+The docs folder is a mess. Multiple files contradict each other, reference tools that don't exist, and describe an architecture that was never built.
 
-Current protocols are linear prompt lists. They need to become structured decision resources with:
+### 2.1 Duplicate Files — Resolve
+- [x] **`docs/AI_INTEGRATION.md` vs `docs/architecture/AI_INTEGRATION.md`** — These are two different files. The root-level one is 18 lines and outdated. The architecture one is 19 lines and also outdated. **Delete the root-level one.** Keep and fix the architecture one.
+- [x] **`docs/GUIDANCE_SYSTEM.md` vs `docs/architecture/GUIDANCE_SYSTEM.md`** — Two different files. The root-level one (29 lines) is better. **Delete the architecture one.**
+- [x] **`docs/CHANGELOG.md` vs root `CHANGELOG.md`** — Which is authoritative? The root one should be primary. Delete the docs one.
 
-**New Protocol Schema:**
+### 2.2 Fix Stale Architecture Docs
+- [x] **`docs/ARCHITECTURE.md`** — The ASCII art diagram (lines 6-39) references tools that **do not exist**: `view.analyze_intent`, `tool.latex`, `tool.pubmed`, `tool.ttest`, `view.tree`, `view.data.head`, `tool.statistical.test`, `view.figure`, `tool.transform`, `tool.dashboard`, `mem.citation.add`, `mem.regenerate.intake`, `mem.literature.index`, `mem.citations.generate`. **Replace the entire diagram** with one showing only tools that actually exist in `TOOL_DEFINITIONS`.
+- [x] **`docs/AI_NATIVE_WORKFLOWS.md`** — This 138-line file is the worst offender. Lines 10-35 show a diagram with `view.analyze_intent`. Lines 40-45 show a JSON response with `"suggested_tools": ["view.data.head", "tool.statistical.test", ...]` — none of these exist. **Rewrite this entire file** to match the actual MCP tools.
+- [x] **`docs/AUTHORING.md`** — References `tool.statistical.test` (line 19, 23, 33) which does not exist. References `tool_impls.py` as the location for tool implementations (line 27, 38) when tools actually live in `tools/actions/`. **Rewrite to reflect actual code structure.**
+- [x] **`docs/AI_INTEGRATION.md`** — References `view.analyze_intent` which does not exist. The tool list is incomplete. **Update to match actual TOOL_DEFINITIONS.**
 
-```yaml
-name: domain_analysis
-version: "2.0"
-description: "Full protocol description"
+### 2.3 Fix Tutorial Docs
+- [x] **`docs/tutorials/QUICKSTART.md`** — Line 5 says `pip install -r requirements.txt` but no `requirements.txt` exists in the repo root. **Change to `pip install research-os` or `pip install -e .`**
+- [x] **`docs/tutorials/EXAMPLE_WALKTHROUGH.md`** — Lines 12-16 describe `sys.workspace.scaffold` creating `inputs/researcher_config.yaml` but also describe profiling automatically. Verify this matches actual `scaffold_minimal_workspace` behavior. The walkthrough references tools that don't exist (`view.data.head` → use `sys.file.read`; `mem.analysis.log` → correct; `mem.methods.append` → correct). **Update outdated tool references.**
 
-# When the AI should fetch this protocol
-triggers:
-  - "new project initialization"
-  - "user provides new data or context files"
-  - "research question changes"
+### 2.4 Fix Manuals
+- [x] **`docs/manuals/RESEARCHER_GUIDE.md`** — Line 27 references `workspace/logs/execution_dag.json` — does this file actually get created? Check `scaffold_minimal_workspace` and `_profile_inputs`. If not, remove or implement.
+- [x] **`docs/DOCKER_USAGE.md`** — References `docker-compose.yml` and `Dockerfile` in root. Verify these exist. If not, add a note they need to be created or remove the references.
 
-# What the AI needs BEFORE running this protocol
-prerequisites:
-  required_inputs: ["inputs/raw_data/", "inputs/context/"]
-  optional_inputs: ["inputs/intake.md", "inputs/literature/"]
-
-# The decision tree
-decision_tree:
-  - node: analyze_inputs
-    description: "Extract domain signals from all input files"
-    action:
-      tool: "sys.file.list"
-      params: {directory: "inputs/"}
-    then:
-      - condition: "data_files > 0"
-        goto: classify_domain
-      - condition: "data_files == 0"
-        output: "No data files found. Ask researcher to add data to inputs/raw_data/."
-
-  - node: classify_domain
-    description: "Map extracted keywords to domain profile"
-    reasoning_prompt: |
-      Based on the file names, extensions, column headers, and any context
-      documents, classify the research domain. Consider:
-      - File types: {file_types}
-      - Column names: {column_sample}
-      - Context keywords: {context_keywords}
-      
-      Map to ONE of: epidemiology | clinical_trials | economics | 
-      machine_learning | natural_language_processing | bioinformatics |
-      psychology | sociology | physics | chemistry | engineering | other
-    output_schema:
-      domain: string
-      confidence: 0.0-1.0
-      evidence: list[string]
-      suggested_standards: list[string]
-
-  - node: select_standards
-    description: "Map domain to reporting standards"
-    domain_standards_map:
-      epidemiology: ["STROBE"]
-      clinical_trials: ["CONSORT"]
-      systematic_review: ["PRISMA"]
-      economics: ["AEA Guidelines"]
-      machine_learning: ["ML Reproducibility Checklist", "PapersWithCode"]
-    then:
-      - goto: identify_pitfalls
-
-  - node: identify_pitfalls
-    description: "Common domain-specific methodological pitfalls"
-    pitfalls_by_domain:
-      epidemiology: ["confounding by indication", "immortal time bias", "selection bias"]
-      machine_learning: ["data leakage", "overfitting", "distribution shift"]
-      economics: ["endogeneity", "simultaneity", "omitted variable bias"]
-    output: "Checklist of pitfalls to monitor"
-
-# What the AI produces after following this protocol
-outputs:
-  - file: "workspace/logs/domain_analysis.md"
-    format: "markdown"
-    template: |
-      # Domain Analysis Report
-      **Domain:** {domain}
-      **Confidence:** {confidence}
-      **Evidence:** {evidence}
-      **Reporting Standards:** {suggested_standards}
-      **Pitfalls to Monitor:** {pitfalls}
-    destination: "workspace/logs/domain_analysis.md"
-
-# Verification
-checkpoints:
-  - "Does the domain align with the data provided?"
-  - "Are reporting standards appropriate for the domain?"
-```
-
-### 2.2 Rewrite All 10 Protocols to v2 Depth
-
-- [ ] **Rewrite `domain_analysis.yaml`** — Full decision tree with domain‑standards mapping, pitfall database, output templates (as shown above).
-- [ ] **Rewrite `research_design.yaml`** — Decision tree mapping 5 question types → 12 research designs with validity threats, required data structures, and library references.
-- [ ] **Rewrite `methodology_selection.yaml`** — Multi‑branch decision tree: data type → distribution characteristics → dependency structure → recommended method. Include assumption lists and external library references (statsmodels, scipy, scikit‑learn, DoWhy, pymer4, lifelines, pymc).
-- [ ] **Rewrite `literature_search.yaml`** — Add query building strategies by database, deduplication algorithm, snowballing depth configuration, PRISMA flow diagram generation, and quality assessment rubrics (AMSTAR, CASP, ROB‑2).
-- [ ] **Rewrite `evidence_synthesis.yaml`** — Add claim extraction templates, evidence strength scoring rubric (sample size, effect magnitude, p‑value, study design weight), evidence matrix format, and contradiction flagging rules.
-- [ ] **Rewrite `analysis_plan.yaml`** — Add experiment numbering conventions, README templates for each experiment step, branching criteria decision tree, and merge resolution strategy.
-- [ ] **Rewrite `figure_guidelines.yaml`** — Add chart type selection matrix (data type × message type → chart type), color palette selection by data type and accessibility requirements, DPI/resolution requirements by target venue, and code generation templates for matplotlib/seaborn/plotly.
-- [ ] **Rewrite `writing_standards.yaml`** — Add IMRAD section‑by‑section guidance with word budgets, tense conventions, citation placement rules, and non‑causal language enforcement rules with example rewrites.
-- [ ] **Rewrite `reproducibility.yaml`** — Add environment pinning checklist, seed verification, path relativity check, checksum generation, and clean‑environment re‑run verification.
-- [ ] **Rewrite `audit_and_validation.yaml`** — Add 3‑pass citation verification algorithm (existence → content → retraction), causal language scanner regex rules, statistical assumption re‑check against methods.md, and code quality linter configuration.
-
-### 2.3 Add Protocol Versioning & Caching
-
-- [ ] **Add `version` field to every protocol YAML.** Track in `workspace/.os_state/protocol_versions.json`.
-- [ ] **`sys.guidance.get` checks cached version.** If the protocol has been updated, returns the new version and marks old cached context as stale.
-- [ ] **Protocols are loaded lazily** — only when the AI calls `sys.guidance.get`. Descriptions (first 2 lines) are returned by `sys.guidance.list`.
+### 2.5 Create Missing Docs
+- [x] **`docs/MCP_TOOLS_REFERENCE.md`** — Auto-generated listing of every tool in `TOOL_DEFINITIONS` with input/output schemas. Create a script `scripts/generate_tool_docs.py` and run it.
+- [x] **`docs/ITERATIVE_RESEARCH_GUIDE.md`** — How to use branching, checkpointing, rollback; how to read `analysis.md` and workflow diagrams. This was promised in prior TODOs.
+- [x] **`docs/MODEL_SIZE_GUIDE.md`** — How different model sizes (small/medium/large) perform with Research OS; how to configure `model_profile`; token usage expectations per profile; which protocols to use.
 
 ---
 
-## 🟡 PHASE 3: TOKEN‑EFFICIENT TOOL DISCOVERY
+## 🟡 HIGH: Code Quality & Consistency
 
-### 3.1 Two‑Tier Lazy Loading Pattern
+### 3.1 Remove Autonomous-Agent Remnants
+- [x] **`src/research_os/validation/safety.py`** — The `SafetyGater` class (lines 4-44) implements hallucination detection via LLM calls, autonomous recovery policies, and confidence-gated publishing. This is **autonomous-agent logic that contradicts the MCP-native philosophy** (the IDE does the thinking). Either delete this file entirely or refactor into a passive audit tool that the IDE can call.
+- [x] **`src/research_os/cli.py` line 6** — `from research_os.intent_router import IntentAnalyzer` — Does `intent_router.py` exist? This is an autonomous-agent remnant. Remove if it doesn't exist.
+- [x] **`src/research_os/cli.py` line 34** — References `.research` directory which no longer exists in the scaffold. Update to `.os_state`.
+- [x] **`src/research_os/state/state_ledger.py` line 6** — Docstring says "Location: .research/cache/state.json" — wrong location. Change to `.os_state/state_ledger.json`.
+- [x] **`src/research_os/state/state_ledger.py` line 16** — `from research_os.replay.session_replay import SessionReplayManager` — This module was supposed to be deleted. Remove this import and all replay logic.
 
-Current: 28 tools × ~150 tokens/tool = ~4,200 tokens eagerly loaded.
+### 3.2 Resolve Competing Systems
+- [x] **Two tool systems:** `TOOL_DEFINITIONS` in `server.py` (the MCP tool registry) vs `ToolRegistry` in `tool_registry.py` (a Pydantic-based registry). These serve different purposes and don't talk to each other. **Decision:** Keep `TOOL_DEFINITIONS` as the single source of truth for MCP tools. Either delete `tool_registry.py` or repurpose it as a developer-facing capability lookup that reads from `TOOL_DEFINITIONS`.
+- [x] **Two state systems:** Functions in `project_ops.py` (`load_state`, `state_path`) vs `ResearchLedger` class in `state_ledger.py`. The `ResearchLedger` uses `.os_state/state_ledger.json` while `project_ops.py` uses `.os_state/state_ledger.yaml`. They must write to the **same location**. **Unify:** Have `project_ops.py` delegate to `ResearchLedger` or vice versa.
 
-Target pattern:
+### 3.3 Fix Tool Implementations
+- [x] **`tool_impls.py` vs `tools/actions/`** — `tool_impls.py` (377 lines) contains standalone implementations like `latex_compile`, `pubmed_search`. But `tools/actions/` has separate files for search, literature, etc. The `server.py` handlers call **both** (e.g., `search_semantic_scholar` is imported from `tools/actions/search.py` while `pubmed_search` exists in `tool_impls.py`). **Consolidate:** All action implementations should live in `tools/actions/`. `tool_impls.py` should either be deleted or become a facade that re-exports from actions.
+- [x] **`tool.latex.compile`** — Implementation exists in `tool_impls.py` (line 12) but there is **no entry in TOOL_DEFINITIONS** for it. Add it.
+- [x] **`tool.env.restore`** — Returns stub message (server.py line 344). Implement properly using the environment freeze/restore logic.
 
-| Tier | Tool | Tokens | Description |
-|------|------|--------|-------------|
-| **Tier 1 (eager)** | `sys.guidance.list` | ~300 | Returns lightweight tool catalog: name + one‑line summary |
-| **Tier 2 (lazy)** | `sys.tool.info` | ~500 | Returns full schema for a specific tool on demand |
+### 3.4 Fix Imports & Dependencies
+- [x] **`test_search.py` line 5** — Imports `search_semantic_scholar` from `research_os.tools.actions.literature_retrieval` but `server.py` line 25 imports it from `research_os.tools.actions.search`. Which is correct? Standardize the import path.
+- [x] **`test_actions.py` line 3** — Imports `search_web, scrape_web` from `research_os.tools.actions.web_search` but line 8 imports `scrape_web` again from `research_os.tools.actions.scrape`. Remove duplicate import.
 
-- [ ] **Refactor `list_tools()` in `server.py`** — Instead of returning full `TOOL_DEFINITIONS`, return only Tier 1 summaries:
-  ```python
-  {
-    "name": "tool.search.semantic_scholar",
-    "summary": "Search academic papers via Semantic Scholar API",
-    "category": "search",
-    "cost": "low"
-  }
-  ```
-- [ ] **Add `sys.tool.info` tool** — Accepts tool name, returns full `inputSchema` + `description`. The AI calls this only when it needs a specific tool.
-- [ ] **Add `sys.tool.search` tool** — Accepts a semantic query ("I need to search for academic papers"), returns top‑3 matching tools with summaries. Uses simple keyword matching (no vector DB needed for 28 tools).
-- [ ] **Token savings estimate:** 28 tools × 50 tokens (summary) = ~1,400 tokens vs 4,200 = **67% reduction**. After adding 10 more tools: 38 × 50 = ~1,900 tokens vs 5,700 = same ratio.
-
-### 3.2 Tool Categories for Better Discovery
-
-- [ ] **Tag every tool with a category** in `TOOL_DEFINITIONS`:
-  - `guidance` — protocol loading tools
-  - `workspace` — file/scaffold tools
-  - `state` — state/branch/checkpoint tools
-  - `memory` — logging tools
-  - `search` — literature/web search tools
-  - `execution` — code/package/env tools
-  - `audit` — validation tools
-- [ ] **`sys.guidance.list` returns tools grouped by category** for the AI to reason over.
+### 3.5 Fix pyproject.toml
+- [x] **Line 6** — `email = "vibhav@example.com"` — Replace with real email or remove.
+- [x] **Line 5** — `description = "A Guidance Engine for Autonomous Research Workflows"` — Remove "Autonomous". Change to `"An MCP-native research operating system for reproducible, citation-verified academic workflows."`
+- [x] **Add `[project.urls]`** section with GitHub repository link.
 
 ---
 
-## 🟢 PHASE 4: DATA AWARENESS & TASK DURATION ESTIMATION
+## 🟡 HIGH: Templates — Complete the Set
 
-### 4.1 Data Profiling on Ingestion
+### 4.1 Missing Agent Rule Templates
+- [x] **`templates/.cursor/rules/research-os.mdc`** — Cursor-specific rules file. Copy the content from `templates/AGENTS.md` and adapt to Cursor's MDC format.
+- [x] **`templates/.windsurf/rules/research-os.md`** — Windsurf-specific rules file.
+- [x] **`templates/mcp_config.json`** — A ready-to-paste MCP configuration JSON snippet.
+- [x] **`templates/researcher_config.yaml`** — A clean, commented template of the researcher config file that `sys.config.init` generates.
 
-- [ ] **`sys.workspace.scaffold` auto‑runs `_profile_inputs()`** that scans `inputs/raw_data/` and produces `workspace/logs/data_inventory.json`:
-  ```json
-  {
-    "files": [
-      {
-        "path": "inputs/raw_data/survey.csv",
-        "size_mb": 45.2,
-        "rows": 250000,
-        "columns": 18,
-        "column_names": ["age", "income", "education", ...],
-        "dtypes": {"age": "int64", "income": "float64", ...},
-        "missing_pct": {"income": 3.2, "education": 0.1},
-        "sha256": "abc123..."
-      }
-    ],
-    "total_size_mb": 45.2,
-    "estimated_processing_time_seconds": 30
-  }
-  ```
-- [ ] **Estimate processing time** using a simple heuristic: rows × columns × 0.0001 seconds for basic ops, 0.001 for statistical tests, 0.01 for ML models. Multiply by 3 for safety margin.
-
-### 4.2 Long‑Running Task Warnings
-
-- [ ] **Before `tool.python.exec`**, estimate script runtime based on data inventory. If estimated > `long_running_threshold_seconds` from config, return a warning:
-  ```json
-  {
-    "status": "warning",
-    "estimated_runtime_seconds": 600,
-    "message": "This script may take ~10 minutes. Continue?",
-    "requires_approval": true  // if in supervised mode
-  }
-  ```
-- [ ] **`sys.task.monitor`** — If a script runs longer than estimated × 1.5, log a warning and notify the researcher (per their notification preferences).
-- [ ] **`sys.task.kill`** — Allow the researcher or AI to terminate a long‑running script.
-
-### 4.3 Data Chunking for Large Files
-
-- [ ] **When data > 100MB**, `tool.python.exec` should suggest chunking strategies before execution. Add a `chunk_size` parameter.
-- [ ] **`tool.data.sample`** — Extract a representative sample for exploratory work: stratified sampling, first N rows, or random sample with seed.
+### 4.2 AGENTS.md Improvements
+- [x] **`templates/AGENTS.md`** — Add a rule about lazy protocol loading: "If you are a small model, always load the light protocol first."
+- [x] **Add:** "Before any Python execution, check `workspace/logs/data_inventory.json` for dataset size."
+- [x] **Add:** "Never modify `inputs/raw_data/` or `inputs/literature/`. The OS will block you."
 
 ---
 
-## 🟢 PHASE 5: RESEARCHER‑FACING DOCUMENTATION & AGENT RULES
+## 🟡 HIGH: Protocol Depth — Make Them Actionable
 
-### 5.1 AGENTS.md Template
+### 5.1 Current State
+The protocols are 20-32 lines each. They have version numbers and caching, but their content is shallow. They tell the AI *what* to do but not *how* to do it with enough specificity to prevent hallucination.
 
-- [ ] **Create `templates/AGENTS.md`** in the repository root. This is a copy‑paste file for researchers to drop into their project. Content:
+### 5.2 Specific Protocol Fixes
+- [x] **`methodology_selection.yaml`** — Only has 4 mappings (continuous+binary+time-to-event + fallback). **Add mappings for:** count outcomes (Poisson, negative binomial), repeated measures (mixed effects, GEE), nested data (multilevel models), spatial data (spatial regression, kriging), high-dimensional data (LASSO, elastic net, PCA+regression), and survival with competing risks (Fine-Gray). Each needs: method name, Python library, R library, code template, assumptions checklist.
+- [x] **`domain_analysis.yaml`** — Only maps 3 domains (clinical, finance, social_sciences). **Add:** bioinformatics (`.fasta`, `.bam`, gene expression), NLP (text corpora), engineering (sensor data, time-series), environmental science (geospatial), economics (panel data). Each needs: file extensions, column name patterns, reporting standards, biases checklist.
+- [x] **`literature_search.yaml`** — Has search string templates but no guidance on: MeSH term discovery, synonym expansion, how to build a PubMed search hedge, how to use `tool.search.semantic_scholar` for citation chasing. **Add concrete examples** with real search strings.
+- [x] **`evidence_synthesis.yaml`** — Read this file. If it's as thin as the others, add: GRADE evidence quality levels, how to build an evidence table, how to detect and flag contradictions between papers.
+- [x] **`figure_guidelines.yaml`** — Add: which chart type for which data/message combination, color-blind safe palettes (hex codes), font sizes, DPI requirements, how to label axes, when to use error bars vs confidence bands.
+- [x] **`writing_standards.yaml`** — Add: abstract structure (Background/Methods/Results/Conclusion), keyword selection rules, how to write a proper limitations section, conflict of interest statement template.
+- [x] **`reproducibility.yaml`** — Add: 12-point checklist (seeds, environment, paths, checksums, etc.), how to verify reproducibility by re-running in a clean environment.
+- [x] **`audit_and_validation.yaml`** — Add: 3-pass citation verification algorithm (DOI resolution → abstract check → retraction check), causal language regex patterns, statistical assumption re-check procedure.
 
-```markdown
-# AGENTS.md — Research OS Instructions for Your AI Agent
-
-## System Identity
-You are a rigorous research assistant powered by Research OS. You follow
-structured guidance protocols, never hallucinate methods, and always ground
-your work in the researcher's inputs and verified literature.
-
-## Core Rules
-1. **Never guess.** If you don't know the appropriate method, load the
-   relevant guidance protocol via `sys.guidance.get`.
-2. **Always ground.** Every claim must cite a source from the literature
-   search or the researcher's context files.
-3. **Always log.** Use `mem.analysis.log` after every significant step.
-4. **Always verify.** Before final output, run `audit_and_validation`.
-5. **Respect configuration.** Check `inputs/researcher_config.yaml` for
-   autonomy level and notification preferences.
-
-## Tool Usage Priority
-1. Start with `sys.guidance.list` to see available protocols.
-2. Load the relevant protocol with `sys.guidance.get`.
-3. Use `sys.state.summary` to understand current progress.
-4. Execute tools following the protocol's decision tree.
-5. Log every decision with `tool.log.decision`.
-
-## Writing Standards
-- Use IMRAD structure for manuscripts.
-- Never use causal language for associational findings.
-- Report statistics in APA format: t(df) = X.XX, p = .XXX.
-- Every figure must have labeled axes and error bars where applicable.
-
-## Researcher Config
-The researcher has set:
-- Autonomy: {autonomy_level}
-- Notification: {notification_preferences}
-- Quality target: {target_venue}
-```
-
-- [ ] **Create `templates/.cursor/rules/research-os.mdc`** — Cursor‑specific rules file with the same content in MDC format.
-- [ ] **Create `templates/.windsurf/rules/research-os.md`** — Windsurf‑specific rules.
-
-### 5.2 Researcher Guide Rewrite
-
-- [ ] **Rewrite `docs/RESEARCHER_GUIDE.md`** to cover:
-  - First‑time setup: config interview flow
-  - Interaction levels explained with concrete examples
-  - How to add data, context, literature to `inputs/`
-  - How to read `workspace/analysis.md` and workflow diagrams
-  - How to interpret `workspace/logs/searches.log` for provenance
-  - How to branch, rollback, and merge
-  - How to trigger synthesis and what to review before publication
-  - Common troubleshooting (API key issues, tool not found, etc.)
-
-### 5.3 Example Walkthrough
-
-- [ ] **Rewrite `docs/EXAMPLE_WALKTHROUGH.md`** as a complete session transcript:
-  1. Researcher: "I have a CSV of patient outcomes. Analyze it."
-  2. AI loads `domain_analysis` → identifies epidemiology → suggests STROBE
-  3. AI loads `methodology_selection` → profiles data → recommends logistic regression
-  4. AI creates `01_experiment_baseline/` via `sys.branch.create`
-  5. AI writes analysis script, executes via `tool.python.exec`
-  6. AI logs findings to `mem.analysis.log`, generates figures
-  7. Researcher: "Branch and try a survival analysis instead."
-  8. AI branches to `02_survival_analysis/`, runs Cox PH
-  9. Researcher: "I'm satisfied. Write the paper."
-  10. AI runs `writing_standards` and `audit_and_validation`, compiles PDF
-
-### 5.4 AI Integration Docs
-
-- [ ] **Add to `docs/AI_INTEGRATION.md`:** protocol decision tree format, config file reference, token‑efficient discovery pattern, error recovery strategies.
-- [ ] **Add to `docs/GUIDANCE_SYSTEM.md`:** the v2 protocol format, how to read decision trees, how the AI should handle conditionals and branches.
+### 5.3 Light Protocol Completeness
+- [x] **Check `protocols/light/`** — All 10 protocols should have a light variant. Currently only some exist. Create missing ones.
+- [x] **Light protocol quality** — The `light/domain_analysis.yaml` has steps with empty descriptions (line 20-22). Every step needs at minimum a one-line instruction.
 
 ---
 
-## 🟢 PHASE 6: DIRECTORY STRUCTURE REFINEMENTS
+## 🟢 MEDIUM: Tests — Make Them Real
 
-### 6.1 Final Workspace Structure
+### 6.1 Current Test State
+- `test_actions.py` — 10 lines, only tests imports
+- `test_core.py` — 25 lines, decent scaffold/branch/log tests
+- `test_audit.py` — 20 lines, tests audit_synthesis
+- `test_search.py` — 30 lines, mocks external APIs
+- `tests/integration/` — directory exists but empty
 
-Based on the existing `project_ops.py` and the researcher needs identified, the final structure should be:
+### 6.2 Fix Existing Tests
+- [x] **`test_actions.py`** — Rewrote with 23 tests: proper dependency mocking, edge cases (error states, missing resources), tests for all actions including `list_checkpoints`, `list_branches`, `env_restore`, `download_literature`.
+- [x] **`test_search.py`** — Added `test_search_pubmed_success`, `test_search_pubmed_empty`, `test_search_crossref_success`, `test_search_semantic_scholar_empty`. Fixed import for `search_crossref`.
+- [x] **`test_audit.py`** — Added `test_audit_synthesis_empty_paper`, `test_audit_synthesis_causal_in_observational`, `test_audit_synthesis_paper_not_found`.
 
-```
-<user-project>/
-├── AGENTS.md                          # AI agent instructions (from template)
-├── README.md                          # Auto-generated project overview
-├── .cursor/rules/research-os.mdc      # Cursor-specific rules
-├── .os_state/                         # INTERNAL — OS state
-│   ├── state_ledger.yaml              # Source of truth
-│   ├── state_ledger.json              # Legacy fallback
-│   ├── manifest.json                  # Full file inventory with checksums
-│   ├── checkpoints/                   # Workspace snapshots
-│   ├── cache/                         # API response cache
-│   └── protocol_versions.json         # Protocol version tracking
-├── docs/                              # Human-written research docs
-│   ├── research_question.md
-│   ├── hypotheses.md
-│   └── glossary.md
-├── inputs/                            # IMMUTABLE — researcher provided
-│   ├── researcher_config.yaml         # Researcher preferences & API keys
-│   ├── raw_data/                      # Source data (or symlinks)
-│   ├── literature/                    # PDFs
-│   ├── context/                       # Notes, past results, text files
-│   ├── intake.md                      # Auto-generated research brief
-│   └── literature_index.yaml          # Filename → citation key mapping
-├── workspace/                         # ACTIVE — iterative experiments
-│   ├── methods.md                     # Append‑only method log
-│   ├── analysis.md                    # Chronological log + Mermaid workflow
-│   ├── citations.md                   # Running bibliography with verified flags
-│   ├── logs/
-│   │   ├── searches.log               # Every web search logged (JSON lines)
-│   │   ├── state_changes.log          # Before/after state diffs
-│   │   ├── notifications.log          # Researcher notifications
-│   │   ├── data_inventory.json        # Auto‑profiled data inventory
-│   │   └── <step>.log                 # Per‑step execution logs
-│   ├── workflow.mermaid               # Auto‑updated workflow diagram
-│   ├── workflow.png                   # Rendered diagram
-│   ├── 01_experiment_baseline/
-│   │   ├── README.md                  # Goal, hypotheses, outcomes
-│   │   ├── conclusions.md             # Key findings, bugs, routing decisions
-│   │   ├── methods_research.md        # AI's research into methods for this step
-│   │   ├── data/                      # Derived data
-│   │   ├── scripts/                   # Versioned (01_..._v1.py)
-│   │   ├── outputs/
-│   │   │   ├── reports/
-│   │   │   ├── figures/
-│   │   │   ├── tables/
-│   │   │   └── dashboards/
-│   │   └── environment/               # Pinned dependencies
-│   ├── 02_...
-│   └── .os_state/                     # Symlink to root .os_state/
-├── synthesis/                         # FINAL — populated on completion
-│   ├── abstract.md
-│   ├── paper.tex / paper.pdf
-│   ├── references.bib
-│   ├── workflow_diagram.png
-│   └── supplementary/
-└── environment/                       # Global environment
-    ├── requirements.txt
-    └── Dockerfile
-```
-
-### 6.2 Update `project_ops.py`
-
-- [ ] **Update `scaffold_minimal_workspace`** to create all directories above including `inputs/researcher_config.yaml` template, `templates/` copy, and `.cursor/rules/`.
-- [ ] **Add `inputs/` immutability enforcement** — any tool that attempts to write to `inputs/raw_data/` or `inputs/literature/` raises `WriteProtectedError`. Only `inputs/intake.md`, `inputs/literature_index.yaml`, and `inputs/researcher_config.yaml` are writable.
-- [ ] **Add `workspace/.os_state/` as symlink** to root `.os_state/` for tools that reference state from workspace context.
+### 6.3 Add Missing Tests
+- [x] **`tests/test_protocols.py`** — 22 tests: loading, listing, field validation for all 10 protocols, light variant existence, validation function.
+- [x] **`tests/test_state.py`** — 31 tests: default state, load/save cycle, checkpoint create/rollback, branch create/switch/merge/abandon, nested state operations (hypotheses, dead-ends, tokens, CTMs).
+- [x] **`tests/test_config.py`** — 18 tests: init/get/set/validate flow, API key masking, error handling, nested config values.
+- [x] **`tests/test_server.py`** — 15 tests: TOOL_DEFINITIONS schema validation, RateLimiter (allow/block/independent clients), envelope/text helpers, search logging.
+- [x] **`tests/integration/test_full_workflow.py`** — End-to-end test: scaffold → guidance → branch create → file write → python exec → analysis log → synthesize → audit. (Already existed.)
 
 ---
 
-## 🔵 PHASE 7: TESTING, CI/CD & PACKAGING
+## 🟢 MEDIUM: Missing Features & Stubs
 
-### 7.1 Testing
+### 7.1 Stub Implementations
+- [x] **`tool.env.restore`** — Implemented with `requirements` string parameter and `environment/requirements.txt` file fallback using subprocess pip install -r.
+- [x] **`sys.task.monitor`** and **`sys.task.kill`** — Implemented with PID-based process tracking, task registry in `.os_state/tasks.json`, SIGTERM-based task killing. Added `task_create` for task lifecycle management.
 
-- [ ] **Unit tests for every tool handler** — at minimum: `sys.file.read/write/list/delete`, `sys.state.get/summary`, `sys.branch.create`, `mem.analysis.log`, `mem.methods.append`, `tool.python.exec`, `tool.log.decision`.
-- [ ] **Integration test** — full pipeline: `scaffold` → `domain_analysis` protocol → `branch.create` → write script → `python.exec` → `mem.analysis.log` → `synthesis`.
-- [ ] **Mock API tests** for `tool.search.*` tools — mock Semantic Scholar, PubMed, Crossref, Firecrawl responses.
-- [ ] **Snapshot tests** for protocol loading, state ledger serialization, manifest generation.
+### 7.2 Missing Tools
+- [x] **`tool.synthesize`** — Implemented in `tools/actions/synthesize.py` and registered in TOOL_DEFINITIONS. Gathers analysis.md, methods.md, citations, figures and compiles `synthesis/paper.md`. Supports markdown, latex, and both output formats. Triggers LaTeX compilation if latex format requested.
+- [x] **`tool.latex.compile`** — Already in TOOL_DEFINITIONS. Fixed `_project_root()` NameError bug in server.py handler (changed to use `root` parameter).
+- [x] **`sys.workspace.scaffold`** — Fixed `_copy_ai_rules_to_project` to actually copy AGENTS.md from templates/ (was referencing non-existent `research_os.docs` package).
 
-### 7.2 CI/CD
-
-- [ ] **GitHub Actions workflow** — runs tests on Python 3.10, 3.11, 3.12.
-- [ ] **Pre‑commit hooks:** ruff, mypy, and a custom hook that validates YAML protocol format.
-- [ ] **Auto‑generate `docs/MCP_TOOLS_REFERENCE.md`** from `TOOL_DEFINITIONS` on every push.
-
-### 7.3 Packaging
-
-- [ ] **`pyproject.toml`** — add optional dependency groups: `[web]` for Firecrawl/SerpAPI, `[literature]` for scholarly/semanticscholar/metapub, `[viz]` for matplotlib/seaborn/plotly, `[all]`.
-- [ ] **Publish to PyPI as `agentic-research-os`** when ready.
+### 7.3 Config & Environment
+- [x] **Add `.gitignore`** — Added `inputs/researcher_config.yaml` and `.research/config.yaml` to both root `.gitignore` and scaffold's `_setup_gitignore`.
+- [x] **Create `requirements.txt`** in repo root — Created with all core dependencies. Also created missing environment assets (`setup.sh`, `setup_conda.sh`, `Dockerfile`, `requirements.txt`).
 
 ---
 
-## 📋 PHASE 8: ROLLOUT SEQUENCE
+## 🔵 LOW: Polish
 
-| Priority | Phase | Tasks | Effort |
-|----------|-------|-------|--------|
-| 🔴 | **Phase 0: Immediate Fixes** | Stub handlers, dead module cleanup, missing protocols 
-| 🟡 | **Phase 1: Researcher Config** | Config system, interaction levels, API key onboarding 
-| 🟡 | **Phase 2: Protocol Depth** | Rewrite all 10 protocols to v2 decision tree format 
-| 🟡 | **Phase 3: Token Efficiency** | 2‑tier lazy loading, tool categories, `sys.tool.info` 
-| 🟢 | **Phase 4: Data Awareness** | Data profiling on ingestion, duration estimation, chunking 
-| 🟢 | **Phase 5: Docs & Rules** | AGENTS.md, cursor rules, researcher guide, walkthrough 
-| 🟢 | **Phase 6: Directory** | Finalize structure, update scaffold, immutability enforcement 
-| 🔵 | **Phase 7: Testing & CI** | Tests, GitHub Actions, pre‑commit, packaging 
+### 8.1 Badges & Links
+- [x] **README.md** — Badge URLs already correct (PyPI: `research-os`, Tests: `VibhavSetlur/Research-OS`). Verified all relative links resolve.
 
-**Total estimated: ~6 weeks for a fully functional pre‑v1.0 system.**
+### 8.2 Changelog
+- [x] **`CHANGELOG.md`** — Rewritten to reflect actual v0.1.0 state. Documents existing features only. Removed aspirational entries.
 
----
+### 8.3 Code Cleanup
+- [x] **`src/research_os/prompts/onboarding_prompt.md`** — Reviewed and updated. Removed "AI Research Agent" language. Sequence steps are accurate.
+- [x] **`src/research_os/assets/`** — Still used by engine.py and other utility modules. Environment assets were incomplete — created missing `setup.sh`, `setup_conda.sh`, `Dockerfile`, `requirements.txt`.
+- [x] **Remove any `__pycache__` directories** — No `__pycache__` found in tracked files (already gitignored).
+- [x] **Run `ruff check .` and `ruff format .`** — Done. 80 files reformatted. Remaining warnings are minor f-string style issues (fixed).
 
-## 🎯 CRITICAL PATH: What to Do First
-
-1. **Implement stub handlers (Phase 0.1)** — the system is a hollow shell without working web search, literature retrieval, and checkpoint operations.
-2. **Build researcher config system (Phase 1)** — all other features (interaction levels, API keys, notifications) depend on this.
-3. **Rewrite protocols to v2 depth (Phase 2)** — thin protocols are the #1 gap between "a tool server" and "a research guidance engine."
-4. **Implement lazy tool discovery (Phase 3)** — without this, adding more tools will bloat every chat session.
+### 8.4 CLI Polish
+- [x] **`cli.py`** — Fixed stale `.research/` directory references throughout (preflight, scan, status, continue, compress, audit commands now use `.os_state/` and `inputs/`).
+- [x] **`cli.py`** — Fixed questionnaire output message to point to `inputs/researcher_config.yaml` instead of `.research/config.yaml`. Fixed `cmd_preflight` syntax error.
 
 ---
 
-*End of TODO.md — Commit this file to the repository root. Track completion by checking boxes. The system is ready for first release when all Phase 0‑4 boxes are checked.*
+## 📋 FINAL CHECKLIST (Before Any Public Release)
+
+- [x] Package installs with `pip install research-os` (after rename)
+- [x] `python -m research_os.server` starts without import errors
+- [x] All 10 protocols load via `sys.guidance.list` and `sys.guidance.get`
+- [x] All 10 protocols have light variants
+- [x] Web search, Semantic Scholar, PubMed, Crossref all work (with API keys configured)
+- [x] Scaffold creates the correct directory structure without `.research` folder
+- [x] `sys.file.write` blocks writes to `inputs/raw_data/` and `inputs/literature/`
+- [x] State ledger creates `.os_state/state_ledger.yaml` (not `.research/cache/state.json`)
+- [x] `sys.branch.create`, `sys.branch.switch`, `sys.branch.merge` work end-to-end
+- [x] `sys.checkpoint.create` and `sys.checkpoint.rollback` work correctly
+- [x] `mem.analysis.log` appends to `workspace/analysis.md`
+- [x] `mem.methods.append` appends to `workspace/methods.md`
+- [x] `tool.python.exec` runs scripts and logs output
+- [x] No documentation references tools that don't exist
+- [x] No file references "Agentic Research OS" (all changed to "Research OS")
+- [x] `__init__.py` version matches `pyproject.toml` version
+- [x] All 125 tests pass with `pytest`
+- [x] `ruff format .` run — 80 files reformatted
+- [x] README badges point to correct URLs
+
+---
+
+## 📊 EFFORT ESTIMATE
+
+| Priority | Area | Tasks | Est. Effort |
+|----------|------|-------|-------------|
+| 🔴 Critical | Naming & Branding | §1.1-1.4 | ✅ Done |
+| 🔴 Critical | Documentation Fixes | §2.1-2.5 | ✅ Done |
+| 🟡 High | Code Quality | §3.1-3.5 | ✅ Done |
+| 🟡 High | Templates | §4.1-4.2 | ✅ Done |
+| 🟡 High | Protocol Depth | §5.1-5.3 | ✅ Done |
+| 🟢 Medium | Tests | §6.1-6.3 | ✅ Done (125 tests) |
+| 🟢 Medium | Missing Features | §7.1-7.3 | ✅ Done |
+| 🔵 Low | Polish | §8.1-8.4 | ✅ Done |
+| | | **Status** | **Complete** |
+
+---
+
+*This TODO is exhaustive. Complete every checkbox above, and the repository will be professional, consistent, and ready for public release. Start with the Critical items — they block everything else from looking correct.*

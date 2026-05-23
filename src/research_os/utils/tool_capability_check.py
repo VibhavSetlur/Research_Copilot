@@ -4,6 +4,7 @@
 Reads the analysis blueprint, checks required tools against the tool registry,
 and writes a tool availability report to .research/cache/.
 """
+
 import argparse
 import shutil
 import subprocess
@@ -28,7 +29,9 @@ def get_config(root: Path) -> Dict[str, Any]:
 def extract_required_tools(blueprint: Dict[str, Any]) -> List[str]:
     required = set()
     for key in ("required_tools", "tools"):
-        for item in blueprint.get(key, []) if isinstance(blueprint.get(key, []), list) else []:
+        for item in (
+            blueprint.get(key, []) if isinstance(blueprint.get(key, []), list) else []
+        ):
             if isinstance(item, str):
                 required.add(item)
             elif isinstance(item, dict):
@@ -37,7 +40,9 @@ def extract_required_tools(blueprint: Dict[str, Any]) -> List[str]:
                     required.add(tool_id)
 
     for key in ("selected_methods", "methods"):
-        for item in blueprint.get(key, []) if isinstance(blueprint.get(key, []), list) else []:
+        for item in (
+            blueprint.get(key, []) if isinstance(blueprint.get(key, []), list) else []
+        ):
             if isinstance(item, dict):
                 tool_id = item.get("tool_id") or item.get("id")
                 if tool_id:
@@ -62,7 +67,9 @@ def check_tool(tool: Dict[str, Any], container_engine: str) -> Dict[str, Any]:
         return result
 
     try:
-        proc = subprocess.run(cmd, shell=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.run(
+            cmd, shell=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         result["exit_code"] = proc.returncode
         result["stdout"] = (proc.stdout or "").strip()
         result["stderr"] = (proc.stderr or "").strip()
@@ -89,10 +96,16 @@ def main() -> int:
     root = find_project_root()
     config = get_config(root)
     registries = config.get("registries", {}) if isinstance(config, dict) else {}
-    tool_registry_path = registries.get("tool_registry", ".research/domains/tool_registry.json")
+    tool_registry_path = registries.get(
+        "tool_registry", ".research/domains/tool_registry.json"
+    )
     tool_registry = load_json(root / tool_registry_path)
 
-    blueprint_path = Path(args.blueprint) if args.blueprint else root / ".research" / "cache" / "analysis_blueprint.json"
+    blueprint_path = (
+        Path(args.blueprint)
+        if args.blueprint
+        else root / ".research" / "cache" / "analysis_blueprint.json"
+    )
     blueprint = load_json(blueprint_path)
 
     required_tools = extract_required_tools(blueprint)
@@ -118,7 +131,11 @@ def main() -> int:
         "tools": results,
     }
 
-    report_path = Path(args.report) if args.report else root / ".research" / "cache" / "tool_availability_report.json"
+    report_path = (
+        Path(args.report)
+        if args.report
+        else root / ".research" / "cache" / "tool_availability_report.json"
+    )
     save_json(report_path, report)
 
     print(f"Tool availability report saved to: {report_path}")

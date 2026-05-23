@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Setlur"
   given-names: "Vibhav"
-title: "Agentic Research OS"
+title: "Research OS"
 version: 1.0.0
 date-released: 2026-05-22
-url: "https://github.com/VibhavSetlur/research-os"
+url: "https://github.com/VibhavSetlur/Research-OS"

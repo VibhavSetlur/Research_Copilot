@@ -34,6 +34,46 @@ decision_tree:
         - "Non-response bias"
         - "Sampling bias"
         - "Recall bias"
+    bioinformatics:
+      file_extensions: [".fasta", ".bam", ".vcf", ".fastq"]
+      columns: ["gene_id", "expression", "log2fc", "pvalue", "chromosome", "position"]
+      reporting_standards: ["MIAME (Microarray)", "MINSEQE (Sequencing)"]
+      biases_checklist:
+        - "Batch effects"
+        - "GC bias in sequencing"
+        - "Library preparation bias"
+    nlp:
+      file_extensions: [".txt", ".json", ".jsonl", ".csv"]
+      columns: ["text", "tokens", "label", "sentiment", "document_id"]
+      reporting_standards: ["ACL guidelines", "Model Card guidelines"]
+      biases_checklist:
+        - "Representation bias in training corpora"
+        - "Annotator bias"
+        - "Language or dialect bias"
+    engineering:
+      file_extensions: [".tdms", ".mat", ".csv", ".h5"]
+      columns: ["timestamp", "sensor_val", "voltage", "temperature", "pressure"]
+      reporting_standards: ["ISO/IEC standards depending on field"]
+      biases_checklist:
+        - "Sensor drift"
+        - "Sampling rate aliasing"
+        - "Calibration error"
+    environmental_science:
+      file_extensions: [".shp", ".tiff", ".nc", ".geojson"]
+      columns: ["latitude", "longitude", "elevation", "temperature", "precipitation"]
+      reporting_standards: ["CF Conventions (Climate and Forecast)"]
+      biases_checklist:
+        - "Spatial autocorrelation"
+        - "Modifiable areal unit problem (MAUP)"
+        - "Temporal aggregation bias"
+    economics:
+      file_extensions: [".dta", ".csv", ".xlsx"]
+      columns: ["year", "country", "gdp", "inflation", "unemployment", "interest_rate"]
+      reporting_standards: ["AEA Data and Code Availability Policy"]
+      biases_checklist:
+        - "Endogeneity"
+        - "Omitted variable bias"
+        - "Simultaneity bias"
 steps:
   - id: identify_domain
     name: "Identify Domain"

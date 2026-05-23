@@ -34,16 +34,18 @@ except ImportError:
 
 from research_os.utils.asset_manager import AssetManager
 
+
 def find_project_root(start: Optional[Path] = None) -> Optional[Path]:
     """Find project root by looking for workspace directories.
-    
+
     Args:
         start: Optional starting directory. If None, uses cwd.
-    
+
     Returns:
         Path to project root.
     """
     return AssetManager.find_project_root(start)
+
 
 def require_project_root() -> Path:
     """Find project root or exit with error message."""
@@ -57,6 +59,7 @@ def require_project_root() -> Path:
 # =============================================================================
 # File I/O
 # =============================================================================
+
 
 def load_yaml(path: Path) -> dict:
     """Load YAML file, return dict or empty dict.
@@ -242,21 +245,37 @@ def load_env(root: Path) -> dict:
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
                     k, v = k.strip(), v.strip().strip('"').strip("'")
-                    if v.lower() == "true": v = True
-                    elif v.lower() == "false": v = False
-                    elif v.isdigit(): v = int(v)
+                    if v.lower() == "true":
+                        v = True
+                    elif v.lower() == "false":
+                        v = False
+                    elif v.isdigit():
+                        v = int(v)
                     env_vars[k] = v
     # Also override with actual os.environ
-    for k in ["RESEARCH_MODE", "MEMORY_TIER_LIMITS", "MAX_BRANCH_DEPTH", "ENABLE_DYNAMIC_REPLANNING",
-              "ENABLE_SELF_CRITIQUE", "ENABLE_DEBATE_LOOP", "ENABLE_AUTONOMOUS_RECOVERY",
-              "CONFIDENCE_THRESHOLD", "MAX_INTERRUPT_DEPTH", "ENABLE_SESSION_REPLAY"]:
+    for k in [
+        "RESEARCH_MODE",
+        "MEMORY_TIER_LIMITS",
+        "MAX_BRANCH_DEPTH",
+        "ENABLE_DYNAMIC_REPLANNING",
+        "ENABLE_SELF_CRITIQUE",
+        "ENABLE_DEBATE_LOOP",
+        "ENABLE_AUTONOMOUS_RECOVERY",
+        "CONFIDENCE_THRESHOLD",
+        "MAX_INTERRUPT_DEPTH",
+        "ENABLE_SESSION_REPLAY",
+    ]:
         if k in os.environ:
             v = os.environ[k]
-            if v.lower() == "true": v = True
-            elif v.lower() == "false": v = False
-            elif v.isdigit(): v = int(v)
+            if v.lower() == "true":
+                v = True
+            elif v.lower() == "false":
+                v = False
+            elif v.isdigit():
+                v = int(v)
             env_vars[k] = v
     return env_vars
+
 
 def get_runtime_profile(mode: str) -> dict:
     """Return configuration overrides for a specific runtime profile."""
@@ -292,9 +311,10 @@ def get_runtime_profile(mode: str) -> dict:
             "ENABLE_DEBATE_LOOP": True,
             "ENABLE_AUTONOMOUS_RECOVERY": True,
             "ENABLE_SESSION_REPLAY": True,
-        }
+        },
     }
     return profiles.get(mode.lower(), {})
+
 
 def get_config(root: Optional[Path] = None, defaults: Optional[dict] = None) -> dict:
     """Load config.yaml, .env, and apply runtime profiles."""
@@ -303,10 +323,13 @@ def get_config(root: Optional[Path] = None, defaults: Optional[dict] = None) -> 
 
     try:
         from research_os.utils.asset_manager import AssetManager
-        config = yaml.safe_load(AssetManager(root).read_text("config.yaml")) if yaml else {}
+
+        config = (
+            yaml.safe_load(AssetManager(root).read_text("config.yaml")) if yaml else {}
+        )
     except Exception:
         config = {}
-    
+
     # Merge defaults
     merged_defaults = {**_DEFAULT_CONFIG}
     if defaults:
@@ -314,16 +337,16 @@ def get_config(root: Optional[Path] = None, defaults: Optional[dict] = None) -> 
 
     for k, v in merged_defaults.items():
         config.setdefault(k, v)
-        
+
     # Load .env
     env_vars = load_env(root)
     config.update(env_vars)
-    
+
     # Apply runtime profile
     mode = config.get("RESEARCH_MODE", "exploratory")
     profile_overrides = get_runtime_profile(mode)
     config.update(profile_overrides)
-    
+
     return config
 
 
@@ -341,6 +364,7 @@ def get_research_map(root: Path, config: dict) -> dict:
 # =============================================================================
 # Hashing
 # =============================================================================
+
 
 def compute_sha256(file_path: Path) -> str:
     """Compute SHA-256 hash of a file using chunked reading.
@@ -365,6 +389,7 @@ def compute_sha256(file_path: Path) -> str:
 # Timestamps
 # =============================================================================
 
+
 def now_iso() -> str:
     """Current UTC time in ISO-8601 format."""
     return datetime.now(timezone.utc).isoformat()
@@ -385,6 +410,7 @@ def now_timestamp(fmt: str = "%Y%m%d_%H%M%S") -> str:
 # =============================================================================
 # Data Scale Thresholds
 # =============================================================================
+
 
 def get_data_scale_thresholds(config: Optional[dict] = None) -> dict:
     """Load data scale thresholds from config or use defaults.
@@ -409,6 +435,7 @@ def get_data_scale_thresholds(config: Optional[dict] = None) -> dict:
 # =============================================================================
 # State Ledger Helpers
 # =============================================================================
+
 
 def load_state(root: Optional[Path] = None) -> dict:
     """Load the research state ledger.

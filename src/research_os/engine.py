@@ -19,7 +19,11 @@ from typing import Any, Dict, Optional
 from research_os.runtime.hooks import hook_engine
 from research_os.state.state_ledger import ResearchLedger
 from research_os.intent_router import IntentAnalyzer
-from research_os.project_ops import create_experiment_branch, log_decision, save_artifact
+from research_os.project_ops import (
+    create_experiment_branch,
+    log_decision,
+    save_artifact,
+)
 from research_os.utils.asset_manager import AssetManager
 from research_os.utils.dag_manager import ExecutionDAGManager
 
@@ -69,16 +73,20 @@ class ResearchEngine:
         self._data_scale_instruction: Optional[str] = None
 
         import sys
+
         self._interactive = sys.stdin.isatty()
 
         from research_os.runtime.token_budget import TokenBudgetTracker
+
         self.token_tracker = TokenBudgetTracker(max_tokens=200_000)
 
         try:
             from research_os.utils.data_scale_detector import DataScaleDetector
 
             detector = DataScaleDetector(self.root)
-            self._data_scale_instruction = detector.get_library_instruction(threshold_mb=500)
+            self._data_scale_instruction = detector.get_library_instruction(
+                threshold_mb=500
+            )
         except Exception as exc:
             logger.warning("Failed to initialize data-scale instruction: %s", exc)
 
@@ -119,7 +127,9 @@ class ResearchEngine:
         logger.warning(
             "Dead-end recorded for node '%s' (attempt %d/%d). "
             "Reverting to parent and injecting error context.",
-            node_id, retry_count + 1, _MAX_DEAD_END_RETRIES,
+            node_id,
+            retry_count + 1,
+            _MAX_DEAD_END_RETRIES,
         )
 
         retry_allowed = retry_count < _MAX_DEAD_END_RETRIES
@@ -191,7 +201,9 @@ class ResearchEngine:
         else:
             logger.warning(
                 "Node %s failed (exit %d):\n%s",
-                node_id, result.exit_code, result.stderr,
+                node_id,
+                result.exit_code,
+                result.stderr,
             )
             return {
                 "status": "failed",
@@ -211,7 +223,10 @@ class ResearchEngine:
         base_prompt: str = "",
         node_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        from research_os.schemas.validator import validate_with_retry, get_schema_for_task
+        from research_os.schemas.validator import (
+            validate_with_retry,
+            get_schema_for_task,
+        )
 
         try:
             schema = get_schema_for_task(task_name)
@@ -280,11 +295,15 @@ class ResearchEngine:
 
         if self._data_scale_instruction:
             if effective_script:
-                effective_script = f"# {self._data_scale_instruction}\n\n" + effective_script
+                effective_script = (
+                    f"# {self._data_scale_instruction}\n\n" + effective_script
+                )
             if base_prompt:
                 base_prompt = f"{base_prompt}\n\n{self._data_scale_instruction}"
             elif dead_end_context:
-                dead_end_context = f"{dead_end_context}\n\n{self._data_scale_instruction}"
+                dead_end_context = (
+                    f"{dead_end_context}\n\n{self._data_scale_instruction}"
+                )
             else:
                 dead_end_context = self._data_scale_instruction
 
@@ -292,11 +311,15 @@ class ResearchEngine:
         if "data_scaffold" in node_id or (task_name and "data" in task_name):
             try:
                 from research_os.utils.data_scale_detector import DataScaleDetector
+
                 detector = DataScaleDetector(self.root)
                 constraint = detector.get_constraint_message()
                 if constraint:
                     if effective_script:
-                        effective_script = f"# {constraint.replace(chr(10), chr(10) + '# ')}\n\n" + effective_script
+                        effective_script = (
+                            f"# {constraint.replace(chr(10), chr(10) + '# ')}\n\n"
+                            + effective_script
+                        )
                     if base_prompt:
                         base_prompt = f"{base_prompt}\n\n{constraint}"
                     if not dead_end_context:
@@ -313,6 +336,7 @@ class ResearchEngine:
             )
 
         import hashlib
+
         inputs_str = json.dumps(
             {"node_id": node_id, "dead_end_retry": dead_end_retry, **kwargs},
             sort_keys=True,
@@ -357,10 +381,15 @@ class ResearchEngine:
                 return result
 
             # ── Item 16: Automated Figure Validation Integration ─────────────
-            if result["status"] == "success" and ("viz" in node_id or "figure" in node_id or "plot" in node_id):
+            if result["status"] == "success" and (
+                "viz" in node_id or "figure" in node_id or "plot" in node_id
+            ):
                 try:
                     from research_os.utils.figure_validator import validate_figure_file
-                    png_files = [f for f in (output_files or []) if str(f).endswith(".png")]
+
+                    png_files = [
+                        f for f in (output_files or []) if str(f).endswith(".png")
+                    ]
                     for png in png_files:
                         png_path = self.root / png
                         if png_path.exists():
@@ -369,9 +398,14 @@ class ResearchEngine:
                                 logger.warning("Figure validation failed for %s", png)
                                 result["status"] = "failed"
                                 errs = "\n".join(val_report.get("errors", []))
-                                result["stderr"] = f"Figure validation failed for {png}:\n{errs}\n" + result.get("stderr", "")
+                                result["stderr"] = (
+                                    f"Figure validation failed for {png}:\n{errs}\n"
+                                    + result.get("stderr", "")
+                                )
                                 result["error_context"] = result["stderr"]
-                                recovery = self._handle_dead_end(node_id, result, dead_end_retry)
+                                recovery = self._handle_dead_end(
+                                    node_id, result, dead_end_retry
+                                )
                                 result.update(recovery)
                                 return result
                 except Exception as e:
@@ -398,6 +432,7 @@ class ResearchEngine:
         else:
             try:
                 from research_os.utils.cache_manager import ResearchCache
+
                 cache = ResearchCache(
                     self.root / ".research" / "cache" / "research_cache.db"
                 )
@@ -431,6 +466,7 @@ class ResearchEngine:
             self.token_tracker.add_usage(500, 200)
 
         return result
+
     def analyze_query(self, query: str, depth: str = "academic") -> Dict[str, Any]:
         """Analyze a user query and return a structured intake schema.
 

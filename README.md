@@ -1,21 +1,17 @@
 # Research OS
 
-**From data to publication-ready manuscript – your AI research copilot.**
+**From data to publication-ready manuscript – your MCP-native research operating system.**
 
-*(Pre-Release Build)*
-
-Agentic Research OS is a Model Context Protocol (MCP) server designed to manage and guide LLM agents (like Cursor, Windsurf, or custom scripts) through rigorous, reproducible academic research workflows.
-
-![Agentic Research OS Demo](https://via.placeholder.com/800x400.png?text=Agentic+Research+OS+Workflow+Demo)
+Research OS is a Model Context Protocol (MCP) server designed to manage and guide LLM agents (like Cursor, Windsurf, or custom scripts) through rigorous, reproducible academic research workflows.
 
 ## Quick Start
 
 1. **Install the OS**
    ```bash
-   pip install agentic-research-os
+   pip install research-os
    
    # Or install with all optional tools (like MCP and Dev):
-   pip install agentic-research-os[all]
+   pip install research-os[all]
    ```
 
 2. **Start the MCP Server**
@@ -27,6 +23,38 @@ Agentic Research OS is a Model Context Protocol (MCP) server designed to manage 
 3. **Initialize your Project**
    In your AI IDE, prompt the agent:
    > "Please scaffold my new project using `sys.workspace.scaffold` with the name 'My First Study'."
+
+## Architecture
+
+```text
++-------------------+       +-------------------+       +-------------------+       +-------------------+
+|                   |       |                   |       |                   |       |                   |
+|     AI IDE        | <---> |   MCP Protocol    | <---> |    Research OS    | <---> |     Workspace     |
+| (Cursor/Windsurf) |       |                   |       |                   |       |                   |
++-------------------+       +-------------------+       +-------------------+       +-------------------+
+```
+
+## What This Is NOT
+
+- **NOT an autonomous agent**: It does not think, plan, or make decisions on its own.
+- **NOT an LLM**: It relies entirely on your AI IDE (e.g., Cursor, Claude) to provide the intelligence.
+- **NOT a black box**: Every decision and change is logged for full transparency.
+
+## Workspace File Tree
+```text
+workspace/
+├── .os_state/
+│   └── state_ledger.json
+├── inputs/
+│   ├── literature/
+│   └── raw_data/
+├── methodology/
+│   └── protocols/
+├── src/
+├── synthesis/
+└── workspace_logs/
+    └── analysis.md
+```
 
 ## Value Proposition
 
@@ -52,6 +80,6 @@ To help you navigate this repository:
 - `src/research_os/state/` - State ledger and checkpoint logic.
 - `templates/` - Default rules and guides to feed to agents.
 
-[![PyPI version](https://badge.fury.io/py/agentic-research-os.svg)](https://badge.fury.io/py/agentic-research-os)
-[![Python versions](https://img.shields.io/pypi/pyversions/agentic-research-os.svg)](https://pypi.org/project/agentic-research-os/)
-[![Tests](https://github.com/vibhav/research-os/actions/workflows/tests.yml/badge.svg)](https://github.com/vibhav/research-os/actions)
+[![PyPI version](https://badge.fury.io/py/research-os.svg)](https://badge.fury.io/py/research-os)
+[![Python versions](https://img.shields.io/pypi/pyversions/research-os.svg)](https://pypi.org/project/research-os/)
+[![Tests](https://github.com/VibhavSetlur/Research-OS/actions/workflows/tests.yml/badge.svg)](https://github.com/VibhavSetlur/Research-OS/actions)

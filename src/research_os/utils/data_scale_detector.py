@@ -64,7 +64,15 @@ LIBRARY_RECOMMENDATIONS = {
 class DataScaleDetector:
     """Detects data file sizes and recommends processing strategies."""
 
-    SUPPORTED_EXTENSIONS = {".csv", ".parquet", ".tsv", ".json", ".feather", ".arrow", ".xlsx"}
+    SUPPORTED_EXTENSIONS = {
+        ".csv",
+        ".parquet",
+        ".tsv",
+        ".json",
+        ".feather",
+        ".arrow",
+        ".xlsx",
+    }
 
     def __init__(self, project_root: Optional[Path] = None):
         if project_root is None:
@@ -80,12 +88,14 @@ class DataScaleDetector:
 
         try:
             import yaml
+
             with open(config_path) as f:
                 config = yaml.safe_load(f)
             ts = config.get("data_scale_thresholds", {})
             return {
                 "small_max_mb": ts.get("medium_mb", SIZE_THRESHOLDS["small_max_mb"]),
-                "medium_max_mb": ts.get("large_gb", SIZE_THRESHOLDS["large_max_gb"]) * 1024,
+                "medium_max_mb": ts.get("large_gb", SIZE_THRESHOLDS["large_max_gb"])
+                * 1024,
                 "large_max_gb": ts.get("massive_gb", SIZE_THRESHOLDS["large_max_gb"]),
             }
         except Exception:
@@ -122,7 +132,10 @@ class DataScaleDetector:
             Dict with file profiles, summary stats, and constraint message.
         """
         if not self.data_dir.exists():
-            return {"files": {}, "summary": {"total_files": 0, "has_large_files": False}}
+            return {
+                "files": {},
+                "summary": {"total_files": 0, "has_large_files": False},
+            }
 
         files = {}
         total_size = 0
@@ -140,8 +153,12 @@ class DataScaleDetector:
                     "size_mb": round(size_bytes / (1024 * 1024), 2),
                     "size_gb": round(size_bytes / (1024 * 1024 * 1024), 4),
                     "classification": classification,
-                    "recommended_library": LIBRARY_RECOMMENDATIONS[classification]["primary"],
-                    "read_function": LIBRARY_RECOMMENDATIONS[classification]["read_func"],
+                    "recommended_library": LIBRARY_RECOMMENDATIONS[classification][
+                        "primary"
+                    ],
+                    "read_function": LIBRARY_RECOMMENDATIONS[classification][
+                        "read_func"
+                    ],
                     "sha256": self._compute_hash(f),
                     "extension": f.suffix.lower(),
                 }
@@ -219,20 +236,20 @@ class DataScaleDetector:
             Python code template string
         """
         templates = {
-            "small": '''# Small file (<100MB) — pandas is fine
+            "small": """# Small file (<100MB) — pandas is fine
 import pandas as pd
 
 df = pd.read_csv("00_inputs/raw_data/data.csv")
 # ... your analysis ...
-''',
-            "medium": '''# Medium file (100MB-1GB) — polars recommended
+""",
+            "medium": """# Medium file (100MB-1GB) — polars recommended
 import polars as pl
 
 df = pl.read_csv("00_inputs/raw_data/data.csv")
 # ... your analysis ...
 # df.collect() not needed for eager mode
-''',
-            "large": '''# Large file (1GB-10GB) — polars lazy frames REQUIRED
+""",
+            "large": """# Large file (1GB-10GB) — polars lazy frames REQUIRED
 import polars as pl
 
 # Use scan_* for lazy evaluation — NO data loaded yet
@@ -249,8 +266,8 @@ result = (
 
 # Collect ONLY after all transformations
 df = result.collect()
-''',
-            "massive": '''# Massive file (>10GB) — pyarrow.dataset + chunked processing REQUIRED
+""",
+            "massive": """# Massive file (>10GB) — pyarrow.dataset + chunked processing REQUIRED
 import pyarrow.dataset as ds
 import pyarrow.compute as pc
 
@@ -273,7 +290,7 @@ for batch in filtered.to_batches(batch_size=batch_size):
 # Combine results
 import pandas as pd
 final = pd.concat(results)
-''',
+""",
         }
         return templates.get(classification, "# Unknown classification")
 
@@ -292,8 +309,7 @@ final = pd.concat(results)
         profile = self.scan()
         profile["constraint_message"] = self.get_constraint_message()
         profile["code_templates"] = {
-            cls: self.get_code_template(cls)
-            for cls in LIBRARY_RECOMMENDATIONS
+            cls: self.get_code_template(cls) for cls in LIBRARY_RECOMMENDATIONS
         }
 
         output_path.parent.mkdir(parents=True, exist_ok=True)

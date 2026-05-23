@@ -9,14 +9,13 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    AI IDE (Brain)                       │
-│  Cursor / Claude Desktop / VS Code / Antigravity        │
+│  Cursor / Windsurf / Claude Desktop                     │
 │  ┌─────────────────────────────────────────────────┐    │
 │  │  The IDE:                                       │    │
 │  │  1. Receives user request (NLP)                 │    │
-│  │  2. Analyzes intent via view.analyze_intent     │    │
-│  │  3. Decides which tools to call                 │    │
-│  │  4. Calls tools in sequence                     │    │
-│  │  5. Reads responses, updates chat               │    │
+│  │  2. Decides which tools to call                 │    │
+│  │  3. Calls tools in sequence                     │    │
+│  │  4. Reads responses, updates chat               │    │
 │  └─────────────────────────────────────────────────┘    │
 └──────────────────────┬──────────────────────────────────┘
                        │ MCP Protocol (stdio JSON-RPC)
@@ -26,35 +25,30 @@ Research OS is an **MCP server** that provides tools (hands), observability (eye
 │                                                         │
 │  ┌───────────────┐  ┌────────────────────────────────┐  │
 │  │  Tool Router  │  │  State Ledger                  │  │
-│  │  (server.py)  │  │  (.os_state/state_ledger.yaml) │  │
+│  │  (server.py)  │  │  (.os_state/state_ledger.json) │  │
 │  │               │  │  - current_branch              │  │
 │  │  sys.*        │  │  - branches & statuses         │  │
 │  │  tool.*       │  │  - checkpoint_history          │  │
-│  │  view.*       │  │  - pipeline_stage              │  │
-│  │  mem.*        │  │                                │  │
+│  │  mem.*        │  │  - pipeline_stage              │  │
 │  └───────┬───────┘  └────────────────────────────────┘  │
 │          │                                              │
 │  ┌───────▼───────────────────────────────────────────┐  │
 │  │  Tool Implementations                             │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │  │
-│  │  │ Hands    │ │ Eyes     │ │ Memory           │   │  │
-│  │  │ (tool.*) │ │ (view.*) │ │ (mem.*)          │   │  │
-│  │  │          │ │          │ │                  │   │  │
-│  │  │ latex    │ │ tree     │ │ methods.append   │   │  │
-│  │  │ pubmed   │ │ data.head│ │ citation.add     │   │  │
-│  │  │ ttest    │ │ figure   │ │ regenerate.intake│   │  │
-│  │  │ figure   │ │ analyze  │ │ literature.index │   │  │
-│  │  │ transform│ │          │ │ citations.generate│  │  │
-│  │  │ dashboard│ │          │ │ checkpoint       │   │  │
-│  │  └──────────┘ └──────────┘ └──────────────────┘   │  │
+│  │  ┌────────────────────┐ ┌────────────────────┐    │  │
+│  │  │ System (sys.*)     │ │ Tools (tool.*)     │    │  │
+│  │  │                    │ │                    │    │  │
+│  │  │ file.read          │ │ search.pubmed      │    │  │
+│  │  │ branch.create      │ │ python.exec        │    │  │
+│  │  │ checkpoint.create  │ │ data.sample        │    │  │
+│  │  │ guidance.validate  │ │ web.scrape         │    │  │
+│  │  └────────────────────┘ └────────────────────┘    │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │  Project State (project_ops.py)                   │  │
 │  │  - Workspace scaffold & conventions               │  │
-│  │  - Numbered experiment creation                   │  │
-│  │  - Input intake & hashing                         │  │
-│  │  - Literature indexing                            │  │
+│  │  - Branch creation                                │  │
+│  │  - Checkpoint management                          │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                        │
@@ -89,10 +83,9 @@ Research OS never:
 
 | Category | Prefix | Responsibility | Examples |
 |----------|--------|---------------|---------|
-| Hands | `tool.` | Execute actions on data | `tool.statistical.test`, `tool.figure.create`, `tool.latex.compile` |
-| Eyes | `view.` | Read/observe state | `view.workspace.tree`, `view.data.head`, `view.figure.show` |
-| Memory | `mem.` | Read/write persistent state | `mem.methods.append`, `mem.citation.add`, `mem.checkpoint` |
-| System | `sys.` | Control the OS itself | `sys.branch.create`, `sys.state`, `sys.synthesize` |
+| System | `sys.` | Control the OS itself | `sys.branch.create`, `sys.file.read`, `sys.guidance.validate` |
+| Tools | `tool.` | Execute actions on data | `tool.python.exec`, `tool.search.pubmed`, `tool.data.sample` |
+| Memory | `mem.` | Read/write persistent state | `mem.methods.append`, `mem.analysis.log` |
 
 ### 3. State Ledger as Source of Truth
 

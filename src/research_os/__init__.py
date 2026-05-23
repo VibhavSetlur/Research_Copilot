@@ -1,3 +1,3 @@
 """Research OS — A self-healing, citation-verified research engine."""
 
-__version__ = "9.0.0"
+__version__ = "0.1.0"

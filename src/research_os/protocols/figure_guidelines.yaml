@@ -28,6 +28,12 @@ formatting:
   layouts:
     forest_plot: "Ensure lines for 95% CI are distinct, align study names left, align OR/RR values right."
     funnel_plot: "Symmetrical pseudo-95% confidence limits must be drawn as dashed lines."
+  technical:
+    dpi_requirements: "Minimum 300 DPI for print publication, 600 DPI for line art."
+    axis_labeling: "Always include units in parentheses, e.g., 'Blood Pressure (mmHg)'. Do not use variable names like 'bp_sys'."
+    error_bars_vs_confidence_bands:
+      error_bars: "Use standard error (SE) or 95% CI for point estimates (e.g., bar charts of means). Explicitly state which one in the caption."
+      confidence_bands: "Use shaded 95% confidence bands for continuous trends (e.g., regression lines or survival curves)."
 steps:
   - id: select_chart
     name: "Select Chart Type"

@@ -42,6 +42,7 @@ def file_hash(path: Path) -> Optional[str]:
 
 # ── Claim Extraction ─────────────────────────────────────────────────────
 
+
 def extract_claims_from_manuscript(path: Path) -> list[dict]:
     """Extract all factual claims from a manuscript markdown file."""
     try:
@@ -64,7 +65,10 @@ def extract_claims_from_manuscript(path: Path) -> list[dict]:
             (r"([Rr]²|[Rr]-squared)\s*=?\s*([-\d.]+)", "statistical_r_squared"),
             (r"p\s*[<>=]\s*([\d.]+)", "statistical_pvalue"),
             (r"([-\d.]+)%\s*(?:confidence\s*interval|CI)", "statistical_ci"),
-            (r"(?:effect\s*size|Cohen['']?\s*d)\s*=?\s*([-\d.]+)", "statistical_effect_size"),
+            (
+                r"(?:effect\s*size|Cohen['']?\s*d)\s*=?\s*([-\d.]+)",
+                "statistical_effect_size",
+            ),
             (r"(?:mean|average)\s*(?:of\s*)?([-\d.]+)", "statistical_mean"),
             (r"(?:n|N|sample)\s*=?\s*(\d+)", "statistical_sample_size"),
             (r"([-\d.]+)\s*±\s*([-\d.]+)", "statistical_mean_sd"),
@@ -74,69 +78,94 @@ def extract_claims_from_manuscript(path: Path) -> list[dict]:
             matches = re.finditer(pattern, line)
             for match in matches:
                 claim_id += 1
-                claims.append({
-                    "id": f"claim_{claim_id:03d}",
-                    "text": line[:200],
-                    "type": claim_type,
-                    "location": f"{path.name}:line_{line_num}",
-                    "matched_value": match.group(0),
-                    "line": line_num,
-                })
+                claims.append(
+                    {
+                        "id": f"claim_{claim_id:03d}",
+                        "text": line[:200],
+                        "type": claim_type,
+                        "location": f"{path.name}:line_{line_num}",
+                        "matched_value": match.group(0),
+                        "line": line_num,
+                    }
+                )
 
         # Literature claims: citations with claims
         citation_patterns = [
-            (r"(?:Prior\s+studies|Previous\s+research|Earlier\s+work)\s+(?:show|found|report|suggest)[^.]*(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)", "literature_prior_work"),
-            (r"(?:consistent\s+with|aligns?\s+with|supports?)\s+[^.]*?(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)", "literature_consistent"),
-            (r"(?:contradicts?\|differs?\s+from)\s+[^.]*?(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)", "literature_contradiction"),
+            (
+                r"(?:Prior\s+studies|Previous\s+research|Earlier\s+work)\s+(?:show|found|report|suggest)[^.]*(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)",
+                "literature_prior_work",
+            ),
+            (
+                r"(?:consistent\s+with|aligns?\s+with|supports?)\s+[^.]*?(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)",
+                "literature_consistent",
+            ),
+            (
+                r"(?:contradicts?\|differs?\s+from)\s+[^.]*?(?:DOI[:\s]+)?(10\.\d{4,}[^\s\"'\]]+)",
+                "literature_contradiction",
+            ),
         ]
 
         for pattern, claim_type in citation_patterns:
             matches = re.finditer(pattern, line)
             for match in matches:
                 claim_id += 1
-                claims.append({
-                    "id": f"claim_{claim_id:03d}",
-                    "text": line[:200],
-                    "type": claim_type,
-                    "location": f"{path.name}:line_{line_num}",
-                    "matched_value": match.group(0),
-                    "line": line_num,
-                })
+                claims.append(
+                    {
+                        "id": f"claim_{claim_id:03d}",
+                        "text": line[:200],
+                        "type": claim_type,
+                        "location": f"{path.name}:line_{line_num}",
+                        "matched_value": match.group(0),
+                        "line": line_num,
+                    }
+                )
 
         # DOI references (standalone)
         doi_matches = re.finditer(r"(10\.\d{4,}[^\s\"'\)\]]+)", line)
         for match in doi_matches:
-            already_found = any(c["line"] == line_num and c["type"].startswith("literature") for c in claims)
+            already_found = any(
+                c["line"] == line_num and c["type"].startswith("literature")
+                for c in claims
+            )
             if not already_found:
                 claim_id += 1
-                claims.append({
+                claims.append(
+                    {
+                        "id": f"claim_{claim_id:03d}",
+                        "text": line[:200],
+                        "type": "citation_reference",
+                        "location": f"{path.name}:line_{line_num}",
+                        "matched_value": match.group(0),
+                        "line": line_num,
+                    }
+                )
+
+        # arXiv references
+        arxiv_matches = re.finditer(
+            r"(?:arXiv[:\s]+)?(\d{4}\.\d{4,5}(?:v\d+)?)\b", line
+        )
+        for match in arxiv_matches:
+            claim_id += 1
+            claims.append(
+                {
                     "id": f"claim_{claim_id:03d}",
                     "text": line[:200],
-                    "type": "citation_reference",
+                    "type": "arxiv_reference",
                     "location": f"{path.name}:line_{line_num}",
                     "matched_value": match.group(0),
                     "line": line_num,
-                })
-
-        # arXiv references
-        arxiv_matches = re.finditer(r"(?:arXiv[:\s]+)?(\d{4}\.\d{4,5}(?:v\d+)?)\b", line)
-        for match in arxiv_matches:
-            claim_id += 1
-            claims.append({
-                "id": f"claim_{claim_id:03d}",
-                "text": line[:200],
-                "type": "arxiv_reference",
-                "location": f"{path.name}:line_{line_num}",
-                "matched_value": match.group(0),
-                "line": line_num,
-            })
+                }
+            )
 
     return claims
 
 
 # ── Trace Building ───────────────────────────────────────────────────────
 
-def trace_statistical_claim(claim: dict, data_lineage: Optional[dict], root: Path) -> dict:
+
+def trace_statistical_claim(
+    claim: dict, data_lineage: Optional[dict], root: Path
+) -> dict:
     """Trace a statistical claim back to its data source."""
     trace = {
         "source_type": "computed_data",
@@ -176,7 +205,11 @@ def trace_statistical_claim(claim: dict, data_lineage: Optional[dict], root: Pat
             for ds in datasets:
                 if isinstance(ds, dict):
                     output = ds.get("output", ds.get("output_file", ""))
-                    if output and trace.get("source_file") and output in trace["source_file"]:
+                    if (
+                        output
+                        and trace.get("source_file")
+                        and output in trace["source_file"]
+                    ):
                         trace["data_file"] = ds.get("input", ds.get("input_file", ""))
                         if trace["data_file"]:
                             data_path = root / trace["data_file"]
@@ -244,11 +277,19 @@ def trace_citation_claim(claim: dict, citation_report: Optional[dict]) -> dict:
     return trace
 
 
-def trace_claim(claim: dict, data_lineage: Optional[dict], citation_report: Optional[dict], root: Path) -> dict:
+def trace_claim(
+    claim: dict,
+    data_lineage: Optional[dict],
+    citation_report: Optional[dict],
+    root: Path,
+) -> dict:
     """Build a complete trace for a single claim."""
     if claim["type"].startswith("statistical"):
         return trace_statistical_claim(claim, data_lineage, root)
-    elif claim["type"].startswith("literature") or claim["type"] in ("citation_reference", "arxiv_reference"):
+    elif claim["type"].startswith("literature") or claim["type"] in (
+        "citation_reference",
+        "arxiv_reference",
+    ):
         return trace_citation_claim(claim, citation_report)
     else:
         return {
@@ -259,6 +300,7 @@ def trace_claim(claim: dict, data_lineage: Optional[dict], citation_report: Opti
 
 
 # ── Main Pipeline ────────────────────────────────────────────────────────
+
 
 def run_claim_tracing(
     manuscript_path: Path,
@@ -287,7 +329,9 @@ def run_claim_tracing(
 
     traced_claims = []
     for i, claim in enumerate(claims):
-        print(f"  [{i+1}/{len(claims)}] Tracing: {claim['type']} at {claim['location']}")
+        print(
+            f"  [{i + 1}/{len(claims)}] Tracing: {claim['type']} at {claim['location']}"
+        )
         trace = trace_claim(claim, data_lineage, citation_report, root)
         claim["trace"] = trace
 
@@ -302,7 +346,9 @@ def run_claim_tracing(
 
     summary = {
         "fully_traced": sum(1 for c in traced_claims if c["status"] == "fully_traced"),
-        "partially_traced": sum(1 for c in traced_claims if c["status"] == "partially_traced"),
+        "partially_traced": sum(
+            1 for c in traced_claims if c["status"] == "partially_traced"
+        ),
         "unsupported": sum(1 for c in traced_claims if c["status"] == "unsupported"),
     }
 
@@ -359,35 +405,62 @@ def print_report_summary(report: dict) -> None:
             print(f"    ID: {trace['identifier']}")
         print(f"    Verified: {trace.get('verified', False)}")
         if claim["status"] == "unsupported":
-            print(f"    ⚠ UNSUPPORTED — must be removed or traced")
+            print("    ⚠ UNSUPPORTED — must be removed or traced")
         print()
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Claim Tracer — Evidence Graph Builder")
-    parser.add_argument("--manuscript", type=str, required=True, help="Path to manuscript markdown file")
+    parser = argparse.ArgumentParser(
+        description="Claim Tracer — Evidence Graph Builder"
+    )
+    parser.add_argument(
+        "--manuscript", type=str, required=True, help="Path to manuscript markdown file"
+    )
     parser.add_argument("--data-lineage", type=str, help="Path to data lineage JSON")
-    parser.add_argument("--citation-report", type=str, help="Path to citation verification report JSON")
-    parser.add_argument("--output", type=str, help="Output report path (default: 03_synthesis/audit/claim_trace_report.json)")
+    parser.add_argument(
+        "--citation-report", type=str, help="Path to citation verification report JSON"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        help="Output report path (default: 03_synthesis/audit/claim_trace_report.json)",
+    )
     args = parser.parse_args()
 
     root = find_project_root()
 
-    manuscript_path = Path(args.manuscript) if Path(args.manuscript).is_absolute() else root / args.manuscript
+    manuscript_path = (
+        Path(args.manuscript)
+        if Path(args.manuscript).is_absolute()
+        else root / args.manuscript
+    )
 
     data_lineage = None
     if args.data_lineage:
-        dl_path = Path(args.data_lineage) if Path(args.data_lineage).is_absolute() else root / args.data_lineage
+        dl_path = (
+            Path(args.data_lineage)
+            if Path(args.data_lineage).is_absolute()
+            else root / args.data_lineage
+        )
         data_lineage = load_json(dl_path)
 
     citation_report = None
     if args.citation_report:
-        cr_path = Path(args.citation_report) if Path(args.citation_report).is_absolute() else root / args.citation_report
+        cr_path = (
+            Path(args.citation_report)
+            if Path(args.citation_report).is_absolute()
+            else root / args.citation_report
+        )
         citation_report = load_json(cr_path)
 
-    output_path = Path(args.output) if args.output else root / "03_synthesis" / "audit" / "claim_trace_report.json"
+    output_path = (
+        Path(args.output)
+        if args.output
+        else root / "03_synthesis" / "audit" / "claim_trace_report.json"
+    )
     if not output_path.is_absolute():
         output_path = root / output_path
 
@@ -396,7 +469,9 @@ def main():
         sys.exit(1)
 
     print(f"Tracing claims from: {manuscript_path}")
-    report = run_claim_tracing(manuscript_path, data_lineage, citation_report, output_path, root)
+    report = run_claim_tracing(
+        manuscript_path, data_lineage, citation_report, output_path, root
+    )
     print_report_summary(report)
     print(f"Report saved to: {output_path}")
 

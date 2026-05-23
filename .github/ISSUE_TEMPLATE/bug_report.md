@@ -1,5 +1,5 @@
 name: Bug Report
-description: Create a report to help us improve Agentic Research OS
+description: Create a report to help us improve Research OS
 title: "[BUG] "
 labels: ["bug"]
 assignees: []

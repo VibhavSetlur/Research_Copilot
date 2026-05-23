@@ -44,6 +44,49 @@ decision_matrix:
         from sklearn.ensemble import RandomForestRegressor
         rf = RandomForestRegressor().fit(X, y)
       assumptions: ["Representative sampling", "Stationarity (if time series)"]
+    count_independent_multivariate:
+      method: "Poisson / Negative Binomial Regression"
+      library: "statsmodels (Python) / MASS (R)"
+      template: |
+        import statsmodels.api as sm
+        model = sm.GLM(y, X, family=sm.families.Poisson()).fit()
+      assumptions: ["Events are independent", "Mean equals variance (Poisson) or variance > mean (NB)"]
+    continuous_repeated_multivariate:
+      method: "Mixed Effects / GEE"
+      library: "statsmodels (Python) / lme4 (R)"
+      template: |
+        import statsmodels.formula.api as smf
+        model = smf.mixedlm("outcome ~ var1", df, groups=df["subject_id"]).fit()
+      assumptions: ["Random effects are normally distributed", "Independence between subjects"]
+    continuous_nested_multivariate:
+      method: "Multilevel Models (Hierarchical)"
+      library: "statsmodels (Python) / lme4 (R)"
+      template: |
+        import statsmodels.formula.api as smf
+        model = smf.mixedlm("outcome ~ var1", df, groups=df["school_id"]).fit()
+      assumptions: ["Linearity", "Normality at each level", "Homoscedasticity"]
+    continuous_spatial_multivariate:
+      method: "Spatial Regression / Kriging"
+      library: "PySAL / sklearn.gaussian_process (Python) / spdep (R)"
+      template: |
+        from sklearn.gaussian_process import GaussianProcessRegressor
+        gpr = GaussianProcessRegressor().fit(X_spatial, y)
+      assumptions: ["Spatial autocorrelation", "Stationarity"]
+    continuous_independent_high-dimensional:
+      method: "LASSO / Elastic Net / PCA+Regression"
+      library: "scikit-learn (Python) / glmnet (R)"
+      template: |
+        from sklearn.linear_model import ElasticNet
+        model = ElasticNet(alpha=1.0, l1_ratio=0.5).fit(X, y)
+      assumptions: ["Sparsity (LASSO)", "Linearity"]
+    time-to-event_independent_competing_risks:
+      method: "Fine-Gray Competing Risks"
+      library: "lifelines (Python) / cmprsk (R)"
+      template: |
+        from lifelines import AalenJohansenFitter
+        ajf = AalenJohansenFitter()
+        ajf.fit(T, E, event_of_interest=1)
+      assumptions: ["Proportional subdistribution hazards", "Independent censoring"]
 steps:
   - id: identify_layers
     name: "Identify Matrix Layers"

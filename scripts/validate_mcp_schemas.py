@@ -19,13 +19,13 @@ from research_os.server import TOOL_DEFINITIONS
 def validate_tool_schema(name: str, schema: dict) -> list[str]:
     """Validate a single tool schema. Returns list of errors."""
     errors = []
-    
+
     # Check required fields
     if "description" not in schema:
         errors.append(f"{name}: Missing 'description' field")
     elif not isinstance(schema["description"], str):
         errors.append(f"{name}: 'description' must be a string")
-    
+
     if "inputSchema" not in schema:
         errors.append(f"{name}: Missing 'inputSchema' field")
     elif not isinstance(schema["inputSchema"], dict):
@@ -37,26 +37,30 @@ def validate_tool_schema(name: str, schema: dict) -> list[str]:
             errors.append(f"{name}: inputSchema missing 'type' field")
         elif input_schema["type"] != "object":
             errors.append(f"{name}: inputSchema type must be 'object'")
-        
+
         # Check properties if present
-        if "properties" in input_schema and not isinstance(input_schema["properties"], dict):
+        if "properties" in input_schema and not isinstance(
+            input_schema["properties"], dict
+        ):
             errors.append(f"{name}: inputSchema 'properties' must be a dict")
-        
+
         # Check required if present
-        if "required" in input_schema and not isinstance(input_schema["required"], list):
+        if "required" in input_schema and not isinstance(
+            input_schema["required"], list
+        ):
             errors.append(f"{name}: inputSchema 'required' must be a list")
-    
+
     return errors
 
 
 def main():
     """Validate all MCP tool schemas."""
     all_errors = []
-    
+
     for name, schema in TOOL_DEFINITIONS.items():
         errors = validate_tool_schema(name, schema)
         all_errors.extend(errors)
-    
+
     if all_errors:
         print("❌ MCP tool schema validation failed:")
         for error in all_errors:

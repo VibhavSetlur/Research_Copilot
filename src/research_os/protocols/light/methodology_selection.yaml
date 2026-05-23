@@ -1,3 +1,6 @@
+name: methodology_selection
+version: 2.0.0
+schema_version: '1.0'
 decision_matrix:
   layers:
     1_outcome_type:
@@ -15,71 +18,77 @@ decision_matrix:
     - multivariate
     - high-dimensional
   mappings:
-    binary_independent_multivariate:
-      assumptions:
-      - Linearity of independent variables and log-odds
-      - Absence of multicollinearity
-      library: scikit-learn (Python) / glm (R)
-      method: Logistic Regression
-      template: 'from sklearn.linear_model import LogisticRegression
-
-        clf = LogisticRegression()
-
-        clf.fit(X, y)
-
-        '
     continuous_independent_multivariate:
+      method: Multiple Linear Regression
+      library: statsmodels (Python) / lm (R)
       assumptions:
       - Linearity
       - Independence of errors
       - Homoscedasticity
       - Normality of residuals
       - No multicollinearity
-      library: statsmodels (Python) / lm (R)
-      method: Multiple Linear Regression
-      template: 'import statsmodels.api as sm
-
-        X = sm.add_constant(df[[''var1'', ''var2'']])
-
-        model = sm.OLS(df[''outcome''], X).fit()
-
-        print(model.summary())
-
-        '
-    fallback:
+    binary_independent_multivariate:
+      method: Logistic Regression
+      library: scikit-learn (Python) / glm (R)
       assumptions:
-      - Representative sampling
-      - Stationarity (if time series)
-      library: scikit-learn / xgboost
-      method: Random Forest / Gradient Boosting (Non-parametric)
-      template: 'from sklearn.ensemble import RandomForestRegressor
-
-        rf = RandomForestRegressor().fit(X, y)
-
-        '
+      - Linearity of independent variables and log-odds
+      - Absence of multicollinearity
     time-to-event_independent_multivariate:
+      method: Cox Proportional Hazards
+      library: lifelines (Python) / survival (R)
       assumptions:
       - Proportional hazards
       - Non-informative censoring
-      library: lifelines (Python) / survival (R)
-      method: Cox Proportional Hazards
-      template: 'from lifelines import CoxPHFitter
-
-        cph = CoxPHFitter()
-
-        cph.fit(df, duration_col=''T'', event_col=''E'')
-
-        cph.print_summary()
-
-        '
-description: Three-layer decision matrix to select the best methodology and tools.
-name: methodology_selection
-schema_version: '1.0'
+    fallback:
+      method: Random Forest / Gradient Boosting (Non-parametric)
+      library: scikit-learn / xgboost
+      assumptions:
+      - Representative sampling
+      - Stationarity (if time series)
+    count_independent_multivariate:
+      method: Poisson / Negative Binomial Regression
+      library: statsmodels (Python) / MASS (R)
+      assumptions:
+      - Events are independent
+      - Mean equals variance (Poisson) or variance > mean (NB)
+    continuous_repeated_multivariate:
+      method: Mixed Effects / GEE
+      library: statsmodels (Python) / lme4 (R)
+      assumptions:
+      - Random effects are normally distributed
+      - Independence between subjects
+    continuous_nested_multivariate:
+      method: Multilevel Models (Hierarchical)
+      library: statsmodels (Python) / lme4 (R)
+      assumptions:
+      - Linearity
+      - Normality at each level
+      - Homoscedasticity
+    continuous_spatial_multivariate:
+      method: Spatial Regression / Kriging
+      library: PySAL / sklearn.gaussian_process (Python) / spdep (R)
+      assumptions:
+      - Spatial autocorrelation
+      - Stationarity
+    continuous_independent_high-dimensional:
+      method: LASSO / Elastic Net / PCA+Regression
+      library: scikit-learn (Python) / glmnet (R)
+      assumptions:
+      - Sparsity (LASSO)
+      - Linearity
+    time-to-event_independent_competing_risks:
+      method: Fine-Gray Competing Risks
+      library: lifelines (Python) / cmprsk (R)
+      assumptions:
+      - Proportional subdistribution hazards
+      - Independent censoring
 steps:
 - id: identify_layers
   name: Identify Matrix Layers
+  description: Determine outcome type, data structure, and number of variables.
 - id: select_methodology
   name: Select Methodology
+  description: Use the decision matrix mapping to pick the method, library, and template.
 - id: document_assumptions
   name: Document Assumptions
-version: 2.0.0
+  description: List the assumptions that must be tested during the analysis.

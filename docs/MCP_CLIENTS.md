@@ -1,6 +1,6 @@
-# Connecting Agentic Research OS via MCP
+# Connecting Research OS via MCP
 
-Since Agentic Research OS acts as a Model Context Protocol (MCP) server, you can connect it directly to advanced AI IDEs like **Claude Desktop**, **Cursor**, or **Windsurf**. This allows the AI in your editor to securely call research tools, execute data pipelines, and read your lab notebook directly.
+Since Research OS acts as a Model Context Protocol (MCP) server, you can connect it directly to advanced AI IDEs like **Claude Desktop**, **Cursor**, or **Windsurf**. This allows the AI in your editor to securely call research tools, execute data pipelines, and read your lab notebook directly.
 
 ## 1. Claude Desktop
 
@@ -40,7 +40,7 @@ Cursor has built-in support for MCP servers.
 2. Navigate to **Features > MCP**
 3. Click **+ Add new MCP server**
 4. Configure as follows:
-   - **Name:** `Agentic Research OS`
+   - **Name:** `Research OS`
    - **Type:** `command`
    - **Command:** `research-os-mcp` (or the absolute path to your `bin/research-os-mcp`)
 

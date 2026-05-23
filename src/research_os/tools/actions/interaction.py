@@ -5,6 +5,7 @@ from research_os.project_ops import now_iso
 
 logger = logging.getLogger("research.tools.interaction")
 
+
 def notify_researcher(message: str, level: str, root: Path) -> Dict[str, Any]:
     try:
         log_path = root / "workspace" / "logs" / "notifications.log"
@@ -16,15 +17,22 @@ def notify_researcher(message: str, level: str, root: Path) -> Dict[str, Any]:
         logger.error(f"Notify failed: {e}")
         return {"status": "error", "message": str(e)}
 
-def checkpoint_pending(description: str, requires_approval: bool, root: Path) -> Dict[str, Any]:
+
+def checkpoint_pending(
+    description: str, requires_approval: bool, root: Path
+) -> Dict[str, Any]:
     # Write pending action to a state file
     try:
         pending_path = root / ".research" / "pending_approval.txt"
         pending_path.parent.mkdir(parents=True, exist_ok=True)
         pending_path.write_text(description)
-        return {"status": "pending_approval", "message": "Awaiting researcher approval via sys.checkpoint.approve"}
+        return {
+            "status": "pending_approval",
+            "message": "Awaiting researcher approval via sys.checkpoint.approve",
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 def checkpoint_approve(root: Path) -> Dict[str, Any]:
     try:

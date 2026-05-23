@@ -6,16 +6,15 @@ This document provides a comprehensive reference for all MCP tools exposed by Re
 
 - **sys.*** - System tools (state, health, workspace management)
 - **mem.*** - Memory tools (methods, analysis, citations)
-- **view.*** - View tools (workspace tree, data preview, figure display)
 - **tool.*** - Research tools (data transform, statistical tests, figures)
 
 ---
 
 ## SYS.* Tools
 
-### `sys.analysis.log`
+### `sys.branch.create`
 
-Append a human/AI note to analysis.md and update the Mermaid workflow diagram.
+Create an experiment branch.
 
 #### Input Schema
 
@@ -23,37 +22,72 @@ Append a human/AI note to analysis.md and update the Mermaid workflow diagram.
 {
   "type": "object",
   "properties": {
-    "entry": {
-      "type": "string",
-      "description": "The note or observation to log"
+    "name": {
+      "type": "string"
     },
-    "step": {
-      "type": "string",
-      "description": "The step/experiment name (e.g. 01_experiment_baseline)"
+    "hypothesis": {
+      "type": "string"
     },
-    "status": {
-      "type": "string",
-      "enum": [
-        "planned",
-        "running",
-        "complete",
-        "failed",
-        "dead_end"
-      ],
-      "description": "Node status for Mermaid diagram coloring"
+    "parent": {
+      "type": "string"
     }
   },
   "required": [
-    "entry"
+    "name"
   ]
 }
 ```
 
 ---
 
-### `sys.branch.abandon`
+### `sys.branch.list`
 
-Mark a branch as abandoned/dead-end. The branch folder is preserved but marked as inactive.
+List all branches.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.branch.merge`
+
+Merge branches.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "source": {
+      "type": "string"
+    },
+    "target": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "target",
+    "message"
+  ]
+}
+```
+
+---
+
+### `sys.branch.switch`
+
+Switch to another branch.
 
 #### Input Schema
 
@@ -62,12 +96,7 @@ Mark a branch as abandoned/dead-end. The branch folder is preserved but marked a
   "type": "object",
   "properties": {
     "branch_id": {
-      "type": "string",
-      "description": "Branch ID to abandon"
-    },
-    "reason": {
-      "type": "string",
-      "description": "Reason for abandonment"
+      "type": "string"
     }
   },
   "required": [
@@ -78,75 +107,24 @@ Mark a branch as abandoned/dead-end. The branch folder is preserved but marked a
 
 ---
 
-### `sys.branch.create`
+### `sys.checkpoint.approve`
 
-Create a numbered experiment folder (01_name/) under workspace/ with full subdirectory tree. Optionally copy from a source step.
+Approve a pending action.
 
 #### Input Schema
 
 ```json
 {
   "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Branch/experiment name (used for folder slug)"
-    },
-    "hypothesis": {
-      "type": "string",
-      "description": "Research hypothesis or goal"
-    },
-    "parent": {
-      "type": "string",
-      "description": "Parent branch to fork from"
-    },
-    "from_step": {
-      "type": "string",
-      "description": "Copy contents from an existing step folder (e.g. 01_exploration)"
-    }
-  },
-  "required": [
-    "name"
-  ]
+  "properties": {}
 }
 ```
 
 ---
 
-### `sys.branch.merge`
+### `sys.checkpoint.create`
 
-Merge findings from one branch into another. Copies conclusions.md into the target branch's directory and merges state ledger entries. Manual review required.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "source": {
-      "type": "string",
-      "description": "Source branch ID to merge from"
-    },
-    "target": {
-      "type": "string",
-      "description": "Target branch ID to merge into (default: main)"
-    },
-    "message": {
-      "type": "string",
-      "description": "Merge rationale / commit message"
-    }
-  },
-  "required": [
-    "source"
-  ]
-}
-```
-
----
-
-### `sys.checkpoint`
-
-Snapshot the entire workspace/ into .os_state/checkpoints/<id>/ for rollback. Large data files (csv, parquet, etc.) are hash-referenced, not copied.
+Snapshot workspace state.
 
 #### Input Schema
 
@@ -154,16 +132,10 @@ Snapshot the entire workspace/ into .os_state/checkpoints/<id>/ for rollback. La
 {
   "type": "object",
   "properties": {
-    "checkpoint_id": {
-      "type": "string",
-      "description": "Unique checkpoint ID (e.g. before_model_training). Auto-generated if omitted."
-    },
     "description": {
-      "type": "string",
-      "description": "Human-readable description of this checkpoint"
+      "type": "string"
     }
-  },
-  "required": []
+  }
 }
 ```
 
@@ -171,55 +143,48 @@ Snapshot the entire workspace/ into .os_state/checkpoints/<id>/ for rollback. La
 
 ### `sys.checkpoint.list`
 
-List all available checkpoints with timestamps and descriptions.
+List all checkpoints.
 
 #### Input Schema
 
 ```json
 {
   "type": "object",
-  "properties": {},
-  "required": []
+  "properties": {}
 }
 ```
 
 ---
 
-### `sys.health`
+### `sys.checkpoint.pending`
 
-Health check endpoint — returns version, uptime, loaded tool count, memory usage. Alias for sys.heartbeat.
+Register a pending action for approval.
 
 #### Input Schema
 
 ```json
 {
   "type": "object",
-  "properties": {},
-  "required": []
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "requires_approval": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "description",
+    "requires_approval"
+  ]
 }
 ```
 
 ---
 
-### `sys.heartbeat`
+### `sys.checkpoint.rollback`
 
-Lightweight health check — returns version, uptime, loaded tool count, memory usage.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `sys.rollback`
-
-Restore workspace to a previous checkpoint. Current state is saved as backup before rollback.
+Rollback to a checkpoint.
 
 #### Input Schema
 
@@ -228,8 +193,7 @@ Restore workspace to a previous checkpoint. Current state is saved as backup bef
   "type": "object",
   "properties": {
     "checkpoint_id": {
-      "type": "string",
-      "description": "ID of the checkpoint to restore"
+      "type": "string"
     }
   },
   "required": [
@@ -240,9 +204,39 @@ Restore workspace to a previous checkpoint. Current state is saved as backup bef
 
 ---
 
-### `sys.scaffold.synthesis`
+### `sys.config.get`
 
-Populate synthesis/ directory with template files (abstract.md, paper.tex, references.bib, supplementary/).
+Get researcher configuration.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.config.init`
+
+Initialize researcher configuration.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.config.set`
+
+Set a specific config value.
 
 #### Input Schema
 
@@ -250,156 +244,55 @@ Populate synthesis/ directory with template files (abstract.md, paper.tex, refer
 {
   "type": "object",
   "properties": {
-    "project_name": {
-      "type": "string",
-      "description": "Project name for templates"
-    }
-  },
-  "required": []
-}
-```
-
----
-
-### `sys.state`
-
-Return the full workspace snapshot: folder tree, pipeline stage, last checkpoint, branches. Enables instant session resume.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `sys.synthesize`
-
-Compile all workspace findings into synthesis/ outputs: abstract.md, paper.tex, references.bib, workflow diagram. Only call when the user explicitly says 'I\'m done' or triggers synthesis.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "project_name": {
-      "type": "string",
-      "description": "Project name for the paper title"
+    "key": {
+      "type": "string"
     },
-    "formats": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "pdf",
-          "html",
-          "md"
-        ]
-      },
-      "description": "Output formats"
-    }
-  },
-  "required": []
-}
-```
-
----
-
-### `sys.workspace.scaffold`
-
-Create the full directory tree for a new research project in one call.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "project_name": {
-      "type": "string",
-      "description": "Name of the research project",
-      "default": "My Research Project"
-    }
-  },
-  "required": []
-}
-```
-
----
-
-## MEM.* Tools
-
-### `mem.citation.add`
-
-Add a BibTeX citation to workspace/citations.md with verified: false flag. The citation_verifier can later flip the flag.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "bibtex": {
-      "type": "string",
-      "description": "BibTeX entry"
-    },
-    "citation_key": {
-      "type": "string",
-      "description": "Unique citation key (e.g. author2024title)"
-    },
-    "source": {
-      "type": "string",
-      "description": "Where this citation came from (DOI, manual, search)"
+    "value": {
+      "type": "string"
     }
   },
   "required": [
-    "bibtex"
+    "key",
+    "value"
   ]
 }
 ```
 
 ---
 
-### `mem.citations.generate`
+### `sys.config.validate`
 
-Regenerate workspace/citations.md from the literature index.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `mem.literature.index`
-
-Scan inputs/literature/ and build/refresh literature_index.yaml mapping filenames to citation keys.
+Validate configuration and API keys.
 
 #### Input Schema
 
 ```json
 {
   "type": "object",
-  "properties": {},
-  "required": []
+  "properties": {}
 }
 ```
 
 ---
 
-### `mem.methods.append`
+### `sys.external_mcp.discover`
 
-Append a structured method entry to workspace/methods.md (append-only).
+Discover external MCP servers.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.file.delete`
+
+Delete a file.
 
 #### Input Schema
 
@@ -407,52 +300,293 @@ Append a structured method entry to workspace/methods.md (append-only).
 {
   "type": "object",
   "properties": {
-    "method": {
-      "type": "string",
-      "description": "Method name or description"
-    },
-    "parameters": {
-      "type": "string",
-      "description": "Key parameters used"
-    },
-    "citation": {
-      "type": "string",
-      "description": "Optional BibTeX citation key"
-    },
-    "tool": {
-      "type": "string",
-      "description": "Tool that ran this method"
+    "filepath": {
+      "type": "string"
     }
   },
   "required": [
-    "method"
+    "filepath"
   ]
 }
 ```
 
 ---
 
-### `mem.regenerate.intake`
+### `sys.file.list`
 
-Re-scan inputs/ and regenerate inputs/intake.md with current SHA-256 hashes, domain, and depth.
+List files in a directory.
 
 #### Input Schema
 
 ```json
 {
   "type": "object",
-  "properties": {},
-  "required": []
+  "properties": {
+    "directory": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "directory"
+  ]
 }
 ```
 
 ---
 
-## VIEW.* Tools
+### `sys.file.read`
 
-### `view.analyze_intent`
+Securely read a file from the workspace.
 
-Passively analyze a user query and return a structured ResearchIntake schema. The IDE uses this to decide which tools to call next — no routing or execution is performed.
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "filepath": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "filepath"
+  ]
+}
+```
+
+---
+
+### `sys.file.write`
+
+Securely write to a file in the workspace.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "filepath": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    },
+    "force": {
+      "type": "boolean",
+      "description": "Force overwrite even in protected directories like synthesis/"
+    }
+  },
+  "required": [
+    "filepath",
+    "content"
+  ]
+}
+```
+
+---
+
+### `sys.guidance.get`
+
+Returns the full YAML content of a guidance protocol.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "protocol_name": {
+      "type": "string",
+      "description": "Protocol name (e.g., domain_analysis)"
+    }
+  },
+  "required": [
+    "protocol_name"
+  ]
+}
+```
+
+---
+
+### `sys.guidance.list`
+
+Lists all available protocols with one-line summaries.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.guidance.validate`
+
+Validates if the expected outputs of a protocol exist in the workspace.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "protocol_name": {
+      "type": "string",
+      "description": "Protocol name (e.g., domain_analysis)"
+    }
+  },
+  "required": [
+    "protocol_name"
+  ]
+}
+```
+
+---
+
+### `sys.notify`
+
+Notify researcher.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string"
+    },
+    "level": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "message",
+    "level"
+  ]
+}
+```
+
+---
+
+### `sys.state.get`
+
+Get full workspace state.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.state.minimal_context`
+
+Get a <=500 token snapshot of the current state, optimized for small models.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.state.summary`
+
+Get a brief summary of the state.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `sys.task.kill`
+
+Kill a background task.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id"
+  ]
+}
+```
+
+---
+
+### `sys.task.monitor`
+
+Monitor a background task.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id"
+  ]
+}
+```
+
+---
+
+### `sys.tool.info`
+
+Get full schema for a tool.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tool_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_name"
+  ]
+}
+```
+
+---
+
+### `sys.tool.search`
+
+Search tools by description.
 
 #### Input Schema
 
@@ -461,17 +595,7 @@ Passively analyze a user query and return a structured ResearchIntake schema. Th
   "type": "object",
   "properties": {
     "query": {
-      "type": "string",
-      "description": "Natural language research request"
-    },
-    "depth": {
-      "type": "string",
-      "enum": [
-        "exploratory",
-        "academic",
-        "publication"
-      ],
-      "description": "Analysis depth"
+      "type": "string"
     }
   },
   "required": [
@@ -482,9 +606,9 @@ Passively analyze a user query and return a structured ResearchIntake schema. Th
 
 ---
 
-### `view.data.head`
+### `sys.workspace.scaffold`
 
-Return first N rows + column types (dtype, null%) + summary stats for any data file. Use before any analysis to understand data shape.
+Create the full directory structure for a new project.
 
 #### Input Schema
 
@@ -492,27 +616,42 @@ Return first N rows + column types (dtype, null%) + summary stats for any data f
 {
   "type": "object",
   "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Relative path to data file in workspace"
-    },
-    "n": {
-      "type": "number",
-      "description": "Number of rows",
-      "default": 5
+    "project_name": {
+      "type": "string"
+    }
+  }
+}
+```
+
+---
+
+## MEM.* Tools
+
+### `mem.analysis.log`
+
+Append to workspace/analysis.md
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "entry": {
+      "type": "string"
     }
   },
   "required": [
-    "filepath"
+    "entry"
   ]
 }
 ```
 
 ---
 
-### `view.figure.show`
+### `mem.methods.append`
 
-Return a base64-encoded PNG of a figure for IDE preview. Accepts path to any PNG/JPG/SVG in workspace.
+Append to workspace/methods.md
 
 #### Input Schema
 
@@ -520,36 +659,13 @@ Return a base64-encoded PNG of a figure for IDE preview. Accepts path to any PNG
 {
   "type": "object",
   "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Relative path to figure file in workspace"
+    "method": {
+      "type": "string"
     }
   },
   "required": [
-    "filepath"
+    "method"
   ]
-}
-```
-
----
-
-### `view.workspace.tree`
-
-Return the full workspace directory tree with file sizes and last-modified timestamps. Use instead of guessing file paths.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "max_depth": {
-      "type": "number",
-      "description": "Maximum directory depth",
-      "default": 4
-    }
-  },
-  "required": []
 }
 ```
 
@@ -557,40 +673,9 @@ Return the full workspace directory tree with file sizes and last-modified times
 
 ## TOOL.* Tools
 
-### `create_experiment_branch`
+### `tool.audit.synthesis`
 
-[Compatibility alias] Use sys.branch.create instead. Creates an isolated experiment branch.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Branch idea or explicit exp_XXX_slug name"
-    },
-    "hypothesis": {
-      "type": "string",
-      "description": "Hypothesis or rationale for this branch"
-    },
-    "parent": {
-      "type": "string",
-      "description": "Parent branch, defaults to current branch"
-    }
-  },
-  "required": [
-    "name"
-  ]
-}
-```
-
----
-
-### `load_skill_context`
-
-Load the full context of a specific skill by its name/id
+Audit a generated manuscript for completeness and scientific claims.
 
 #### Input Schema
 
@@ -598,22 +683,107 @@ Load the full context of a specific skill by its name/id
 {
   "type": "object",
   "properties": {
-    "skill_name": {
-      "type": "string",
-      "description": "The id/name of the skill"
+    "paper_path": {
+      "type": "string"
     }
   },
   "required": [
-    "skill_name"
+    "paper_path"
   ]
 }
 ```
 
 ---
 
-### `log_decision`
+### `tool.data.sample`
 
-Append a methodological choice to the active experiment decisions.yaml
+Sample data.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "filepath": {
+      "type": "string"
+    },
+    "n_rows": {
+      "type": "number"
+    },
+    "strategy": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "filepath",
+    "n_rows",
+    "strategy"
+  ]
+}
+```
+
+---
+
+### `tool.env.freeze`
+
+Freeze current environment.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `tool.env.restore`
+
+Restore environment.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+---
+
+### `tool.literature.download`
+
+Download a paper PDF.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string"
+    },
+    "filename": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "filename"
+  ]
+}
+```
+
+---
+
+### `tool.log.decision`
+
+Log a key reasoning step.
 
 #### Input Schema
 
@@ -629,21 +799,6 @@ Append a methodological choice to the active experiment decisions.yaml
     },
     "rationale": {
       "type": "string"
-    },
-    "options_considered": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "linked_literature": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "branch_id": {
-      "type": "string"
     }
   },
   "required": [
@@ -656,42 +811,9 @@ Append a methodological choice to the active experiment decisions.yaml
 
 ---
 
-### `patch_file`
+### `tool.package.install`
 
-Surgically edit specific functions or lines in a file. Returns absolute path and checksum of modified file.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Path to the file to edit"
-    },
-    "search_block": {
-      "type": "string",
-      "description": "The exact block of code to search for and replace"
-    },
-    "replace_block": {
-      "type": "string",
-      "description": "The new block of code to insert"
-    }
-  },
-  "required": [
-    "filepath",
-    "search_block",
-    "replace_block"
-  ]
-}
-```
-
----
-
-### `query_research_context`
-
-Query the serialized Context Transfer Memoranda (CTMs) to retrieve specific research context
+Install Python packages.
 
 #### Input Schema
 
@@ -699,225 +821,46 @@ Query the serialized Context Transfer Memoranda (CTMs) to retrieve specific rese
 {
   "type": "object",
   "properties": {
-    "question": {
-      "type": "string",
-      "description": "The question to ask against the CTMs"
-    }
-  },
-  "required": [
-    "question"
-  ]
-}
-```
-
----
-
-### `research_agent`
-
-Read a packaged agent prompt, honoring a project-local override if present
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Agent name, e.g. research_init"
-    }
-  },
-  "required": [
-    "name"
-  ]
-}
-```
-
----
-
-### `research_data_scale`
-
-Analyze input data files and report size classifications and library constraints
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `research_preflight`
-
-Run environment preflight checks to verify all dependencies are installed and ready
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `research_skill`
-
-Read a packaged skill methodology, honoring a project-local override if present
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Skill name"
-    }
-  },
-  "required": [
-    "name"
-  ]
-}
-```
-
----
-
-### `research_status`
-
-Show clean workspace state, active branch, and input hash count
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `research_workflow`
-
-Read a packaged workflow YAML
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Workflow name"
-    }
-  },
-  "required": []
-}
-```
-
----
-
-### `route_intent`
-
-[Deprecated] Use view.analyze_intent instead. Returns a passive intake schema for the IDE to consume.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "query": {
-      "type": "string",
-      "description": "Natural language research request"
-    },
-    "depth": {
-      "type": "string",
-      "enum": [
-        "exploratory",
-        "academic",
-        "publication"
-      ],
-      "description": "Routing depth"
-    }
-  },
-  "required": [
-    "query"
-  ]
-}
-```
-
----
-
-### `save_artifact`
-
-Save a text artifact. Returns absolute path + SHA-256 checksum.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "filename": {
-      "type": "string"
-    },
-    "content": {
-      "type": "string"
-    },
-    "artifact_type": {
-      "type": "string",
-      "enum": [
-        "artifact",
-        "analysis",
-        "figure",
-        "table"
-      ]
-    },
-    "generated_by": {
-      "type": "string"
-    },
-    "source_script": {
-      "type": "string"
-    },
-    "input_files": {
+    "packages": {
       "type": "array",
       "items": {
         "type": "string"
       }
-    },
-    "decisions_applied": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "branch_id": {
+    }
+  },
+  "required": [
+    "packages"
+  ]
+}
+```
+
+---
+
+### `tool.python.exec`
+
+Execute a python script in the workspace. WARNING: Scripts run with the same permissions as the host OS user. For strict sandboxing, run Research OS inside a Docker container.
+
+#### Input Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "script_path": {
       "type": "string"
     }
   },
   "required": [
-    "filename",
-    "content"
+    "script_path"
   ]
 }
 ```
 
 ---
 
-### `search_skills`
+### `tool.search.crossref`
 
-Search the skill index for a specific topic or keyword
+Search Crossref.
 
 #### Input Schema
 
@@ -926,160 +869,10 @@ Search the skill index for a specific topic or keyword
   "type": "object",
   "properties": {
     "query": {
-      "type": "string",
-      "description": "Search keyword or phrase"
-    }
-  },
-  "required": [
-    "query"
-  ]
-}
-```
-
----
-
-### `tool.dashboard.create`
-
-Generate an interactive Panel dashboard (or static HTML fallback) from a data file.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Relative path to data file in workspace"
-    },
-    "dashboard_type": {
-      "type": "string",
-      "enum": [
-        "panel",
-        "html"
-      ],
-      "default": "panel"
-    }
-  },
-  "required": [
-    "filepath"
-  ]
-}
-```
-
----
-
-### `tool.data.transform`
-
-Apply data cleaning transformations (normalize, impute, encode, drop, rename) to a CSV/Parquet file using sklearn.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Relative path to data file in workspace"
-    },
-    "operations": {
-      "type": "array",
-      "items": {
-        "type": "object"
-      },
-      "description": "List of operations: {type, columns, strategy, value}"
-    },
-    "output": {
-      "type": "string",
-      "description": "Output path (default: workspace/data/derived/transformed_<name>)"
-    }
-  },
-  "required": [
-    "filepath",
-    "operations"
-  ]
-}
-```
-
----
-
-### `tool.figure.create`
-
-Create a publication-quality figure (scatter, line, bar, hist, box, violin, heatmap, pairplot) from data. Returns 300 DPI PNG.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Relative path to data file in workspace"
-    },
-    "chart_type": {
-      "type": "string",
-      "enum": [
-        "scatter",
-        "line",
-        "bar",
-        "hist",
-        "box",
-        "violin",
-        "heatmap",
-        "pairplot"
-      ]
-    },
-    "x_column": {
-      "type": "string",
-      "description": "X-axis column"
-    },
-    "y_column": {
-      "type": "string",
-      "description": "Y-axis column"
-    },
-    "group_column": {
-      "type": "string",
-      "description": "Grouping/hue column"
-    },
-    "title": {
-      "type": "string",
-      "description": "Figure title"
-    },
-    "output": {
-      "type": "string",
-      "description": "Output path (default: workspace/figures/)"
-    }
-  },
-  "required": [
-    "filepath",
-    "chart_type",
-    "x_column"
-  ]
-}
-```
-
----
-
-### `tool.google.scholar.search`
-
-Search Google Scholar for publications. Requires `scholarly` package (pip install scholarly).
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "query": {
-      "type": "string",
-      "description": "Search query"
+      "type": "string"
     },
     "limit": {
-      "type": "number",
-      "description": "Max results",
-      "default": 5
+      "type": "number"
     }
   },
   "required": [
@@ -1090,25 +883,9 @@ Search Google Scholar for publications. Requires `scholarly` package (pip instal
 
 ---
 
-### `tool.latex.compile`
+### `tool.search.pubmed`
 
-Run pdflatex + bibtex on synthesis/paper.tex to produce paper.pdf.
-
-#### Input Schema
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "required": []
-}
-```
-
----
-
-### `tool.pubmed.search`
-
-Search PubMed for publications matching a query.
+Search PubMed.
 
 #### Input Schema
 
@@ -1117,13 +894,10 @@ Search PubMed for publications matching a query.
   "type": "object",
   "properties": {
     "query": {
-      "type": "string",
-      "description": "Search query (e.g. 'machine learning diabetes')"
+      "type": "string"
     },
     "limit": {
-      "type": "number",
-      "description": "Max results (max 20)",
-      "default": 5
+      "type": "number"
     }
   },
   "required": [
@@ -1134,9 +908,9 @@ Search PubMed for publications matching a query.
 
 ---
 
-### `tool.semantic_scholar.search`
+### `tool.search.semantic_scholar`
 
-Search Semantic Scholar for papers matching a query. Includes abstracts and citation counts.
+Search Semantic Scholar.
 
 #### Input Schema
 
@@ -1145,13 +919,10 @@ Search Semantic Scholar for papers matching a query. Includes abstracts and cita
   "type": "object",
   "properties": {
     "query": {
-      "type": "string",
-      "description": "Search query"
+      "type": "string"
     },
     "limit": {
-      "type": "number",
-      "description": "Max results (max 20)",
-      "default": 5
+      "type": "number"
     }
   },
   "required": [
@@ -1162,9 +933,9 @@ Search Semantic Scholar for papers matching a query. Includes abstracts and cita
 
 ---
 
-### `tool.statistical.test`
+### `tool.search.web`
 
-Run a statistical test (ttest, anova, chi_square, mann_whitney, kruskal) with automatic assumption checks (normality, homoscedasticity).
+Search the web.
 
 #### Input Schema
 
@@ -1172,47 +943,24 @@ Run a statistical test (ttest, anova, chi_square, mann_whitney, kruskal) with au
 {
   "type": "object",
   "properties": {
-    "filepath": {
-      "type": "string",
-      "description": "Absolute path to data file"
+    "query": {
+      "type": "string"
     },
-    "test_type": {
-      "type": "string",
-      "enum": [
-        "ttest",
-        "anova",
-        "chi_square",
-        "mann_whitney",
-        "kruskal"
-      ],
-      "description": "Type of test"
-    },
-    "x_column": {
-      "type": "string",
-      "description": "Primary column (dependent variable or first variable)"
-    },
-    "y_column": {
-      "type": "string",
-      "description": "Secondary column (for paired tests or contingency)"
-    },
-    "group_column": {
-      "type": "string",
-      "description": "Grouping column (for independent tests)"
+    "limit": {
+      "type": "number"
     }
   },
   "required": [
-    "filepath",
-    "test_type",
-    "x_column"
+    "query"
   ]
 }
 ```
 
 ---
 
-### `write_to_scratchpad`
+### `tool.web.scrape`
 
-Record step-by-step reasoning. Returns absolute path.
+Scrape a webpage.
 
 #### Input Schema
 
@@ -1220,13 +968,12 @@ Record step-by-step reasoning. Returns absolute path.
 {
   "type": "object",
   "properties": {
-    "thought": {
-      "type": "string",
-      "description": "The reasoning or calculation to record"
+    "url": {
+      "type": "string"
     }
   },
   "required": [
-    "thought"
+    "url"
   ]
 }
 ```

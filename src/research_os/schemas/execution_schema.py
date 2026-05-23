@@ -14,8 +14,12 @@ class ExecutionResult(BaseModel):
     stdout: str = Field(default="", description="Captured stdout")
     stderr: str = Field(default="", description="Captured stderr")
     duration_seconds: float = Field(..., description="Execution duration in seconds")
-    container_used: Optional[str] = Field(default=None, description="Container image or runtime used")
-    artifacts_produced: List[str] = Field(default=[], description="Artifacts produced by the execution")
+    container_used: Optional[str] = Field(
+        default=None, description="Container image or runtime used"
+    )
+    artifacts_produced: List[str] = Field(
+        default=[], description="Artifacts produced by the execution"
+    )
 
 
 class ToolStatus(BaseModel):
@@ -23,7 +27,9 @@ class ToolStatus(BaseModel):
     """Availability status for a single tool."""
 
     tool_id: str = Field(..., description="Tool registry ID")
-    status: str = Field(..., description="AVAILABLE/INSTALLABLE/MISSING_REQUIRES_CONTAINER")
+    status: str = Field(
+        ..., description="AVAILABLE/INSTALLABLE/MISSING_REQUIRES_CONTAINER"
+    )
     version: Optional[str] = Field(default=None, description="Detected version string")
     install_cmd: Optional[str] = Field(default=None, description="Installation command")
 

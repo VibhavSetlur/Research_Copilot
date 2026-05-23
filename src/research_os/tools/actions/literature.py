@@ -7,11 +7,13 @@ import json
 
 logger = logging.getLogger("research.tools.literature")
 
+
 def _check_unpaywall(url: str) -> Dict[str, Any]:
     # Try to extract DOI if present in URL, otherwise we just try
     import re
     import urllib.request
-    match = re.search(r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)', url, re.I)
+
+    match = re.search(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", url, re.I)
     if not match:
         return {"is_oa": True, "reason": "No DOI found in URL, assuming direct link."}
     doi = match.group(1)
@@ -19,9 +21,15 @@ def _check_unpaywall(url: str) -> Dict[str, Any]:
         req_url = f"https://api.unpaywall.org/v2/{doi}?email=research@os.local"
         data = json.loads(urllib.request.urlopen(req_url).read())
         is_oa = data.get("is_oa", False)
-        return {"is_oa": is_oa, "reason": "Unpaywall reported closed access." if not is_oa else "Unpaywall reported open access."}
+        return {
+            "is_oa": is_oa,
+            "reason": "Unpaywall reported closed access."
+            if not is_oa
+            else "Unpaywall reported open access.",
+        }
     except Exception as e:
         return {"is_oa": True, "reason": f"Unpaywall check failed: {e}, assuming open."}
+
 
 def download_literature(url: str, filename: str, root: Path) -> Dict[str, Any]:
     try:
@@ -32,9 +40,12 @@ def download_literature(url: str, filename: str, root: Path) -> Dict[str, Any]:
             log_path = root / "workspace" / "logs" / "errors.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             with open(log_path, "a") as f:
-                 f.write(f"Paywall warning for {url}: {oa_check['reason']}\n")
-            return {"status": "error", "message": f"Article is behind a paywall: {oa_check['reason']}"}
-            
+                f.write(f"Paywall warning for {url}: {oa_check['reason']}\n")
+            return {
+                "status": "error",
+                "message": f"Article is behind a paywall: {oa_check['reason']}",
+            }
+
         out_path = root / "inputs" / "literature" / filename
         out_path.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(url, out_path)

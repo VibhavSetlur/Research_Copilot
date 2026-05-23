@@ -1,18 +1,38 @@
-description: Standards for IMRAD structuring, writing style, and tables.
+name: writing_standards
+version: 2.0.0
+schema_version: '1.0'
 imrad_budgets:
-  Discussion: 1000-1500 words (Summary, Context, Limitations, Conclusion)
+  Abstract: 200-250 words (Background, Methods, Results, Conclusion)
   Introduction: 500-750 words (Context, Gap, Objective)
   Methods: 750-1000 words (Design, Sample, Measures, Analysis)
   Results: 500-800 words (Primary findings, Secondary findings, Sensitivities)
-name: writing_standards
-schema_version: '1.0'
-steps:
-- id: check_word_budgets
-  name: Check Word Budgets
-- id: enforce_rules
-  name: Enforce Writing Rules
-- id: format_tables
-  name: Format Tables
+  Discussion: 1000-1500 words (Summary, Context, Limitations, Conclusion)
+writing_rules:
+  do_this:
+  - State the direction and magnitude of effects.
+  - Use past tense for completed actions.
+  not_that:
+  - Do not repeat all table numbers in the text.
+  - Do not use 'prove' (use 'suggest' or 'indicate').
+  causal_language:
+    avoid_if_observational:
+    - caused
+    - led to
+    - resulted in
+    - impacted
+    - determined
+    use_instead:
+    - was associated with
+    - was correlated with
+    - predicted
+  keywords:
+    selection_rules:
+    - Select 3-5 keywords.
+    - Do not duplicate words from the title.
+    - Use Medical Subject Headings (MeSH) if applicable.
+  limitations:
+    structure: 'Always include: 1) Identification of the limitation, 2) How it might
+      have affected the results, 3) Why the study is still valid despite it.'
 templates:
   apa_table: 'Table 1
 
@@ -31,22 +51,20 @@ templates:
     Note. M = Mean, SD = Standard Deviation.
 
     '
-version: 2.0.0
-writing_rules:
-  causal_language:
-    avoid_if_observational:
-    - caused
-    - led to
-    - resulted in
-    - impacted
-    - determined
-    use_instead:
-    - was associated with
-    - was correlated with
-    - predicted
-  do_this:
-  - State the direction and magnitude of effects.
-  - Use past tense for completed actions.
-  not_that:
-  - Do not repeat all table numbers in the text.
-  - Do not use 'prove' (use 'suggest' or 'indicate').
+  conflict_of_interest: 'Conflict of Interest Statement:
+
+    The authors declare that the research was conducted in the absence of any commercial
+    or financial relationships that could be construed as a potential conflict of
+    interest.
+
+    '
+steps:
+- id: check_word_budgets
+  name: Check Word Budgets
+  description: Ensure each section falls within the allocated word count.
+- id: enforce_rules
+  name: Enforce Writing Rules
+  description: Scan the text to replace causal language in observational studies.
+- id: format_tables
+  name: Format Tables
+  description: Apply the APA table template to all data summaries.
