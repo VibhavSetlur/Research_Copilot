@@ -3,13 +3,16 @@ version: 2.0.0
 description: Scale validation and survey analysis.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/02_analysis/reliability_metrics.json"
-  - "workspace/02_analysis/cfa_results.txt"
-  - "workspace/03_synthesis/non_response_bias.md"
+  - "workspace/<path>/outputs/reports/reliability_metrics.json"
+  - "workspace/<path>/outputs/reports/cfa_results.txt"
+  - "workspace/<path>/outputs/reports/non_response_bias.md"
 prerequisites:
   - "Survey responses data."
   - "R with lavaan package or Python equivalent."
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
+    description: "Create a new path via sys.path.create to store scripts and outputs."
   - id: scale_validation
     name: "Scale Validation"
     description: "Calculate Cronbach's alpha, McDonald's omega, and perform Confirmatory Factor Analysis (CFA)."

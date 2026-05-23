@@ -2,7 +2,13 @@ name: causal_inference_deep
 version: 2.0.0
 schema_version: "1.0"
 description: "Concise checklist for causal inference"
+expected_outputs:
+  - "workspace/<path>/outputs/figures/causal_dag.png"
+  - "workspace/<path>/outputs/reports/causal_estimates.json"
+  - "workspace/<path>/outputs/reports/refutation_results.json"
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
   - id: dag_creation
     name: "DAG Creation"
   - id: identification

@@ -3,15 +3,18 @@ version: 2.0.0
 description: DoWhy-based causal analysis and DAG creation.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/02_analysis/causal_dag.png"
-  - "workspace/02_analysis/causal_estimates.json"
-  - "workspace/02_analysis/refutation_results.json"
+  - "workspace/<path>/outputs/figures/causal_dag.png"
+  - "workspace/<path>/outputs/reports/causal_estimates.json"
+  - "workspace/<path>/outputs/reports/refutation_results.json"
 prerequisites:
   - "Observational dataset."
   - "Python libraries: dowhy, econml."
 decision_tree:
   - "Are there unobserved confounders? -> Use instrumental variables if available, or compute E-values."
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
+    description: "Create a new path via sys.path.create to store scripts and outputs."
   - id: dag_creation
     name: "DAG Creation"
     description: "Define causal graph and identify backdoor/frontdoor paths. (Integration with DAGitty)"

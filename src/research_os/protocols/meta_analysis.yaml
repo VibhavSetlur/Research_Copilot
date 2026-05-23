@@ -3,9 +3,9 @@ version: 2.0.0
 description: Guide for extracting effect sizes, assessing heterogeneity, and performing meta-analysis.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/03_synthesis/forest_plot.png"
-  - "workspace/03_synthesis/funnel_plot.png"
-  - "workspace/03_synthesis/meta_analysis_results.json"
+  - "workspace/<path>/outputs/figures/forest_plot.png"
+  - "workspace/<path>/outputs/figures/funnel_plot.png"
+  - "workspace/<path>/outputs/reports/meta_analysis_report.md"
 decision_tree:
   - "Are studies highly heterogeneous? If yes -> Use random-effects model. If no -> Fixed-effects model."
   - "Is there risk of publication bias? -> Run Egger's test and build funnel plot."
@@ -13,6 +13,9 @@ prerequisites:
   - "Extracted effect sizes and variances/standard errors from primary studies."
   - "Python libraries: statsmodels, PyMARE, or R packages: metafor."
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
+    description: "Create a new path via sys.path.create (e.g., 03_meta_analysis) to store scripts and outputs."
   - id: extract_effect_sizes
     name: "Extract Effect Sizes"
     description: "Standardize effect sizes across heterogeneous studies (e.g., Cohen's d, Odds Ratios)."

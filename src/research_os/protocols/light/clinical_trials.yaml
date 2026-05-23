@@ -2,7 +2,13 @@ name: clinical_trials
 version: 2.0.0
 schema_version: "1.0"
 description: "Concise checklist for clinical trials"
+expected_outputs:
+  - "workspace/<path>/outputs/figures/participant_flow.png"
+  - "workspace/<path>/outputs/reports/efficacy_results.json"
+  - "workspace/<path>/outputs/reports/adverse_events_table.md"
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
   - id: randomisation_checks
     name: "Randomisation Checks"
   - id: blinding_assessment

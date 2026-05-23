@@ -3,9 +3,9 @@ version: 2.0.0
 description: TRIPOD-compliant workflow for predictive modelling.
 schema_version: "1.0"
 expected_outputs:
-  - "workspace/02_analysis/model_performance.json"
-  - "workspace/03_synthesis/shap_summary.png"
-  - "workspace/03_synthesis/calibration_plot.png"
+  - "workspace/<path>/outputs/reports/model_performance.json"
+  - "workspace/<path>/outputs/figures/shap_summary.png"
+  - "workspace/<path>/outputs/figures/calibration_plot.png"
 prerequisites:
   - "Cleaned dataset."
   - "Python libraries: scikit-learn, xgboost, shap."
@@ -13,6 +13,9 @@ decision_tree:
   - "Is the dataset imbalanced? -> Use stratified splitting and consider SMOTE or class weights."
   - "Are there non-linear relationships? -> Prefer tree-based models over linear models."
 steps:
+  - id: create_experiment_path
+    name: "Create Experiment Path"
+    description: "Create a new path via sys.path.create to store scripts and outputs."
   - id: data_splitting
     name: "Data Splitting"
     description: "Perform stratified train/validation/test splits."

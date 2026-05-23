@@ -4,15 +4,13 @@ description: Plan the directory structure, create boilerplates, and manage branc
 schema_version: "1.0"
 expected_outputs:
   - "workspace/methods.md: Appended analysis steps"
-  - "workspace/01_data_prep/README.md"
-  - "workspace/02_analysis/README.md"
+  - "workspace/<path>/README.md"
+  - "workspace/<path>/scripts/analysis.py"
 structure:
-  01_data_prep:
-    purpose: "Data cleaning, filtering, and feature engineering."
-  02_analysis:
-    purpose: "Statistical modelling and core computations."
-  03_synthesis:
-    purpose: "Figure generation, table formatting, and text synthesis."
+  "<step_number>_<experiment_name>":
+    purpose: "Self-contained experiment step with scripts, data, and outputs."
+  "03_synthesis":
+    purpose: "Final output generation, table formatting, and text synthesis."
 templates:
   boilerplate_readme: |
     # {Folder_Name}
@@ -31,7 +29,7 @@ branching_criteria:
 steps:
   - id: setup_directories
     name: "Setup Directories"
-    description: "Ensure the 01_, 02_, 03_ structure exists."
+    description: "Use sys.path.create to instantiate sequential experiment paths as needed."
   - id: write_readmes
     name: "Write READMEs"
     description: "Populate each directory with the boilerplate README."
