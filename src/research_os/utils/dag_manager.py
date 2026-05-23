@@ -82,14 +82,14 @@ class ExecutionDAGManager:
         except (FileNotFoundError, PermissionError):
             return "error"
 
-    def _current_branch(self) -> str:
-        state_path = self.root / ".research" / "cache" / "state.json"
+    def _current_path(self) -> str:
+        state_path = self.root / ".os_state" / "state_ledger.json"
         try:
             with open(state_path) as f:
                 state = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             return "main"
-        return state.get("current_branch", state.get("active_branch", "main"))
+        return state.get("current_path", "main")
 
     def add_node(
         self,
@@ -104,7 +104,7 @@ class ExecutionDAGManager:
         container: str = None,
         tool_ids: list = None,
         domain: str = None,
-        branch_id: str = None,
+        path_id: str = None,
         exit_code: int = None,
         duration: float = None,
     ) -> dict:
@@ -122,7 +122,7 @@ class ExecutionDAGManager:
             container: Container image used
             tool_ids: Tool IDs from the tool registry
             domain: Domain context (genomics, neuroimaging, etc.)
-            branch_id: Experiment branch that owns this execution
+            path_id: Experiment path that owns this execution
             exit_code: Process exit code
             duration: Execution duration in seconds
 
@@ -131,7 +131,7 @@ class ExecutionDAGManager:
         """
         dag = self._load()
         now = datetime.now(timezone.utc).isoformat()
-        branch_id = branch_id or self._current_branch()
+        branch_id = path_id or self._current_path()
 
         input_hashes = {}
         for fp in input_files:

@@ -167,11 +167,11 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         return "ERROR: No state found. Project has not been initialized. Run `rcp init` first."
 
     budget = state.get("token_budget", {})
-    branches = state.get("branches", {})
-    active_branch = state.get("current_branch", state.get("active_branch", "main"))
-    branch_info = branches.get(active_branch, {})
-    experiment_dir = branch_info.get(
-        "experiment_dir", "02_experiments/exp_001_baseline"
+    paths = state.get("paths", {})
+    active_path = state.get("current_path", "main")
+    path_info = paths.get(active_path, {})
+    experiment_dir = path_info.get(
+        "experiment_dir", "workspace"
     )
 
     prompt_parts = [
@@ -182,7 +182,7 @@ def get_restoration_prompt(root: Optional[Path] = None, max_tokens: int = 800) -
         "### Project Overview",
         f"- **Project**: {state.get('project', 'unnamed')}",
         f"- **Current Phase**: {state.get('phase', 'unknown')} (step {state.get('step', 0)})",
-        f"- **Active Branch**: {active_branch}",
+        f"- **Active Path**: {active_path}",
         f"- **Last Updated**: {state.get('updated_at', 'unknown')}",
         "",
         "### Phase Progress",

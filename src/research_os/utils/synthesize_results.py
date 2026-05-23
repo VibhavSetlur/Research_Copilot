@@ -329,16 +329,14 @@ def main():
         # Output to ledger via log_decision
         from research_os.project_ops import (
             log_decision,
-            current_branch,
             find_project_root,
         )
 
         root = find_project_root()
         log_decision(
-            context="Parallel execution synthesis. Need to select winning exploratory branch.",
-            selected="LLM selected best branch based on empirical results.",
+            context="Parallel execution synthesis. Need to select winning exploratory path.",
+            selected="LLM selected best path based on empirical results.",
             rationale=synthesis_decision,
-            branch_id=current_branch(root),
             root=root,
         )
         print("Synthesis decision logged to experiment ledger.")

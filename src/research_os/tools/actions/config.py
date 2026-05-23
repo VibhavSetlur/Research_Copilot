@@ -77,7 +77,7 @@ def init_config(root: Path) -> Dict[str, Any]:
                 "autonomy_level": "supervised",
                 "notification_preferences": {"on_error": True},
             },
-            "api_keys": {"firecrawl": "", "openai": ""},
+            "api_keys": {"firecrawl": "", "semantic_scholar": "", "pubmed": "", "crossref": "", "serpapi": ""},
             "model_profile": "medium",  # small, medium, large
         }
         config_path.parent.mkdir(parents=True, exist_ok=True)

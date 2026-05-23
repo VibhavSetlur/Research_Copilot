@@ -105,14 +105,14 @@ def write_json(path: Path, data: Any) -> None:
 def _compute_state_diff(before: dict, after: dict) -> list[str]:
     """Return human-readable diff lines between two state dicts."""
     lines: list[str] = []
-    before_branches = set(before.get("branches", {}).keys())
-    after_branches = set(after.get("branches", {}).keys())
+    before_paths = set(before.get("paths", {}).keys())
+    after_paths = set(after.get("paths", {}).keys())
 
-    added = after_branches - before_branches
-    removed = before_branches - after_branches
-    if before.get("current_branch") != after.get("current_branch"):
+    added = after_paths - before_paths
+    removed = before_paths - after_paths
+    if before.get("current_path") != after.get("current_path"):
         lines.append(
-            f"  branch switch: {before.get('current_branch')} → {after.get('current_branch')}"
+            f"  path switch: {before.get('current_path')} → {after.get('current_path')}"
         )
 
     if before.get("pipeline_stage") != after.get("pipeline_stage"):
@@ -124,10 +124,10 @@ def _compute_state_diff(before: dict, after: dict) -> list[str]:
         lines.append(f"  step: {before.get('step')} → {after.get('step')}")
 
     for b in added:
-        s = after["branches"][b].get("status", "active")
-        lines.append(f"  branch +{b} ({s})")
+        s = after["paths"][b].get("status", "active")
+        lines.append(f"  path +{b} ({s})")
     for b in removed:
-        lines.append(f"  branch -{b}")
+        lines.append(f"  path -{b}")
 
     # checkpoint history diff
     before_cp = before.get("checkpoint_history", [])
@@ -168,18 +168,15 @@ def default_state() -> dict:
         "updated_at": now_iso(),
         "step": 0,
         "pipeline_stage": "init",
-        "current_branch": "main",
+        "current_path": "main",
         "checkpoint_history": [],
-        "branches": {
+        "paths": {
             "main": {
-                "branch_id": "main",
-                "parent_branch": None,
+                "path_id": "main",
                 "status": "active",
-                "hypothesis": "Primary research workflow",
                 "experiment_dir": "workspace",
                 "created_at": now_iso(),
                 "input_data_hashes": {},
-                "conclusions": [],
             }
         },
     }
@@ -218,8 +215,8 @@ def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
     root = _resolve_root(root)
     hashes: dict[str, str] = {}
     for base in (
-        root / "workspace" / "data" / "raw",
-        root / "workspace" / "data" / "derived",
+        root / "inputs" / "raw_data",
+        root / "inputs" / "literature",
     ):
         if not base.exists():
             continue
@@ -230,34 +227,17 @@ def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
                 and path.name not in {"README.md", ".gitkeep"}
             ):
                 hashes[path.relative_to(root).as_posix()] = compute_file_hash(path)
+    # Also hash inputs/context files
+    context_dir = root / "inputs" / "context"
+    if context_dir.exists():
+        for path in sorted(context_dir.rglob("*")):
+            if (
+                path.is_file()
+                and not path.name.startswith(".")
+                and path.name not in {"README.md", ".gitkeep"}
+            ):
+                hashes[path.relative_to(root).as_posix()] = compute_file_hash(path)
     return hashes
-
-
-def next_experiment_id(root: Path | None, slug: str) -> str:
-    root = _resolve_root(root)
-    experiments = root / "workspace" / "logs"
-    max_seen = 1
-    if experiments.exists():
-        for path in experiments.iterdir():
-            match = re.match(r"exp_(\d+)_", path.name)
-            if match:
-                max_seen = max(max_seen, int(match.group(1)))
-    return f"exp_{max_seen + 1:03d}_{slugify(slug)}"
-
-
-def _ensure_branch_dir(root: Path, branch_id: str, parent: str) -> None:
-    branch_dir = root / "workspace" / "logs" / branch_id
-    branch_dir.mkdir(parents=True, exist_ok=True)
-    decisions_path = branch_dir / "decisions.yaml"
-    if not decisions_path.exists():
-        decisions_path.write_text(
-            "schema_version: '1.0'\n"
-            f"experiment_id: {branch_id}\n"
-            f"parent_experiment: {parent}\n"
-            f"created: {now_iso()}\n"
-            "input_data_hashes: {}\n"
-            "decisions:\n"
-        )
 
 
 def write_readme(path: Path, title: str, body: str) -> None:
@@ -361,7 +341,7 @@ def scaffold_minimal_workspace(
             f'project_id: "{project_name}"',
             f'research_question: "{research_question}"',
             f'domain: "{domain}"',
-            'schema_version: "10.0.0"',
+            'schema_version: "0.1.0"',
             f'default_depth: "{depth}"',
             "data_scale_thresholds:",
             "  medium_mb: 100",
@@ -459,13 +439,13 @@ def scaffold_minimal_workspace(
         "created_at": now_iso(),
         "architecture": "unified_workspace",
         "top_level_directories": ["workspace", ".os_state"],
-        "active_experiment": "main",
-        "branches": {"main": {"status": "active"}},
+        "active_path": "main",
+        "paths": {"main": {"status": "active"}},
     }
     write_json(manifest_path(root), manifest)
 
     state = default_state()
-    state["branches"]["main"]["input_data_hashes"] = compute_input_hashes(root)
+    state["paths"]["main"]["input_data_hashes"] = compute_input_hashes(root)
     state["project_name"] = project_name
     save_state(root, state)
 
@@ -690,106 +670,26 @@ def _copy_environment_to_project(root: Path) -> None:
 def _update_workspace_readme_manifest(root: Path) -> None:
     readme_path = root / "workspace" / "README.md"
 
-    # Read derived and raw files
-    raw_files = list((root / "workspace" / "data" / "raw").rglob("*"))
-    derived_files = list((root / "workspace" / "data" / "derived").rglob("*"))
+    # Gather numbered experiment paths
+    import re
+    experiment_dirs = sorted(
+        p for p in (root / "workspace").iterdir()
+        if p.is_dir() and re.match(r"^\d{2}_", p.name)
+    )
 
     lines = [
         "# Workspace Manifest",
         "",
         "This directory is actively managed by Research OS.",
         "",
-        "## Data / Raw",
     ]
-    for f in sorted(raw_files):
-        if f.is_file() and not f.name.startswith("."):
-            lines.append(f"- `{f.relative_to(root)}`")
-
-    lines.append("")
-    lines.append("## Data / Derived")
-    for f in sorted(derived_files):
-        if f.is_file() and not f.name.startswith("."):
-            lines.append(f"- `{f.relative_to(root)}`")
+    if experiment_dirs:
+        lines.append("## Experiment Paths")
+        for exp_dir in experiment_dirs:
+            lines.append(f"- `{exp_dir.name}/`")
+        lines.append("")
 
     readme_path.write_text("\n".join(lines) + "\n")
-
-
-def create_experiment_branch(
-    name: str,
-    hypothesis: str = "",
-    parent: str | None = None,
-    root: Path | None = None,
-) -> dict:
-    """Create an isolated experiment branch and update state/manifest."""
-    root = _resolve_root(root)
-    state = load_state(root)
-    parent = parent or state.get("current_branch", "main")
-    branch_id = name if name.startswith("exp_") else next_experiment_id(root, name)
-    if branch_id in state.get("branches", {}):
-        raise ValueError(f"Branch '{branch_id}' already exists.")
-
-    data_hashes = compute_input_hashes(root)
-    _ensure_branch_dir(root, branch_id, parent)
-    experiment_dir = root / "workspace" / "logs" / branch_id
-    decisions_path = experiment_dir / "decisions.yaml"
-
-    if not decisions_path.exists():
-        decisions_path.write_text(
-            "schema_version: '1.0'\n"
-            f"experiment_id: {branch_id}\n"
-            f"parent_experiment: {parent}\n"
-            f"created: {now_iso()}\n"
-            "input_data_hashes:\n"
-            + _yaml_mapping(data_hashes, indent=2)
-            + "decisions:\n"
-            "  decision_001:\n"
-            f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
-            "    context: Alternate hypothesis branch created.\n"
-            "    selected: Create isolated experiment branch.\n"
-            f"    rationale: {hypothesis or name}\n"
-            "    linked_literature: []\n"
-        )
-
-    state["branches"][branch_id] = {
-        "branch_id": branch_id,
-        "parent_branch": parent,
-        "status": "active",
-        "hypothesis": hypothesis or name,
-        "experiment_dir": f"workspace/logs/{branch_id}",
-        "created_at": now_iso(),
-        "input_data_hashes": data_hashes,
-    }
-    state["current_branch"] = branch_id
-    save_state(root, state)
-
-    manifest = read_json(manifest_path(root), {})
-    manifest.setdefault("branches", {})[branch_id] = {
-        "status": "active",
-        "parent_branch": parent,
-        "hypothesis": hypothesis or name,
-        "created_at": now_iso(),
-    }
-    manifest["active_experiment"] = branch_id
-    write_json(manifest_path(root), manifest)
-
-    return {
-        "branch_id": branch_id,
-        "parent_branch": parent,
-        "experiment_dir": f"workspace/logs/{branch_id}",
-        "data_hashes": data_hashes,
-        "decisions": decisions_path.relative_to(root).as_posix(),
-    }
-
-
-def current_branch(root: Path | None = None) -> str:
-    return cast(str, load_state(root).get("current_branch", "main"))
-
-
-def branch_decisions_path(root: Path, branch_id: str | None = None) -> Path:
-    branch_id = branch_id or current_branch(root)
-    if branch_id == "main":
-        return root / "workspace" / "logs" / "decisions.yaml"
-    return root / "workspace" / "logs" / branch_id / "decisions.yaml"
 
 
 def log_decision(
@@ -799,12 +699,11 @@ def log_decision(
     *,
     options_considered: list[str] | None = None,
     linked_literature: list[str] | None = None,
-    branch_id: str | None = None,
     root: Path | None = None,
 ) -> dict:
-    """Append a methodological decision to the active experiment ledger."""
+    """Append a methodological decision to the experiment decisions log."""
     root = _resolve_root(root)
-    path = branch_decisions_path(root, branch_id)
+    path = root / "workspace" / "logs" / "decisions.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
 
     if yaml is not None and path.exists():
@@ -824,7 +723,6 @@ def log_decision(
         "linked_literature": linked_literature or [],
     }
     data.setdefault("schema_version", "1.0")
-    data.setdefault("experiment_id", branch_id or current_branch(root))
     data.setdefault("created", now_iso())
 
     if yaml is not None:
@@ -847,12 +745,10 @@ def save_artifact(
     source_script: str = "",
     input_files: list[str] | None = None,
     decisions_applied: list[str] | None = None,
-    branch_id: str | None = None,
     root: Path | None = None,
 ) -> dict:
     """Save a text artifact with required sibling provenance metadata."""
     root = _resolve_root(root)
-    branch_id = branch_id or current_branch(root)
     folder = {
         "figure": "figures",
         "table": "data/derived",
@@ -891,7 +787,6 @@ def save_artifact(
         "script_hash": script_hash,
         "data_hashes": data_hashes,
         "decisions_applied": decisions_applied or [],
-        "branch_id": branch_id,
     }
     meta_path = output_path.with_name(f"{output_path.stem}.meta.yaml")
     if yaml is not None:
@@ -902,7 +797,6 @@ def save_artifact(
     return {
         "artifact": output_path.relative_to(root).as_posix(),
         "metadata": meta_path.relative_to(root).as_posix(),
-        "branch_id": branch_id,
     }
 
 
@@ -1185,21 +1079,20 @@ def create_numbered_experiment(
         paths_created += [str(readme.absolute()), str(conclusions.absolute())]
 
     # Update state ledger
-    state["branches"][branch_id] = {
-        "branch_id": branch_id,
+    state["paths"][branch_id] = {
+        "path_id": branch_id,
         "experiment_number": next_num,
-        "parent_branch": parent or state.get("current_branch", "main"),
         "status": status,
         "hypothesis": hypothesis or name,
         "experiment_dir": f"workspace/{branch_id}",
         "created_at": now_iso(),
     }
-    state["current_branch"] = branch_id
+    state["current_path"] = branch_id
     state["pipeline_stage"] = status
     save_state(root, state)
 
     return {
-        "branch_id": branch_id,
+        "path_id": branch_id,
         "experiment_number": next_num,
         "experiment_dir": str(experiment_dir.absolute()),
         "from_step": from_step,

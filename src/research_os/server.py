@@ -25,7 +25,6 @@ logger = logging.getLogger("research-os.server")
 
 from research_os.project_ops import (
     compute_file_hash,
-    create_experiment_branch,
     load_state,
     now_iso,
     scaffold_minimal_workspace,
@@ -44,11 +43,7 @@ from research_os.tools.actions.checkpoint import (
     rollback_checkpoint,
     list_checkpoints,
 )
-from research_os.tools.actions.branch import (
-    switch_branch,
-    merge_branches,
-    list_branches,
-)
+from research_os.tools.actions.path import create_path, abandon_path, list_paths
 from research_os.tools.actions.literature import download_literature
 from research_os.tools.actions.config import (
     get_config,
@@ -284,45 +279,33 @@ TOOL_DEFINITIONS = {
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.branch.create": {
-        "description": "Create an experiment branch.",
-        "category": "state",
+    "sys.path.create": {
+        "description": "Create a numbered experiment path in workspace/.",
+        "category": "workspace",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "name": {"type": "string"},
-                "hypothesis": {"type": "string"},
-                "parent": {"type": "string"},
+                "name": {"type": "string", "description": "Short name for the experiment (e.g. bayesian_model)"},
             },
             "required": ["name"],
         },
     },
-    "sys.branch.switch": {
-        "description": "Switch to another branch.",
-        "category": "state",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"branch_id": {"type": "string"}},
-            "required": ["branch_id"],
-        },
-    },
-    "sys.branch.list": {
-        "description": "List all branches.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys.branch.merge": {
-        "description": "Merge branches.",
-        "category": "state",
+    "sys.path.abandon": {
+        "description": "Mark an experiment path as a dead end (renames directory with __DEAD_END suffix).",
+        "category": "workspace",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "source": {"type": "string"},
-                "target": {"type": "string"},
-                "message": {"type": "string"},
+                "path_name": {"type": "string", "description": "Name of the path directory (e.g. 03_bayesian_model)"},
+                "rationale": {"type": "string", "description": "Why this path was abandoned"},
             },
-            "required": ["source", "target", "message"],
+            "required": ["path_name", "rationale"],
         },
+    },
+    "sys.path.list": {
+        "description": "List all numbered experiment paths with their status.",
+        "category": "workspace",
+        "inputSchema": {"type": "object", "properties": {}},
     },
     "sys.config.init": {
         "description": "Initialize researcher configuration.",
@@ -504,6 +487,7 @@ TOOL_DEFINITIONS = {
     },
     "tool.env.restore": {
         "description": "Restore a frozen environment.",
+        "category": "execution",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -517,6 +501,7 @@ TOOL_DEFINITIONS = {
     },
     "tool.latex.compile": {
         "description": "Compile paper.tex in the synthesis directory to PDF using pdflatex and bibtex.",
+        "category": "execution",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -718,11 +703,12 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 
     if name == "sys.state.summary":
         state = load_state(root)
+        paths = list(state.get("paths", {}).keys())
         return _text(
             _success_envelope(
                 {
-                    "current_branch": state.get("current_branch"),
-                    "branches": list(state.get("branches", {}).keys()),
+                    "current_path": state.get("current_path"),
+                    "paths": paths,
                 }
             )
         )
@@ -796,40 +782,25 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
             else _text(_error_envelope(res["message"]))
         )
 
-    if name == "sys.branch.create":
-        res = create_experiment_branch(
-            arguments["name"],
-            arguments.get("hypothesis", ""),
-            arguments.get("parent"),
-            root=root,
-        )
-        return _text(_success_envelope(res))
-
-    if name == "sys.branch.switch":
-        res = switch_branch(arguments["branch_id"], root)
-        return (
-            _text(_success_envelope(res))
-            if "error" not in res
-            else _text(_error_envelope(str(res.get("error"))))
-        )
-
-    if name == "sys.branch.list":
-        res = list_branches(root)
+    if name == "sys.path.create":
+        res = create_path(arguments["name"], root)
         return (
             _text(_success_envelope(res))
             if res["status"] == "success"
             else _text(_error_envelope(res["message"]))
         )
 
-    if name == "sys.branch.merge":
-        res = merge_branches(
-            arguments["source"], arguments["target"], arguments["message"], root
-        )
+    if name == "sys.path.abandon":
+        res = abandon_path(arguments["path_name"], arguments["rationale"], root)
         return (
             _text(_success_envelope(res))
-            if "error" not in res
-            else _text(_error_envelope(str(res.get("error"))))
+            if res["status"] == "success"
+            else _text(_error_envelope(res["message"]))
         )
+
+    if name == "sys.path.list":
+        res = list_paths(root)
+        return _text(_success_envelope(res))
 
     if name == "sys.config.init":
         res = init_config(root)

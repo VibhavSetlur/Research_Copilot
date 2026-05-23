@@ -26,6 +26,9 @@ build/
 .research/workflow_dag.json
 .research/workflow_dag.mermaid
 
+# OS state (auto-created during pipeline runs)
+.os_state/
+
 # Virtual environments
 .venv/
 venv/

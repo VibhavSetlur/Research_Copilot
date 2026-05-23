@@ -322,7 +322,7 @@ def generate_figure_interpretation(state: dict, *args, **kwargs) -> dict:
             stat_results = state.get("statistical_results", {})
             research_question = state.get("research_question", "")
             hypothesis = state.get("hypothesis", "")
-            branch_id = state.get("active_branch", "main")
+            path_id = state.get("current_path", "main")
 
             interp_path = coupler.generate_interpretation(
                 fig_path,

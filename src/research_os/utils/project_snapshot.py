@@ -94,7 +94,7 @@ def get_snapshot(root: Optional[Path] = None, max_tokens: int = 800) -> str:
         "project": state.get("project", "unnamed"),
         "phase": state.get("phase", "unknown"),
         "step": state.get("step", 0),
-        "branch": state.get("current_branch", state.get("active_branch", "main")),
+        "path": state.get("current_path", "main"),
         "checkpoints": state.get("checkpoints", {}),
         "dead_ends": state.get("dead_ends", [])[-5:],
         "resumable_from": state.get("resumable_from"),

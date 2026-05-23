@@ -20,11 +20,11 @@ This document demonstrates how a researcher and an LLM agent interact using Rese
 ## Step 2: Safe Exploration
 
 9. **Agent**: Instead of writing a script to load the entire 2GB file, the agent calls `tool.data.sample`:
-   - `filepath`: `inputs/raw_data/trial_data.csv`
-   - `n_rows`: 1000
-   - `strategy`: `random`
-10. **Agent**: The tool returns the path to `workspace/data/derived/sampled_trial_data.csv`.
-11. **Agent**: Writes a Python script `workspace/scripts/01_eda.py` to analyze the sampled data.
+    - `filepath`: `inputs/raw_data/trial_data.csv`
+    - `n_rows`: 1000
+    - `strategy`: `random`
+10. **Agent**: The tool returns a sampled dataset.
+11. **Agent**: Writes a Python script `workspace/01_experiment_baseline/scripts/01_eda.py` to analyze the sampled data.
 12. **Agent**: Calls `tool.python.exec` on the script.
 13. **Agent**: Calls `mem.analysis.log` to append the initial EDA findings to `workspace/analysis.md`.
 
@@ -32,30 +32,30 @@ This document demonstrates how a researcher and an LLM agent interact using Rese
 
 14. **Agent**: Decides to clean the data (handle missing values). It tries to write back to `inputs/raw_data/trial_data_cleaned.csv` using `sys.file.write`.
 15. **Research OS**: Returns a `WriteProtectedError`.
-16. **Agent**: Realizes its mistake, updates the script to save the cleaned data to `workspace/data/derived/cleaned_trial_data.csv`.
+16. **Agent**: Realizes its mistake, updates the script to save the cleaned data to `workspace/01_experiment_baseline/data/cleaned_trial_data.csv`.
 17. **Agent**: Calls `tool.log.decision`:
     - `context`: "Handling missing values in blood pressure readings."
     - `selected`: "Imputation via K-Nearest Neighbors."
     - `rationale`: "KNN imputation preserves the underlying distribution better than mean imputation for this dataset size."
 18. **Agent**: Calls `mem.methods.append`: "Applied KNN imputation for missing blood pressure values."
 
-## Step 4: Experiment Branching
+## Step 4: Experiment Paths
 
 19. **Researcher (in Chat)**: "Try running a Bayesian hierarchical model instead of the standard frequentist approach we discussed."
-20. **Agent**: Recognizing this is a significant methodological shift, calls `sys.branch.create`:
-    - `name`: `exp_bayesian_model`
-    - `hypothesis`: "A Bayesian hierarchical model will better account for site-level variations."
-21. **Agent**: Now operating in the new branch context, writes and executes `workspace/scripts/02_bayesian_model.py`.
-22. **Agent**: Calls `sys.checkpoint.create` after the model runs successfully.
+20. **Agent**: Recognizing this is a significant methodological shift, calls `sys.path.create`:
+    - `name`: `bayesian_model`
+21. This creates `workspace/03_bayesian_model/` (auto-numbered based on existing `0x_*` directories). The agent now works within this numbered experiment path.
+22. **Agent**: Writes and executes `workspace/03_bayesian_model/scripts/bayesian_model.py`.
+23. **Agent**: Calls `sys.checkpoint.create` after the model runs successfully.
 
 ## Step 5: Approval and Synthesis
 
-23. **Agent**: Completes the analysis in the branch and calls `sys.checkpoint.pending`:
-    - `description`: "Completed Bayesian hierarchical model. Ready to merge findings into main analysis."
+24. **Agent**: Completes the analysis and calls `sys.checkpoint.pending`:
+    - `description`: "Completed Bayesian hierarchical model."
     - `requires_approval`: true
-24. **Researcher**: Reviews the generated figures and reports.
-25. **Researcher (in Chat)**: "Looks good, merge it."
-26. **Agent**: Calls `sys.checkpoint.approve`, then `sys.branch.merge` targeting `main`.
-27. **Agent**: Generates a final report in `synthesis/report.md` summarizing the methodology (pulled from `methods.md`), decisions (`decisions.log`), and findings (`analysis.md`).
+25. **Researcher**: Reviews the generated figures and reports.
+26. **Researcher (in Chat)**: "Looks good, proceed."
+27. **Agent**: Calls `sys.checkpoint.approve`.
+28. **Agent**: Generates a final report in `synthesis/paper.md` summarizing the methodology (pulled from `methods.md`), decisions (`decisions.log`), and findings (`analysis.md`).
 
 This workflow ensures the researcher maintains control, the agent acts safely, and every step of the research process is rigorously documented.

@@ -12,9 +12,9 @@ from pathlib import Path
 import yaml  # type: ignore[import-untyped]
 
 
+from research_os.tools.actions.path import create_path, list_paths
 from research_os.project_ops import (
     compute_input_hashes,
-    create_experiment_branch,
     load_state,
     log_decision,
     save_artifact,
@@ -346,10 +346,11 @@ def cmd_status(args: argparse.Namespace) -> None:
     root = _project_root()
     state = load_state(root)
     hashes = compute_input_hashes(root)
-    experiments_dir = root / "workspace" / "logs"
+    import re
+    workspace_dir = root / "workspace"
     experiments = (
-        sorted(p.name for p in experiments_dir.iterdir() if p.is_dir())
-        if experiments_dir.exists()
+        sorted(p.name for p in workspace_dir.iterdir() if p.is_dir() and re.match(r"^\d{2}_", p.name))
+        if workspace_dir.exists()
         else []
     )
     manifest_exists = (root / ".os_state" / "manifest.json").exists()
@@ -358,10 +359,10 @@ def cmd_status(args: argparse.Namespace) -> None:
     print("RESEARCH PROJECT STATUS")
     print("=" * 60)
     print(f"Workspace: {root}")
-    print(f"Current branch: {state.get('current_branch', 'exp_001_baseline')}")
-    print(f"Experiments: {len(experiments)}")
+    print(f"Current path: {state.get('current_path', 'main')}")
+    print(f"Experiment paths: {len(experiments)}")
     for exp in experiments[:8]:
-        marker = "*" if exp == state.get("current_branch") else "-"
+        marker = "*" if exp == state.get("current_path") else "-"
         print(f"  {marker} {exp}")
     if len(experiments) > 8:
         print(f"  ... and {len(experiments) - 8} more")
@@ -650,28 +651,29 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def cmd_branch(args: argparse.Namespace) -> None:
-    result = create_experiment_branch(
-        args.name, hypothesis=args.hypothesis, parent=args.parent, root=_project_root()
-    )
-    print(f"Created branch: {result['branch_id']}")
-    print(f"Experiment: {result['experiment_dir']}")
-    print(f"Input hashes inherited: {len(result['data_hashes'])}")
+def cmd_path_create(args: argparse.Namespace) -> None:
+    result = create_path(args.name, root=_project_root())
+    if result["status"] == "success":
+        print(f"Created path: {result['path_id']}")
+        print(f"Directory: {result['experiment_dir']}")
+        print(f"Sub-directories created: {len(result.get('paths_created', []))}")
+    else:
+        print(f"Error: {result['message']}")
 
 
-def cmd_branches(args: argparse.Namespace) -> None:
-    state = load_state(_project_root())
-    active = state.get("current_branch")
-    print(f"{'Branch':<28} {'Parent':<24} {'Status':<12} Hypothesis")
-    print("-" * 90)
-    for branch_id, branch in sorted(state.get("branches", {}).items()):
-        marker = "*" if branch_id == active else " "
-        print(
-            f"{marker} {branch_id:<26} "
-            f"{str(branch.get('parent_branch') or ''):<24} "
-            f"{branch.get('status', ''):<12} "
-            f"{branch.get('hypothesis', '')}"
-        )
+def cmd_paths(args: argparse.Namespace) -> None:
+    result = list_paths(_project_root())
+    if result["status"] == "success":
+        print(f"{'Path':<32} {'#':<4} {'Status':<12}")
+        print("-" * 54)
+        for p in result["paths"]:
+            print(
+                f"{p['path_id']:<32} "
+                f"{p['number']:<4} "
+                f"{p['status']:<12}"
+            )
+    else:
+        print(f"Error: {result['message']}")
 
 
 def cmd_log_decision(args: argparse.Namespace) -> None:
@@ -679,7 +681,6 @@ def cmd_log_decision(args: argparse.Namespace) -> None:
         context=args.context,
         selected=args.selected,
         rationale=args.rationale,
-        branch_id=args.branch,
         root=_project_root(),
     )
     print(f"Logged {result['decision_id']} -> {result['path']}")
@@ -692,7 +693,6 @@ def cmd_save_artifact(args: argparse.Namespace) -> None:
         artifact_type=args.artifact_type,
         generated_by=args.generated_by,
         source_script=args.source_script or "",
-        branch_id=args.branch,
         root=_project_root(),
     )
     print(f"Saved {result['artifact']}")
@@ -961,11 +961,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_intent.add_argument("query")
     p_intent.add_argument("--depth", choices=DEPTH_CHOICES, default=None)
 
-    p_branch = sub.add_parser("branch", help="Create an isolated experiment branch")
-    p_branch.add_argument("name")
-    p_branch.add_argument("--hypothesis", default="")
-    p_branch.add_argument("--from", dest="parent", default=None)
-    sub.add_parser("branches", help="List experiment branches")
+    p_path_create = sub.add_parser("path-create", help="Create a numbered experiment path in workspace/")
+    p_path_create.add_argument("name")
+    sub.add_parser("paths", help="List experiment paths")
 
     p_decision = sub.add_parser(
         "log-decision", help="Append to the active experiment decisions.yaml"
@@ -973,8 +971,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_decision.add_argument("--context", required=True)
     p_decision.add_argument("--selected", required=True)
     p_decision.add_argument("--rationale", required=True)
-    p_decision.add_argument("--branch")
-
     p_artifact = sub.add_parser(
         "save-artifact", help="Save artifact with sibling .meta.yaml"
     )
@@ -987,8 +983,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_artifact.add_argument("--generated-by", default="cli")
     p_artifact.add_argument("--source-script")
-    p_artifact.add_argument("--branch")
-
     p_start = sub.add_parser("start", help="Boot the MCP server")
     p_start.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     p_start.add_argument("--port", type=int, default=8080)
@@ -1042,8 +1036,8 @@ def main() -> None:
         "trace": cmd_trace,
         "compile": cmd_compile,
         "ingest": cmd_ingest,
-        "branch": cmd_branch,
-        "branches": cmd_branches,
+        "path-create": cmd_path_create,
+        "paths": cmd_paths,
         "log-decision": cmd_log_decision,
         "save-artifact": cmd_save_artifact,
         "start": cmd_start,
