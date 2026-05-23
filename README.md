@@ -130,3 +130,4 @@ To help you navigate this repository:
 [![PyPI version](https://badge.fury.io/py/research-os.svg)](https://badge.fury.io/py/research-os)
 [![Python versions](https://img.shields.io/pypi/pyversions/research-os.svg)](https://pypi.org/project/research-os/)
 [![Tests](https://github.com/VibhavSetlur/Research-OS/actions/workflows/tests.yml/badge.svg)](https://github.com/VibhavSetlur/Research-OS/actions)
+[![SafeSkill 60/100](https://img.shields.io/badge/SafeSkill-60%2F100_Use%20with%20Caution-orange)](https://safeskill.dev/scan/vibhavsetlur-research-os)
