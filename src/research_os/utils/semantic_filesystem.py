@@ -135,7 +135,12 @@ SEMANTIC_TAXONOMY = {
     },
 }
 
-OUTPUT_CATEGORIES_REQUIRING_SIDECAR = {"figure", "table", "derived_data", "assumption_doc"}
+OUTPUT_CATEGORIES_REQUIRING_SIDECAR = {
+    "figure",
+    "table",
+    "derived_data",
+    "assumption_doc",
+}
 
 
 class SemanticFilesystemEnforcer:
@@ -231,26 +236,30 @@ class SemanticFilesystemEnforcer:
 
         script_hash = ""
         if source_script:
-            script_path = self.root / source_script if not Path(source_script).is_absolute() else Path(source_script)
+            script_path = (
+                self.root / source_script
+                if not Path(source_script).is_absolute()
+                else Path(source_script)
+            )
             if script_path.exists() and script_path.is_file():
                 script_hash = hashlib.sha256(script_path.read_bytes()).hexdigest()
 
         meta_path = file_path.with_name(f"{file_path.stem}.meta.yaml")
         lines = [
-            f"generated_by: \"{generated_by}\"",
-            f"timestamp: \"{datetime.now(timezone.utc).isoformat()}\"",
-            f"source_script: \"{source_script}\"",
-            f"script_hash: \"{script_hash}\"",
+            f'generated_by: "{generated_by}"',
+            f'timestamp: "{datetime.now(timezone.utc).isoformat()}"',
+            f'source_script: "{source_script}"',
+            f'script_hash: "{script_hash}"',
             "input_files:",
         ]
-        lines.extend(f"  - \"{item}\"" for item in input_files)
+        lines.extend(f'  - "{item}"' for item in input_files)
         lines.append("data_hashes:")
         if data_hashes:
-            lines.extend(f"  \"{k}\": \"{v}\"" for k, v in data_hashes.items())
+            lines.extend(f'  "{k}": "{v}"' for k, v in data_hashes.items())
         else:
             lines.append("  {}")
         lines.append("decisions_applied:")
-        lines.extend(f"  - \"{item}\"" for item in decisions_applied)
+        lines.extend(f'  - "{item}"' for item in decisions_applied)
         for key, value in extra.items():
             lines.append(f"{key}: {json.dumps(value)}")
         meta_path.write_text("\n".join(lines) + "\n")
@@ -359,7 +368,9 @@ class SemanticFilesystemEnforcer:
         Returns:
             Validation result dict
         """
-        relative = file_path.relative_to(self.root) if file_path.is_absolute() else file_path
+        relative = (
+            file_path.relative_to(self.root) if file_path.is_absolute() else file_path
+        )
 
         result = {
             "file": str(file_path),
@@ -425,9 +436,7 @@ class SemanticFilesystemEnforcer:
         logger.info("Enforced taxonomy: %s -> %s", filename, dest_path)
         return dest_path
 
-    def _generate_frontmatter(
-        self, agent: str, skill: str, filename: str
-    ) -> str:
+    def _generate_frontmatter(self, agent: str, skill: str, filename: str) -> str:
         """Generate YAML frontmatter for provenance tracking."""
         return f"""---
 producing_agent: {agent}

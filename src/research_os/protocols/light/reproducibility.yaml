@@ -1,13 +1,6 @@
-description: Checklist and instructions to ensure full reproducibility.
-instructions:
-  freeze_environment:
-    command: pip freeze > environment/requirements.txt
-  random_seeds:
-    python: import numpy as np; np.random.seed(42); import random; random.seed(42)
-  relative_paths:
-    rule: Never use absolute paths like /home/user/... Always use paths starting with
-      inputs/ or workspace/.
 name: reproducibility
+version: 2.0.0
+schema_version: '1.0'
 reproducibility_checklist:
   1: Are all raw data files immutable and strictly read-only?
   2: Are derived datasets saved separately in data/derived/?
@@ -18,13 +11,26 @@ reproducibility_checklist:
   7: Is code linted and free of obvious syntax errors?
   8: Do scripts run from top to bottom without manual intervention?
   9: Are third-party data access dates/versions recorded?
-  10: Are intermediate outputs properly cached or consistently regenerated?
+  10: Are intermediate data files verified via MD5/SHA256 checksums?
   11: Are figure generation scripts separate from heavy analysis scripts?
   12: Are dependencies restricted to stable, version-pinned releases?
-schema_version: '1.0'
+instructions:
+  freeze_environment:
+    command: pip freeze > environment/requirements.txt
+  relative_paths:
+    rule: Never use absolute paths like /home/user/... Always use paths starting with
+      inputs/ or workspace/.
+  random_seeds:
+    python: import numpy as np; np.random.seed(42); import random; random.seed(42)
+  verification:
+    clean_environment_run: To verify, create a new virtual environment (`python -m
+      venv venv`), install requirements (`pip install -r environment/requirements.txt`),
+      and execute the main pipeline scripts sequentially to ensure output matches
+      exactly (compare checksums).
 steps:
 - id: verify_checklist
   name: Verify Checklist
+  description: Ensure all 12 points of the reproducibility checklist are met.
 - id: freeze_env
   name: Freeze Environment
-version: 2.0.0
+  description: Run pip freeze to lock down dependency versions.

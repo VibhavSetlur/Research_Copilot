@@ -49,6 +49,10 @@ inputs/papers/*
 !inputs/papers/.gitkeep
 !inputs/papers/README.md
 
+# Researcher config (contains API keys)
+inputs/researcher_config.yaml
+.research/config.yaml
+
 # Large files (never commit)
 *.h5
 *.hdf5
@@ -89,3 +93,4 @@ desktop.ini
 
 # Temporary scratch folder
 scratch/
+workspace/

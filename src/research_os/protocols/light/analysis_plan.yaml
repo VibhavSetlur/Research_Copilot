@@ -1,21 +1,6 @@
-branching_criteria:
-  continue_when:
-  - Adding standard robustness checks.
-  - Fixing bugs in the current script.
-  fork_when:
-  - Testing a high-risk data transformation (e.g., massive outlier removal).
-  - Trying an alternative, unproven model architecture.
-  - Conducting a separate sensitivity analysis that might disrupt the main flow.
-description: Plan the directory structure, create boilerplates, and manage branching.
 name: analysis_plan
+version: 2.0.0
 schema_version: '1.0'
-steps:
-- id: setup_directories
-  name: Setup Directories
-- id: write_readmes
-  name: Write READMEs
-- id: evaluate_branching
-  name: Evaluate Branching
 structure:
   01_data_prep:
     purpose: Data cleaning, filtering, and feature engineering.
@@ -35,4 +20,22 @@ templates:
     **Scripts**: {List of scripts with brief descriptions}
 
     '
-version: 2.0.0
+branching_criteria:
+  fork_when:
+  - Testing a high-risk data transformation (e.g., massive outlier removal).
+  - Trying an alternative, unproven model architecture.
+  - Conducting a separate sensitivity analysis that might disrupt the main flow.
+  continue_when:
+  - Adding standard robustness checks.
+  - Fixing bugs in the current script.
+steps:
+- id: setup_directories
+  name: Setup Directories
+  description: Ensure the 01_, 02_, 03_ structure exists.
+- id: write_readmes
+  name: Write READMEs
+  description: Populate each directory with the boilerplate README.
+- id: evaluate_branching
+  name: Evaluate Branching
+  description: Review branching criteria to decide if current plan requires a new
+    branch.

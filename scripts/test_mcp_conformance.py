@@ -13,20 +13,15 @@ from pathlib import Path
 def test_with_inspector():
     """Run MCP conformance test using mcp-inspector."""
     print("Testing MCP conformance with mcp-inspector...")
-    
+
     # Check if mcp-inspector is installed
     try:
-        subprocess.run(
-            ["npx", "--version"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        subprocess.run(["npx", "--version"], capture_output=True, text=True, check=True)
     except FileNotFoundError:
         print("❌ npx not found. Please install Node.js to use mcp-inspector.")
         print("   Alternatively, run the standalone conformance test.")
         return False
-    
+
     # Run mcp-inspector
     cmd = [
         "npx",
@@ -36,9 +31,9 @@ def test_with_inspector():
         "-m",
         "research_os.server",
         "--transport",
-        "stdio"
+        "stdio",
     ]
-    
+
     print(f"Running: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -52,14 +47,14 @@ def test_with_inspector():
 def test_standalone_conformance():
     """Run standalone MCP conformance tests."""
     print("Running standalone MCP conformance tests...")
-    
+
     sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-    
+
     from research_os.server import TOOL_DEFINITIONS, _handle_tool_call
     import json
-    
+
     errors = []
-    
+
     # Test 1: All tools have valid schemas
     print("  Testing tool schemas...")
     for name, schema in TOOL_DEFINITIONS.items():
@@ -73,7 +68,7 @@ def test_standalone_conformance():
                 errors.append(f"Tool {name} inputSchema missing type")
             elif input_schema["type"] != "object":
                 errors.append(f"Tool {name} inputSchema type must be 'object'")
-    
+
     # Test 2: sys.health tool exists and returns correct structure
     print("  Testing sys.health tool...")
     try:
@@ -88,7 +83,7 @@ def test_standalone_conformance():
                 errors.append("sys.health should return version")
     except Exception as e:
         errors.append(f"sys.health test failed: {e}")
-    
+
     # Test 3: sys.heartbeat tool exists
     print("  Testing sys.heartbeat tool...")
     try:
@@ -101,7 +96,7 @@ def test_standalone_conformance():
                 errors.append("sys.heartbeat should return success status")
     except Exception as e:
         errors.append(f"sys.heartbeat test failed: {e}")
-    
+
     # Test 4: sys.state tool exists
     print("  Testing sys.state tool...")
     try:
@@ -114,7 +109,7 @@ def test_standalone_conformance():
                 errors.append("sys.state should return success status")
     except Exception as e:
         errors.append(f"sys.state test failed: {e}")
-    
+
     if errors:
         print("❌ Standalone conformance test failed:")
         for error in errors:
@@ -128,12 +123,16 @@ def test_standalone_conformance():
 def main():
     """Main entry point."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="MCP protocol conformance test")
-    parser.add_argument("--inspector", action="store_true", help="Use mcp-inspector for testing")
-    parser.add_argument("--standalone", action="store_true", help="Run standalone tests")
+    parser.add_argument(
+        "--inspector", action="store_true", help="Use mcp-inspector for testing"
+    )
+    parser.add_argument(
+        "--standalone", action="store_true", help="Run standalone tests"
+    )
     args = parser.parse_args()
-    
+
     if args.inspector:
         success = test_with_inspector()
     elif args.standalone:
@@ -141,8 +140,10 @@ def main():
     else:
         # Default to standalone test
         success = test_standalone_conformance()
-        print("\nTip: Use --inspector to run with mcp-inspector for full conformance testing")
-    
+        print(
+            "\nTip: Use --inspector to run with mcp-inspector for full conformance testing"
+        )
+
     sys.exit(0 if success else 1)
 
 

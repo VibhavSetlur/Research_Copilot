@@ -9,11 +9,20 @@ class ResearchQuestion(BaseModel):
     """A single research question with all required metadata."""
 
     text: str = Field(..., min_length=10, description="The research question text")
-    type: Literal["descriptive", "comparative", "associational", "causal", "predictive", "exploratory"]
+    type: Literal[
+        "descriptive",
+        "comparative",
+        "associational",
+        "causal",
+        "predictive",
+        "exploratory",
+    ]
     hypothesis: str = Field(..., min_length=10, description="The hypothesis to test")
     outcome: str = Field(..., description="Outcome variable name")
     predictor: str = Field(..., description="Predictor variable name")
-    covariates: Optional[List[str]] = Field(default=[], description="Covariate variables")
+    covariates: Optional[List[str]] = Field(
+        default=[], description="Covariate variables"
+    )
     files: Optional[List[str]] = Field(default=[], description="Data files needed")
     prep: Optional[str] = Field(default=None, description="Data preparation needed")
     prior: Optional[str] = Field(default=None, description="Prior research context")
@@ -33,9 +42,15 @@ class DataFile(BaseModel):
     path: str = Field(..., description="Relative path to the data file")
     format: str = Field(..., description="Detected file format")
     size_kb: Optional[float] = Field(default=None, description="File size in KB")
-    format_class: Optional[str] = Field(default=None, description="High-level format class")
-    pandera_applicable: bool = Field(default=False, description="Whether Pandera checks apply")
-    domain_hint: Optional[str] = Field(default=None, description="Domain hint from format routing")
+    format_class: Optional[str] = Field(
+        default=None, description="High-level format class"
+    )
+    pandera_applicable: bool = Field(
+        default=False, description="Whether Pandera checks apply"
+    )
+    domain_hint: Optional[str] = Field(
+        default=None, description="Domain hint from format routing"
+    )
 
 
 class DataSection(BaseModel):
@@ -43,9 +58,15 @@ class DataSection(BaseModel):
     """Data section of the research map."""
 
     files: List[DataFile] = Field(default=[], description="Detected data files")
-    schema_cache: Dict[str, Any] = Field(default={}, description="Schema cache for tabular files")
-    format_manifest: Optional[str] = Field(default=None, description="Path to format manifest JSON")
-    format_summary: Dict[str, Any] = Field(default={}, description="Summary counts for format scan")
+    schema_cache: Dict[str, Any] = Field(
+        default={}, description="Schema cache for tabular files"
+    )
+    format_manifest: Optional[str] = Field(
+        default=None, description="Path to format manifest JSON"
+    )
+    format_summary: Dict[str, Any] = Field(
+        default={}, description="Summary counts for format scan"
+    )
 
 
 class ResearchMap(BaseModel):
@@ -59,8 +80,12 @@ class ResearchMap(BaseModel):
     domain: dict = Field(..., description="Domain configuration")
     feasibility: dict = Field(..., description="Feasibility assessment")
     follow_up: List[str] = Field(default=[], description="Follow-up questions for user")
-    required_containers: List[str] = Field(default=[], description="Containers required by the project")
-    required_tools: List[str] = Field(default=[], description="Tool IDs required by the project")
+    required_containers: List[str] = Field(
+        default=[], description="Containers required by the project"
+    )
+    required_tools: List[str] = Field(
+        default=[], description="Tool IDs required by the project"
+    )
 
     @field_validator("questions")
     @classmethod
@@ -75,5 +100,7 @@ class ResearchMap(BaseModel):
         if "verdict" not in v:
             raise ValueError("Feasibility must include a verdict")
         if v["verdict"] not in ("go", "caution", "stop"):
-            raise ValueError("Invalid feasibility verdict. Must be: go, caution, or stop")
+            raise ValueError(
+                "Invalid feasibility verdict. Must be: go, caution, or stop"
+            )
         return v

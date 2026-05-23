@@ -19,6 +19,7 @@ except ImportError:  # pragma: no cover - PyYAML is a package dependency.
     yaml = None
 
 from research_os.utils.common import find_project_root, now_iso
+from research_os.state.state_ledger import ResearchLedger
 
 
 def _resolve_root(root: Path | None = None) -> Path:
@@ -45,6 +46,7 @@ def slugify(value: str, fallback: str = "branch") -> str:
 
 # ── State ledger paths ──────────────────────────────────────────────
 
+
 def state_path(root: Path) -> Path:
     return root / ".os_state" / "state_ledger.yaml"
 
@@ -63,9 +65,12 @@ def state_diff_log_path(root: Path) -> Path:
 
 # ── YAML helpers ────────────────────────────────────────────────────
 
+
 def read_yaml(path: Path) -> dict | None:
     if not yaml:
-        raise RuntimeError("PyYAML is required but not installed. Run: pip install pyyaml")
+        raise RuntimeError(
+            "PyYAML is required but not installed. Run: pip install pyyaml"
+        )
     try:
         with open(path) as f:
             return cast(dict, yaml.safe_load(f))
@@ -75,12 +80,16 @@ def read_yaml(path: Path) -> dict | None:
 
 def write_yaml(path: Path, data: dict) -> None:
     if not yaml:
-        raise RuntimeError("PyYAML is required but not installed. Run: pip install pyyaml")
+        raise RuntimeError(
+            "PyYAML is required but not installed. Run: pip install pyyaml"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            yaml.dump(
+                data, f, default_flow_style=False, sort_keys=False, allow_unicode=True
+            )
         os.replace(tmp_path, str(path))
     except Exception:
         if os.path.exists(tmp_path):
@@ -103,6 +112,7 @@ def write_json(path: Path, data: Any) -> None:
 
 # ── State diff logging ──────────────────────────────────────────────
 
+
 def _compute_state_diff(before: dict, after: dict) -> list[str]:
     """Return human-readable diff lines between two state dicts."""
     lines: list[str] = []
@@ -114,10 +124,14 @@ def _compute_state_diff(before: dict, after: dict) -> list[str]:
     common = before_branches & after_branches
 
     if before.get("current_branch") != after.get("current_branch"):
-        lines.append(f"  branch switch: {before.get('current_branch')} → {after.get('current_branch')}")
+        lines.append(
+            f"  branch switch: {before.get('current_branch')} → {after.get('current_branch')}"
+        )
 
     if before.get("pipeline_stage") != after.get("pipeline_stage"):
-        lines.append(f"  stage: {before.get('pipeline_stage')} → {after.get('pipeline_stage')}")
+        lines.append(
+            f"  stage: {before.get('pipeline_stage')} → {after.get('pipeline_stage')}"
+        )
 
     if before.get("step") != after.get("step"):
         lines.append(f"  step: {before.get('step')} → {after.get('step')}")
@@ -131,9 +145,11 @@ def _compute_state_diff(before: dict, after: dict) -> list[str]:
     # checkpoint history diff
     before_cp = before.get("checkpoint_history", [])
     after_cp = after.get("checkpoint_history", [])
-    new_cps = after_cp[len(before_cp):]
+    new_cps = after_cp[len(before_cp) :]
     for cp in new_cps:
-        lines.append(f"  checkpoint: {cp.get('id', '?')} = {cp.get('step', '?')} @ {cp.get('timestamp', '?')}")
+        lines.append(
+            f"  checkpoint: {cp.get('id', '?')} = {cp.get('step', '?')} @ {cp.get('timestamp', '?')}"
+        )
 
     return lines
 
@@ -154,6 +170,7 @@ def write_state_diff(root: Path, before: dict | None, after: dict) -> None:
 
 
 # ── Primary state functions ─────────────────────────────────────────
+
 
 def default_state() -> dict:
     return {
@@ -183,33 +200,18 @@ def default_state() -> dict:
 
 def load_state(root: Path | None = None) -> dict:
     root = _resolve_root(root)
-    yaml_path = state_path(root)
-    json_path = state_json_path(root)
-
-    # Try YAML first (primary), fall back to JSON (legacy)
-    state = read_yaml(yaml_path)
-    if state is not None:
-        state.setdefault("current_branch", "main")
-        state.setdefault("branches", {})
-        state.setdefault("checkpoint_history", [])
-        return cast(dict, state)
-
-    legacy = read_json(json_path, default_state())
-    legacy.setdefault("current_branch", "main")
-    legacy.setdefault("branches", {})
-    legacy.setdefault("checkpoint_history", [])
-    # Migrate: write to YAML so next load uses it
-    write_yaml(yaml_path, legacy)
-    return cast(dict, legacy)
+    ledger = ResearchLedger(state_json_path(root))
+    # _load handles default state correctly
+    return ledger._load()
 
 
 def save_state(root: Path, state: dict) -> dict:
-    """Atomically save state to YAML (primary) and JSON (backup), logging diff."""
+    """Atomically save state using ResearchLedger, logging diff."""
     root = _resolve_root(root)
-    before = read_yaml(state_path(root)) or read_json(state_json_path(root), None)
+    ledger = ResearchLedger(state_json_path(root))
+    before = ledger._load()
     state["updated_at"] = now_iso()
-    write_yaml(state_path(root), state)
-    write_json(state_json_path(root), state)
+    ledger._save(state)
     write_state_diff(root, before, state)
     return state
 
@@ -228,18 +230,25 @@ def compute_file_hash(path: Path) -> str:
 def compute_input_hashes(root: Path | None = None) -> dict[str, str]:
     root = _resolve_root(root)
     hashes: dict[str, str] = {}
-    for base in (root / "workspace" / "data" / "raw", root / "workspace" / "data" / "derived"):
+    for base in (
+        root / "workspace" / "data" / "raw",
+        root / "workspace" / "data" / "derived",
+    ):
         if not base.exists():
             continue
         for path in sorted(base.rglob("*")):
-            if path.is_file() and not path.name.startswith(".") and path.name not in {"README.md", ".gitkeep"}:
+            if (
+                path.is_file()
+                and not path.name.startswith(".")
+                and path.name not in {"README.md", ".gitkeep"}
+            ):
                 hashes[path.relative_to(root).as_posix()] = compute_file_hash(path)
     return hashes
 
 
 def next_experiment_id(root: Path | None, slug: str) -> str:
     root = _resolve_root(root)
-    experiments = root / "02_experiments"
+    experiments = root / "workspace" / "logs"
     max_seen = 1
     if experiments.exists():
         for path in experiments.iterdir():
@@ -249,6 +258,21 @@ def next_experiment_id(root: Path | None, slug: str) -> str:
     return f"exp_{max_seen + 1:03d}_{slugify(slug)}"
 
 
+def _ensure_branch_dir(root: Path, branch_id: str, parent: str) -> None:
+    branch_dir = root / "workspace" / "logs" / branch_id
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    decisions_path = branch_dir / "decisions.yaml"
+    if not decisions_path.exists():
+        decisions_path.write_text(
+            "schema_version: '1.0'\n"
+            f"experiment_id: {branch_id}\n"
+            f"parent_experiment: {parent}\n"
+            f"created: {now_iso()}\n"
+            "input_data_hashes: {}\n"
+            "decisions:\n"
+        )
+
+
 def write_readme(path: Path, title: str, body: str) -> None:
     path.mkdir(parents=True, exist_ok=True)
     readme = path / "README.md"
@@ -256,7 +280,9 @@ def write_readme(path: Path, title: str, body: str) -> None:
         readme.write_text(f"# {title}\n\n{body.strip()}\n")
 
 
-def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: dict | None = None) -> None:
+def scaffold_minimal_workspace(
+    root: Path, project_name: str, config_overrides: dict | None = None
+) -> None:
     """Create the unified workspace directory structure and .os_state config.
 
     Args:
@@ -273,9 +299,18 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
     (root / ".os_state").mkdir(parents=True, exist_ok=True)
     (root / "docs").mkdir(parents=True, exist_ok=True)
     for doc_file, content in [
-        ("research_question.md", f"# Research Question\n\n## Main Question\n\n*({project_name})*\n\n## Sub-Questions\n\n1. \n2. \n3. \n\n## Last Updated\n\n{now_iso()}\n"),
-        ("hypotheses.md", f"# Hypotheses\n\n## H1\n\n- **Statement**:\n- **Test**:\n- **Outcome**:\n\n## H2\n\n- **Statement**:\n- **Test**:\n- **Outcome**:\n\n*Auto-generated: {now_iso()}*\n"),
-        ("glossary.md", f"# Glossary\n\n| Term | Definition |\n|------|------------|\n| | |\n\n*Auto-generated: {now_iso()}*\n"),
+        (
+            "research_question.md",
+            f"# Research Question\n\n## Main Question\n\n*({project_name})*\n\n## Sub-Questions\n\n1. \n2. \n3. \n\n## Last Updated\n\n{now_iso()}\n",
+        ),
+        (
+            "hypotheses.md",
+            f"# Hypotheses\n\n## H1\n\n- **Statement**:\n- **Test**:\n- **Outcome**:\n\n## H2\n\n- **Statement**:\n- **Test**:\n- **Outcome**:\n\n*Auto-generated: {now_iso()}*\n",
+        ),
+        (
+            "glossary.md",
+            f"# Glossary\n\n| Term | Definition |\n|------|------------|\n| | |\n\n*Auto-generated: {now_iso()}*\n",
+        ),
     ]:
         p = root / "docs" / doc_file
         if not p.exists():
@@ -326,8 +361,8 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
     citations_path = root / "workspace" / "citations.md"
     if not citations_path.exists():
         citations_path.write_text(
-            f"# Running Bibliography\n\n"
-            f"*Each entry has a `verified` flag for the citation_verifier.*\n\n"
+            "# Running Bibliography\n\n"
+            "*Each entry has a `verified` flag for the citation_verifier.*\n\n"
         )
 
     # Generate strict mplstyle for figures
@@ -357,27 +392,27 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
         research_question = config_overrides.get("research_question", "")
 
         config_lines = [
-            f"# Research OS — Project Configuration",
+            "# Research OS — Project Configuration",
             f'project_id: "{project_name}"',
             f'research_question: "{research_question}"',
             f'domain: "{domain}"',
-            f'schema_version: "10.0.0"',
+            'schema_version: "10.0.0"',
             f'default_depth: "{depth}"',
-            f'default_workflow: "quick_exploratory"',
+            'default_workflow: "quick_exploratory"',
             f'llm_provider: "{provider}"',
-            f"branching:",
-            f"  enabled: true",
-            f"data_scale_thresholds:",
-            f"  medium_mb: 100",
-            f"  large_gb: 1",
-            f"  massive_gb: 10",
-            f"execution:",
-            f"  supported_runtimes: [python, r, bash]",
-            f"dependency_management:",
-            f"  auto_detect: true",
-            f'  requirements_file: "environment/requirements.txt"',
-            f"quality_gates_enabled: true",
-            f"pin_dependency_versions: true",
+            "branching:",
+            "  enabled: true",
+            "data_scale_thresholds:",
+            "  medium_mb: 100",
+            "  large_gb: 1",
+            "  massive_gb: 10",
+            "execution:",
+            "  supported_runtimes: [python, r, bash]",
+            "dependency_management:",
+            "  auto_detect: true",
+            '  requirements_file: "environment/requirements.txt"',
+            "quality_gates_enabled: true",
+            "pin_dependency_versions: true",
         ]
         config_path.write_text("\n".join(config_lines) + "\n")
 
@@ -387,7 +422,7 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
         try:
             workspace_os_state.symlink_to(root / ".os_state", target_is_directory=True)
         except OSError:
-            pass # Handle OS limitations (e.g. Windows without admin rights)
+            pass  # Handle OS limitations (e.g. Windows without admin rights)
 
     intake = root / "inputs" / "intake.md"
     if not intake.exists():
@@ -463,15 +498,22 @@ def scaffold_minimal_workspace(root: Path, project_name: str, config_overrides: 
     _initialize_git(root)
     _run_preflight_checks()
 
+
 def _initialize_git(root: Path) -> None:
     import subprocess
+
     if not (root / ".git").exists():
         try:
             subprocess.run(["git", "init"], cwd=root, capture_output=True)
             subprocess.run(["git", "add", "."], cwd=root, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "chore: initial research os scaffold"], cwd=root, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "chore: initial research os scaffold"],
+                cwd=root,
+                capture_output=True,
+            )
         except Exception:
             pass
+
 
 def _run_preflight_checks() -> None:
     print("=" * 60)
@@ -479,7 +521,10 @@ def _run_preflight_checks() -> None:
     print("=" * 60)
     import subprocess
     import sys
-    print(f"  [✓] Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+
+    print(
+        f"  [✓] Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
 
     try:
         docker = subprocess.run(["docker", "--version"], capture_output=True, text=True)
@@ -537,12 +582,15 @@ def _setup_gitignore(root: Path) -> None:
             "workspace/data/raw/*\n"
             "!workspace/data/raw/.gitkeep\n"
             ".os_state/\n"
+            "# Researcher config (contains API keys)\n"
+            "inputs/researcher_config.yaml\n"
         )
 
 
 def _setup_mcp_configs(root: Path) -> None:
     """Generate default MCP configuration for popular AI IDEs."""
     import sys as _sys
+
     server_cmd = f"{_sys.executable} -m research_os.server --transport stdio"
     mcp_entry = {
         "command": _sys.executable,
@@ -598,19 +646,31 @@ def _setup_mcp_configs(root: Path) -> None:
 
 
 def _copy_ai_rules_to_project(root: Path) -> None:
-    """Copy AI agent rules files from package assets to the project root."""
+    """Copy AI agent rules files from templates to the project root."""
     try:
         import importlib.resources as importlib_resources
     except ImportError:
         import importlib_resources  # type: ignore[no-redef]
 
-    assets = ["AGENTS.md", "os-instructions.md"]
+    assets = ["AGENTS.md"]
     for asset_name in assets:
         try:
-            asset_path = importlib_resources.files("research_os.docs") / asset_name
+            asset_path = (
+                importlib_resources.files("research_os")
+                / ".."
+                / ".."
+                / "templates"
+                / asset_name
+            )
+            if not asset_path.exists():
+                asset_path = (
+                    Path(__file__).parent.parent.parent / "templates" / asset_name
+                )
             dest = root / asset_name
-            if not dest.exists():
-                dest.write_text(asset_path.read_text(encoding="utf-8"), encoding="utf-8")
+            if not dest.exists() and asset_path.exists():
+                dest.write_text(
+                    asset_path.read_text(encoding="utf-8"), encoding="utf-8"
+                )
         except Exception:
             pass
 
@@ -625,42 +685,53 @@ def _copy_environment_to_project(root: Path) -> None:
     env_dir = root / "environment"
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    files = ["setup.sh", "setup_conda.sh", "requirements.txt", "README.md"]
+    files = [
+        "setup.sh",
+        "setup_conda.sh",
+        "requirements.txt",
+        "README.md",
+        "Dockerfile",
+    ]
     for filename in files:
         try:
-            asset_path = importlib_resources.files("research_os.assets.environment") / filename
+            asset_path = (
+                importlib_resources.files("research_os.assets.environment") / filename
+            )
             dest = env_dir / filename
             if not dest.exists():
-                dest.write_text(asset_path.read_text(encoding="utf-8"), encoding="utf-8")
+                dest.write_text(
+                    asset_path.read_text(encoding="utf-8"), encoding="utf-8"
+                )
         except Exception:
             pass
 
 
 def _update_workspace_readme_manifest(root: Path) -> None:
     readme_path = root / "workspace" / "README.md"
-    
+
     # Read derived and raw files
     raw_files = list((root / "workspace" / "data" / "raw").rglob("*"))
     derived_files = list((root / "workspace" / "data" / "derived").rglob("*"))
-    
+
     lines = [
         "# Workspace Manifest",
         "",
-        "This directory is actively managed by Agentic Research OS.",
+        "This directory is actively managed by Research OS.",
         "",
         "## Data / Raw",
     ]
     for f in sorted(raw_files):
         if f.is_file() and not f.name.startswith("."):
             lines.append(f"- `{f.relative_to(root)}`")
-            
+
     lines.append("")
     lines.append("## Data / Derived")
     for f in sorted(derived_files):
         if f.is_file() and not f.name.startswith("."):
             lines.append(f"- `{f.relative_to(root)}`")
-            
+
     readme_path.write_text("\n".join(lines) + "\n")
+
 
 def create_experiment_branch(
     name: str,
@@ -676,25 +747,27 @@ def create_experiment_branch(
     if branch_id in state.get("branches", {}):
         raise ValueError(f"Branch '{branch_id}' already exists.")
 
-    experiment_dir = root / "workspace" / "logs" / branch_id
-    experiment_dir.mkdir(parents=True, exist_ok=True)
-    
     data_hashes = compute_input_hashes(root)
-
+    _ensure_branch_dir(root, branch_id, parent)
+    experiment_dir = root / "workspace" / "logs" / branch_id
     decisions_path = experiment_dir / "decisions.yaml"
-    decisions_path.write_text(
-        "schema_version: '1.0'\n"
-        f"experiment_id: {branch_id}\n"
-        f"parent_experiment: {parent}\n"
-        f"created: {now_iso()}\n"
-        "input_data_hashes:\n" + _yaml_mapping(data_hashes, indent=2) + "decisions:\n"
-        "  decision_001:\n"
-        f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
-        "    context: Alternate hypothesis branch created.\n"
-        "    selected: Create isolated experiment branch.\n"
-        f"    rationale: {hypothesis or name}\n"
-        "    linked_literature: []\n"
-    )
+
+    if not decisions_path.exists():
+        decisions_path.write_text(
+            "schema_version: '1.0'\n"
+            f"experiment_id: {branch_id}\n"
+            f"parent_experiment: {parent}\n"
+            f"created: {now_iso()}\n"
+            "input_data_hashes:\n"
+            + _yaml_mapping(data_hashes, indent=2)
+            + "decisions:\n"
+            "  decision_001:\n"
+            f"    date: {datetime.now(timezone.utc).date().isoformat()}\n"
+            "    context: Alternate hypothesis branch created.\n"
+            "    selected: Create isolated experiment branch.\n"
+            f"    rationale: {hypothesis or name}\n"
+            "    linked_literature: []\n"
+        )
 
     state["branches"][branch_id] = {
         "branch_id": branch_id,
@@ -721,7 +794,7 @@ def create_experiment_branch(
     return {
         "branch_id": branch_id,
         "parent_branch": parent,
-        "experiment_dir": f"02_experiments/{branch_id}",
+        "experiment_dir": f"workspace/logs/{branch_id}",
         "data_hashes": data_hashes,
         "decisions": decisions_path.relative_to(root).as_posix(),
     }
@@ -809,7 +882,7 @@ def save_artifact(
     output_path = root / "workspace" / folder / safe_name
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content)
-    
+
     # Update README
     _update_workspace_readme_manifest(root)
 
@@ -822,7 +895,11 @@ def save_artifact(
 
     script_hash = ""
     if source_script:
-        script_path = root / source_script if not Path(source_script).is_absolute() else Path(source_script)
+        script_path = (
+            root / source_script
+            if not Path(source_script).is_absolute()
+            else Path(source_script)
+        )
         if script_path.exists():
             script_hash = compute_file_hash(script_path)
 
@@ -859,7 +936,10 @@ def _yaml_mapping(values: dict, indent: int = 0) -> str:
 # §2.2 — intake.md auto-regeneration (with SHA-256 hashes)
 # ------------------------------------------------------------------
 
-def regenerate_intake(root: Path, project_name: str | None = None, config_overrides: dict | None = None) -> str:
+
+def regenerate_intake(
+    root: Path, project_name: str | None = None, config_overrides: dict | None = None
+) -> str:
     """Regenerate inputs/intake.md with current file hashes, domain, depth, and keywords.
 
     Call this after init and after every major research prompt.
@@ -887,10 +967,16 @@ def regenerate_intake(root: Path, project_name: str | None = None, config_overri
         d = root / "inputs" / subdir
         if d.exists():
             for f in sorted(d.rglob("*")):
-                if f.is_file() and not f.name.startswith(".") and f.name not in (".gitkeep",):
+                if (
+                    f.is_file()
+                    and not f.name.startswith(".")
+                    and f.name not in (".gitkeep",)
+                ):
                     sha = compute_file_hash(f)
                     rel = f.relative_to(root).as_posix()
-                    input_files.append({"path": rel, "sha256": sha, "size_kb": f.stat().st_size / 1024})
+                    input_files.append(
+                        {"path": rel, "sha256": sha, "size_kb": f.stat().st_size / 1024}
+                    )
 
     # Write intake.md
     intake_path = root / "inputs" / "intake.md"
@@ -920,7 +1006,9 @@ def regenerate_intake(root: Path, project_name: str | None = None, config_overri
         lines.append("| File | SHA-256 | Size |")
         lines.append("|------|---------|------|")
         for f in input_files:
-            lines.append(f"| {f['path']} | `{f['sha256'][:12]}...` | {f['size_kb']:.1f} KB |")
+            lines.append(
+                f"| {f['path']} | `{f['sha256'][:12]}...` | {f['size_kb']:.1f} KB |"
+            )
     else:
         lines.append("*(No input files found. Place data in `inputs/raw_data/`.)*")
     lines.append("")
@@ -933,6 +1021,7 @@ def regenerate_intake(root: Path, project_name: str | None = None, config_overri
 # ------------------------------------------------------------------
 # §2.2 — literature_index.yaml sidecar
 # ------------------------------------------------------------------
+
 
 def update_literature_index(root: Path) -> dict:
     """Scan inputs/literature/ and build/refresh literature_index.yaml.
@@ -958,7 +1047,12 @@ def update_literature_index(root: Path) -> dict:
         for f in sorted(lit_dir.iterdir()):
             if f.is_file() and f.suffix.lower() in (".pdf", ".epub", ".ps", ".djvu"):
                 name = f.name
-                citation_key = f.stem.replace(" ", "_").replace("-", "_").replace("__", "_").lower()
+                citation_key = (
+                    f.stem.replace(" ", "_")
+                    .replace("-", "_")
+                    .replace("__", "_")
+                    .lower()
+                )
                 sha = compute_file_hash(f)
                 if name not in index["entries"]:
                     index["entries"][name] = {
@@ -1041,12 +1135,16 @@ def create_numbered_experiment(
                     pass
 
     next_num = max_num + 1
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip().lower()).strip("_") or "experiment"
+    slug = (
+        re.sub(r"[^a-zA-Z0-9]+", "_", name.strip().lower()).strip("_") or "experiment"
+    )
     branch_id = f"{next_num:02d}_{slug}"
     experiment_dir = workspace_dir / branch_id
 
     if experiment_dir.exists():
-        raise ValueError(f"Experiment folder '{branch_id}' already exists at {experiment_dir}")
+        raise ValueError(
+            f"Experiment folder '{branch_id}' already exists at {experiment_dir}"
+        )
 
     # Optionally copy from a source step
     if from_step:
@@ -1056,7 +1154,9 @@ def create_numbered_experiment(
         check_write_permitted(experiment_dir)
         shutil.copytree(src_dir, experiment_dir, symlinks=True, dirs_exist_ok=True)
         paths_created = [str(src_dir.absolute()), str(experiment_dir.absolute())]
-        paths_created += [str(p.absolute()) for p in experiment_dir.rglob("*") if p.is_dir()]
+        paths_created += [
+            str(p.absolute()) for p in experiment_dir.rglob("*") if p.is_dir()
+        ]
     else:
         # Create fresh subdirectory tree
         check_write_permitted(experiment_dir)
@@ -1129,6 +1229,7 @@ def create_numbered_experiment(
 # §2.4 — synthesis helpers
 # ------------------------------------------------------------------
 
+
 def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> dict:
     """Populate synthesis/ directory with template files.
 
@@ -1148,10 +1249,11 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
     supplementary_dir.mkdir(parents=True, exist_ok=True)
 
     created = []
-    
+
     # workflow_diagram.png auto-generation
     import shutil
     from research_os.project_ops import render_workflow_diagram
+
     diagram_result = render_workflow_diagram(root)
     workflow_png_path = root / "workspace" / "workflow.png"
     synthesis_diagram_path = synthesis_dir / "workflow_diagram.png"
@@ -1159,7 +1261,6 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
         check_write_permitted(synthesis_diagram_path)
         shutil.copy2(workflow_png_path, synthesis_diagram_path)
         created.append(str(synthesis_diagram_path.absolute()))
-
 
     # abstract.md
     abstract_path = synthesis_dir / "abstract.md"
@@ -1197,7 +1298,9 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
 \usepackage{natbib}
 \usepackage{hyperref}
 
-\title{""" + project_name + r"""}
+\title{"""
+            + project_name
+            + r"""}
 \author{Research OS}
 \date{\today}
 
@@ -1229,7 +1332,9 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
     bib_path = synthesis_dir / "references.bib"
     if not bib_path.exists():
         check_write_permitted(bib_path)
-        bib_path.write_text("% References will be auto-populated from workspace/citations.md\n")
+        bib_path.write_text(
+            "% References will be auto-populated from workspace/citations.md\n"
+        )
         created.append(str(bib_path.absolute()))
 
     return {"paths_created": created, "synthesis_dir": str(synthesis_dir.absolute())}
@@ -1238,6 +1343,7 @@ def scaffold_synthesis(root: Path, project_name: str = "Research Project") -> di
 # ------------------------------------------------------------------
 # §3.4 — Workflow diagram rendering
 # ------------------------------------------------------------------
+
 
 def render_workflow_diagram(root: Path) -> dict:
     """Render workspace/workflow.mermaid → workspace/workflow.png via mmdc.
@@ -1249,9 +1355,14 @@ def render_workflow_diagram(root: Path) -> dict:
     png_path = root / "workspace" / "workflow.png"
 
     if not mermaid_path.exists():
-        return {"png_path": None, "rendered": False, "warning": "No workflow.mermaid found to render"}
+        return {
+            "png_path": None,
+            "rendered": False,
+            "warning": "No workflow.mermaid found to render",
+        }
 
     import shutil
+
     mmdc = shutil.which("mmdc")
     if not mmdc:
         return {
@@ -1265,16 +1376,27 @@ def render_workflow_diagram(root: Path) -> dict:
         }
 
     import subprocess
+
     try:
         result = subprocess.run(
             [mmdc, "-i", str(mermaid_path), "-o", str(png_path), "-b", "white"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode != 0:
-            return {"png_path": None, "rendered": False, "warning": f"mmdc failed: {result.stderr.strip()}"}
+            return {
+                "png_path": None,
+                "rendered": False,
+                "warning": f"mmdc failed: {result.stderr.strip()}",
+            }
         return {"png_path": str(png_path.absolute()), "rendered": True, "warning": None}
     except subprocess.TimeoutExpired:
-        return {"png_path": None, "rendered": False, "warning": "mmdc timed out after 60s"}
+        return {
+            "png_path": None,
+            "rendered": False,
+            "warning": "mmdc timed out after 60s",
+        }
     except Exception as e:
         return {"png_path": None, "rendered": False, "warning": f"mmdc error: {e}"}
 

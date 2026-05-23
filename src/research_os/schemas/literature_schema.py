@@ -17,10 +17,12 @@ class PaperEntry(BaseModel):
     journal: Optional[str] = Field(default=None, description="Journal name")
     abstract: Optional[str] = Field(default=None, description="Paper abstract")
     citations: Optional[int] = Field(default=None, ge=0, description="Citation count")
-    relevance_score: Optional[float] = Field(default=None, ge=0, le=1, description="Relevance to project (0-1)")
-    verification_status: Literal["verified", "unverified", "retracted", "expression_of_concern"] = Field(
-        default="unverified", description="Citation verification status"
+    relevance_score: Optional[float] = Field(
+        default=None, ge=0, le=1, description="Relevance to project (0-1)"
     )
+    verification_status: Literal[
+        "verified", "unverified", "retracted", "expression_of_concern"
+    ] = Field(default="unverified", description="Citation verification status")
 
     @field_validator("title")
     @classmethod
@@ -36,7 +38,9 @@ class LiteratureCorpus(BaseModel):
 
     schema_version: str = Field(..., pattern=r"^\d+\.\d+\.\d+$")
     papers: List[PaperEntry] = Field(..., min_length=1)
-    search_queries: List[str] = Field(default=[], description="Search queries used to build corpus")
+    search_queries: List[str] = Field(
+        default=[], description="Search queries used to build corpus"
+    )
     last_updated: str = Field(..., description="ISO 8601 timestamp of last update")
 
     @field_validator("papers")

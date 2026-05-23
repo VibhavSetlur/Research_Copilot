@@ -65,7 +65,9 @@ def get_input_files(script_path: Path) -> list[str]:
     return sorted(files)
 
 
-def extract_failing_function(traceback_text: str, script_path: str) -> tuple[Optional[str], Optional[int]]:
+def extract_failing_function(
+    traceback_text: str, script_path: str
+) -> tuple[Optional[str], Optional[int]]:
     """Extract the failing function name and line number from traceback."""
     script_name = Path(script_path).name
     lines = traceback_text.split("\n")
@@ -82,7 +84,9 @@ def extract_failing_function(traceback_text: str, script_path: str) -> tuple[Opt
     return None, None
 
 
-def extract_function_source(script_path: Path, func_name: str, line_num: Optional[int] = None) -> Optional[str]:
+def extract_function_source(
+    script_path: Path, func_name: str, line_num: Optional[int] = None
+) -> Optional[str]:
     """Extract a specific function's source code from a script."""
     try:
         content = script_path.read_text()
@@ -148,7 +152,14 @@ def build_debug_bundle(
     if func_name:
         func_source = extract_function_source(script_path, func_name, line_num)
 
-    important_packages = ["pandas", "numpy", "scipy", "matplotlib", "sklearn", "statsmodels"]
+    important_packages = [
+        "pandas",
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "sklearn",
+        "statsmodels",
+    ]
 
     bundle = {
         "script": str(script_path),
@@ -281,7 +292,9 @@ def log_debug_attempt(
         f.write("## Environment\n")
         f.write(f"- Python: {bundle['environment']['python_version']}\n")
         f.write(f"- CWD: {bundle['environment']['cwd']}\n")
-        f.write(f"- Packages: {json.dumps(bundle['environment']['packages'], indent=2)}\n\n")
+        f.write(
+            f"- Packages: {json.dumps(bundle['environment']['packages'], indent=2)}\n\n"
+        )
 
         if bundle["input_files"]:
             f.write("## Input Files\n")
@@ -317,7 +330,7 @@ def run_auto_debug(
         returncode, stdout, stderr = run_script(script_path)
 
         if returncode == 0:
-            print(f"  SUCCESS: Script completed without errors")
+            print("  SUCCESS: Script completed without errors")
             result = {
                 "attempt": attempt,
                 "success": True,
@@ -325,47 +338,79 @@ def run_auto_debug(
             }
             results.append(result)
 
-            bundle = build_debug_bundle(script_path, returncode, stdout, stderr, attempt, max_attempts)
-            log_path = log_debug_attempt(script_path, bundle, fix_code if fix_code else None, True)
+            bundle = build_debug_bundle(
+                script_path, returncode, stdout, stderr, attempt, max_attempts
+            )
+            log_path = log_debug_attempt(
+                script_path, bundle, fix_code if fix_code else None, True
+            )
             print(f"  Debug log: {log_path}")
             return {"success": True, "attempts": attempt, "results": results}
 
         print(f"  FAILED: {stderr[:200]}...")
 
-        bundle = build_debug_bundle(script_path, returncode, stdout, stderr, attempt, max_attempts)
-        results.append({
-            "attempt": attempt,
-            "success": False,
-            "error_type": bundle["error_type"],
-            "failing_function": bundle["failing_function"],
-            "failing_line": bundle["failing_line"],
-            "traceback": stderr[-500:],
-        })
+        bundle = build_debug_bundle(
+            script_path, returncode, stdout, stderr, attempt, max_attempts
+        )
+        results.append(
+            {
+                "attempt": attempt,
+                "success": False,
+                "error_type": bundle["error_type"],
+                "failing_function": bundle["failing_function"],
+                "failing_line": bundle["failing_line"],
+                "traceback": stderr[-500:],
+            }
+        )
 
         log_path = log_debug_attempt(script_path, bundle, None, False)
         print(f"  Debug log: {log_path}")
-        print(f"  Debug bundle saved for LLM processing")
+        print("  Debug bundle saved for LLM processing")
 
         if attempt < max_attempts:
             print(f"  Waiting for LLM to provide fix for: {bundle['failing_function']}")
-            print(f"  Debug bundle: {json.dumps({k: v for k, v in bundle.items() if k != 'traceback'}, indent=2)}")
-            return {"success": False, "needs_fix": True, "bundle": bundle, "attempts": attempt, "results": results}
+            print(
+                f"  Debug bundle: {json.dumps({k: v for k, v in bundle.items() if k != 'traceback'}, indent=2)}"
+            )
+            return {
+                "success": False,
+                "needs_fix": True,
+                "bundle": bundle,
+                "attempts": attempt,
+                "results": results,
+            }
 
     print(f"\n  FAILED after {max_attempts} attempts")
-    print(f"  Creating dead end entry")
-    return {"success": False, "needs_fix": False, "attempts": max_attempts, "results": results}
+    print("  Creating dead end entry")
+    return {
+        "success": False,
+        "needs_fix": False,
+        "attempts": max_attempts,
+        "results": results,
+    }
 
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-Debugging Sandbox")
-    parser.add_argument("--script", type=str, required=True, help="Path to the failing script")
-    parser.add_argument("--max-attempts", type=int, default=3, help="Maximum debug attempts (default: 3)")
-    parser.add_argument("--apply-fix", type=str, help="Path to file containing fixed function code")
+    parser.add_argument(
+        "--script", type=str, required=True, help="Path to the failing script"
+    )
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=3,
+        help="Maximum debug attempts (default: 3)",
+    )
+    parser.add_argument(
+        "--apply-fix", type=str, help="Path to file containing fixed function code"
+    )
     parser.add_argument("--fix-func", type=str, help="Name of the function to replace")
     args = parser.parse_args()
 
     root = find_project_root()
-    script_path = Path(args.script) if Path(args.script).is_absolute() else root / args.script
+    script_path = (
+        Path(args.script) if Path(args.script).is_absolute() else root / args.script
+    )
 
     if not script_path.exists():
         print(f"ERROR: Script not found: {script_path}")
@@ -373,10 +418,19 @@ def main():
 
     fix_code = None
     if args.apply_fix:
-        fix_path = Path(args.apply_fix) if Path(args.apply_fix).is_absolute() else root / args.apply_fix
+        fix_path = (
+            Path(args.apply_fix)
+            if Path(args.apply_fix).is_absolute()
+            else root / args.apply_fix
+        )
         fix_code = fix_path.read_text()
 
-    result = run_auto_debug(script_path, max_attempts=args.max_attempts, fix_code=fix_code, fix_func=args.fix_func)
+    result = run_auto_debug(
+        script_path,
+        max_attempts=args.max_attempts,
+        fix_code=fix_code,
+        fix_func=args.fix_func,
+    )
 
     print(f"\n{'=' * 60}")
     print("AUTO-DEBUG SUMMARY")
@@ -387,15 +441,18 @@ def main():
 
     if not result["success"] and result.get("needs_fix"):
         bundle = result["bundle"]
-        print(f"\n  LLM ACTION REQUIRED:")
+        print("\n  LLM ACTION REQUIRED:")
         print(f"  Fix the function: {bundle['failing_function']}")
         print(f"  Error type: {bundle['error_type']}")
         if bundle.get("function_source"):
-            print(f"\n  Current function source:")
+            print("\n  Current function source:")
             print(f"  {bundle['function_source'][:500]}")
-        print(f"\n  Then run: python .research/scripts/utils/auto_debug.py --script {script_path} --apply-fix <fixed_file> --fix-func {bundle['failing_function']}")
+        print(
+            f"\n  Then run: python .research/scripts/utils/auto_debug.py --script {script_path} --apply-fix <fixed_file> --fix-func {bundle['failing_function']}"
+        )
 
     sys.exit(0 if result["success"] else 1)
+
 
 def trace_node(node_id: str, root: Path) -> None:
     ledger_path = root / "03_synthesis" / "state_ledger.json"
@@ -404,7 +461,7 @@ def trace_node(node_id: str, root: Path) -> None:
         return
     with open(ledger_path) as f:
         ledger = json.load(f)
-    
+
     node_entries = [e for e in ledger.get("history", []) if e.get("node_id") == node_id]
     if not node_entries:
         print(f"No execution history found for node: {node_id}")
@@ -414,7 +471,7 @@ def trace_node(node_id: str, root: Path) -> None:
     print(f"TRACE FOR NODE: {node_id}")
     print("=" * 60)
     for idx, entry in enumerate(node_entries):
-        print(f"\n--- EXECUTION ATTEMPT {idx+1} ---")
+        print(f"\n--- EXECUTION ATTEMPT {idx + 1} ---")
         print(f"Status: {entry.get('status')}")
         if entry.get("prompt"):
             print("\n[PROMPT]")

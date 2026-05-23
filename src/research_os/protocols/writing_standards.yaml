@@ -5,6 +5,7 @@ schema_version: "1.0"
 expected_outputs:
   - "workspace/03_synthesis/draft.md: Draft adhering to budgets and rules"
 imrad_budgets:
+  Abstract: "200-250 words (Background, Methods, Results, Conclusion)"
   Introduction: "500-750 words (Context, Gap, Objective)"
   Methods: "750-1000 words (Design, Sample, Measures, Analysis)"
   Results: "500-800 words (Primary findings, Secondary findings, Sensitivities)"
@@ -19,6 +20,10 @@ writing_rules:
   causal_language:
     avoid_if_observational: ["caused", "led to", "resulted in", "impacted", "determined"]
     use_instead: ["was associated with", "was correlated with", "predicted"]
+  keywords:
+    selection_rules: ["Select 3-5 keywords.", "Do not duplicate words from the title.", "Use Medical Subject Headings (MeSH) if applicable."]
+  limitations:
+    structure: "Always include: 1) Identification of the limitation, 2) How it might have affected the results, 3) Why the study is still valid despite it."
 templates:
   apa_table: |
     Table 1
@@ -29,6 +34,9 @@ templates:
     Age               35.2      4.1       120
     ---------------------------------------------------
     Note. M = Mean, SD = Standard Deviation.
+  conflict_of_interest: |
+    Conflict of Interest Statement:
+    The authors declare that the research was conducted in the absence of any commercial or financial relationships that could be construed as a potential conflict of interest.
 steps:
   - id: check_word_budgets
     name: "Check Word Budgets"

@@ -7,6 +7,7 @@ Pandas masking: every Python execution is prefixed with a safety preamble that
 caps DataFrame display rows to 10, preventing accidental context-window blowouts
 from large DataFrames printed to stdout.
 """
+
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Dict, Any
 import subprocess
@@ -70,6 +71,7 @@ class ExecutionResult:
 def _find_project_root() -> Path:
     """Find project root by looking for .research directory."""
     from research_os.utils.common import find_project_root
+
     return find_project_root()
 
 
@@ -84,41 +86,86 @@ def _load_config(root: Path) -> Dict[str, Any]:
 
 
 class ResearchExecutor:
-    def __init__(self, root: Optional[Path] = None, container_engine: Optional[str] = None, log_path: Optional[Path] = None):
+    def __init__(
+        self,
+        root: Optional[Path] = None,
+        container_engine: Optional[str] = None,
+        log_path: Optional[Path] = None,
+    ):
         self.root = root or _find_project_root()
         config = _load_config(self.root)
         exec_cfg = config.get("execution", {}) if isinstance(config, dict) else {}
-        self.container_engine = container_engine or exec_cfg.get("container_engine", "docker")
-        log_default = exec_cfg.get("executor_log", ".research/cache/execution_log.jsonl")
+        self.container_engine = container_engine or exec_cfg.get(
+            "container_engine", "docker"
+        )
+        log_default = exec_cfg.get(
+            "executor_log", ".research/cache/execution_log.jsonl"
+        )
         self.log_path = Path(log_path) if log_path else (self.root / log_default)
 
-    def _run(self, cmd: List[str], timeout: Optional[int] = None,
-             tool_ids: Optional[List[str]] = None, domain: Optional[str] = None) -> ExecutionResult:
+    def _run(
+        self,
+        cmd: List[str],
+        timeout: Optional[int] = None,
+        tool_ids: Optional[List[str]] = None,
+        domain: Optional[str] = None,
+    ) -> ExecutionResult:
         if timeout is None:
             timeout = 300
         else:
             timeout = min(timeout, 300)
         start = time.time()
         try:
-            p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            p = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout,
+            )
             duration = time.time() - start
-            return ExecutionResult(runtime=cmd[0] if cmd else "", script_path=" ", exit_code=p.returncode,
-                                   stdout=p.stdout, stderr=p.stderr, duration_seconds=duration,
-                                   container_used=None, artifacts_produced=[],
-                                   tool_ids=tool_ids or [], domain=domain)
+            return ExecutionResult(
+                runtime=cmd[0] if cmd else "",
+                script_path=" ",
+                exit_code=p.returncode,
+                stdout=p.stdout,
+                stderr=p.stderr,
+                duration_seconds=duration,
+                container_used=None,
+                artifacts_produced=[],
+                tool_ids=tool_ids or [],
+                domain=domain,
+            )
         except subprocess.TimeoutExpired as e:
             duration = time.time() - start
-            return ExecutionResult(runtime=cmd[0] if cmd else "", script_path=" ", exit_code=124,
-                                   stdout="", stderr=str(e), duration_seconds=duration,
-                                   container_used=None, artifacts_produced=[],
-                                   tool_ids=tool_ids or [], domain=domain)
+            return ExecutionResult(
+                runtime=cmd[0] if cmd else "",
+                script_path=" ",
+                exit_code=124,
+                stdout="",
+                stderr=str(e),
+                duration_seconds=duration,
+                container_used=None,
+                artifacts_produced=[],
+                tool_ids=tool_ids or [],
+                domain=domain,
+            )
 
-    def _wrap_container(self, container: Optional[str], command: List[str]) -> List[str]:
+    def _wrap_container(
+        self, container: Optional[str], command: List[str]
+    ) -> List[str]:
         if not container:
             return command
         if shutil.which(self.container_engine):
             # simple docker run wrapper; users should prefer runtime_selector for complex needs
-            return [self.container_engine, "run", "--rm", "-v", f"{Path.cwd()}:/workspace", container] + command
+            return [
+                self.container_engine,
+                "run",
+                "--rm",
+                "-v",
+                f"{Path.cwd()}:/workspace",
+                container,
+            ] + command
         return command
 
     def _make_node_id(self, script_path: str, iteration_id: Optional[str]) -> str:
@@ -141,7 +188,9 @@ class ResearchExecutor:
         except ImportError:
             return
 
-        node_id = metadata.get("node_id") or self._make_node_id(result.script_path, metadata.get("iteration_id"))
+        node_id = metadata.get("node_id") or self._make_node_id(
+            result.script_path, metadata.get("iteration_id")
+        )
         input_files = metadata.get("input_files") or []
         output_files = metadata.get("output_files") or []
         depends_on = metadata.get("depends_on") or []
@@ -149,15 +198,27 @@ class ResearchExecutor:
         status = "complete" if result.exit_code == 0 else "failed"
 
         dag = ExecutionDAGManager(self.root)
-        dag.add_node(node_id, result.script_path, input_files, output_files,
-                     depends_on=depends_on, iteration_id=iteration_id, status=status,
-                     runtime=result.runtime, container=result.container_used,
-                     tool_ids=result.tool_ids, domain=result.domain,
-                     exit_code=result.exit_code, duration=result.duration_seconds)
+        dag.add_node(
+            node_id,
+            result.script_path,
+            input_files,
+            output_files,
+            depends_on=depends_on,
+            iteration_id=iteration_id,
+            status=status,
+            runtime=result.runtime,
+            container=result.container_used,
+            tool_ids=result.tool_ids,
+            domain=result.domain,
+            exit_code=result.exit_code,
+            duration=result.duration_seconds,
+        )
         if output_files:
             dag.update_output_hashes(node_id)
 
-    def _post_process(self, result: ExecutionResult, metadata: Dict[str, Any]) -> ExecutionResult:
+    def _post_process(
+        self, result: ExecutionResult, metadata: Dict[str, Any]
+    ) -> ExecutionResult:
         self._log_execution(result, metadata)
         self._update_dag(result, metadata)
         return result
@@ -179,6 +240,7 @@ class ResearchExecutor:
                 f.write(PANDAS_DISPLAY_PREAMBLE + original)
         except Exception:
             import os
+
             os.unlink(tmp_path)
             return script_path
         return tmp_path
@@ -198,6 +260,7 @@ class ResearchExecutor:
         domain: Optional[str] = None,
     ) -> ExecutionResult:
         import os
+
         wrapped_path = self._inject_preamble(script_path)
         cmd = [sys.executable, wrapped_path] + (args or [])
         cmd = self._wrap_container(container, cmd)
@@ -210,13 +273,16 @@ class ResearchExecutor:
                 os.unlink(wrapped_path)
             except OSError:
                 pass
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def run_r(
         self,
@@ -238,13 +304,16 @@ class ResearchExecutor:
         res.runtime = "r"
         res.script_path = script_path
         res.container_used = container
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def run_bash(
         self,
@@ -265,13 +334,16 @@ class ResearchExecutor:
         res.runtime = "bash"
         res.script_path = command
         res.container_used = container
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def run_nextflow(
         self,
@@ -293,13 +365,16 @@ class ResearchExecutor:
         res.runtime = "nextflow"
         res.script_path = pipeline
         res.container_used = container
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def run_snakemake(
         self,
@@ -321,13 +396,16 @@ class ResearchExecutor:
         res.runtime = "snakemake"
         res.script_path = snakefile
         res.container_used = container
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def run_julia(
         self,
@@ -349,13 +427,16 @@ class ResearchExecutor:
         res.runtime = "julia"
         res.script_path = script_path
         res.container_used = container
-        return self._post_process(res, {
-            "input_files": input_files or [],
-            "output_files": output_files or [],
-            "depends_on": depends_on or [],
-            "iteration_id": iteration_id,
-            "node_id": node_id,
-        })
+        return self._post_process(
+            res,
+            {
+                "input_files": input_files or [],
+                "output_files": output_files or [],
+                "depends_on": depends_on or [],
+                "iteration_id": iteration_id,
+                "node_id": node_id,
+            },
+        )
 
     def check_runtime(self, runtime: str) -> bool:
         if runtime == "docker":
@@ -456,7 +537,11 @@ class TemplateExecutor:
             return p
 
         # Normalise — add extension if missing.
-        name = template_name if template_name.endswith(".py.template") else f"{template_name}.py.template"
+        name = (
+            template_name
+            if template_name.endswith(".py.template")
+            else f"{template_name}.py.template"
+        )
 
         # 1. User override templates.
         user_dir = self.root / ".research" / "templates"
@@ -504,6 +589,7 @@ class TemplateExecutor:
             )
 
         import jinja2
+
         upper_vars = {k.upper(): v for k, v in variables.items()}
         return jinja2.Template(source).render(**upper_vars)
 
@@ -570,11 +656,13 @@ class TemplateExecutor:
             for tmpl in sorted(d.rglob("*.py.template")):
                 source = tmpl.read_text()
                 placeholders = sorted(set(self.PLACEHOLDER_RE.findall(source)))
-                results.append({
-                    "name": tmpl.stem.replace(".py", ""),
-                    "path": str(tmpl),
-                    "placeholders": ", ".join(placeholders),
-                })
+                results.append(
+                    {
+                        "name": tmpl.stem.replace(".py", ""),
+                        "path": str(tmpl),
+                        "placeholders": ", ".join(placeholders),
+                    }
+                )
         return results
 
 

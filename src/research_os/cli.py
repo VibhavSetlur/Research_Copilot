@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-from research_os.intent_router import IntentAnalyzer
+
 from research_os.project_ops import (
     compute_input_hashes,
     create_experiment_branch,
@@ -72,7 +72,11 @@ def _print_tree(path: Path, prefix: str = "", is_root: bool = True) -> None:
     entries = sorted(path.iterdir()) if path.exists() else []
 
     for i, entry in enumerate(entries):
-        if entry.name.startswith(".") and entry.name not in (".research", ".os_state", ".cursor"):
+        if entry.name.startswith(".") and entry.name not in (
+            ".research",
+            ".os_state",
+            ".cursor",
+        ):
             continue
         if entry.name in ("__pycache__", ".git"):
             continue
@@ -101,7 +105,9 @@ def _interactive_questionnaire(target_dir: Path) -> dict:
     print("(Press Enter to accept defaults in brackets.)")
     print()
 
-    project_name = input(f"  Project name [{target_dir.name}]: ").strip() or target_dir.name
+    project_name = (
+        input(f"  Project name [{target_dir.name}]: ").strip() or target_dir.name
+    )
 
     default_question = f"Research question for '{project_name}'"
     research_question = input(f"  {default_question} []: ").strip()
@@ -113,7 +119,13 @@ def _interactive_questionnaire(target_dir: Path) -> dict:
     print("    4. Engineering / CS")
     print("    5. Economics / Business")
     domain_choice = input("  Choose domain [1]: ").strip() or "1"
-    domain_map = {"1": "general", "2": "natural_sciences", "3": "biomedical", "4": "engineering", "5": "economics"}
+    domain_map = {
+        "1": "general",
+        "2": "natural_sciences",
+        "3": "biomedical",
+        "4": "engineering",
+        "5": "economics",
+    }
     domain = domain_map.get(domain_choice, "general")
 
     print("  Research depth:")
@@ -138,6 +150,7 @@ def _interactive_questionnaire(target_dir: Path) -> dict:
 def _print_mcp_snippet(project_root: Path) -> None:
     """Print the MCP JSON snippet that users paste into their IDE."""
     import sys as _sys
+
     server_cmd = f"{_sys.executable} -m research_os.server"
     snippet = {
         "research-os": {
@@ -155,7 +168,9 @@ def _print_mcp_snippet(project_root: Path) -> None:
         print(f"  │ {line:<73} │")
     print("  └────────────────────────────────────────────────────────────────────┘")
     print()
-    print(f"  Or run: echo '{json.dumps({'mcpServers': snippet})}' > {project_root / '.cursor' / 'mcp.json'}")
+    print(
+        f"  Or run: echo '{json.dumps({'mcpServers': snippet})}' > {project_root / '.cursor' / 'mcp.json'}"
+    )
 
 
 def cmd_init(args: argparse.Namespace) -> None:
@@ -173,7 +188,16 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     if target_dir.exists():
         # Check if there's existing data to preserve
-        for pattern in ("*.csv", "*.json", "*.xlsx", "*.txt", "*.r", "*.py", "*.ipynb", "*.pdf"):
+        for pattern in (
+            "*.csv",
+            "*.json",
+            "*.xlsx",
+            "*.txt",
+            "*.r",
+            "*.py",
+            "*.ipynb",
+            "*.pdf",
+        ):
             existing = list(target_dir.glob(pattern))
             if existing:
                 has_existing_data = True
@@ -187,8 +211,8 @@ def cmd_init(args: argparse.Namespace) -> None:
 
         if has_existing_data and not args.force:
             print(f"Found existing files in '{target_dir}'.")
-            print(f"Research OS will NOT overwrite your data.")
-            print(f"Existing data will be symlinked into the workspace.")
+            print("Research OS will NOT overwrite your data.")
+            print("Existing data will be symlinked into the workspace.")
             print()
 
     if has_existing_data and not args.force:
@@ -222,6 +246,7 @@ def cmd_init(args: argparse.Namespace) -> None:
                     link.symlink_to(src.absolute())
                 except OSError:
                     import shutil
+
                     shutil.copy2(src, link)
 
     print()
@@ -237,15 +262,15 @@ def cmd_init(args: argparse.Namespace) -> None:
     print()
     print("Next steps:")
     print(f"  1. cd {target_dir}")
-    print(f"  2. research-os doctor    # Verify everything is ready")
-    print(f"  3. Open in your AI IDE and paste the MCP config:")
+    print("  2. research-os doctor    # Verify everything is ready")
+    print("  3. Open in your AI IDE and paste the MCP config:")
     print()
     _print_mcp_snippet(target_dir)
     print()
     print("  4. Type in the IDE: 'Explore my data'")
     print()
 
-    print(f"Project config: {target_dir / '.research' / 'config.yaml'}")
+    print(f"Project config: {target_dir / 'inputs' / 'researcher_config.yaml'}")
 
 
 def cmd_preflight(args: argparse.Namespace) -> None:
@@ -254,10 +279,16 @@ def cmd_preflight(args: argparse.Namespace) -> None:
         print("=" * 60)
         print("ENVIRONMENT PREFLIGHT CHECKS")
         print("=" * 60)
-        print(f"Python Version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        print(
+            f"Python Version: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        )
         print(f"Workspace:      {root}")
-        print(f"Config Folder:  {root / '.research' if (root / '.research').exists() else 'MISSING'}")
-        print(f"Inputs Folder:  {root / '00_inputs' if (root / '00_inputs').exists() else 'MISSING'}")
+        print(
+            f"Config Folder:  {'.os_state/' if (root / '.os_state').exists() else 'MISSING'}"
+        )
+        print(
+            f"Inputs Folder:  {'inputs/' if (root / 'inputs').exists() else 'MISSING'}"
+        )
         print("Status:         OK")
     except Exception as e:
         print(f"Preflight error: {e}")
@@ -269,7 +300,7 @@ def cmd_scan(args: argparse.Namespace) -> None:
         from research_os.utils.data_scale_detector import DataScaleDetector
 
         root = _project_root()
-        inputs_dir = root / "00_inputs" / "raw_data"
+        inputs_dir = root / "inputs" / "raw_data"
         if not inputs_dir.exists():
             print(f"Error: Raw data directory not found at {inputs_dir}")
             sys.exit(1)
@@ -306,7 +337,9 @@ def cmd_setup(args: argparse.Namespace) -> None:
     print("Bundled assets:")
     for name, count in asset_counts.items():
         print(f"  - {name}: {count}")
-    print(f"Local overrides: {len([r for r in local_overrides if r.source == 'local_override'])}")
+    print(
+        f"Local overrides: {len([r for r in local_overrides if r.source == 'local_override'])}"
+    )
     print("Status: READY")
 
 
@@ -314,9 +347,13 @@ def cmd_status(args: argparse.Namespace) -> None:
     root = _project_root()
     state = load_state(root)
     hashes = compute_input_hashes(root)
-    experiments_dir = root / "02_experiments"
-    experiments = sorted(p.name for p in experiments_dir.iterdir() if p.is_dir()) if experiments_dir.exists() else []
-    manifest_exists = (root / "03_synthesis" / "manifest.json").exists()
+    experiments_dir = root / "workspace" / "logs"
+    experiments = (
+        sorted(p.name for p in experiments_dir.iterdir() if p.is_dir())
+        if experiments_dir.exists()
+        else []
+    )
+    manifest_exists = (root / ".os_state" / "manifest.json").exists()
 
     print("=" * 60)
     print("RESEARCH PROJECT STATUS")
@@ -402,23 +439,13 @@ def cmd_workflow(args: argparse.Namespace) -> None:
         print(f"  {idx}. {agent}")
 
 
-def cmd_intent(args: argparse.Namespace) -> None:
-    analyzer = IntentAnalyzer(_project_root())
-    intake = analyzer.build_bootstrap_intake(args.query)
-    cls = intake.get("classification", {})
-    print(f"Primary Intent: {cls.get('primary_intent', 'unknown')}")
-    print(f"Suggested Skills: {', '.join(intake.get('suggested_skills', []))}")
-    print(f"Suggested Agents: {', '.join(intake.get('suggested_agents', []))}")
-    print(f"Suggested Steps: {', '.join(intake.get('suggested_workflow_steps', []))}")
-    print(f"Excluded Categories: {', '.join(intake.get('excluded_categories', []))}")
-
-
 def cmd_run(args: argparse.Namespace) -> None:
     from research_os.engine import ResearchEngine
+
     root = _project_root()
     engine = ResearchEngine(root, hitl_enabled=False)
     print("=" * 60)
-    print("AGENTIC RESEARCH OS - RUN")
+    print("RESEARCH OS - RUN")
     print("=" * 60)
     print(f"Query: {args.query}")
     print("Booting engine...\n")
@@ -429,7 +456,6 @@ def cmd_run(args: argparse.Namespace) -> None:
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Run comprehensive pre-flight checks and output READY / NOT READY status."""
     import os
-    import shutil
     import subprocess
     from research_os.config import settings
 
@@ -447,14 +473,20 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         checks.append({"name": name, "ok": ok, "message": message})
 
     # ── 1. Python Version ──────────────────────────────────────────
-    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    py_ver = (
+        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
     py_ok = sys.version_info >= (3, 10)
-    _check("Python version", py_ok,
-           f"Python {py_ver} {'✓ (>= 3.10)' if py_ok else '✗ (need 3.10+)'}")
+    _check(
+        "Python version",
+        py_ok,
+        f"Python {py_ver} {'✓ (>= 3.10)' if py_ok else '✗ (need 3.10+)'}",
+    )
 
     # ── 2. MCP SDK ─────────────────────────────────────────────────
     try:
         import mcp
+
         mcp_version = getattr(mcp, "__version__", "unknown")
         _check("MCP SDK", True, f"MCP SDK {mcp_version} found")
     except ImportError:
@@ -463,23 +495,31 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     # ── 3. Docker ──────────────────────────────────────────────────
     docker_path = shutil.which("docker")
     docker_ok = docker_path is not None
-    _check("Docker", docker_ok,
-           "Docker found" if docker_ok else "Docker not found (optional for containerized runs)")
+    _check(
+        "Docker",
+        docker_ok,
+        "Docker found"
+        if docker_ok
+        else "Docker not found (optional for containerized runs)",
+    )
 
     # ── 4. Disk Space ──────────────────────────────────────────────
     try:
         root = _project_root()
         stat = os.statvfs(root)
-        free_gb = stat.f_bavail * stat.f_frsize / (1024 ** 3)
+        free_gb = stat.f_bavail * stat.f_frsize / (1024**3)
         space_ok = free_gb >= 1.0
-        _check("Disk space", space_ok,
-               f"{free_gb:.1f} GB free {'✓' if space_ok else '✗ (need ≥ 1 GB)'}")
+        _check(
+            "Disk space",
+            space_ok,
+            f"{free_gb:.1f} GB free {'✓' if space_ok else '✗ (need ≥ 1 GB)'}",
+        )
     except Exception:
         _check("Disk space", False, "Could not determine free disk space")
 
     # ── 5. Write Permissions ────────────────────────────────────────
     try:
-        test_dir = (root if 'root' in dir() else Path.cwd()) / ".doctor_test"
+        test_dir = (root if "root" in dir() else Path.cwd()) / ".doctor_test"
         test_dir.mkdir(parents=True, exist_ok=True)
         test_file = test_dir / "test_write"
         test_file.write_text("ok")
@@ -491,12 +531,22 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
     # ── 6. API Keys ─────────────────────────────────────────────────
     llm_ok = bool(settings.OPENAI_API_KEY or settings.ANTHROPIC_API_KEY)
-    _check("LLM API key", llm_ok,
-           "LLM API key configured" if llm_ok else "No OPENAI_API_KEY or ANTHROPIC_API_KEY found")
+    _check(
+        "LLM API key",
+        llm_ok,
+        "LLM API key configured"
+        if llm_ok
+        else "No OPENAI_API_KEY or ANTHROPIC_API_KEY found",
+    )
 
     semantic_ok = bool(settings.SEMANTIC_SCHOLAR_API_KEY)
-    _check("Semantic Scholar API key", True,
-           "Semantic Scholar API key configured" if semantic_ok else "No key (will use public endpoints)")
+    _check(
+        "Semantic Scholar API key",
+        True,
+        "Semantic Scholar API key configured"
+        if semantic_ok
+        else "No key (will use public endpoints)",
+    )
 
     # ── 7. Validate API Keys (lightweight test call) ───────────────
     if llm_ok:
@@ -504,6 +554,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         try:
             if settings.OPENAI_API_KEY:
                 import httpx
+
                 r = httpx.get(
                     "https://api.openai.com/v1/models",
                     headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
@@ -512,41 +563,78 @@ def cmd_doctor(args: argparse.Namespace) -> None:
                 key_valid = r.status_code == 200
             elif settings.ANTHROPIC_API_KEY:
                 import httpx
+
                 r = httpx.get(
                     "https://api.anthropic.com/v1/messages",
-                    headers={"x-api-key": settings.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01"},
+                    headers={
+                        "x-api-key": settings.ANTHROPIC_API_KEY,
+                        "anthropic-version": "2023-06-01",
+                    },
                     timeout=10,
                 )
-                key_valid = r.status_code in (200, 400)  # 400 means auth passed but body format may differ
+                key_valid = r.status_code in (
+                    200,
+                    400,
+                )  # 400 means auth passed but body format may differ
             else:
                 key_valid = False
-            _check(f"API key test ({key_source})", key_valid,
-                   f"{key_source} API key validated" if key_valid else f"{key_source} API key rejected")
+            _check(
+                f"API key test ({key_source})",
+                key_valid,
+                f"{key_source} API key validated"
+                if key_valid
+                else f"{key_source} API key rejected",
+            )
         except Exception as e:
-            _check(f"API key test ({key_source})", False, f"Could not validate {key_source} key: {e}")
+            _check(
+                f"API key test ({key_source})",
+                False,
+                f"Could not validate {key_source} key: {e}",
+            )
 
     # ── 8. Input Files ─────────────────────────────────────────────
     try:
         inputs_dir = root / "inputs"
         if inputs_dir.exists():
             data_files = list(inputs_dir.rglob("*"))
-            data_files = [f for f in data_files if f.is_file() and not f.name.startswith(".")]
+            data_files = [
+                f for f in data_files if f.is_file() and not f.name.startswith(".")
+            ]
             has_inputs = len(data_files) > 0
-            _check("Input files", has_inputs,
-                   f"{len(data_files)} file(s) in inputs/" if has_inputs else "inputs/ is empty — add data")
+            _check(
+                "Input files",
+                has_inputs,
+                f"{len(data_files)} file(s) in inputs/"
+                if has_inputs
+                else "inputs/ is empty — add data",
+            )
         else:
-            _check("Input files", False, "inputs/ directory not found — run 'research-os init'")
+            _check(
+                "Input files",
+                False,
+                "inputs/ directory not found — run 'research-os init'",
+            )
     except Exception:
         _check("Input files", False, "Could not check inputs/")
 
     # ── 9. LaTeX / Pandoc ──────────────────────────────────────────
     latex_ok = shutil.which("pdflatex") is not None
-    _check("pdflatex", latex_ok,
-           "pdflatex found (PDF compilation)" if latex_ok else "pdflatex not found (Markdown only)")
+    _check(
+        "pdflatex",
+        latex_ok,
+        "pdflatex found (PDF compilation)"
+        if latex_ok
+        else "pdflatex not found (Markdown only)",
+    )
 
     pandoc_ok = shutil.which("pandoc") is not None
-    _check("pandoc", pandoc_ok,
-           "pandoc found" if pandoc_ok else "pandoc not found (manuscript compilation may fail)")
+    _check(
+        "pandoc",
+        pandoc_ok,
+        "pandoc found"
+        if pandoc_ok
+        else "pandoc not found (manuscript compilation may fail)",
+    )
 
     # ── Print Results ──────────────────────────────────────────────
     print()
@@ -574,7 +662,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
 
 def cmd_branch(args: argparse.Namespace) -> None:
-    result = create_experiment_branch(args.name, hypothesis=args.hypothesis, parent=args.parent, root=_project_root())
+    result = create_experiment_branch(
+        args.name, hypothesis=args.hypothesis, parent=args.parent, root=_project_root()
+    )
     print(f"Created branch: {result['branch_id']}")
     print(f"Experiment: {result['experiment_dir']}")
     print(f"Input hashes inherited: {len(result['data_hashes'])}")
@@ -622,18 +712,21 @@ def cmd_save_artifact(args: argparse.Namespace) -> None:
 
 def cmd_trace(args: argparse.Namespace) -> None:
     from research_os.utils.auto_debug import trace_node
+
     trace_node(args.node_id, _project_root())
+
 
 def cmd_continue(args: argparse.Namespace) -> None:
     root = _project_root()
     from research_os.state.state_ledger import ResearchLedger
-    ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+
+    ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
     state = ledger.get()
-    
+
     if state.get("phase") != "WAITING_ON_USER":
         print("No plan pending approval.")
         return
-        
+
     pending = state.get("hitl_pending", {})
     if not args.approve and not args.reject:
         print("=" * 60)
@@ -656,20 +749,24 @@ def cmd_continue(args: argparse.Namespace) -> None:
         ledger.update(phase="user_rejected", hitl_pending=None)
         print("Plan rejected.")
         return
-        
+
     if args.approve:
         ledger.update(phase="running", hitl_pending=None)
         print("Plan approved. Resuming workflow...")
         from research_os.engine import ResearchEngine
+
         engine = ResearchEngine(root, hitl_enabled=False)
         query = pending.get("query", "")
         depth = pending.get("depth", "academic")
         result = engine.route_and_execute(query, depth=depth)
         print(f"Resume status: {result.get('status', 'completed')}")
 
+
 def cmd_ingest(args: argparse.Namespace) -> None:
     from research_os.utils.cache_manager import cmd_ingest as _ingest
+
     _ingest(args)
+
 
 def cmd_compress(args: argparse.Namespace) -> None:
     """Compress the state ledger using a local LLM to free context window space."""
@@ -677,7 +774,7 @@ def cmd_compress(args: argparse.Namespace) -> None:
         from research_os.state.state_ledger import ResearchLedger
 
         root = _project_root()
-        ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+        ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
         result = ledger.compress_ledger(model=args.model, dry_run=args.dry_run)
 
         print("=" * 60)
@@ -700,7 +797,7 @@ def cmd_audit(args: argparse.Namespace) -> None:
         from research_os.utils.provenance_mapper import ProvenanceMapper
 
         root = _project_root()
-        ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
+        ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
         mapper = ProvenanceMapper(ledger)
 
         lineage = mapper.build_lineage(args.result_file)
@@ -717,46 +814,56 @@ def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "daemon", False):
         import subprocess
         import sys
+
         cmd = [sys.executable, "-m", "research_os.server"]
         if args.transport:
             cmd.extend(["--transport", args.transport])
         if args.port:
             cmd.extend(["--port", str(args.port)])
         subprocess.Popen(cmd, start_new_session=True)
-        print(f"Started MCP server daemon (transport: {args.transport}, port: {args.port})")
+        print(
+            f"Started MCP server daemon (transport: {args.transport}, port: {args.port})"
+        )
         return
 
     from research_os.server import main
     import sys
+
     if "start" in sys.argv:
         sys.argv.remove("start")
     if getattr(args, "daemon", False) and "--daemon" in sys.argv:
         sys.argv.remove("--daemon")
     main()
 
+
 def cmd_env(args: argparse.Namespace) -> None:
     import subprocess
+
     root = _project_root()
     step_dir = root / "workspace" / args.step
     if not step_dir.exists():
         print(f"Error: Step directory {step_dir} does not exist.")
         sys.exit(1)
-        
+
     env_dir = step_dir / "environment"
     env_dir.mkdir(parents=True, exist_ok=True)
     req_file = env_dir / "requirements.txt"
-    
+
     if args.env_cmd == "freeze":
         print(f"Freezing environment to {req_file}...")
         with open(req_file, "w") as f:
-            subprocess.run([sys.executable, "-m", "pip", "freeze"], stdout=f, check=True)
+            subprocess.run(
+                [sys.executable, "-m", "pip", "freeze"], stdout=f, check=True
+            )
         print("Environment frozen successfully.")
     elif args.env_cmd == "restore":
         if not req_file.exists():
             print(f"Error: {req_file} not found. Cannot restore.")
             sys.exit(1)
         print(f"Restoring environment from {req_file}...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True
+        )
         print("Environment restored successfully.")
 
 
@@ -774,22 +881,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
 
-    p_init = sub.add_parser("init", help="Initialize a Research OS workspace in a directory")
-    p_init.add_argument("directory", help="Target directory path (e.g. /home/user/my-project/)")
+    p_init = sub.add_parser(
+        "init", help="Initialize a Research OS workspace in a directory"
+    )
+    p_init.add_argument(
+        "directory", help="Target directory path (e.g. /home/user/my-project/)"
+    )
     p_init.add_argument("--name", help="Project name (defaults to directory name)")
-    p_init.add_argument("--force", action="store_true", help="Overwrite existing directory and ignore existing data")
-    p_init.add_argument("--interactive", "-i", action="store_true", help="Run interactive questionnaire for config")
+    p_init.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing directory and ignore existing data",
+    )
+    p_init.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Run interactive questionnaire for config",
+    )
 
     sub.add_parser("preflight", help="Run environment preflight checks")
     sub.add_parser("scan", help="Scan inputs and build research map")
     sub.add_parser("setup", help="Verify package assets and local overrides")
     sub.add_parser("status", help="Show clean workspace status")
-    
-    p_run = sub.add_parser("run", help="Run the Agentic Research OS on a natural language query")
+
+    p_run = sub.add_parser(
+        "run", help="Run the Research OS on a natural language query"
+    )
     p_run.add_argument("query", help="The research task to execute")
-    p_run.add_argument("--plan-only", action="store_true", help="Generate the research plan and exit without executing loops.")
-    
-    sub.add_parser("doctor", help="Pre-flight check for API keys, LaTeX, and permissions")
+    p_run.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Generate the research plan and exit without executing loops.",
+    )
+
+    sub.add_parser(
+        "doctor", help="Pre-flight check for API keys, LaTeX, and permissions"
+    )
 
     p_compress = sub.add_parser(
         "compress",
@@ -806,17 +934,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Preview compressed outputs without saving changes",
     )
 
-    p_audit = sub.add_parser("audit", help="Trace the provenance of a result file back to its inputs")
+    p_audit = sub.add_parser(
+        "audit", help="Trace the provenance of a result file back to its inputs"
+    )
     p_audit.add_argument("result_file", help="Path to the output result file to audit")
 
-    p_compile = sub.add_parser("compile", help="Map-reduce manuscript sections into PDF/HTML via Pandoc")
-    p_compile.add_argument("--formats", default="pdf,html", help="Comma-separated formats (e.g., pdf,html)")
+    p_compile = sub.add_parser(
+        "compile", help="Map-reduce manuscript sections into PDF/HTML via Pandoc"
+    )
+    p_compile.add_argument(
+        "--formats", default="pdf,html", help="Comma-separated formats (e.g., pdf,html)"
+    )
 
     p_trace = sub.add_parser("trace", help="Trace node execution sequence")
     p_trace.add_argument("node_id", help="Node ID to trace")
 
     p_continue = sub.add_parser("continue", help="Continue a paused workflow")
-    p_continue.add_argument("--approve", action="store_true", help="Approve the workflow")
+    p_continue.add_argument(
+        "--approve", action="store_true", help="Approve the workflow"
+    )
     p_continue.add_argument("--reject", action="store_true", help="Reject the workflow")
 
     p_ingest = sub.add_parser("ingest", help="Ingest a file into local vector database")
@@ -833,7 +969,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_workflow = sub.add_parser("workflow", help="Show workflow")
     p_workflow.add_argument("name", nargs="?")
 
-    p_intent = sub.add_parser("intent", help="Route a query through depth-aware intent routing")
+    p_intent = sub.add_parser(
+        "intent", help="Route a query through depth-aware intent routing"
+    )
     p_intent.add_argument("query")
     p_intent.add_argument("--depth", choices=DEPTH_CHOICES, default=None)
 
@@ -843,16 +981,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_branch.add_argument("--from", dest="parent", default=None)
     sub.add_parser("branches", help="List experiment branches")
 
-    p_decision = sub.add_parser("log-decision", help="Append to the active experiment decisions.yaml")
+    p_decision = sub.add_parser(
+        "log-decision", help="Append to the active experiment decisions.yaml"
+    )
     p_decision.add_argument("--context", required=True)
     p_decision.add_argument("--selected", required=True)
     p_decision.add_argument("--rationale", required=True)
     p_decision.add_argument("--branch")
 
-    p_artifact = sub.add_parser("save-artifact", help="Save artifact with sibling .meta.yaml")
+    p_artifact = sub.add_parser(
+        "save-artifact", help="Save artifact with sibling .meta.yaml"
+    )
     p_artifact.add_argument("filename")
     p_artifact.add_argument("--content", required=True)
-    p_artifact.add_argument("--artifact-type", choices=["artifact", "analysis", "figure", "table"], default="artifact")
+    p_artifact.add_argument(
+        "--artifact-type",
+        choices=["artifact", "analysis", "figure", "table"],
+        default="artifact",
+    )
     p_artifact.add_argument("--generated-by", default="cli")
     p_artifact.add_argument("--source-script")
     p_artifact.add_argument("--branch")
@@ -860,16 +1006,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_start = sub.add_parser("start", help="Boot the MCP server")
     p_start.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     p_start.add_argument("--port", type=int, default=8080)
-    p_start.add_argument("--daemon", action="store_true", help="Run server in the background")
+    p_start.add_argument(
+        "--daemon", action="store_true", help="Run server in the background"
+    )
 
     p_env = sub.add_parser("env", help="Manage reproducible environments per step")
     env_sub = p_env.add_subparsers(dest="env_cmd", required=True)
-    
+
     p_env_freeze = env_sub.add_parser("freeze", help="Snapshot current environment")
-    p_env_freeze.add_argument("step", help="Experiment step folder name (e.g., 01_baseline)")
-    
-    p_env_restore = env_sub.add_parser("restore", help="Restore environment from a step")
-    p_env_restore.add_argument("step", help="Experiment step folder name (e.g., 01_baseline)")
+    p_env_freeze.add_argument(
+        "step", help="Experiment step folder name (e.g., 01_baseline)"
+    )
+
+    p_env_restore = env_sub.add_parser(
+        "restore", help="Restore environment from a step"
+    )
+    p_env_restore.add_argument(
+        "step", help="Experiment step folder name (e.g., 01_baseline)"
+    )
 
     return parser
 
@@ -883,7 +1037,7 @@ def main() -> None:
     args.depth = getattr(args, "depth", None) or args.global_depth
 
     commands = {
-        "chat": lambda a: __import__('research_os.chat').chat.start_chat_loop(),
+        "chat": lambda a: __import__("research_os.chat").chat.start_chat_loop(),
         "init": cmd_init,
         "run": cmd_run,
         "doctor": cmd_doctor,
@@ -898,11 +1052,9 @@ def main() -> None:
         "skill": cmd_skills,
         "skills": lambda a: cmd_skills(argparse.Namespace(name=None)),
         "workflow": cmd_workflow,
-        "intent": cmd_intent,
         "continue": cmd_continue,
         "trace": cmd_trace,
         "compile": cmd_compile,
-        "trace": cmd_trace,
         "ingest": cmd_ingest,
         "branch": cmd_branch,
         "branches": cmd_branches,

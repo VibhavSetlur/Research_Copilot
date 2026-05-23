@@ -164,7 +164,7 @@ class ExecutionDAGManager:
         if node_id not in dag["branches"][branch_id]["nodes"]:
             dag["branches"][branch_id]["nodes"].append(node_id)
 
-        for dep in (depends_on or []):
+        for dep in depends_on or []:
             if dep in dag["nodes"]:
                 dag["edges"].append({"from": dep, "to": node_id})
 
@@ -201,7 +201,9 @@ class ExecutionDAGManager:
         lineage = []
 
         for node_id, node in dag["nodes"].items():
-            if file_path in node.get("input_files", []) or file_path in node.get("output_files", []):
+            if file_path in node.get("input_files", []) or file_path in node.get(
+                "output_files", []
+            ):
                 lineage.append(node)
 
         return sorted(lineage, key=lambda n: n["timestamp"])
@@ -291,12 +293,14 @@ class ExecutionDAGManager:
             else:
                 current_hash = self._compute_hash(p)
                 if current_hash != recorded_hash:
-                    changes.append({
-                        "file": fp,
-                        "status": "changed",
-                        "recorded_hash": recorded_hash[:8],
-                        "current_hash": current_hash[:8],
-                    })
+                    changes.append(
+                        {
+                            "file": fp,
+                            "status": "changed",
+                            "recorded_hash": recorded_hash[:8],
+                            "current_hash": current_hash[:8],
+                        }
+                    )
                     input_changed = True
 
         return {
@@ -349,7 +353,9 @@ class ExecutionDAGManager:
                     ct = n.get("container") or "local"
                     tools = ", ".join(n.get("tool_ids", [])) or "-"
                     lines.append(f"      {status_marker} {n['script_path']}")
-                    lines.append(f"         runtime={rt} container={ct} tools=[{tools}]")
+                    lines.append(
+                        f"         runtime={rt} container={ct} tools=[{tools}]"
+                    )
                 lines.append("")
 
         branches = {}
@@ -388,7 +394,7 @@ class ExecutionDAGManager:
 
         branch_nodes = dag["branches"][branch_id].get("nodes", [])
         dag.setdefault("branches", {}).setdefault(target_branch, {"nodes": []})
-        
+
         for nid in branch_nodes:
             if nid not in dag["branches"][target_branch]["nodes"]:
                 dag["branches"][target_branch]["nodes"].append(nid)

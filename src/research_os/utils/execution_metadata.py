@@ -7,6 +7,7 @@ Merges data from:
 
 Produces structured analysis-ready metadata consumed by downstream phases.
 """
+
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -136,8 +137,10 @@ def write_analysis_metadata(
 ) -> str:
     root = root or _find_project_root()
     metadata = build_analysis_metadata(root)
-    out = Path(output_path) if output_path else (
-        root / ".research" / "cache" / "execution_metadata.json"
+    out = (
+        Path(output_path)
+        if output_path
+        else (root / ".research" / "cache" / "execution_metadata.json")
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
@@ -153,9 +156,9 @@ def get_analysis_pipeline_summary(root: Optional[Path] = None) -> Dict[str, Any]
         "total_executions": sm["total_executions"],
         "successful": sm["successful"],
         "failed": sm["failed"],
-        "success_rate_pct": round(
-            sm["successful"] / sm["total_executions"] * 100, 1
-        ) if sm["total_executions"] > 0 else 0,
+        "success_rate_pct": round(sm["successful"] / sm["total_executions"] * 100, 1)
+        if sm["total_executions"] > 0
+        else 0,
         "runtimes_used": sm["runtimes_used"],
         "containers_used": sm["containers_used"],
         "tools_used": sm["tools_used"],
@@ -165,6 +168,7 @@ def get_analysis_pipeline_summary(root: Optional[Path] = None) -> Dict[str, Any]
 
 if __name__ == "__main__":
     import sys
+
     if "--summary" in sys.argv:
         sm = get_analysis_pipeline_summary()
         print(json.dumps(sm, indent=2))
@@ -175,7 +179,9 @@ if __name__ == "__main__":
         path = write_analysis_metadata()
         print(f"Execution metadata written to: {path}")
         sm = get_analysis_pipeline_summary()
-        print(f"\nSummary: {sm['total_executions']} executions, "
-              f"{sm['successful']} successful, "
-              f"{sm['failed']} failed "
-              f"({sm['success_rate_pct']}% success rate)")
+        print(
+            f"\nSummary: {sm['total_executions']} executions, "
+            f"{sm['successful']} successful, "
+            f"{sm['failed']} failed "
+            f"({sm['success_rate_pct']}% success rate)"
+        )

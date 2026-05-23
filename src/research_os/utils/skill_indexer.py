@@ -21,27 +21,204 @@ from typing import List, Dict, Any, Optional
 
 # A basic list of stop words to filter out when generating keywords
 STOP_WORDS = {
-    'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 'as', 'at',
-    'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'cant', 'cannot', 'could',
-    'couldnt', 'did', 'didnt', 'do', 'does', 'doesnt', 'doing', 'dont', 'down', 'during', 'each', 'few', 'for', 'from',
-    'further', 'had', 'hadnt', 'has', 'hasnt', 'have', 'havent', 'having', 'he', 'hed', 'hell', 'hes', 'her', 'here',
-    'heres', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'hows', 'i', 'id', 'ill', 'im', 'ive', 'if', 'in',
-    'into', 'is', 'isnt', 'it', 'its', 'itself', 'lets', 'me', 'more', 'most', 'mustnt', 'my', 'myself', 'no', 'nor',
-    'not', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves', 'out', 'over', 'own',
-    'same', 'shant', 'she', 'shed', 'shell', 'shes', 'should', 'shouldnt', 'so', 'some', 'such', 'than', 'that', 'thats',
-    'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'theres', 'these', 'they', 'theyd', 'theyll',
-    'theyre', 'theyve', 'this', 'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'wasnt', 'we',
-    'wed', 'well', 'were', 'weve', 'werent', 'what', 'whats', 'when', 'whens', 'where', 'wheres', 'which', 'while',
-    'who', 'whos', 'whom', 'why', 'whys', 'with', 'wont', 'would', 'wouldnt', 'you', 'youd', 'youll', 'youre', 'youve',
-    'your', 'yours', 'yourself', 'yourselves', 'can', 'will', 'just', 'should', 'would', 'use', 'using', 'also', 'how',
-    'the', 'this', 'that', 'them', 'these', 'those'
+    "a",
+    "about",
+    "above",
+    "after",
+    "again",
+    "against",
+    "all",
+    "am",
+    "an",
+    "and",
+    "any",
+    "are",
+    "arent",
+    "as",
+    "at",
+    "be",
+    "because",
+    "been",
+    "before",
+    "being",
+    "below",
+    "between",
+    "both",
+    "but",
+    "by",
+    "cant",
+    "cannot",
+    "could",
+    "couldnt",
+    "did",
+    "didnt",
+    "do",
+    "does",
+    "doesnt",
+    "doing",
+    "dont",
+    "down",
+    "during",
+    "each",
+    "few",
+    "for",
+    "from",
+    "further",
+    "had",
+    "hadnt",
+    "has",
+    "hasnt",
+    "have",
+    "havent",
+    "having",
+    "he",
+    "hed",
+    "hell",
+    "hes",
+    "her",
+    "here",
+    "heres",
+    "hers",
+    "herself",
+    "him",
+    "himself",
+    "his",
+    "how",
+    "hows",
+    "i",
+    "id",
+    "ill",
+    "im",
+    "ive",
+    "if",
+    "in",
+    "into",
+    "is",
+    "isnt",
+    "it",
+    "its",
+    "itself",
+    "lets",
+    "me",
+    "more",
+    "most",
+    "mustnt",
+    "my",
+    "myself",
+    "no",
+    "nor",
+    "not",
+    "of",
+    "off",
+    "on",
+    "once",
+    "only",
+    "or",
+    "other",
+    "ought",
+    "our",
+    "ours",
+    "ourselves",
+    "out",
+    "over",
+    "own",
+    "same",
+    "shant",
+    "she",
+    "shed",
+    "shell",
+    "shes",
+    "should",
+    "shouldnt",
+    "so",
+    "some",
+    "such",
+    "than",
+    "that",
+    "thats",
+    "the",
+    "their",
+    "theirs",
+    "them",
+    "themselves",
+    "then",
+    "there",
+    "theres",
+    "these",
+    "they",
+    "theyd",
+    "theyll",
+    "theyre",
+    "theyve",
+    "this",
+    "those",
+    "through",
+    "to",
+    "too",
+    "under",
+    "until",
+    "up",
+    "very",
+    "was",
+    "wasnt",
+    "we",
+    "wed",
+    "well",
+    "were",
+    "weve",
+    "werent",
+    "what",
+    "whats",
+    "when",
+    "whens",
+    "where",
+    "wheres",
+    "which",
+    "while",
+    "who",
+    "whos",
+    "whom",
+    "why",
+    "whys",
+    "with",
+    "wont",
+    "would",
+    "wouldnt",
+    "you",
+    "youd",
+    "youll",
+    "youre",
+    "youve",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "can",
+    "will",
+    "just",
+    "should",
+    "would",
+    "use",
+    "using",
+    "also",
+    "how",
+    "the",
+    "this",
+    "that",
+    "them",
+    "these",
+    "those",
 }
+
 
 def clean_text(text: str) -> str:
     """Normalize text by removing special characters and lowercasing."""
-    return re.sub(r'[^a-zA-Z0-9\s-]', '', text).lower()
+    return re.sub(r"[^a-zA-Z0-9\s-]", "", text).lower()
 
-def extract_keywords(title: str, purpose: str, category: str, content: str) -> List[str]:
+
+def extract_keywords(
+    title: str, purpose: str, category: str, content: str
+) -> List[str]:
     """Generate a clean list of keywords from skill metadata and content."""
     words = []
     # Add title words
@@ -50,7 +227,7 @@ def extract_keywords(title: str, purpose: str, category: str, content: str) -> L
     words.append(category.lower())
     # Add purpose words
     words.extend(clean_text(purpose).split())
-    
+
     # Extract terms in the first 500 characters of content
     words.extend(clean_text(content[:500]).split())
 
@@ -62,7 +239,7 @@ def extract_keywords(title: str, purpose: str, category: str, content: str) -> L
             if w not in seen:
                 seen.add(w)
                 unique_keywords.append(w)
-    
+
     return unique_keywords[:25]  # Limit to top 25 keywords per skill
 
 
@@ -126,8 +303,10 @@ def build_index(project_root: Path) -> Path:
                 for i, line in enumerate(lines):
                     if line.strip() == "## Purpose":
                         purpose_lines = []
-                        for next_line in lines[i + 1:]:
-                            if next_line.startswith("## ") or next_line.startswith("---"):
+                        for next_line in lines[i + 1 :]:
+                            if next_line.startswith("## ") or next_line.startswith(
+                                "---"
+                            ):
                                 break
                             if next_line.strip():
                                 purpose_lines.append(next_line.strip())
@@ -146,14 +325,16 @@ def build_index(project_root: Path) -> Path:
 
                 keywords = extract_keywords(title, purpose, category, content)
 
-                skills_index["skills"].append({
-                    "id": md_file.stem,
-                    "title": title,
-                    "category": category,
-                    "description": purpose,
-                    "keywords": keywords,
-                    "path": str(relative_path),
-                })
+                skills_index["skills"].append(
+                    {
+                        "id": md_file.stem,
+                        "title": title,
+                        "category": category,
+                        "description": purpose,
+                        "keywords": keywords,
+                        "path": str(relative_path),
+                    }
+                )
 
             except Exception as e:
                 print(f"WARNING: Failed to parse skill file {md_file.name}: {e}")
@@ -161,22 +342,28 @@ def build_index(project_root: Path) -> Path:
     with open(index_path, "w") as f:
         json.dump(skills_index, f, indent=2)
 
-    print(f"Successfully generated skill index: {index_path} ({len(skills_index['skills'])} skills indexed)")
+    print(
+        f"Successfully generated skill index: {index_path} ({len(skills_index['skills'])} skills indexed)"
+    )
     return index_path
+
 
 import hashlib
 
 MAX_DOC_CHARS = 2_000
 
+
 def _tokenize(text: str) -> List[str]:
     """Lowercase, strip punctuation, split on whitespace."""
     return re.sub(r"[^a-z0-9\s]", " ", text.lower()).split()
+
 
 def _corpus_fingerprint(skills_dir: Path) -> str:
     md5 = hashlib.md5()
     for md_file in sorted(skills_dir.rglob("*.md")):
         md5.update(str(md_file.stat().st_mtime).encode())
     return md5.hexdigest()
+
 
 def _build_bm25_index(skills_dir: Path) -> tuple[List[Dict], Any]:
     try:
@@ -200,9 +387,11 @@ def _build_bm25_index(skills_dir: Path) -> tuple[List[Dict], Any]:
 
     return corpus_meta, BM25Okapi(tokenized_corpus)
 
+
 _INDEX_META: Optional[List[Dict]] = None
 _BM25: Optional[Any] = None
 _INDEX_FINGERPRINT: Optional[str] = None
+
 
 def _get_index(skills_dir: Path):
     global _INDEX_META, _BM25, _INDEX_FINGERPRINT
@@ -211,6 +400,7 @@ def _get_index(skills_dir: Path):
         _INDEX_META, _BM25 = _build_bm25_index(skills_dir)
         _INDEX_FINGERPRINT = fp
     return _INDEX_META, _BM25
+
 
 def search_skills(query: str, top_k: int = 1) -> List[Dict]:
     current = Path.cwd()
@@ -223,9 +413,13 @@ def search_skills(query: str, top_k: int = 1) -> List[Dict]:
         skills_dirs = [Path(__file__).parent.parent / "assets" / "skills"]
     else:
         skills_dirs = _find_skills_dirs(root)
-        
-    skills_dir = skills_dirs[0] if skills_dirs else Path(__file__).parent.parent / "assets" / "skills"
-    
+
+    skills_dir = (
+        skills_dirs[0]
+        if skills_dirs
+        else Path(__file__).parent.parent / "assets" / "skills"
+    )
+
     corpus_meta, bm25 = _get_index(skills_dir)
     tokens = _tokenize(query)
     scores = bm25.get_scores(tokens)
@@ -239,13 +433,16 @@ def search_skills(query: str, top_k: int = 1) -> List[Dict]:
             content = path.read_text(errors="replace")[:MAX_DOC_CHARS]
         except OSError:
             content = ""
-        results.append({
-            "path": str(path),
-            "title": meta["title"],
-            "score": float(score),
-            "content": content,
-        })
+        results.append(
+            {
+                "path": str(path),
+                "title": meta["title"],
+                "score": float(score),
+                "content": content,
+            }
+        )
     return results
+
 
 def resolve_library_id(library_name: str, cache=None) -> str:
     results = search_skills(library_name, top_k=1)
@@ -253,12 +450,14 @@ def resolve_library_id(library_name: str, cache=None) -> str:
         return f"skill:{results[0]['title']}"
     return f"lib_{library_name.strip().lower()}_generic"
 
+
 def get_library_docs(library_id: str, topic: str, cache=None) -> str:
     query = f"{library_id} {topic}"
     results = search_skills(query, top_k=1)
     if results and results[0]["score"] > 0:
         return results[0]["content"]
     return f"No local skill documentation found for '{topic}' in '{library_id}'.\nRefer to the official library documentation online."
+
 
 if __name__ == "__main__":
     # Find project root
@@ -268,7 +467,7 @@ if __name__ == "__main__":
         if (p / ".research").exists():
             root = p
             break
-    
+
     if not root:
         print("ERROR: Could not find project root containing .research/")
         sys.exit(1)

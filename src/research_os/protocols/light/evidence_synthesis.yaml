@@ -1,25 +1,6 @@
-automated_contradiction_detector:
-  action: Log all flagged contradictions in workspace/03_synthesis/contradictions.md
-    and prompt for potential reasons (e.g., different populations, dosages, or timeframes).
-  rule: Extract the primary outcome direction (positive, negative, null) for each
-    paper. If Paper A asserts positive and Paper B asserts negative/null for the same
-    relationship, flag as a contradiction.
-description: Synthesise findings, build evidence tables, and detect contradictions.
-grade_system:
-  high: RCTs without serious limitations, or overwhelming evidence from observational
-    studies.
-  low: Observational studies with limitations.
-  moderate: RCTs with limitations, or strong observational studies.
-  very_low: Case series, expert opinion, or studies with severe flaws.
 name: evidence_synthesis
+version: 2.0.0
 schema_version: '1.0'
-steps:
-- id: build_evidence_table
-  name: Build Evidence Table
-- id: grade_evidence
-  name: Grade Evidence
-- id: detect_contradictions
-  name: Detect Contradictions
 templates:
   evidence_table_apa: '| Author(s) & Year | Study Design | Sample Size | Key Findings
     | GRADE Strength |
@@ -29,4 +10,25 @@ templates:
     | Doe et al., 2023 | RCT          | N=250       | ...          | High           |
 
     '
-version: 2.0.0
+grade_system:
+  high: RCTs without serious limitations, or overwhelming evidence from observational
+    studies.
+  moderate: RCTs with limitations, or strong observational studies.
+  low: Observational studies with limitations.
+  very_low: Case series, expert opinion, or studies with severe flaws.
+automated_contradiction_detector:
+  rule: Extract the primary outcome direction (positive, negative, null) for each
+    paper. If Paper A asserts positive and Paper B asserts negative/null for the same
+    relationship, flag as a contradiction.
+  action: Log all flagged contradictions in workspace/03_synthesis/contradictions.md
+    and prompt for potential reasons (e.g., different populations, dosages, or timeframes).
+steps:
+- id: build_evidence_table
+  name: Build Evidence Table
+  description: Extract data from included papers and fill the APA-style template.
+- id: grade_evidence
+  name: Grade Evidence
+  description: Assign a GRADE strength to each paper.
+- id: detect_contradictions
+  name: Detect Contradictions
+  description: Run the automated contradiction detector and log conflicts.

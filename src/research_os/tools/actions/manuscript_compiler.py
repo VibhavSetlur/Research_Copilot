@@ -65,7 +65,9 @@ class ManuscriptCompiler:
 
         return sorted(sections, key=lambda s: s.order)
 
-    def compile_markdown(self, sections: List[ManuscriptSection], output_path: Optional[Path] = None) -> Path:
+    def compile_markdown(
+        self, sections: List[ManuscriptSection], output_path: Optional[Path] = None
+    ) -> Path:
         if output_path is None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             output_path = self.output_dir / "draft.md"
@@ -88,12 +90,18 @@ class ManuscriptCompiler:
             figures_markdown.append("\n\n## Figures\n")
             for i, fig in enumerate(sorted(self.figures_dir.glob("*.png")), 1):
                 # Ensure path is relative to the manuscript folder or absolute
-                figures_markdown.append(f"![Figure {i}: {fig.stem}](../../workspace/figures/{fig.name})\n")
-                
-        output_path.write_text("\n\n---\n\n".join(content_parts) + "\n".join(figures_markdown))
+                figures_markdown.append(
+                    f"![Figure {i}: {fig.stem}](../../workspace/figures/{fig.name})\n"
+                )
+
+        output_path.write_text(
+            "\n\n---\n\n".join(content_parts) + "\n".join(figures_markdown)
+        )
         return output_path
 
-    def compile_tex(self, markdown_path: Path, output_path: Optional[Path] = None) -> dict:
+    def compile_tex(
+        self, markdown_path: Path, output_path: Optional[Path] = None
+    ) -> dict:
         """Compile Markdown to .tex using Pandoc, then run pdflatex to generate PDF."""
         if output_path is None:
             output_path = markdown_path.with_suffix(".tex")
@@ -102,42 +110,48 @@ class ManuscriptCompiler:
             cmd_pandoc = [
                 "pandoc",
                 str(markdown_path),
-                "-o", str(output_path),
-                "--standalone"
+                "-o",
+                str(output_path),
+                "--standalone",
             ]
             subprocess.run(cmd_pandoc, capture_output=True, text=True, check=True)
-            
+
             # Now autonomously run pdflatex
             cmd_pdflatex = [
                 "pdflatex",
                 "-interaction=nonstopmode",
-                "-output-directory", str(output_path.parent),
-                str(output_path)
+                "-output-directory",
+                str(output_path.parent),
+                str(output_path),
             ]
-            result = subprocess.run(cmd_pdflatex, capture_output=True, text=True, check=True)
-            
+            result = subprocess.run(
+                cmd_pdflatex, capture_output=True, text=True, check=True
+            )
+
             return {
                 "status": "success",
                 "output_path": output_path.with_suffix(".pdf"),
                 "stderr": result.stderr,
-                "pandoc_available": True
+                "pandoc_available": True,
             }
         except FileNotFoundError:
             return {
                 "status": "pandoc_missing",
                 "output_path": None,
                 "stderr": "Pandoc or pdflatex is not installed.",
-                "pandoc_available": False
+                "pandoc_available": False,
             }
         except subprocess.CalledProcessError as e:
             return {
                 "status": "failed",
                 "output_path": None,
                 "stderr": e.stderr,
-                "pandoc_available": True
+                "pandoc_available": True,
             }
 
-    def compile_html(self, markdown_path: Path, output_path: Optional[Path] = None) -> dict:
+    def compile_html(
+        self, markdown_path: Path, output_path: Optional[Path] = None
+    ) -> dict:
         if output_path is None:
             output_path = markdown_path.with_suffix(".html")
 
@@ -145,30 +159,31 @@ class ManuscriptCompiler:
             cmd = [
                 "pandoc",
                 str(markdown_path),
-                "-o", str(output_path),
+                "-o",
+                str(output_path),
                 "--standalone",
-                "--toc"
+                "--toc",
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             return {
                 "status": "success",
                 "output_path": output_path,
                 "stderr": result.stderr,
-                "pandoc_available": True
+                "pandoc_available": True,
             }
         except FileNotFoundError:
             return {
                 "status": "pandoc_missing",
                 "output_path": None,
                 "stderr": "Pandoc is not installed.",
-                "pandoc_available": False
+                "pandoc_available": False,
             }
         except subprocess.CalledProcessError as e:
             return {
                 "status": "failed",
                 "output_path": None,
                 "stderr": e.stderr,
-                "pandoc_available": True
+                "pandoc_available": True,
             }
 
     def run_map_reduce(self, formats: List[str] = None) -> dict:
@@ -177,7 +192,12 @@ class ManuscriptCompiler:
 
         sections = self.discover_sections()
         if not sections:
-            return {"sections_found": 0, "markdown_path": None, "outputs": {}, "errors": ["No sections found."]}
+            return {
+                "sections_found": 0,
+                "markdown_path": None,
+                "outputs": {},
+                "errors": ["No sections found."],
+            }
 
         md_path = self.compile_markdown(sections)
         outputs = {}
@@ -199,7 +219,7 @@ class ManuscriptCompiler:
             "sections_found": len(sections),
             "markdown_path": md_path,
             "outputs": outputs,
-            "errors": errors
+            "errors": errors,
         }
 
     def get_section_prompt(self, section_id: str) -> str:
@@ -208,13 +228,17 @@ class ManuscriptCompiler:
             "methods": "Write a detailed Methods section describing the approach used.",
             "results": "Write a Results section with all statistics and findings.",
             "discussion": "Write a Discussion section interpreting the results and limitations.",
-            "abstract": "Write a 250-word Abstract summarizing the entire study."
+            "abstract": "Write a 250-word Abstract summarizing the entire study.",
         }
         return prompts.get(section_id, f"Write the {section_id} section.")
 
 
 def cmd_compile(args) -> int:
-    formats = args.formats.split(",") if hasattr(args, "formats") and args.formats else ["pdf", "html"]
+    formats = (
+        args.formats.split(",")
+        if hasattr(args, "formats") and args.formats
+        else ["pdf", "html"]
+    )
     mc = ManuscriptCompiler()
     result = mc.run_map_reduce(formats=formats)
     print(f"Sections discovered: {result['sections_found']}")

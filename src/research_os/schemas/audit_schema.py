@@ -11,19 +11,25 @@ class AuditCheck(BaseModel):
     check_name: str = Field(..., description="Name of audit check")
     status: Literal["PASS", "FAIL", "CONDITIONAL"]
     details: str = Field(..., min_length=10, description="Detailed findings")
-    remediation: Optional[str] = Field(default=None, description="Fix instructions if FAIL or CONDITIONAL")
+    remediation: Optional[str] = Field(
+        default=None, description="Fix instructions if FAIL or CONDITIONAL"
+    )
 
 
 class AuditReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
     """Complete audit report for a phase."""
 
-    audit_type: str = Field(..., description="Type of audit (reproducibility, citations, claims, etc.)")
+    audit_type: str = Field(
+        ..., description="Type of audit (reproducibility, citations, claims, etc.)"
+    )
     timestamp: str = Field(..., description="ISO 8601 timestamp")
     checks: List[AuditCheck] = Field(..., min_length=1)
     overall_verdict: Literal["PASS", "FAIL", "CONDITIONAL"]
     failures: List[str] = Field(default=[], description="List of failed check names")
-    auto_healing_attempts: int = Field(default=0, ge=0, le=3, description="Number of auto-healing attempts")
+    auto_healing_attempts: int = Field(
+        default=0, ge=0, le=3, description="Number of auto-healing attempts"
+    )
 
     @field_validator("checks")
     @classmethod

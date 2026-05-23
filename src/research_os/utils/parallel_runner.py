@@ -31,12 +31,14 @@ class FileLock:
         start_time = time.time()
         while True:
             try:
-                if sys.platform == 'win32':
+                if sys.platform == "win32":
                     if self.lock_path.exists():
                         raise OSError("Lock file exists")
                     self.lock_path.write_text(str(os.getpid()))
                 else:
-                    self.fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    self.fd = os.open(
+                        self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                    )
                     os.write(self.fd, str(os.getpid()).encode())
                 return True
             except (OSError, FileExistsError):
@@ -46,7 +48,7 @@ class FileLock:
 
     def release(self):
         try:
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 if self.lock_path.exists():
                     self.lock_path.unlink()
             else:
@@ -62,14 +64,16 @@ class FileLock:
 from research_os.utils.common import find_project_root
 
 
-def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[str, Any]]:
+def build_tasks_from_questions(
+    questions: List[str], root: Path
+) -> List[Dict[str, Any]]:
     """Build task list from question IDs by reading the research map."""
     research_map_path = root / ".research" / "cache" / "research_map.json"
     if not research_map_path.exists():
         research_map_path = root / "03_synthesis" / "research_map.json"
 
     if not research_map_path.exists():
-        print(f"ERROR: Research map not found. Run 'research scan' first.")
+        print("ERROR: Research map not found. Run 'research scan' first.")
         sys.exit(1)
 
     with open(research_map_path) as f:
@@ -106,7 +110,9 @@ def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[st
                 "id": f"q{q_idx}",
                 "command": f"{sys.executable} .research/scripts/utils/run_analysis.py --question q{q_idx}",
                 "output_dir": str(root / "03_synthesis" / "analysis" / f"q{q_idx}"),
-                "log_file": str(root / "03_synthesis" / "analysis" / f"q{q_idx}" / "task.log"),
+                "log_file": str(
+                    root / "03_synthesis" / "analysis" / f"q{q_idx}" / "task.log"
+                ),
             }
             tasks.append(task)
         else:
@@ -115,7 +121,9 @@ def build_tasks_from_questions(questions: List[str], root: Path) -> List[Dict[st
     return tasks
 
 
-async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) -> Dict[str, Any]:
+async def run_single_task(
+    task: Dict[str, Any], semaphore: asyncio.Semaphore
+) -> Dict[str, Any]:
     """Run a single task subprocess under semaphore control."""
     task_id = task.get("id", "unknown")
     command = task.get("command")
@@ -128,7 +136,7 @@ async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) ->
             "success": False,
             "error": "No command specified",
             "returncode": -1,
-            "elapsed": 0.0
+            "elapsed": 0.0,
         }
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -136,6 +144,7 @@ async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) ->
 
     if isinstance(command, str):
         import shlex
+
         cmd_args = shlex.split(command)
     else:
         cmd_args = [str(x) for x in command]
@@ -151,7 +160,7 @@ async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) ->
                     *cmd_args[1:],
                     stdout=log_fd,
                     stderr=log_fd,
-                    env=os.environ.copy()
+                    env=os.environ.copy(),
                 )
                 await process.wait()
                 returncode = process.returncode
@@ -165,17 +174,19 @@ async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) ->
                     "success": True,
                     "returncode": 0,
                     "elapsed": elapsed,
-                    "log_file": str(log_file)
+                    "log_file": str(log_file),
                 }
             else:
-                print(f"[FAILED] Task {task_id} exited with code {returncode} (see log: {log_file})")
+                print(
+                    f"[FAILED] Task {task_id} exited with code {returncode} (see log: {log_file})"
+                )
                 return {
                     "id": task_id,
                     "success": False,
                     "returncode": returncode,
                     "elapsed": elapsed,
                     "log_file": str(log_file),
-                    "error": f"Exit code {returncode}"
+                    "error": f"Exit code {returncode}",
                 }
 
         except Exception as e:
@@ -195,31 +206,41 @@ async def run_single_task(task: Dict[str, Any], semaphore: asyncio.Semaphore) ->
                 "returncode": -2,
                 "elapsed": elapsed,
                 "log_file": str(log_file),
-                "error": error_msg
+                "error": error_msg,
             }
 
 
-async def run_parallel_tasks_async(tasks: List[Dict[str, Any]], max_workers: int) -> List[Dict[str, Any]]:
+async def run_parallel_tasks_async(
+    tasks: List[Dict[str, Any]], max_workers: int
+) -> List[Dict[str, Any]]:
     """Run all tasks in parallel using asyncio Semaphores."""
     semaphore = asyncio.Semaphore(max_workers)
     tasks_to_run = [run_single_task(task, semaphore) for task in tasks]
     return await asyncio.gather(*tasks_to_run)
 
 
-def run_parallel_tasks(tasks: List[Dict[str, Any]], max_workers: int = 4) -> List[Dict[str, Any]]:
+def run_parallel_tasks(
+    tasks: List[Dict[str, Any]], max_workers: int = 4
+) -> List[Dict[str, Any]]:
     """Python API to run independent tasks concurrently."""
     return asyncio.run(run_parallel_tasks_async(tasks, max_workers))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Research OS Parallel Subprocess Runner")
+    parser = argparse.ArgumentParser(
+        description="Research OS Parallel Subprocess Runner"
+    )
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--tasks", help="Path to JSON file containing tasks list")
     group.add_argument("--questions", help="Comma-separated question IDs (q1,q2,q3)")
 
-    parser.add_argument("--max-workers", type=int, default=4, help="Maximum number of parallel workers")
-    parser.add_argument("--state-ledger", help="Optional path to state.json ledger to update atomically")
+    parser.add_argument(
+        "--max-workers", type=int, default=4, help="Maximum number of parallel workers"
+    )
+    parser.add_argument(
+        "--state-ledger", help="Optional path to state.json ledger to update atomically"
+    )
 
     args = parser.parse_args()
 
@@ -251,7 +272,7 @@ def main():
         sys.exit(1)
 
     print("=" * 60)
-    print(f"PARALLEL WORKER ENGINE STARTING")
+    print("PARALLEL WORKER ENGINE STARTING")
     print(f"  Total tasks: {len(tasks)}")
     print(f"  Max workers: {args.max_workers}")
     print("=" * 60)
@@ -283,12 +304,14 @@ def main():
                 if "parallel_runs" not in ledger_data:
                     ledger_data["parallel_runs"] = []
 
-                ledger_data["parallel_runs"].append({
-                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "total_tasks": len(tasks),
-                    "success": fail_count == 0,
-                    "results": results
-                })
+                ledger_data["parallel_runs"].append(
+                    {
+                        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "total_tasks": len(tasks),
+                        "success": fail_count == 0,
+                        "results": results,
+                    }
+                )
 
                 with open(ledger_path, "w") as lf:
                     json.dump(ledger_data, lf, indent=2)
@@ -302,13 +325,17 @@ def main():
     results_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(results_path, "w") as f:
-            json.dump({
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "total_tasks": len(tasks),
-                "success": fail_count == 0,
-                "elapsed": total_elapsed,
-                "results": results
-            }, f, indent=2)
+            json.dump(
+                {
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "total_tasks": len(tasks),
+                    "success": fail_count == 0,
+                    "elapsed": total_elapsed,
+                    "results": results,
+                },
+                f,
+                indent=2,
+            )
         print(f"Results log saved to: {results_path}")
     except Exception as e:
         print(f"WARNING: Could not save results file: {e}")

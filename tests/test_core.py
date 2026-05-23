@@ -11,11 +11,12 @@ from research_os.project_ops import (
     log_decision,
 )
 
+
 def test_scaffold_workspace():
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
         scaffold_minimal_workspace(root, "Test Project")
-        
+
         assert (root / ".os_state").exists()
         assert (root / "docs").exists()
         assert (root / "inputs").exists()
@@ -28,11 +29,12 @@ def test_scaffold_workspace():
         assert state["current_branch"] == "main"
         assert "main" in state["branches"]
 
+
 def test_branching():
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
         scaffold_minimal_workspace(root, "Test Project")
-        
+
         res = create_experiment_branch("test_branch", "test hypothesis", root=root)
         assert "test_branch" in res["branch_id"]
 
@@ -42,13 +44,16 @@ def test_branching():
         assert state["current_branch"] == branch_id
         assert state["branches"][branch_id]["parent_branch"] == "main"
 
+
 def test_log_decision():
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
         scaffold_minimal_workspace(root, "Test Project")
-        
-        res = log_decision("Choosing test", "Mann-Whitney U", "Data is skewed", root=root)
-        
+
+        res = log_decision(
+            "Choosing test", "Mann-Whitney U", "Data is skewed", root=root
+        )
+
         decisions_path = root / "workspace" / "logs" / "decisions.yaml"
         assert decisions_path.exists()
         content = decisions_path.read_text()

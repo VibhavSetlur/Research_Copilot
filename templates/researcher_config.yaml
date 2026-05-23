@@ -1,0 +1,36 @@
+# Research OS Project Configuration
+# This file governs the behavior of AI agents operating in this workspace.
+
+# -----------------------------------------------------------------------------
+# 1. Identity & Scope
+# -----------------------------------------------------------------------------
+project_name: "My Research Project"
+domain: "data_science"            # E.g., data_science, bioinformatics, literature_review
+research_question: "What is the primary hypothesis?"
+
+# -----------------------------------------------------------------------------
+# 2. Agent Constraints
+# -----------------------------------------------------------------------------
+# model_profile defines the context limit and verbosity of the agent:
+#   - small: (<32k context) Uses light protocols, minimal context logging.
+#   - medium: (~100k context) Standard balance of detail and performance.
+#   - large: (>128k context) Reads large chunks, maintains deep history.
+model_profile: "medium"
+
+# depth defines the rigorousness of the research loop:
+#   - exploratory: Fast EDA, minimal statistical tests.
+#   - academic: Robust tests, assumption checks, full citations.
+#   - publication: Exhaustive validation, reproducible environment freeze.
+depth: "academic"
+
+# -----------------------------------------------------------------------------
+# 3. Automation Gates
+# -----------------------------------------------------------------------------
+# autonomy controls how much the agent can do without asking permission:
+#   - supervised: Agent must request approval for major steps (checkpoints).
+#   - semi-autonomous: Agent can branch and merge, but pauses for synthesis.
+#   - autonomous: Agent drives end-to-end (use with caution).
+autonomy: "supervised"
+
+# Enable Model Context Protocol capabilities
+mcp_enabled: true

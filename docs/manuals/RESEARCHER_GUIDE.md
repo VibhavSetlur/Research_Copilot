@@ -1,6 +1,6 @@
 # 📘 Researcher Guide: Operational Manual
 
-Welcome to the Agentic Research OS! This operational manual will walk you through launching your first AI-assisted research project.
+Welcome to the Research OS! This operational manual will walk you through launching your first AI-assisted research project.
 
 ## 🏁 Tutorial: Your First Project
 
@@ -42,7 +42,7 @@ inputs/
 You don't need to read every single line of Python code the agent writes. Instead, monitor these two files:
 
 1. **`workspace/analysis.md`**: This is the chronological narrative of your research. Check here for statistical results, key findings, and interpretation of graphs.
-2. **`workspace/logs/execution_dag.json` (and compiled `workflow.png`)**: This visualizes the directed acyclic graph (DAG) of the data pipeline. Check this to see what scripts were run and which datasets were generated.
+2. **`.os_state/execution_dag.json` (and compiled `workflow.png`)**: This visualizes the directed acyclic graph (DAG) of the data pipeline. Check this to see what scripts were run and which datasets were generated.
 
 ## 🛠️ MCP Tool Cheat Sheet
 

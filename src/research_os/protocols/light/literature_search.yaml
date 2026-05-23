@@ -1,35 +1,49 @@
-description: Protocol for systematic literature search and deduplication.
+name: literature_search
+version: 2.0.0
+schema_version: '1.0'
+search_strategies:
+  mesh_discovery:
+    description: Use PubMed MeSH database to find official terms before building the
+      hedge.
+    example: If searching for 'heart attack', discover 'Myocardial Infarction'[Mesh].
+  synonym_expansion:
+    description: Combine MeSH terms with Title/Abstract (tiab) free-text synonyms
+      using OR.
+    example: ('Myocardial Infarction'[Mesh] OR 'heart attack'[tiab] OR 'myocardial
+      infarction'[tiab])
+  pubmed_hedge:
+    example: ("Neoplasms"[Mesh] OR "cancer"[tiab] OR "tumor"[tiab]) AND ("Immunotherapy"[Mesh]
+      OR "immunotherapy"[tiab]) AND (English[la])
+  semantic_scholar:
+    citation_chasing:
+      description: Once key seed papers are found, use `tool.search.semantic_scholar`
+        to retrieve their `citations` (forward chasing) and `references` (backward
+        chasing) via their DOI or CorpusID.
+  arxiv: {}
 filters:
+  quality:
+    min_citations: 5
+    exception_years_recent: 2
   deduplication_algorithm:
     step1: Exact match on DOI
     step2: Fuzzy match on Title (Levenshtein distance < 3) AND exact match on first
       author's last name
-  quality:
-    exception_years_recent: 2
-    min_citations: 5
-name: literature_search
 prisma_flow:
   steps:
     1_identification: Record total records identified from each database.
     2_screening: Remove duplicates using the deduplication_algorithm. Record count.
     3_eligibility: Apply quality filters (citations/recency). Record excluded count.
     4_included: Final list of studies included in synthesis.
-schema_version: '1.0'
-search_strategies:
-  arxiv:
-    string_template: all:"{concept1}" AND all:"{concept2}"
-  pubmed:
-    string_template: ("{concept1}"[Mesh] OR "{concept1}") AND ("{concept2}"[Mesh]
-      OR "{concept2}")
-  semantic_scholar:
-    string_template: ("{concept1}") AND ("{concept2}")
 steps:
 - id: generate_search_strings
   name: Generate Search Strings
+  description: Fill the placeholders in the string templates.
 - id: execute_search
   name: Execute Search
+  description: Query databases, applying the quality filters.
 - id: deduplicate
   name: Deduplicate
+  description: Run the deduplication algorithm across all results.
 - id: build_prisma_flow
   name: Build PRISMA Flow
-version: 2.0.0
+  description: Document the PRISMA step counts in analysis.md.

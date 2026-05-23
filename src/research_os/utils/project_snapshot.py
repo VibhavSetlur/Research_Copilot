@@ -76,12 +76,14 @@ def get_snapshot(root: Optional[Path] = None, max_tokens: int = 800) -> str:
         registry = load_json_safe(iterations_dir / "registry.json")
         iters = registry.get("iterations", [])[-3:]
         for it in iters:
-            iteration_summaries.append({
-                "id": it.get("id"),
-                "type": it.get("type"),
-                "summary": compress_to_tokens(it.get("summary", ""), 50),
-                "decision": it.get("decision"),
-            })
+            iteration_summaries.append(
+                {
+                    "id": it.get("id"),
+                    "type": it.get("type"),
+                    "summary": compress_to_tokens(it.get("summary", ""), 50),
+                    "decision": it.get("decision"),
+                }
+            )
 
     # Read key findings
     key_findings = load_text_safe(root / "03_synthesis" / "key_findings.md")

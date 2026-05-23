@@ -7,10 +7,19 @@ expected_outputs:
   - "inputs/literature_index.yaml: Updated with valid papers"
   - "workspace/analysis.md: Appended PRISMA flow steps"
 search_strategies:
-  pubmed:
-    string_template: '("{concept1}"[Mesh] OR "{concept1}") AND ("{concept2}"[Mesh] OR "{concept2}")'
+  mesh_discovery:
+    description: "Use PubMed MeSH database to find official terms before building the hedge."
+    example: "If searching for 'heart attack', discover 'Myocardial Infarction'[Mesh]."
+  synonym_expansion:
+    description: "Combine MeSH terms with Title/Abstract (tiab) free-text synonyms using OR."
+    example: "('Myocardial Infarction'[Mesh] OR 'heart attack'[tiab] OR 'myocardial infarction'[tiab])"
+  pubmed_hedge:
+    string_template: '("{concept1_mesh}"[Mesh] OR "{concept1_syn1}"[tiab] OR "{concept1_syn2}"[tiab]) AND ("{concept2_mesh}"[Mesh] OR "{concept2_syn1}"[tiab]) AND (2018:2024[dp])'
+    example: '("Neoplasms"[Mesh] OR "cancer"[tiab] OR "tumor"[tiab]) AND ("Immunotherapy"[Mesh] OR "immunotherapy"[tiab]) AND (English[la])'
   semantic_scholar:
-    string_template: '("{concept1}") AND ("{concept2}")'
+    string_template: '"{concept1}" AND ("{concept2_syn1}" | "{concept2_syn2}")'
+    citation_chasing:
+      description: "Once key seed papers are found, use `tool.search.semantic_scholar` to retrieve their `citations` (forward chasing) and `references` (backward chasing) via their DOI or CorpusID."
   arxiv:
     string_template: 'all:"{concept1}" AND all:"{concept2}"'
 filters:

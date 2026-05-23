@@ -35,7 +35,7 @@ def compute_sha256(file_path: Path) -> str:
 
 def detect_conflicts(compiled_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Detect statistical or empirical conflicts across parallel task findings.
-    
+
     Looks for:
     1. Direct coefficient/effect sign contradictions for the same variable/outcome.
     2. Discrepancies in statistical significance (one worker finds significant, another non-significant).
@@ -55,7 +55,7 @@ def detect_conflicts(compiled_data: Dict[str, Any]) -> List[Dict[str, Any]]:
             outcome = finding.get("outcome")
             effect_size = finding.get("effect_size")
             p_value = finding.get("p_value")
-            
+
             if not variable or not outcome:
                 continue
 
@@ -63,12 +63,14 @@ def detect_conflicts(compiled_data: Dict[str, Any]) -> List[Dict[str, Any]]:
             if key not in variable_effects:
                 variable_effects[key] = []
 
-            variable_effects[key].append({
-                "question_id": question_id,
-                "effect_size": effect_size,
-                "p_value": p_value,
-                "finding": finding
-            })
+            variable_effects[key].append(
+                {
+                    "question_id": question_id,
+                    "effect_size": effect_size,
+                    "p_value": p_value,
+                    "finding": finding,
+                }
+            )
 
     # Compare effects for each variable-outcome pair
     for (variable, outcome), list_effects in variable_effects.items():
@@ -89,13 +91,15 @@ def detect_conflicts(compiled_data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 if val_i is not None and val_j is not None:
                     try:
                         if float(val_i) * float(val_j) < 0:
-                            conflicts.append({
-                                "type": "directional_conflict",
-                                "variable": variable,
-                                "outcome": outcome,
-                                "detail": f"Contradictory effect directions for {variable} on {outcome}: "
-                                         f"{eff_i['question_id']} ({val_i}) vs {eff_j['question_id']} ({val_j})"
-                            })
+                            conflicts.append(
+                                {
+                                    "type": "directional_conflict",
+                                    "variable": variable,
+                                    "outcome": outcome,
+                                    "detail": f"Contradictory effect directions for {variable} on {outcome}: "
+                                    f"{eff_i['question_id']} ({val_i}) vs {eff_j['question_id']} ({val_j})",
+                                }
+                            )
                     except (ValueError, TypeError):
                         pass
 
@@ -105,13 +109,15 @@ def detect_conflicts(compiled_data: Dict[str, Any]) -> List[Dict[str, Any]]:
                         sig_i = float(p_i) < 0.05
                         sig_j = float(p_j) < 0.05
                         if sig_i != sig_j:
-                            conflicts.append({
-                                "type": "significance_discrepancy",
-                                "variable": variable,
-                                "outcome": outcome,
-                                "detail": f"Discrepant significance levels for {variable} on {outcome}: "
-                                         f"{eff_i['question_id']} (p={p_i}) vs {eff_j['question_id']} (p={p_j})"
-                            })
+                            conflicts.append(
+                                {
+                                    "type": "significance_discrepancy",
+                                    "variable": variable,
+                                    "outcome": outcome,
+                                    "detail": f"Discrepant significance levels for {variable} on {outcome}: "
+                                    f"{eff_i['question_id']} (p={p_i}) vs {eff_j['question_id']} (p={p_j})",
+                                }
+                            )
                     except (ValueError, TypeError):
                         pass
 
@@ -143,16 +149,28 @@ def update_research_map(map_path: Path, compiled_data: Dict[str, Any]) -> bool:
             return True
     except Exception as e:
         print(f"WARNING: Failed to update research map: {e}")
-    
+
     return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Consolidate and Synthesize Parallel Runner Outputs")
-    parser.add_argument("--results-file", required=True, help="Path to parallel run _results.json file")
-    parser.add_argument("--output-dir", default="reports/analysis", help="Target output directory for combined results")
+    parser = argparse.ArgumentParser(
+        description="Consolidate and Synthesize Parallel Runner Outputs"
+    )
+    parser.add_argument(
+        "--results-file", required=True, help="Path to parallel run _results.json file"
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="reports/analysis",
+        help="Target output directory for combined results",
+    )
     parser.add_argument("--research-map", help="Path to research_map.json to update")
-    parser.add_argument("--manifest", default="docs/manifest.json", help="Path to manifest.json to update")
+    parser.add_argument(
+        "--manifest",
+        default="docs/manifest.json",
+        help="Path to manifest.json to update",
+    )
 
     args = parser.parse_args()
 
@@ -192,7 +210,7 @@ def main():
         # Convention: The worker outputs results into their directory
         # e.g., reports/analysis/q1/q1_results.json
         q_results_file = Path(args.output_dir) / task_id / f"{task_id}_results.json"
-        
+
         # Fallback: search in output dir or task directory
         if not q_results_file.exists():
             # Try searching recursively for a json summary in the subfolder
@@ -209,15 +227,14 @@ def main():
 
         # Hash verify the worker file
         file_hash = compute_sha256(q_results_file)
-        print(f"  [✓] Verified Task {task_id} output: {q_results_file.name} (SHA-256: {file_hash[:8]})")
+        print(
+            f"  [✓] Verified Task {task_id} output: {q_results_file.name} (SHA-256: {file_hash[:8]})"
+        )
 
         try:
             with open(q_results_file, "r") as f:
                 task_data = json.load(f)
-            compiled_results[task_id] = {
-                "hash": file_hash,
-                "results": task_data
-            }
+            compiled_results[task_id] = {"hash": file_hash, "results": task_data}
             # Extract findings if present
             if "findings" in task_data:
                 compiled_results[task_id]["findings"] = task_data["findings"]
@@ -231,7 +248,7 @@ def main():
 
     # 2. Conflict Detection
     conflicts = detect_conflicts(compiled_results)
-    
+
     # 3. Create combined outputs JSON
     output_dir_path = Path(args.output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
@@ -244,10 +261,10 @@ def main():
             "total_workers": len(worker_results),
             "valid_workers": len(compiled_results),
             "failures": validation_failures,
-            "conflicts_detected": len(conflicts)
+            "conflicts_detected": len(conflicts),
         },
         "tasks": compiled_results,
-        "conflicts": conflicts
+        "conflicts": conflicts,
     }
 
     try:
@@ -264,6 +281,7 @@ def main():
     print("=" * 60)
     try:
         from research_os.runtime.model_resolver import cascade_resolve
+
         prompt = (
             "You are the synthesis selector for parallel branch outputs. "
             "Choose the single strongest branch using methodological rigor, statistical support, and conflict review.\n"
@@ -273,44 +291,57 @@ def main():
             "No markdown, no prose, no extra keys.\n\n"
             f"Results: {json.dumps(combined_payload, indent=2)}"
         )
-        synthesis_decision_raw = cascade_resolve(prompt, model="google/gemini-pro", temperature=0.2)
+        synthesis_decision_raw = cascade_resolve(
+            prompt, model="google/gemini-pro", temperature=0.2
+        )
         try:
             decision = SynthesisDecision.model_validate_json(synthesis_decision_raw)
             synthesis_decision = decision.model_dump()
             winning_branch = decision.winning_branch_name
             winning_data_path = decision.winning_artifacts_data_path
-            print("Synthesis Decision JSON:\n", json.dumps(synthesis_decision, indent=2))
-            
+            print(
+                "Synthesis Decision JSON:\n", json.dumps(synthesis_decision, indent=2)
+            )
+
             from research_os.utils.dag_manager import ExecutionDAGManager
             from research_os.project_ops import find_project_root
+
             root = find_project_root()
             if root and winning_branch:
                 dag = ExecutionDAGManager(root)
                 dag.merge_branch_lineage(winning_branch)
                 print(f"Successfully merged data lineage for branch: {winning_branch}")
                 from research_os.state.state_ledger import ResearchLedger
+
                 ledger = ResearchLedger(root / "03_synthesis" / "state_ledger.json")
                 ledger.update(
                     winning_branch_name=winning_branch,
                     winning_artifacts_data_path=winning_data_path,
                     main_trunk_artifacts_data_path=winning_data_path,
                 )
-                print(f"Updated main trunk data path in state ledger: {winning_data_path}")
+                print(
+                    f"Updated main trunk data path in state ledger: {winning_data_path}"
+                )
         except ValidationError:
             print("WARNING: Synthesis LLM did not return valid schema-compliant JSON.")
             synthesis_decision = {"raw_output": synthesis_decision_raw}
-        
+
         # Output to ledger via log_decision
-        from research_os.project_ops import log_decision, current_branch, find_project_root
+        from research_os.project_ops import (
+            log_decision,
+            current_branch,
+            find_project_root,
+        )
+
         root = find_project_root()
         log_decision(
             context="Parallel execution synthesis. Need to select winning exploratory branch.",
             selected="LLM selected best branch based on empirical results.",
             rationale=synthesis_decision,
             branch_id=current_branch(root),
-            root=root
+            root=root,
         )
-        print(f"Synthesis decision logged to experiment ledger.")
+        print("Synthesis decision logged to experiment ledger.")
     except Exception as e:
         print(f"WARNING: LLM synthesis failed: {e}")
 
@@ -326,11 +357,11 @@ def main():
             try:
                 with open(manifest_path, "r") as f:
                     manifest = json.load(f)
-                
+
                 manifest["last_updated"] = time.strftime("%Y-%m-%d", time.gmtime())
                 if "analysis_status" not in manifest:
                     manifest["analysis_status"] = {}
-                
+
                 for task_id in compiled_results.keys():
                     manifest["analysis_status"][task_id] = "complete"
 
@@ -345,14 +376,16 @@ def main():
     print("SYNTHESIS SUMMARY REPORT")
     print("=" * 60)
     print(f"  Valid workers processed: {len(compiled_results)}/{len(worker_results)}")
-    
+
     if conflicts:
-        print(f"\n  [!] WARNING: {len(conflicts)} conflict(s) detected during synthesis:")
+        print(
+            f"\n  [!] WARNING: {len(conflicts)} conflict(s) detected during synthesis:"
+        )
         for c in conflicts:
             print(f"    - [{c['type'].upper()}] {c['detail']}")
     else:
         print("\n  [✓] No directional or significance conflicts detected.")
-        
+
     print()
     if validation_failures > 0:
         sys.exit(1)

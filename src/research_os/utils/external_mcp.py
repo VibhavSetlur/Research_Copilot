@@ -35,7 +35,12 @@ STANDARD_MCP_SERVERS: Dict[str, Dict[str, Any]] = {
         "description": "Local file system read/write via MCP",
         "default_port": 5011,
         "requires": ["node", "npx"],
-        "start_cmd": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "{root_path}"],
+        "start_cmd": [
+            "npx",
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "{root_path}",
+        ],
         "capabilities": ["read_file", "write_file", "list_directory", "search_files"],
     },
 }
@@ -70,6 +75,7 @@ class ExternalMCPManager:
 
     def __init__(self, project_root: Optional[Path] = None):
         from research_os.utils.common import find_project_root
+
         self.root = project_root or find_project_root()
         self._running: Dict[str, subprocess.Popen] = {}
         self.external_servers: Dict[str, Dict[str, Any]] = {}
@@ -85,7 +91,11 @@ class ExternalMCPManager:
         """
         spec = STANDARD_MCP_SERVERS.get(server_id)
         if not spec:
-            return {"server_id": server_id, "available": False, "reason": "Unknown server ID."}
+            return {
+                "server_id": server_id,
+                "available": False,
+                "reason": "Unknown server ID.",
+            }
 
         if not _check_node_available():
             return {
@@ -125,7 +135,11 @@ class ExternalMCPManager:
         """
         status = self.check_server_available(server_id)
         if not status["available"]:
-            return {"status": "error", "server_id": server_id, "reason": status["reason"]}
+            return {
+                "status": "error",
+                "server_id": server_id,
+                "reason": status["reason"],
+            }
 
         spec = STANDARD_MCP_SERVERS[server_id]
         effective_port = port or spec["default_port"]
@@ -161,7 +175,9 @@ class ExternalMCPManager:
             self._running[server_id] = proc
             logger.info(
                 "Started MCP server '%s' on port %d (pid %d)",
-                server_id, effective_port, proc.pid,
+                server_id,
+                effective_port,
+                proc.pid,
             )
             return {
                 "status": "started",
@@ -247,9 +263,15 @@ class ExternalMCPManager:
         """
         if server_id and server_id in self.external_servers:
             target = server_id
-        elif any(kw in query.lower() for kw in ("sql", "table", "query", "select", "database", "db")):
+        elif any(
+            kw in query.lower()
+            for kw in ("sql", "table", "query", "select", "database", "db")
+        ):
             target = "sqlite"
-        elif any(kw in query.lower() for kw in ("file", "read", "write", "directory", "path", "csv", "json")):
+        elif any(
+            kw in query.lower()
+            for kw in ("file", "read", "write", "directory", "path", "csv", "json")
+        ):
             target = "filesystem"
         else:
             target = "filesystem"  # safe default
@@ -313,5 +335,8 @@ class ExternalMCPManager:
             }
         for uri, info in self.external_servers.items():
             if uri not in summary:
-                summary[uri] = {"status": info.get("status"), "tools": info.get("tools", [])}
+                summary[uri] = {
+                    "status": info.get("status"),
+                    "tools": info.get("tools", []),
+                }
         return summary

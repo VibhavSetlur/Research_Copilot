@@ -12,6 +12,13 @@ validators:
     pass_3_retraction: "Query the Retraction Watch database or Crossref for retracted status."
   statistical_assumptions:
     action: "Re-read the assumptions logged during methodology_selection. Run specific tests (e.g., Shapiro-Wilk for normality, VIF for multicollinearity) and log the p-values/metrics."
+  causal_language:
+    regex_patterns:
+      - "(?i)\\b(causes?|caused|causing)\\b"
+      - "(?i)\\b(leads? to|led to)\\b"
+      - "(?i)\\b(results? in|resulted in)\\b"
+      - "(?i)\\b(impacts?|impacted)\\b"
+    action: "Scan manuscript drafts using these regex patterns. If the study design is observational, flag these matches for manual review and suggest associative language instead."
   code_linter:
     command_python: "ruff check workspace/02_analysis/ || pylint workspace/02_analysis/"
 steps:

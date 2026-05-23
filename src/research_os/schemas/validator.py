@@ -55,10 +55,14 @@ def validate_with_retry(
 
         except (json.JSONDecodeError, ValidationError) as e:
             if attempt == max_retries:
-                logger.error(f"{prefix}Validation failed permanently after {max_retries} retries: {e}")
+                logger.error(
+                    f"{prefix}Validation failed permanently after {max_retries} retries: {e}"
+                )
                 raise e
 
-            logger.warning(f"{prefix}Validation failed (attempt {attempt + 1}/{max_retries}): {e}. Triggering auto-recovery.")
+            logger.warning(
+                f"{prefix}Validation failed (attempt {attempt + 1}/{max_retries}): {e}. Triggering auto-recovery."
+            )
 
             # Construct recovery prompt
             recovery_prompt = (
@@ -87,6 +91,7 @@ def validate_with_retry(
 # ---------------------------------------------------------------------------
 # Original API (backwards compatible)
 # ---------------------------------------------------------------------------
+
 
 def validate_payload(
     data: Union[dict, str, Path],

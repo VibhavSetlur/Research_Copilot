@@ -6,7 +6,7 @@ Clone the repository and install the dependencies:
 ```bash
 git clone https://github.com/VibhavSetlur/Research-OS.git
 cd Research-OS
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## 2. Running the MCP Server

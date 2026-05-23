@@ -83,12 +83,14 @@ class CheckpointManager:
         for f in sorted(self._dir.glob("*.json")):
             with open(f) as fh:
                 cp = json.load(fh)
-            results.append({
-                "file": str(f),
-                "phase": cp.get("phase"),
-                "timestamp": cp.get("timestamp"),
-                "metadata": cp.get("metadata", {}),
-            })
+            results.append(
+                {
+                    "file": str(f),
+                    "phase": cp.get("phase"),
+                    "timestamp": cp.get("timestamp"),
+                    "metadata": cp.get("metadata", {}),
+                }
+            )
         return results
 
     def delete(self, phase: str, keep_latest: int = 1) -> int:
@@ -130,7 +132,11 @@ class CheckpointManager:
             for cp in checkpoints:
                 ts = cp.get("timestamp", "unknown")[:19]
                 meta = cp.get("metadata", {})
-                extra = f" — {meta.get('description', '')}" if meta.get("description") else ""
+                extra = (
+                    f" — {meta.get('description', '')}"
+                    if meta.get("description")
+                    else ""
+                )
                 lines.append(f"    - {cp['phase']} [{ts}]{extra}")
         lines.append("")
         return "\n".join(lines)
@@ -141,9 +147,16 @@ class CheckpointManager:
         Returns dict with: phase, timestamp, key results (effect sizes,
         significant findings), and pending actions. Feeds into session_restorer.py.
         """
-        all_checkpoints = sorted(self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
+        all_checkpoints = sorted(
+            self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime
+        )
         if not all_checkpoints:
-            return {"phase": "none", "timestamp": None, "key_results": [], "pending_actions": []}
+            return {
+                "phase": "none",
+                "timestamp": None,
+                "key_results": [],
+                "pending_actions": [],
+            }
 
         latest_path = all_checkpoints[-1]
         with open(latest_path) as f:
@@ -156,8 +169,12 @@ class CheckpointManager:
         for finding in data.get("findings", []):
             if isinstance(finding, dict):
                 result = {
-                    "variable": finding.get("variable", finding.get("predictor", "unknown")),
-                    "effect_size": finding.get("effect_size", finding.get("coef", finding.get("estimate"))),
+                    "variable": finding.get(
+                        "variable", finding.get("predictor", "unknown")
+                    ),
+                    "effect_size": finding.get(
+                        "effect_size", finding.get("coef", finding.get("estimate"))
+                    ),
                     "significant": finding.get("p_value", 1) < 0.05,
                 }
                 key_results.append(result)

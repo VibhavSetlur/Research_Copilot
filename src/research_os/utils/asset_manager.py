@@ -32,7 +32,9 @@ class AssetManager:
     """Resolve bundled assets and project-local overrides."""
 
     def __init__(self, project_root: Optional[Path] = None):
-        self.project_root = Path(project_root) if project_root else self.find_project_root()
+        self.project_root = (
+            Path(project_root) if project_root else self.find_project_root()
+        )
         self.override_root = self.project_root / ".research"
 
     @staticmethod
@@ -86,7 +88,10 @@ class AssetManager:
         return self.override_root / rel
 
     def exists(self, relative_path: str) -> bool:
-        return self.local_override(relative_path).exists() or self.package_asset(relative_path).is_file()
+        return (
+            self.local_override(relative_path).exists()
+            or self.package_asset(relative_path).is_file()
+        )
 
     def read_text(self, relative_path: str, encoding: str = "utf-8") -> str:
         """Read a text asset, preferring an explicit local override."""
@@ -116,12 +121,16 @@ class AssetManager:
             for item in local_base.rglob("*"):
                 if item.is_file() and fnmatch.fnmatch(item.name, pattern):
                     rel = f"{rel_dir}/{item.relative_to(local_base).as_posix()}"
-                    merged[rel] = AssetRef(relative_path=rel, source="local_override", local_path=item)
+                    merged[rel] = AssetRef(
+                        relative_path=rel, source="local_override", local_path=item
+                    )
 
         for rel in sorted(merged):
             yield merged[rel]
 
-    def copy_asset_tree(self, relative_dir: str, destination: Path, *, overwrite: bool = False) -> list[Path]:
+    def copy_asset_tree(
+        self, relative_dir: str, destination: Path, *, overwrite: bool = False
+    ) -> list[Path]:
         """Copy a packaged asset directory to disk.
 
         This is intended for advanced export/debug workflows, not normal project

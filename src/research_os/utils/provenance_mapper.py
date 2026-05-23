@@ -24,26 +24,26 @@ class ProvenanceMapper:
     def find_producing_node(self, target_file: str) -> Optional[Dict[str, Any]]:
         """Find the node that produced the given file."""
         target_norm = self._normalize_path(target_file)
-        
+
         for node_id, node_data in self.dag.get("nodes", {}).items():
             for out_file in node_data.get("output_files", []):
                 if self._normalize_path(out_file) == target_norm:
                     return node_data
-                    
+
         return None
 
     def build_lineage(self, target_file: str) -> Dict[str, Any]:
         """Traverse the DAG backwards from target_file to build its lineage tree."""
         node = self.find_producing_node(target_file)
-        
+
         if not node:
             return {
                 "file": target_file,
                 "type": "source_or_unknown",
                 "producing_node": None,
-                "inputs": []
+                "inputs": [],
             }
-            
+
         result = {
             "file": target_file,
             "type": "derived",
@@ -51,28 +51,30 @@ class ProvenanceMapper:
                 "id": node.get("node_id"),
                 "script": node.get("script_path"),
                 "timestamp": node.get("timestamp"),
-                "hash": node.get("data_hash_out", {}).get(target_file)
+                "hash": node.get("data_hash_out", {}).get(target_file),
             },
-            "inputs": []
+            "inputs": [],
         }
-        
+
         for input_file in node.get("input_files", []):
             input_hash = node.get("data_hash_in", {}).get(input_file)
             input_lineage = self.build_lineage(input_file)
             input_lineage["hash"] = input_hash
             result["inputs"].append(input_lineage)
-            
+
         return result
 
-    def format_human_readable(self, lineage_tree: Dict[str, Any], indent_level: int = 0) -> str:
+    def format_human_readable(
+        self, lineage_tree: Dict[str, Any], indent_level: int = 0
+    ) -> str:
         """Convert lineage dictionary into a clean, formatted text hierarchy."""
         indent = "  " * indent_level
         lines = []
-        
+
         file_path = lineage_tree.get("file", "Unknown")
         file_hash = lineage_tree.get("hash")
         hash_str = f" [Hash: {file_hash[:8]}...]" if file_hash else ""
-        
+
         if indent_level == 0:
             lines.append(f"Provenance Chain for: {file_path}{hash_str}")
         else:
@@ -85,7 +87,7 @@ class ProvenanceMapper:
             timestamp = producing_node.get("timestamp", "Unknown time")
             lines.append(f"{indent}   Produced by: Node '{producing_node.get('id')}'")
             lines.append(f"{indent}   Script: {script} at {timestamp}")
-            
+
             inputs = lineage_tree.get("inputs", [])
             if inputs:
                 lines.append(f"{indent}   Consumed:")
@@ -94,5 +96,5 @@ class ProvenanceMapper:
         else:
             if indent_level > 0:
                 lines.append(f"{indent}   (Original Source)")
-                
+
         return "\n".join(lines)

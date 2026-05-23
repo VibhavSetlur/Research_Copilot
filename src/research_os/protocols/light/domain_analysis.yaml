@@ -1,11 +1,14 @@
+name: domain_analysis
+version: 2.0.0
+schema_version: '1.0'
 decision_tree:
   mapping:
     clinical:
-      biases_checklist:
-      - Selection bias (e.g., non-representative sample)
-      - Attrition bias (e.g., loss to follow-up)
-      - Confounding by indication
-      - Measurement bias
+      file_extensions:
+      - .dcm
+      - .edf
+      - .nii
+      - .csv
       columns:
       - bp
       - cholesterol
@@ -13,21 +16,21 @@ decision_tree:
       - diagnosis
       - treatment
       - bmi
-      file_extensions:
-      - .dcm
-      - .edf
-      - .nii
-      - .csv
       reporting_standards:
       - CONSORT (for RCTs)
       - STROBE (for Observational Studies)
       - PRISMA (for Systematic Reviews)
-    finance:
       biases_checklist:
-      - Survivorship bias (ignoring delisted companies)
-      - Look-ahead bias (using data not available at the time)
-      - Time period bias
-      - Data snooping/overfitting
+      - Selection bias (e.g., non-representative sample)
+      - Attrition bias (e.g., loss to follow-up)
+      - Confounding by indication
+      - Measurement bias
+    finance:
+      file_extensions:
+      - .csv
+      - .xml
+      - .json
+      - .xlsx
       columns:
       - ticker
       - price
@@ -35,20 +38,19 @@ decision_tree:
       - market_cap
       - pe_ratio
       - yield
-      file_extensions:
-      - .csv
-      - .xml
-      - .json
-      - .xlsx
       reporting_standards:
       - GIPS (Global Investment Performance Standards)
       - IFRS (International Financial Reporting Standards)
-    social_sciences:
       biases_checklist:
-      - Social desirability bias
-      - Non-response bias
-      - Sampling bias
-      - Recall bias
+      - Survivorship bias (ignoring delisted companies)
+      - Look-ahead bias (using data not available at the time)
+      - Time period bias
+      - Data snooping/overfitting
+    social_sciences:
+      file_extensions:
+      - .sav
+      - .dta
+      - .csv
       columns:
       - survey
       - likert
@@ -56,24 +58,121 @@ decision_tree:
       - respondent
       - age_group
       - income_bracket
-      file_extensions:
-      - .sav
-      - .dta
-      - .csv
       reporting_standards:
       - APA Guidelines
       - JARS (Journal Article Reporting Standards)
-description: Analyze a research domain to identify trends, required reporting standards,
-  and domain-specific biases.
-name: domain_analysis
-schema_version: '1.0'
+      biases_checklist:
+      - Social desirability bias
+      - Non-response bias
+      - Sampling bias
+      - Recall bias
+    bioinformatics:
+      file_extensions:
+      - .fasta
+      - .bam
+      - .vcf
+      - .fastq
+      columns:
+      - gene_id
+      - expression
+      - log2fc
+      - pvalue
+      - chromosome
+      - position
+      reporting_standards:
+      - MIAME (Microarray)
+      - MINSEQE (Sequencing)
+      biases_checklist:
+      - Batch effects
+      - GC bias in sequencing
+      - Library preparation bias
+    nlp:
+      file_extensions:
+      - .txt
+      - .json
+      - .jsonl
+      - .csv
+      columns:
+      - text
+      - tokens
+      - label
+      - sentiment
+      - document_id
+      reporting_standards:
+      - ACL guidelines
+      - Model Card guidelines
+      biases_checklist:
+      - Representation bias in training corpora
+      - Annotator bias
+      - Language or dialect bias
+    engineering:
+      file_extensions:
+      - .tdms
+      - .mat
+      - .csv
+      - .h5
+      columns:
+      - timestamp
+      - sensor_val
+      - voltage
+      - temperature
+      - pressure
+      reporting_standards:
+      - ISO/IEC standards depending on field
+      biases_checklist:
+      - Sensor drift
+      - Sampling rate aliasing
+      - Calibration error
+    environmental_science:
+      file_extensions:
+      - .shp
+      - .tiff
+      - .nc
+      - .geojson
+      columns:
+      - latitude
+      - longitude
+      - elevation
+      - temperature
+      - precipitation
+      reporting_standards:
+      - CF Conventions (Climate and Forecast)
+      biases_checklist:
+      - Spatial autocorrelation
+      - Modifiable areal unit problem (MAUP)
+      - Temporal aggregation bias
+    economics:
+      file_extensions:
+      - .dta
+      - .csv
+      - .xlsx
+      columns:
+      - year
+      - country
+      - gdp
+      - inflation
+      - unemployment
+      - interest_rate
+      reporting_standards:
+      - AEA Data and Code Availability Policy
+      biases_checklist:
+      - Endogeneity
+      - Omitted variable bias
+      - Simultaneity bias
 steps:
 - id: identify_domain
   name: Identify Domain
+  description: Examine file extensions and column names to map to a specific domain
+    using the decision_tree mapping.
 - id: map_landscape
   name: Map Landscape
+  description: Identify major sub-fields and leading authors based on the problem
+    statement.
 - id: check_reporting_standards
   name: Check Reporting Standards
+  description: Ensure the identified domain's reporting standards are documented in
+    methods.md.
 - id: evaluate_biases
   name: Evaluate Biases
-version: 2.0.0
+  description: Run through the domain-specific biases checklist and note potential
+    risks in analysis.md.

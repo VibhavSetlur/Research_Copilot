@@ -11,8 +11,8 @@ This document demonstrates how a researcher and an LLM agent interact using Rese
 
 ## Step 1: Scaffolding and Profiling
 
-5. **Agent**: Calls `sys.workspace.scaffold` with project name "Efficacy of Drug X on Hypertension".
-   - *Behind the scenes*: Research OS creates the directory structure, writes initial documentation templates, and creates `inputs/researcher_config.yaml`.
+5. **Agent**: Calls `sys.workspace.scaffold` with project name "Efficacy of Drug X on Hypertension", then calls `sys.config.init` to create `inputs/researcher_config.yaml`.
+   - *Behind the scenes*: Research OS creates the directory structure and initial documentation templates.
 6. **Researcher**: Drops `trial_data.csv` (2GB) into `inputs/raw_data/`.
 7. **Agent**: Calls `sys.workspace.scaffold` again (idempotent) or `sys.file.list` to discover the data.
 8. **Agent**: Observes the `workspace/logs/data_inventory.json` file created by the profiling hook. It notes that the file is 2GB and estimated processing time is high.

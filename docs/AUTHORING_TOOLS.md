@@ -1,6 +1,6 @@
 # Authoring Custom Tools
 
-Agentic Research OS exposes its capabilities to Claude, Cursor, and Windsurf via the Model Context Protocol (MCP). If you want to give the AI new abilities (e.g., querying your internal database, running a specific simulation engine), you can easily author custom tools.
+Research OS exposes its capabilities to Claude, Cursor, and Windsurf via the Model Context Protocol (MCP). If you want to give the AI new abilities (e.g., querying your internal database, running a specific simulation engine), you can easily author custom tools.
 
 ## Step 1: Create the Python Logic
 Create your tool logic in `src/research_os/tools/actions/` (or `src/research_os/tools/actions/`).

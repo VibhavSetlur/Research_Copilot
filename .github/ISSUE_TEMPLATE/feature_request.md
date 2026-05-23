@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for your interest in improving Agentic Research OS!
+        Thanks for your interest in improving Research OS!
   - type: textarea
     id: feature-description
     attributes:

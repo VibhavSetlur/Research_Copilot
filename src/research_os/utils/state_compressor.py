@@ -98,7 +98,9 @@ def _node_output(node: dict[str, Any], root: Path) -> str:
     return "\n\n".join(outputs)
 
 
-def _completed_nodes(state: dict[str, Any], root: Path, limit: int = 5) -> list[dict[str, Any]]:
+def _completed_nodes(
+    state: dict[str, Any], root: Path, limit: int = 5
+) -> list[dict[str, Any]]:
     dag_path = state.get("execution_dag_path")
     if dag_path:
         candidate = Path(dag_path)
@@ -112,7 +114,11 @@ def _completed_nodes(state: dict[str, Any], root: Path, limit: int = 5) -> list[
     if not isinstance(nodes, dict):
         return []
 
-    completed = [node for node in nodes.values() if str(node.get("status", "")).lower() in {"complete", "completed"}]
+    completed = [
+        node
+        for node in nodes.values()
+        if str(node.get("status", "")).lower() in {"complete", "completed"}
+    ]
     completed.sort(key=lambda node: node.get("timestamp", ""))
 
     recent: list[dict[str, Any]] = []
@@ -127,7 +133,9 @@ def _completed_nodes(state: dict[str, Any], root: Path, limit: int = 5) -> list[
     return recent
 
 
-def build_sliding_context_window(root: Optional[Path] = None, limit: int = 5) -> dict[str, Any]:
+def build_sliding_context_window(
+    root: Optional[Path] = None, limit: int = 5
+) -> dict[str, Any]:
     root = root or _project_root()
     state = _load_json(_state_path(root))
     return {
