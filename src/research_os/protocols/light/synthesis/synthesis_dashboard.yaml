@@ -1,7 +1,11 @@
 name: synthesis_dashboard
 version: 1.0.0
-description: Light version
+description: Generate an interactive dashboard from experiment outputs.
+always_include: []
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: gather_data
+  name: Gather Data
+  description: Collect figures and tables from all completed experiment steps.
+- id: create_dashboard
+  name: Create Dashboard
+  description: Call tool.

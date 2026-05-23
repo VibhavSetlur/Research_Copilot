@@ -1,7 +1,23 @@
 name: tool_discovery
 version: 1.0.0
-description: Light version
+description: Guide to discovering and evaluating Python/R/Julia packages for a specific
+  task.
+always_include: []
+schema_version: '1.0'
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: formulate_query
+  name: Formulate Search Query
+  description: 'Build a specific query: "<task> Python library", e.'
+- id: search_web
+  name: Search the Web
+  description: Use tool.
+- id: evaluate_library
+  name: Evaluate Library Quality
+  description: For each candidate, check (via tool.
+- id: test_installation
+  name: Test Installation Feasibility
+  description: Call tool.
+- id: log_decision
+  name: Log Decision
+  description: Record the selected library, its version, documentation URL, and justification
+    in methods_research.

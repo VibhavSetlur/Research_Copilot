@@ -1,7 +1,12 @@
 name: synthesis_poster
 version: 1.0.0
-description: Light version
+description: Generate a professional research poster.
+always_include:
+- writing_core
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: collect_content
+  name: Collect Content
+  description: Gather key findings, figures, and conclusions from workspace.
+- id: call_poster_tool
+  name: Generate Poster
+  description: Call tool.

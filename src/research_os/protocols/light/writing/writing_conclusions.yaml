@@ -1,7 +1,16 @@
 name: writing_conclusions
 version: 1.0.0
-description: Light version
+description: "How to write per\u2011step conclusions."
+always_include:
+- writing_core
+template: "# {step_name} \u2014 Conclusions\n\n## Key Findings\n1. {finding_1_with_number}\n\
+  2. {finding_2_with_number}\n\n## Statistical Summary\n| Metric | Value | 95% CI\
+  \ | p-value |\n|--------|-------|--------|---------|\n| {metric} | {value} | [{lower},\
+  \ {upper}] | {p} |\n\n## Bugs / Issues Encountered\n- {bug_or_none}\n\n## Routing\
+  \ Decision\n- **Next Step:** {next_step}\n- **Rationale:** {why}\n- **Continue in\
+  \ Same Path:** {yes/no}\n- **New Path Number (if applicable):** {path_number}\n\n\
+  ## Data Changes\n- {new_data_or_none}\n"
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: write_conclusions
+  name: Write Conclusions
+  description: Populate conclusions.

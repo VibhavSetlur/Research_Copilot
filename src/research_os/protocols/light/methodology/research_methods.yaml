@@ -1,7 +1,27 @@
 name: research_methods
 version: 1.0.0
-description: Light version
+description: Guide to researching and selecting appropriate statistical/analytical
+  methods for a given dataset and research question.
+always_include: []
+schema_version: '1.0'
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: understand_data
+  name: Understand Data Characteristics
+  description: Use the data inventory (workspace/logs/data_inventory.
+- id: define_goal
+  name: Define Research Goal
+  description: 'Identify the primary objective: description, prediction, association,
+    causal inference, classification, clustering, etc.'
+- id: search_literature
+  name: Search Literature for Methods
+  description: '- Construct a query for Semantic Scholar: "[domain] [goal] statistical
+    method".'
+- id: search_documentation
+  name: Search for Tool/Library Documentation
+  description: '- Use tool.'
+- id: evaluate_options
+  name: Evaluate Options
+  description: For each candidate method, assess:.
+- id: log_decision
+  name: Log Decision
+  description: Populate workspace/{step_number}_.

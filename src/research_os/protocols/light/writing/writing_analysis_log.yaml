@@ -1,7 +1,12 @@
 name: writing_analysis_log
 version: 1.0.0
-description: Light version
+description: How to write structured entries to workspace/analysis.
+always_include:
+- writing_core
+entry_template: "[{timestamp}] **{step_name} \u2014 {status}**\n- **Tools used:**\
+  \ {tool_list}\n- **Key result:** {quantitative_summary}\n- **Decision:** {next_action}\n\
+  - **Routing:** {continue_in_path_or_new_path}\n- **Warnings:** {warnings}\n"
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: log_entry
+  name: Log Analysis Entry
+  description: Write an entry to analysis.

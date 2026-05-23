@@ -1,7 +1,53 @@
 name: writing_readme
 version: 1.0.0
-description: Light version
+description: "How to update project and per\u2011step README."
+always_include:
+- writing_core
+project_readme_template: '# {project_name}
+
+
+  **Research Question:** {question}
+
+  **Status:** {status}
+
+  **Last Updated:** {date}
+
+
+  ## Workflow Summary
+
+  ![Workflow](synthesis/workflow_diagram.png)
+
+
+  ## Key Findings
+
+  {top_3_findings}
+
+
+  ## Outputs
+
+  - [Abstract](synthesis/abstract.md)
+
+  - [Paper](synthesis/paper.pdf)
+
+  {extra_outputs}
+
+
+  ## How to Reproduce
+
+  1. Clone repository
+
+  2. Restore environment: `pip install -r environment/requirements.txt`
+
+  3. Run scripts in order: {script_order}
+
+  '
+per_step_readme_template: "# {step_name}\n**Created:** {date}\n\n## Goal\n{goal}\n\
+  \n## Input Data\n- {input_1} (sha256:{hash})\n\n## Methods\n- {method_1}\n\n## Outputs\n\
+  - {output_1}\n\n## Next\u2011Step Decision\n{decision}\n"
 steps:
-  - id: run
-    name: Run
-    description: Run
+- id: update_project_readme
+  name: Update Project README
+  description: After final synthesis, update the project README.
+- id: update_step_readme
+  name: Update Step README
+  description: "After completing a step, fill in the per\u2011step README."
