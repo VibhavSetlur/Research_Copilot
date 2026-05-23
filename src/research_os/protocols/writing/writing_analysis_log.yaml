@@ -1,9 +1,19 @@
 name: writing_analysis_log
 version: 1.0.0
-description: How to write to workspace/analysis.md via mem.analysis.log
-template: |
-  ### [Timestamp - ISO format]
-  - **Tools Used**: [List of tools]
-  - **Key Result**: [Brief summary of findings]
-  - **Routing Decision**: [Next steps or path chosen based on result]
-instructions: "Keep entries concise but informative enough to resume context after a handoff."
+description: "How to write structured entries to workspace/analysis.md via mem.analysis.log."
+always_include: ["writing_core"]
+entry_template: |
+  [{timestamp}] **{step_name} — {status}**
+  - **Tools used:** {tool_list}
+  - **Key result:** {quantitative_summary}
+  - **Decision:** {next_action}
+  - **Routing:** {continue_in_path_or_new_path}
+  - **Warnings:** {warnings}
+rules:
+  - "Status must be: STARTED, COMPLETED, ABANDONED, PAUSED."
+  - "Key result must include a number or statistical finding."
+  - "After logging, update workspace/workflow.mermaid."
+steps:
+  - id: log_entry
+    name: "Log Analysis Entry"
+    description: "Write an entry to analysis.md using the template."

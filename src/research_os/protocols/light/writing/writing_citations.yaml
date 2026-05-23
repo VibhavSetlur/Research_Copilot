@@ -1,8 +1,7 @@
 name: writing_citations
 version: 1.0.0
-template: |
-  ## [Author, Year]
-  - DOI: [doi]
-  - Status: [Verified]
-  - Claims Used: [Claims]
-  - BibTeX: [entry]
+description: Light version
+steps:
+  - id: run
+    name: Run
+    description: Run

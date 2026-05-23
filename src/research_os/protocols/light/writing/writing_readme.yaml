@@ -1,10 +1,7 @@
 name: writing_readme
 version: 1.0.0
-project_template: |
-  # [Name]
-  ## Objective
-  [Obj]
-step_template: |
-  # Step [X]
-  ## Purpose
-  [Purp]
+description: Light version
+steps:
+  - id: run
+    name: Run
+    description: Run

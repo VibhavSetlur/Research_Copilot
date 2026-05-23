@@ -1,0 +1,25 @@
+name: synthesis_abstract
+version: 1.0.0
+description: "Generate a standalone structured abstract (250 words)."
+always_include: ["writing_core"]
+trigger: "When output_types includes 'abstract' but not a full paper."
+sources:
+  - "synthesis/methods.md"
+  - "synthesis/results.md"
+  - "synthesis/discussion.md (if exists)"
+template:
+  background: "1‑2 sentences on research gap."
+  methods: "2‑3 sentences on design, sample, analysis."
+  results: "2‑3 sentences with key numbers and confidence interval."
+  conclusion: "1‑2 sentences on implications."
+  word_limit: 250
+steps:
+  - id: gather_sources
+    name: "Gather Sources"
+    description: "Read the required source files."
+  - id: draft_abstract
+    name: "Draft Abstract"
+    description: "Write the abstract following the template."
+  - id: apply_writing_core
+    name: "Apply Writing Core"
+    description: "Check for banned phrases, causal language, number formatting."

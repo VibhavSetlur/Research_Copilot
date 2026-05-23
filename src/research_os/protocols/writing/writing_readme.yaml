@@ -1,18 +1,51 @@
 name: writing_readme
 version: 1.0.0
-description: How to update project and per-step README.md
-project_template: |
-  # Project Name
-  ## Objective
-  [Objective]
-  ## Structure
-  - `workspace/`: [Description]
-  ## Status
-  [Current Status]
-step_template: |
-  # Step [X]
-  ## Purpose
-  [Purpose]
+description: "How to update project and per‑step README.md files."
+always_include: ["writing_core"]
+project_readme_template: |
+  # {project_name}
+  
+  **Research Question:** {question}
+  **Status:** {status}
+  **Last Updated:** {date}
+  
+  ## Workflow Summary
+  ![Workflow](synthesis/workflow_diagram.png)
+  
+  ## Key Findings
+  {top_3_findings}
+  
   ## Outputs
-  - [File 1]
-instructions: "Maintain a clear overview of the project structure and step-specific goals."
+  - [Abstract](synthesis/abstract.md)
+  - [Paper](synthesis/paper.pdf)
+  {extra_outputs}
+  
+  ## How to Reproduce
+  1. Clone repository
+  2. Restore environment: `pip install -r environment/requirements.txt`
+  3. Run scripts in order: {script_order}
+per_step_readme_template: |
+  # {step_name}
+  **Created:** {date}
+  
+  ## Goal
+  {goal}
+  
+  ## Input Data
+  - {input_1} (sha256:{hash})
+  
+  ## Methods
+  - {method_1}
+  
+  ## Outputs
+  - {output_1}
+  
+  ## Next‑Step Decision
+  {decision}
+steps:
+  - id: update_project_readme
+    name: "Update Project README"
+    description: "After final synthesis, update the project README."
+  - id: update_step_readme
+    name: "Update Step README"
+    description: "After completing a step, fill in the per‑step README."

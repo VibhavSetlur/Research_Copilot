@@ -1,0 +1,20 @@
+name: synthesis_poster
+version: 1.0.0
+description: "Generate a professional research poster."
+always_include: ["writing_core"]
+trigger: "When output_types includes 'poster'."
+tool: "tool.poster.create"
+sections:
+  - "Title & Authors"
+  - "Background"
+  - "Methods"
+  - "Results (2‑4 key figures)"
+  - "Conclusions"
+  - "References (compact)"
+steps:
+  - id: collect_content
+    name: "Collect Content"
+    description: "Gather key findings, figures, and conclusions from workspace."
+  - id: call_poster_tool
+    name: "Generate Poster"
+    description: "Call tool.poster.create with the collected content."

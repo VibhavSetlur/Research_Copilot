@@ -1,20 +1,34 @@
 name: writing_conclusions
 version: 1.0.0
-description: How to write per-step conclusions.md
+description: "How to write per‑step conclusions.md."
+always_include: ["writing_core"]
 template: |
-  # Step Conclusions
+  # {step_name} — Conclusions
   
   ## Key Findings
-  - [Finding 1]
+  1. {finding_1_with_number}
+  2. {finding_2_with_number}
   
   ## Statistical Summary
-  | Metric | Value | CI |
-  |--------|-------|----|
-  | [M]    | [V]   | [C]|
+  | Metric | Value | 95% CI | p-value |
+  |--------|-------|--------|---------|
+  | {metric} | {value} | [{lower}, {upper}] | {p} |
   
-  ## Bugs & Issues Encountered
-  - [Issue 1]
+  ## Bugs / Issues Encountered
+  - {bug_or_none}
   
   ## Routing Decision
-  - [Next Step / Decision]
-instructions: "Summarize the experiment step. Include a markdown table for key statistics. Note any bugs encountered for reproducibility."
+  - **Next Step:** {next_step}
+  - **Rationale:** {why}
+  - **Continue in Same Path:** {yes/no}
+  - **New Path Number (if applicable):** {path_number}
+  
+  ## Data Changes
+  - {new_data_or_none}
+rules:
+  - "Every finding must include a quantitative result."
+  - "If no bugs, write 'None.'"
+steps:
+  - id: write_conclusions
+    name: "Write Conclusions"
+    description: "Populate conclusions.md using the template."

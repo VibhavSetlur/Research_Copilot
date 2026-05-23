@@ -1,0 +1,16 @@
+name: synthesis_dashboard
+version: 1.0.0
+description: "Generate an interactive dashboard from experiment outputs."
+always_include: []
+trigger: "When output_types includes 'dashboard'."
+tool: "tool.dashboard.create"
+sources:
+  - "workspace/*/outputs/figures/"
+  - "workspace/*/outputs/tables/"
+steps:
+  - id: gather_data
+    name: "Gather Data"
+    description: "Collect figures and tables from all completed experiment steps."
+  - id: create_dashboard
+    name: "Create Dashboard"
+    description: "Call tool.dashboard.create to generate an interactive HTML dashboard."
