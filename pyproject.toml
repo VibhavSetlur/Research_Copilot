@@ -25,7 +25,7 @@ Repository = "https://github.com/VibhavSetlur/Research-OS"
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.0.0"]
-web = ["firecrawl-py", "beautifulsoup4"]
+web = ["firecrawl-py", "beautifulsoup4", "tenacity", "trafilatura"]
 literature = ["metapub", "semanticscholar"]
 viz = ["matplotlib", "seaborn", "plotly", "panel"]
 execution = ["docker"]
