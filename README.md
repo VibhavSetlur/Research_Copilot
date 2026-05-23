@@ -119,7 +119,7 @@ Why use Research OS?
 
 ## Documentation
 - **Manuals**: [Researcher Guide (Operational Manual)](docs/RESEARCHER_GUIDE.md) - Learn how to run your first project.
-- **Tutorials**: [Quickstart](docs/tutorials/QUICKSTART.md), [Example Walkthrough](docs/tutorials/EXAMPLE_WALKTHROUGH.md)
+- **Tutorials**: [Quickstart](docs/QUICKSTART.md), [Example Walkthrough](docs/tutorials/EXAMPLE_WALKTHROUGH.md)
 - **Architecture**: [AI Integration](docs/architecture/AI_INTEGRATION.md), [Guidance System](docs/architecture/GUIDANCE_SYSTEM.md)
 - **Templates**: [Agents Guide](templates/AGENTS.md) - Strict rules for LLM agents operating in this workspace.
 - **Project**: [Contributing](CONTRIBUTING.md) | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
