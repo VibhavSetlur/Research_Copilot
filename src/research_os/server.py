@@ -418,6 +418,30 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "alpha", "n"],
         },
     },
+    "sys.md.validate": {
+        "description": "Validates a written MD file against a writing protocol template.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string", "description": "Path to MD file"},
+                "protocol_name": {"type": "string", "description": "Writing protocol to check against (e.g., writing_methods)"}
+            },
+            "required": ["filepath", "protocol_name"],
+        },
+    },
+    "tool.audit.md_consistency": {
+        "description": "Scans written MD files and verifies they follow templates (alias for sys.md.validate).",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "protocol_name": {"type": "string"}
+            },
+            "required": ["filepath", "protocol_name"],
+        },
+    },
     "tool.audit.assumptions": {
         "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
@@ -1273,7 +1297,17 @@ def _handle_tool_synthesize(name: str, arguments: dict, root: Path) -> list[Text
         return _text(_success_envelope(res))
 
 
+
+def _handle_sys_md_validate(name: str, arguments: dict, root: Path) -> list[TextContent]:
+    from research_os.tools.actions.md_audit import validate_md_template
+    res = validate_md_template(arguments["filepath"], arguments["protocol_name"], root)
+    if res["status"] == "success":
+        return _text(_success_envelope(res))
+    return _text(_error_envelope(res.get("message", "Validation failed") + str(res.get("errors", ""))))
+
 _HANDLERS = {
+    "sys.md.validate": _handle_sys_md_validate,
+    "tool.audit.md_consistency": _handle_sys_md_validate,
     "sys.guidance.list": _handle_sys_guidance_list,
     "sys.guidance.get": _handle_sys_guidance_get,
     "sys.guidance.validate": _handle_sys_guidance_validate,

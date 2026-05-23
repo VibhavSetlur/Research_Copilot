@@ -21,7 +21,7 @@ validators:
       is observational, flag these matches for manual review and suggest associative
       language instead.
   code_linter:
-    command_python: ruff check workspace/02_analysis/ || pylint workspace/02_analysis/
+    command_python: ruff check workspace/*/scripts/ || pylint workspace/*/scripts/
 steps:
 - id: validate_citations
   name: Validate Citations

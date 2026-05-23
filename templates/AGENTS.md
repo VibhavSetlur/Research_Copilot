@@ -30,6 +30,7 @@
     - For writing tasks: NEVER combine methods, citations, conclusions, and
       synthesis into one response. Load writing_standards to discover the right
       protocol, then execute ONE writing protocol per prompt.
+    - After writing any MD file, verify it follows the template from the relevant writing protocol using sys.md.validate.
 
 14. Token Budget:
     - Token usage varies significantly based on data size, model choice, and research complexity. For guidance on optimizing your sessions, see the model-size guide.
