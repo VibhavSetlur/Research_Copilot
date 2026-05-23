@@ -23,7 +23,7 @@ research-os init --name "My Research Project"
 Start the Research OS MCP server in your project directory:
 
 ```bash
-python -m research_os.server --workspace .
+research-os start --workspace .
 ```
 
 Connect your AI IDE (like Cursor or Claude Desktop) to this server command.

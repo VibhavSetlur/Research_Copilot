@@ -18,7 +18,7 @@ cd air-pollution-research
 research-os init --name "Air Pollution and Respiratory Health"
 
 # Start the MCP Server
-python -m research_os.server --workspace .
+research-os start --workspace .
 ```
 
 Connect your AI IDE (like Cursor or Claude Desktop) to the running MCP server.

@@ -154,8 +154,8 @@ def _print_mcp_snippet(project_root: Path) -> None:
 
     snippet = {
         "research-os": {
-            "command": _sys.executable,
-            "args": ["-m", "research_os.server", "--transport", "stdio"],
+            "command": "research-os",
+            "args": ["start", "--transport", "stdio"],
         }
     }
     print("  ┌─ Cursor — paste into .cursor/mcp.json ─────────────────────────────┐")
@@ -799,24 +799,23 @@ def cmd_start(args: argparse.Namespace) -> None:
         import sys
 
         cmd = [sys.executable, "-m", "research_os.server"]
-        if args.transport:
+        if getattr(args, "transport", None):
             cmd.extend(["--transport", args.transport])
-        if args.port:
-            cmd.extend(["--port", str(args.port)])
+        if getattr(args, "workspace", None):
+            cmd.extend(["--workspace", args.workspace])
         subprocess.Popen(cmd, start_new_session=True)
-        print(
-            f"Started MCP server daemon (transport: {args.transport}, port: {args.port})"
-        )
+        print(f"Started MCP server daemon (transport: {getattr(args, 'transport', 'stdio')})")
         return
 
-    from research_os.server import main
+    from research_os.server import main as server_main
     import sys
 
-    if "start" in sys.argv:
-        sys.argv.remove("start")
-    if getattr(args, "daemon", False) and "--daemon" in sys.argv:
-        sys.argv.remove("--daemon")
-    main()
+    # Reconstruct sys.argv for server_main() parsing
+    sys.argv = [sys.argv[0], "--transport", getattr(args, "transport", "stdio")]
+    if getattr(args, "workspace", None):
+        sys.argv.extend(["--workspace", args.workspace])
+
+    server_main()
 
 
 def cmd_env(args: argparse.Namespace) -> None:
@@ -986,6 +985,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_start.add_argument(
         "--daemon", action="store_true", help="Run server in the background"
     )
+    p_start.add_argument("--workspace", type=str, help="Workspace directory to start the server in")
 
     p_env = sub.add_parser("env", help="Manage reproducible environments per step")
     env_sub = p_env.add_subparsers(dest="env_cmd", required=True)

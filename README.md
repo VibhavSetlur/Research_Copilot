@@ -23,7 +23,7 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 
 3. **Start the MCP Server**
    ```bash
-   python -m research_os.server --workspace .
+   research-os start --workspace .
    ```
    *(Configure this command in your MCP client like Cursor or Claude Code)*
 

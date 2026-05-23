@@ -91,8 +91,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "name": "research-os",
   "type": "command",
-  "command": "python",
-  "args": ["-m", "research_os.server", "--transport", "stdio"],
+  "command": "research-os",
+  "args": ["start", "--transport", "stdio"],
   "cwd": "/absolute/path/to/your/research-project"
 }
 ```
@@ -108,10 +108,9 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "mcpServers": {
     "research-os": {
-      "command": "python",
+      "command": "research-os",
       "args": [
-        "-m",
-        "research_os.server",
+        "start",
         "--transport",
         "stdio",
         "--workspace",
@@ -133,8 +132,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 {
   "servers": {
     "research-os": {
-      "command": "python",
-      "args": ["-m", "research_os.server", "--transport", "stdio"],
+      "command": "research-os",
+      "args": ["start", "--transport", "stdio"],
       "env": {}
     }
   }
@@ -155,7 +154,7 @@ After installation and MCP configuration, verify everything works:
 research-os doctor
 
 # Test MCP server manually
-echo '{"jsonrpc":"2.0","id":1,"method":"list_tools"}' | python -m research_os.server --transport stdio
+echo '{"jsonrpc":"2.0","id":1,"method":"list_tools"}' | research-os start --transport stdio
 ```
 
 In your IDE, you should see:
@@ -178,7 +177,7 @@ export PATH=$PATH:~/.local/bin
 ### MCP tools not appearing in IDE
 
 - Restart the IDE
-- Verify `python -m research_os.server --transport stdio` works in a terminal
+- Verify `research-os start --transport stdio` works in a terminal
 - Check the IDE's MCP output panel for error messages
 
 ### `pdflatex not found`
