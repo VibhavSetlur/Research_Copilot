@@ -175,17 +175,22 @@ def cmd_init(args: argparse.Namespace) -> None:
         research-os init /home/user/my-project/
         research-os init /home/user/existing-project/ --interactive
     """
-    if args.directory is None:
-        if args.name:
-            import re
-            slug = re.sub(r"[^a-zA-Z0-9_-]", "-", args.name.replace(" ", "-")).lower()
-            target_dir = (Path.cwd() / slug).resolve()
-        else:
-            target_dir = Path.cwd()
+    if args.name and args.directory is None:
+        import re
+        slug = re.sub(r"[^a-zA-Z0-9_-]", "-", args.name.replace(" ", "-")).lower()
+        target_dir = (Path.cwd() / slug).resolve()
+        created_new_folder = not target_dir.exists()
     else:
-        target_dir = Path(args.directory).resolve()
+        target_dir = Path(args.directory).resolve() if args.directory else Path.cwd().resolve()
+        created_new_folder = False
 
     project_name = args.name or target_dir.name
+
+    # Early exit if already initialized
+    if (target_dir / ".os_state").exists():
+        print(f"Project already initialized at {target_dir}")
+        print("Re-running will update scaffolding.")
+        print()
 
     has_existing_data = False
     existing_data_sources = []
@@ -205,21 +210,20 @@ def cmd_init(args: argparse.Namespace) -> None:
             existing = list(target_dir.glob(pattern))
             if existing:
                 has_existing_data = True
-                existing_data_sources.extend(existing[:5])  # Show at most 5 per pattern
+                existing_data_sources.extend(existing[:5])
                 break
 
-        # Also check common subdirectories
         for sub in ("data", "raw_data", "inputs", "csv", "json", "notebooks"):
             if (target_dir / sub).exists():
                 has_existing_data = True
 
-        if has_existing_data and not args.force:
+        if has_existing_data and not args.force and not (target_dir / ".os_state").exists():
             print(f"Found existing files in '{target_dir}'.")
             print("Research OS will NOT overwrite your data.")
             print("Existing data will be symlinked into the workspace.")
             print()
 
-    if has_existing_data and not args.force:
+    if has_existing_data and not args.force and not (target_dir / ".os_state").exists():
         confirm = input("Proceed with initialization? [y/N]: ").strip().lower()
         if confirm not in ("y", "yes"):
             print("Aborted.")
@@ -258,7 +262,6 @@ def cmd_init(args: argparse.Namespace) -> None:
                     link.symlink_to(src.absolute())
                 except OSError:
                     import shutil
-
                     shutil.copy2(src, link)
 
     print()
@@ -269,17 +272,36 @@ def cmd_init(args: argparse.Namespace) -> None:
     print(f"  Location: {target_dir}")
     print()
 
-    _print_tree(target_dir)
+    # Only print tree for new folders or small projects
+    if created_new_folder:
+        _print_tree(target_dir)
+    else:
+        existing_files = list(target_dir.rglob("*"))
+        file_count = len([f for f in existing_files if f.is_file()])
+        if file_count < 20:
+            _print_tree(target_dir)
+        else:
+            print(f"  (Workspace has {file_count} files — tree omitted.)")
+            print()
 
-    print()
     print("Next steps:")
-    print(f"  1. cd {target_dir}")
-    print("  2. research-os doctor    # Verify everything is ready")
-    print("  3. Open in your AI IDE and paste the MCP config:")
+    steps = []
+    if created_new_folder:
+        steps.append(f"  1. cd {target_dir}")
+        steps.append("  2. research-os doctor    # Verify everything is ready")
+        steps.append("  3. Open in your AI IDE and paste the MCP config:")
+    else:
+        steps.append("  1. research-os doctor    # Verify everything is ready")
+        steps.append("  2. Open in your AI IDE and paste the MCP config:")
+    for s in steps:
+        print(s)
     print()
     _print_mcp_snippet(target_dir)
     print()
-    print("  4. Type in the IDE: 'Explore my data'")
+    if created_new_folder:
+        print(f"  {len(steps)}. Type in the IDE: 'Explore my data'")
+    else:
+        print(f"  {len(steps)}. Type in the IDE: 'Explore my data'")
     print()
 
     print(f"Project config: {target_dir / 'inputs' / 'researcher_config.yaml'}")

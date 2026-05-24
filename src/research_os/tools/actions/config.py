@@ -66,11 +66,9 @@ def set_config(key: str, value: Any, root: Path) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-def init_config(root: Path) -> Dict[str, Any]:
-    # Placeholder for AI-driven init process
+def init_config(root: Path, overrides: dict | None = None) -> Dict[str, Any]:
     config_path = root / "inputs" / "researcher_config.yaml"
     if not config_path.exists():
-        # Create default
         template = '''# ============================================================
 # Researcher Configuration
 # Uncomment and fill in the options below.
@@ -109,28 +107,42 @@ def init_config(root: Path) -> Dict[str, Any]:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(template)
 
-        # Restrict permissions
-        if os.name != "nt":
-            try:
-                os.chmod(config_path, 0o600)
-            except Exception:
-                pass
+    if overrides:
+        config = yaml.safe_load(config_path.read_text()) or {}
+        if "project_name" in overrides:
+            config["project_name"] = overrides["project_name"]
+        if "domain" in overrides:
+            config["domain"] = overrides["domain"]
+        if "depth" in overrides:
+            config["default_depth"] = overrides["depth"]
+        if "research_question" in overrides:
+            config["research_question"] = overrides["research_question"]
+        if "provider" in overrides:
+            config["model_profile"] = "medium"
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
-        # Add to .gitignore
-        gitignore_path = root / ".gitignore"
-        gitignore_content = ""
-        if gitignore_path.exists():
-            gitignore_content = gitignore_path.read_text()
+    # Restrict permissions
+    if os.name != "nt":
+        try:
+            os.chmod(config_path, 0o600)
+        except Exception:
+            pass
 
-        if "inputs/researcher_config.yaml" not in gitignore_content:
-            with open(gitignore_path, "a") as gf:
-                gf.write("\n# Secure config\ninputs/researcher_config.yaml\n")
+    # Add to .gitignore
+    gitignore_path = root / ".gitignore"
+    gitignore_content = ""
+    if gitignore_path.exists():
+        gitignore_content = gitignore_path.read_text()
 
-        return {
-            "status": "success",
-            "message": "Initialized default config and secured it. Please populate api keys.",
-        }
-    return {"status": "success", "message": "Config already exists."}
+    if "inputs/researcher_config.yaml" not in gitignore_content:
+        with open(gitignore_path, "a") as gf:
+            gf.write("\n# Secure config\ninputs/researcher_config.yaml\n")
+
+    return {
+        "status": "success",
+        "message": "Initialized default config and secured it. Please populate api keys.",
+    }
 
 
 def validate_config(root: Path) -> Dict[str, Any]:

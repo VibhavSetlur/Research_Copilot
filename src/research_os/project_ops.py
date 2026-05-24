@@ -200,6 +200,14 @@ def save_state(root: Path, state: dict) -> dict:
     return state
 
 
+def get_active_experiment_dir(root: Path) -> Path | None:
+    """Return the active experiment directory path if it exists."""
+    state = load_state(root)
+    current_path = state.get("current_path", "main")
+    exp_dir = root / "workspace" / current_path
+    return exp_dir if exp_dir.exists() else None
+
+
 def compute_file_hash(path: Path) -> str:
     sha256 = hashlib.sha256()
     try:
@@ -358,7 +366,7 @@ def scaffold_minimal_workspace(
 
     # ── Auto-generate researcher_config.yaml via init_config ──
     from research_os.tools.actions.config import init_config
-    init_config(root)
+    init_config(root, overrides=config_overrides)
 
     # Symlink .os_state into workspace for easier access by scripts
     workspace_os_state = root / "workspace" / ".os_state"
@@ -507,7 +515,7 @@ def _setup_mcp_configs(root: Path, ide_flags: list[str] = None) -> None:
         cursor_mcp = cursor_dir / "mcp.json"
         if not cursor_mcp.exists():
             cursor_mcp.write_text(
-                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\\n"
+                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
             )
 
         # Copy Cursor rules if they exist
@@ -531,7 +539,7 @@ def _setup_mcp_configs(root: Path, ide_flags: list[str] = None) -> None:
         if not claude_mcp.exists():
             try:
                 claude_mcp.write_text(
-                    json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\\n"
+                    json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
                 )
             except Exception:
                 pass
@@ -573,14 +581,14 @@ def _setup_mcp_configs(root: Path, ide_flags: list[str] = None) -> None:
             )
 
     # VS Code OS
-    if ide in ("all", "vscode"):
+    if "vscode" in ide_flags or "all-ide" in ide_flags:
         vscode_dir = root / ".vscode"
         vscode_dir.mkdir(parents=True, exist_ok=True)
-    vscode_mcp = vscode_dir / "mcp.json"
-    if not vscode_mcp.exists():
-        vscode_mcp.write_text(
-            json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
-        )
+        vscode_mcp = vscode_dir / "mcp.json"
+        if not vscode_mcp.exists():
+            vscode_mcp.write_text(
+                json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n"
+            )
 
 
 def _copy_environment_to_project(root: Path) -> None:

@@ -113,6 +113,11 @@ class ResearchLedger:
     def get(self) -> dict:
         return self._load()
 
+    def get_current_path(self) -> str:
+        """Return the currently active experiment path id."""
+        state = self._load()
+        return state.get("current_path", "main")
+
     def update(self, **kwargs) -> dict:
         state = self._load()
         state.update(kwargs)

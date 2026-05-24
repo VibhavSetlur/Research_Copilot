@@ -175,7 +175,7 @@ TOOL_DEFINITIONS = {
                 },
                 "ide": {
                     "type": "string",
-                    "description": "Which IDE to generate MCP config for (all, cursor, claude, opencode, vscode). Default: all",
+                    "description": "IDE(s) to configure. Use 'all' for all supported IDEs, or comma-separated: 'cursor,claude,opencode,vscode,antigravity'. Default: all",
                     "default": "all",
                 },
             },
@@ -787,15 +787,19 @@ def _handle_tool_bash_exec(name: str, arguments: dict, root: Path) -> list[TextC
 
 
 def _handle_sys_workspace_scaffold(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        ide_str = arguments.get("ide", "all")
+        valid_ides = ["cursor", "claude", "opencode", "vscode", "antigravity"]
+        ide_flags = valid_ides if ide_str == "all" else [i.strip() for i in ide_str.split(",") if i.strip() in valid_ides]
         scaffold_minimal_workspace(
             root,
             arguments.get("project_name", "Research Project"),
             git_init=arguments.get("git_init", False),
-            ide=arguments.get("ide", "all"),
+            ide_flags=ide_flags,
+            copy_agents=True,
         )
         if (root / ".os_state").exists() and (root / "workspace").exists():
             _profile_inputs(root)
-        return _text(_success_envelope({"scaffolded": True}))
+        return _text(_success_envelope({"scaffolded": True, "ide_flags": ide_flags}))
 
 
 def _handle_sys_file_read(name: str, arguments: dict, root: Path) -> list[TextContent]:
