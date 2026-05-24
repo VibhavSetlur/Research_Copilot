@@ -1,0 +1,41 @@
+name: hypothesis_tracking
+version: 1.0.0
+description: Track, update, and validate research hypotheses throughout analysis.
+steps:
+- id: read_hypotheses
+  description: Read docs/hypotheses.md (create if not exists from docs/research_question.md).
+  name: Read Hypothesis File
+- id: update_status
+  description: 'For each hypothesis, assess its current status:
+
+    - TESTING: actively being analyzed in current path
+
+    - SUPPORTED: evidence favors it (note effect size + p-value)
+
+    - REJECTED: evidence contradicts it
+
+    - INCONCLUSIVE: insufficient data
+
+    Update the status in docs/hypotheses.md.
+
+    '
+  name: Update Hypothesis Status
+- id: log_update
+  description: Call mem.analysis.log with hypothesis status summary.
+  name: Log Hypothesis Update
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''hypothesis_tracking completed''.
+
+    5. Ask researcher: ''I''ve completed hypothesis_tracking. Want me to proceed to
+    the next protocol?'''
+schema_version: '1.0'

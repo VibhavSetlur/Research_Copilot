@@ -1,0 +1,29 @@
+name: dead_end_routing
+version: 1.0.0
+description: Structured protocol when an experiment path fails or is abandoned.
+steps:
+- id: document_failure
+  name: Document Failure
+  description: Write workspace/{path_name}/conclusions.md with what was tried, what went wrong, and what was learned.
+- id: abandon_path
+  name: Abandon Path
+  description: Call sys.path.abandon with path_name and rationale.
+- id: propose_alternatives
+  name: Propose Alternatives
+  description: Based on lessons learned, propose 2-3 alternative approaches and present to researcher.
+- id: create_new_path
+  name: Create New Path
+  description: After researcher chooses, call sys.path.create with chosen alternative name.
+- id: update_logs
+  name: Update Logs
+  description: Call mem.analysis.log to note the dead end and new direction.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call sys.checkpoint.create with description=''dead_end_routing completed''.
+
+    3. Ask researcher: ''I''ve completed dead_end_routing. Want me to proceed?'''
+schema_version: '1.0'

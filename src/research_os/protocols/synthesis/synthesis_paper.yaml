@@ -1,50 +1,93 @@
 name: synthesis_paper
 version: 1.0.0
-description: "Guide to building synthesis/paper.md section-by-section. Produces the final IMRAD academic paper."
-always_include: ["writing_core"]
-schema_version: "1.0"
-trigger: "When the final task is to synthesize all research outputs into a paper."
-
+description: Guide to building synthesis/paper.md section-by-section. Produces the
+  final IMRAD academic paper.
+always_include:
+- writing_core
+schema_version: '1.0'
+trigger: When the final task is to synthesize all research outputs into a paper.
 section_order:
-  1: "Methods"
-  2: "Results"
-  3: "Discussion"
-  4: "Abstract"
-  5: "Final Assembly"
-
-tool_calls: "Use tool.synthesize with section parameter (e.g. section='methods'). Call without section for final assembly."
-
-small_model_workflow: "Treat EACH synthesis section as a separate chat session to avoid context bloat. Wait for user approval before moving to the next section. Use sys.session.handoff."
-
+  1: Methods
+  2: Results
+  3: Discussion
+  4: Abstract
+  5: Final Assembly
+tool_calls: Use tool.synthesize with section parameter (e.g. section='methods'). Call
+  without section for final assembly.
+small_model_workflow: Treat EACH synthesis section as a separate chat session to avoid
+  context bloat. Wait for user approval before moving to the next section. Use sys.session.handoff.
 sources:
-  - "workspace/methods.md"
-  - "workspace/analysis.md"
-  - "workspace/citations.md"
-  - "workspace/*/conclusions.md"
-  - "workspace/*/outputs/figures/*"
-
+- workspace/methods.md
+- workspace/analysis.md
+- workspace/citations.md
+- workspace/*/conclusions.md
+- workspace/*/outputs/figures/*
 review_prompts:
-  methods: "Does the methods section provide enough detail for an independent researcher to replicate the study? Are all software versions and statistical tests documented?"
-  results: "Are all p-values and confidence intervals included? Are references to figures correct?"
-  discussion: "Does the discussion directly answer the research question without overstating the findings?"
-
+  methods: Does the methods section provide enough detail for an independent researcher
+    to replicate the study? Are all software versions and statistical tests documented?
+  results: Are all p-values and confidence intervals included? Are references to figures
+    correct?
+  discussion: Does the discussion directly answer the research question without overstating
+    the findings?
+model_adaptations:
+  small:
+    draft_methods:
+      description: Use sys.state.minimal_context. Read only workspace/methods.md.
+        Generate a single paragraph.
+    draft_results:
+      description: Read only the last 3 conclusions.md entries. Generate 2-3 key bullet
+        points.
+    draft_discussion:
+      description: Write 2-3 sentences based on the results paragraph. Skip the review
+        prompt.
+    draft_abstract:
+      description: Generate a 100-word abstract. Do not read full context.
+    final_assembly:
+      description: Concatenate sections into a single file. No audit step.
+  medium:
+    draft_methods:
+      description: Standard synthesis from workspace/methods.md. Apply review prompt.
+    draft_results:
+      description: Synthesize analysis.md and conclusions.md. Apply review prompt.
+  large:
+    draft_methods:
+      description: Full synthesis from all sources. Include all software versions
+        and parameters. Apply review prompt.
+    draft_results:
+      description: Read full analysis.md and all conclusions.md. Generate complete
+        results. Apply review prompt.
 steps:
-  - id: draft_methods
-    name: "Draft Methods Section"
-    description: "Synthesize workspace/methods.md into the formal Methods section. Apply the methods review prompt."
-  
-  - id: draft_results
-    name: "Draft Results Section"
-    description: "Synthesize analysis.md, conclusions.md, and figures into the Results section. Apply the results review prompt."
-    
-  - id: draft_discussion
-    name: "Draft Discussion Section"
-    description: "Write the Discussion section based on the Results. Apply the discussion review prompt."
-    
-  - id: draft_abstract
-    name: "Draft Abstract"
-    description: "Summarize the entire paper into a 250-word abstract following writing_core."
-    
-  - id: final_assembly
-    name: "Final Assembly"
-    description: "Combine all sections into synthesis/paper.md. Call tool.audit.synthesis for final checks."
+- id: draft_methods
+  name: Draft Methods Section
+  description: Synthesize workspace/methods.md into the formal Methods section. Apply
+    the methods review prompt.
+- id: draft_results
+  name: Draft Results Section
+  description: Synthesize analysis.md, conclusions.md, and figures into the Results
+    section. Apply the results review prompt.
+- id: draft_discussion
+  name: Draft Discussion Section
+  description: Write the Discussion section based on the Results. Apply the discussion
+    review prompt.
+- id: draft_abstract
+  name: Draft Abstract
+  description: Summarize the entire paper into a 250-word abstract following writing_core.
+- id: final_assembly
+  name: Final Assembly
+  description: Combine all sections into synthesis/paper.md. Call tool.audit.synthesis
+    for final checks.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''synthesis_paper completed''.
+
+    5. Ask researcher: ''I''ve completed synthesis_paper. Want me to proceed to the
+    next protocol?'''

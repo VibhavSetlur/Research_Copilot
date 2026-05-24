@@ -1,22 +1,56 @@
 name: project_startup
-version: 1.0.0
-description: "First actions after the researcher has placed files in inputs/."
+version: 2.0.0
+description: 'End-to-end startup protocol: from empty inputs/ to baseline EDA complete.'
+next_protocol: domain/domain_analysis
+pre_conditions:
+- researcher_config.yaml has been read (session_boot completed)
+- At least one file exists in inputs/
 steps:
-  - id: scan_inputs
-    description: "sys.file.list inputs/, read notes, profile raw data."
-  - id: domain_analysis
-    description: "Load domain/domain_analysis. Classify domain, note pitfalls."
-  - id: research_design
-    description: "Load domain/research_design. Write docs/research_question.md and hypotheses.md."
-  - id: create_baseline_path
-    description: "sys.path.create name='baseline_eda'."
-  - id: methods_research
-    description: "Research EDA methods. Write to 01_baseline_eda/methods_research.md."
-  - id: run_eda
-    description: "Write and execute EDA script in 01_baseline_eda. Save outputs."
-  - id: conclude_baseline
-    description: "Write conclusions.md using writing/conclusions."
-  - id: update_logs
-    description: "mem.analysis.log and writing/methods."
-  - id: suggest_next
-    description: "Summarise and suggest 2-3 next steps."
+- id: scan_inputs
+  description: sys.file.list inputs/, read notes via sys.file.read, profile raw data
+    via tool.data.sample.
+  name: Scan Inputs
+- id: read_researcher_config
+  description: Call sys.config.get. Extract output_types, expertise_level, autonomy_level.
+  name: Read Researcher Config
+- id: domain_analysis
+  description: Load domain/domain_analysis. Classify domain, note pitfalls.
+  name: Domain Analysis
+- id: formalize_research_question
+  description: Propose 1-2 candidate questions from data columns. Write to docs/research_question.md.
+    Wait for confirmation.
+  name: Formalize Research Question
+- id: present_summary
+  description: 'Present brief summary: data count, domain, question. Ask to proceed.'
+  name: Present Summary to Researcher
+- id: create_baseline_path
+  description: sys.path.create name='baseline_eda'.
+  name: Create Baseline Path
+- id: methods_research
+  description: Research EDA methods. Write to 01_baseline_eda/methods_research.md.
+  name: Methods Research
+- id: run_eda
+  description: Write and execute a short EDA script. Save key outputs.
+  name: Run Eda
+- id: write_conclusions
+  description: Write conclusions.md with key findings and next step ideas.
+  name: Write Conclusions
+- id: suggest_next
+  description: Suggest 2-3 next steps. Ask researcher for direction.
+  name: Suggest Next Steps
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''project_startup completed''.
+
+    5. Ask researcher: ''I''ve completed project_startup. Want me to proceed to the
+    next protocol?'''
+schema_version: '1.0'

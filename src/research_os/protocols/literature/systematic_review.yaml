@@ -1,37 +1,55 @@
 name: systematic_review
 version: 2.0.0
 description: Full PRISMA workflow for systematic reviews.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/search_strategy.md"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/prisma_flow_diagram.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/tables/data_extraction.csv"
-_output_path_note: "{step_number}_{descriptive_name} is created by sys.path.create. Example names: 02_search_and_screening, 03_data_extraction_path_1."
+- workspace/{step_number}_{descriptive_name}/outputs/reports/search_strategy.md
+- workspace/{step_number}_{descriptive_name}/outputs/figures/prisma_flow_diagram.png
+- workspace/{step_number}_{descriptive_name}/outputs/tables/data_extraction.csv
+_output_path_note: '{step_number}_{descriptive_name} is created by sys.path.create.
+  Example names: 02_search_and_screening, 03_data_extraction_path_1.'
 prerequisites:
-  - "Defined research question (PICO framework)."
-  - "Access to academic databases (PubMed, Semantic Scholar)."
+- Defined research question (PICO framework).
+- Access to academic databases (PubMed, Semantic Scholar).
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-    description: "Create a new path via sys.path.create to store scripts and outputs."
-  - id: search_strategy
-    name: "Search Strategy Creation"
-    description: "Formulate boolean queries and execute database querying."
-  - id: deduplication
-    name: "Deduplication"
-    description: "Apply deduplication algorithm to combined search results."
-  - id: screening
-    name: "Title/Abstract & Full-Text Screening"
-    description: "Screen records based on inclusion/exclusion criteria. Track counts for PRISMA."
-  - id: data_extraction
-    name: "Data Extraction"
-    description: "Extract study characteristics into a standardized table."
-  - id: rob_assessment
-    name: "Risk of Bias Assessment"
-    description: "Perform ROB-2 (RCTs) or ROBINS-I (observational) assessment."
-  - id: prisma_diagram
-    name: "Generate PRISMA Diagram"
-    description: "Create a PRISMA flow diagram summarizing the screening process."
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Create a new path via sys.path.create to store scripts and outputs.
+- id: search_strategy
+  name: Search Strategy Creation
+  description: Formulate boolean queries and execute database querying.
+- id: deduplication
+  name: Deduplication
+  description: Apply deduplication algorithm to combined search results.
+- id: screening
+  name: Title/Abstract & Full-Text Screening
+  description: Screen records based on inclusion/exclusion criteria. Track counts
+    for PRISMA.
+- id: data_extraction
+  name: Data Extraction
+  description: Extract study characteristics into a standardized table.
+- id: rob_assessment
+  name: Risk of Bias Assessment
+  description: Perform ROB-2 (RCTs) or ROBINS-I (observational) assessment.
+- id: prisma_diagram
+  name: Generate PRISMA Diagram
+  description: Create a PRISMA flow diagram summarizing the screening process.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''systematic_review completed''.
+
+    5. Ask researcher: ''I''ve completed systematic_review. Want me to proceed to
+    the next protocol?'''
 checkpoints:
-  - "Ensure inclusion/exclusion criteria were applied consistently."
-  - "Verify PRISMA counts match total retrieved."
+- Ensure inclusion/exclusion criteria were applied consistently.
+- Verify PRISMA counts match total retrieved.
+next_protocol: literature/evidence_synthesis

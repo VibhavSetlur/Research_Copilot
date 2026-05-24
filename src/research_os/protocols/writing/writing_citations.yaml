@@ -1,29 +1,37 @@
 name: writing_citations
 version: 1.0.0
-description: "How to format and manage citations in workspace/citations.md."
-always_include: ["writing_core"]
+description: How to format and manage citations in workspace/citations.md.
+always_include:
+- writing_core
 citation_entry_template:
-  format: |
-    ### [{citation_key}]
-    - **Authors:** {authors_et_al}
-    - **Year:** {year}
-    - **Title:** {title}
-    - **Venue:** {journal_or_conference}
-    - **DOI:** [{doi}]({doi_url})
-    - **Verified:** {status} — {verification_date}
-    - **Claims Used:** {list_of_claims}
-    - **BibTeX:**
-      ```bibtex
-      {bibtex_entry}
-      ```
+  format: "### [{citation_key}]\n- **Authors:** {authors_et_al}\n- **Year:** {year}\n\
+    - **Title:** {title}\n- **Venue:** {journal_or_conference}\n- **DOI:** [{doi}]({doi_url})\n\
+    - **Verified:** {status} — {verification_date}\n- **Claims Used:** {list_of_claims}\n\
+    - **BibTeX:**\n  ```bibtex\n  {bibtex_entry}\n  ```\n"
   rules:
-    - "citation_key format: FirstAuthorLastNameYear"
-    - "Verified status: VERIFIED | CONDITIONAL | FAILED | PENDING"
-    - "Always run citation verification before marking VERIFIED."
+  - 'citation_key format: FirstAuthorLastNameYear'
+  - 'Verified status: VERIFIED | CONDITIONAL | FAILED | PENDING'
+  - Always run citation verification before marking VERIFIED.
 steps:
-  - id: add_entry
-    name: "Add Citation Entry"
-    description: "Insert a new citation in citations.md using the template above."
-  - id: verify
-    name: "Verify Citation"
-    description: "Call tool.audit.citations on the entry and update verification status."
+- id: add_entry
+  name: Add Citation Entry
+  description: Insert a new citation in citations.md using the template above.
+- id: verify
+  name: Verify Citation
+  description: Call tool.audit.citations on the entry and update verification status.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_citations completed''.
+
+    5. Ask researcher: ''I''ve completed writing_citations. Want me to proceed to
+    the next protocol?'''
+schema_version: '1.0'

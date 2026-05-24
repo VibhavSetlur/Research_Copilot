@@ -1,30 +1,54 @@
 name: evidence_synthesis
 version: 2.0.0
 description: Synthesise findings, build evidence tables, and detect contradictions.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "synthesis/evidence_table.md"
-  - "synthesis/contradictions.md"
+- synthesis/evidence_table.md
+- synthesis/contradictions.md
 templates:
-  evidence_table_apa: |
-    | Author(s) & Year | Study Design | Sample Size | Key Findings | GRADE Strength |
+  evidence_table_apa: '| Author(s) & Year | Study Design | Sample Size | Key Findings
+    | GRADE Strength |
+
     |------------------|--------------|-------------|--------------|----------------|
+
     | Doe et al., 2023 | RCT          | N=250       | ...          | High           |
+
+    '
 grade_system:
-  high: "RCTs without serious limitations, or overwhelming evidence from observational studies."
-  moderate: "RCTs with limitations, or strong observational studies."
-  low: "Observational studies with limitations."
-  very_low: "Case series, expert opinion, or studies with severe flaws."
+  high: RCTs without serious limitations, or overwhelming evidence from observational
+    studies.
+  moderate: RCTs with limitations, or strong observational studies.
+  low: Observational studies with limitations.
+  very_low: Case series, expert opinion, or studies with severe flaws.
 automated_contradiction_detector:
-  rule: "Extract the primary outcome direction (positive, negative, null) for each paper. If Paper A asserts positive and Paper B asserts negative/null for the same relationship, flag as a contradiction."
-  action: "Log all flagged contradictions in synthesis/contradictions.md and prompt for potential reasons (e.g., different populations, dosages, or timeframes)."
+  rule: Extract the primary outcome direction (positive, negative, null) for each
+    paper. If Paper A asserts positive and Paper B asserts negative/null for the same
+    relationship, flag as a contradiction.
+  action: Log all flagged contradictions in synthesis/contradictions.md and prompt
+    for potential reasons (e.g., different populations, dosages, or timeframes).
 steps:
-  - id: build_evidence_table
-    name: "Build Evidence Table"
-    description: "Extract data from included papers and fill the APA-style template."
-  - id: grade_evidence
-    name: "Grade Evidence"
-    description: "Assign a GRADE strength to each paper."
-  - id: detect_contradictions
-    name: "Detect Contradictions"
-    description: "Run the automated contradiction detector and log conflicts."
+- id: build_evidence_table
+  name: Build Evidence Table
+  description: Extract data from included papers and fill the APA-style template.
+- id: grade_evidence
+  name: Grade Evidence
+  description: Assign a GRADE strength to each paper.
+- id: detect_contradictions
+  name: Detect Contradictions
+  description: Run the automated contradiction detector and log conflicts.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''evidence_synthesis completed''.
+
+    5. Ask researcher: ''I''ve completed evidence_synthesis. Want me to proceed to
+    the next protocol?'''
+next_protocol: methodology/methodology_selection

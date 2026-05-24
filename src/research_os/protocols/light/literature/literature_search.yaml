@@ -47,3 +47,19 @@ steps:
 - id: build_prisma_flow
   name: Build PRISMA Flow
   description: Document the PRISMA step counts in analysis.md.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''literature_search completed''.
+
+    5. Ask researcher: ''I''ve completed literature_search. Want me to proceed to
+    the next protocol?'''
+next_protocol: literature/evidence_synthesis

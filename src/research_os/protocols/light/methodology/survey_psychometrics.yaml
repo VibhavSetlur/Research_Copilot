@@ -1,19 +1,40 @@
 name: survey_psychometrics
 version: 2.0.0
-schema_version: "1.0"
-description: "Concise checklist for survey psychometrics"
+schema_version: '1.0'
+description: Concise checklist for survey psychometrics
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/cfa_results.txt"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/non_response_bias.md"
+- workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json
+- workspace/{step_number}_{descriptive_name}/outputs/reports/cfa_results.txt
+- workspace/{step_number}_{descriptive_name}/outputs/reports/non_response_bias.md
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-  - id: scale_validation
-    name: "Scale Validation"
-  - id: sampling_weights
-    name: "Apply Sampling Weights"
-  - id: non_response_bias
-    name: "Non-Response Bias Analysis"
-  - id: reporting
-    name: "Reporting Standards"
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Execute create_experiment_path step.
+- id: scale_validation
+  name: Scale Validation
+  description: Execute scale_validation step.
+- id: sampling_weights
+  name: Apply Sampling Weights
+  description: Execute sampling_weights step.
+- id: non_response_bias
+  name: Non-Response Bias Analysis
+  description: Execute non_response_bias step.
+- id: reporting
+  name: Reporting Standards
+  description: Execute reporting step.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''survey_psychometrics completed''.
+
+    5. Ask researcher: ''I''ve completed survey_psychometrics. Want me to proceed
+    to the next protocol?'''
+next_protocol: methodology/methodology_selection

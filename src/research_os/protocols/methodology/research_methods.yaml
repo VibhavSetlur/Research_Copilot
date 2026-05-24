@@ -1,53 +1,89 @@
 name: research_methods
 version: 1.0.0
-description: "Guide to researching and selecting appropriate statistical/analytical methods for a given dataset and research question."
+description: Guide to researching and selecting appropriate statistical/analytical
+  methods for a given dataset and research question.
 always_include: []
-schema_version: "1.0"
-trigger: "When the AI needs to choose a method but doesn't know which one to use, OR when the user asks 'what method should I use?'"
-
+schema_version: '1.0'
+trigger: When the AI needs to choose a method but doesn't know which one to use, OR
+  when the user asks 'what method should I use?'
 steps:
-  - id: understand_data
-    name: "Understand Data Characteristics"
-    description: |
-      Use the data inventory (workspace/logs/data_inventory.json) and data profiling tools (tool.data.profile) to extract:
-      - Outcome variable type (continuous, binary, count, time‑to‑event)
-      - Data structure (independent, repeated measures, nested, spatial, time‑series)
-      - Sample size and missingness patterns
-      - Number of variables / dimensionality
+- id: understand_data
+  name: Understand Data Characteristics
+  description: 'Use the data inventory (workspace/logs/data_inventory.json) and data
+    profiling tools (tool.data.profile) to extract:
 
-  - id: define_goal
-    name: "Define Research Goal"
-    description: |
-      Identify the primary objective: description, prediction, association, causal inference, classification, clustering, etc.
-      Use the research question from inputs/intake.md and researcher_config.yaml.
+    - Outcome variable type (continuous, binary, count, time‑to‑event)
 
-  - id: search_literature
-    name: "Search Literature for Methods"
-    description: |
-      - Construct a query for Semantic Scholar: "[domain] [goal] statistical method"
-      - Call tool.search.semantic_scholar with the query and retrieve top 5 relevant papers.
-      - For each paper, note: method name, why it was used, and its assumptions.
+    - Data structure (independent, repeated measures, nested, spatial, time‑series)
 
-  - id: search_documentation
-    name: "Search for Tool/Library Documentation"
-    description: |
-      - Use tool.search.web to find official documentation for candidate methods (e.g., "statsmodels logistic regression documentation").
-      - Verify library version, maintenance status, and community support.
+    - Sample size and missingness patterns
 
-  - id: evaluate_options
-    name: "Evaluate Options"
-    description: |
-      For each candidate method, assess:
-      - Does it match the data characteristics?
-      - Are its assumptions testable with the available data?
-      - Is there a well‑maintained Python/R/Julia package?
-      - What are the alternatives if assumptions are violated?
+    - Number of variables / dimensionality
 
-  - id: log_decision
-    name: "Log Decision"
-    description: |
-      Populate workspace/{step_number}_.../methods_research.md using the template from writing/methods protocol.
-      Include all literature sources and documentation links.
+    '
+- id: define_goal
+  name: Define Research Goal
+  description: 'Identify the primary objective: description, prediction, association,
+    causal inference, classification, clustering, etc.
 
+    Use the research question from inputs/intake.md and researcher_config.yaml.
+
+    '
+- id: search_literature
+  name: Search Literature for Methods
+  description: '- Construct a query for Semantic Scholar: "[domain] [goal] statistical
+    method"
+
+    - Call tool.search.semantic_scholar with the query and retrieve top 5 relevant
+    papers.
+
+    - For each paper, note: method name, why it was used, and its assumptions.
+
+    '
+- id: search_documentation
+  name: Search for Tool/Library Documentation
+  description: '- Use tool.search.web to find official documentation for candidate
+    methods (e.g., "statsmodels logistic regression documentation").
+
+    - Verify library version, maintenance status, and community support.
+
+    '
+- id: evaluate_options
+  name: Evaluate Options
+  description: 'For each candidate method, assess:
+
+    - Does it match the data characteristics?
+
+    - Are its assumptions testable with the available data?
+
+    - Is there a well‑maintained Python/R/Julia package?
+
+    - What are the alternatives if assumptions are violated?
+
+    '
+- id: log_decision
+  name: Log Decision
+  description: 'Populate workspace/{step_number}_.../methods_research.md using the
+    template from writing/methods protocol.
+
+    Include all literature sources and documentation links.
+
+    '
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''research_methods completed''.
+
+    5. Ask researcher: ''I''ve completed research_methods. Want me to proceed to the
+    next protocol?'''
 expected_outputs:
-  - "workspace/{step_number}_.../methods_research.md populated with method research notes"
+- workspace/{step_number}_.../methods_research.md populated with method research notes
+next_protocol: methodology/methodology_selection

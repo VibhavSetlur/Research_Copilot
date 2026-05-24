@@ -26,7 +26,7 @@ sample_size_justification:
       power: 0.8
       alpha: 0.05
       formula: n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2
-      example: "For d=0.5, n \u2248 64 per group."
+      example: For d=0.5, n ≈ 64 per group.
     binary_outcome:
       description: Comparing two proportions.
       power: 0.8
@@ -41,3 +41,19 @@ steps:
   name: Calculate Sample Size
   description: Use the provided formulae to compute and justify the required sample
     size, given power=0.8 and alpha=0.05.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''research_design completed''.
+
+    5. Ask researcher: ''I''ve completed research_design. Want me to proceed to the
+    next protocol?'''
+next_protocol: methodology/methodology_selection

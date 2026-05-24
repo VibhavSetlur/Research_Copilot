@@ -1,33 +1,55 @@
 name: audit_and_validation
 version: 2.0.0
 description: Protocol to audit citations, assumptions, and code quality.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/logs/audit.log: Detailed report of validation passes"
-  - "workspace/analysis.md: Final validation summary"
+- 'workspace/logs/audit.log: Detailed report of validation passes'
+- 'workspace/analysis.md: Final validation summary'
 validators:
   citation_validator:
-    pass_1_doi: "Attempt to resolve all DOIs. Flag broken links."
-    pass_2_abstract: "Verify that the claim in the text matches the abstract's conclusion."
-    pass_3_retraction: "Query the Retraction Watch database or Crossref for retracted status."
+    pass_1_doi: Attempt to resolve all DOIs. Flag broken links.
+    pass_2_abstract: Verify that the claim in the text matches the abstract's conclusion.
+    pass_3_retraction: Query the Retraction Watch database or Crossref for retracted
+      status.
   statistical_assumptions:
-    action: "Re-read the assumptions logged during methodology_selection. Run specific tests (e.g., Shapiro-Wilk for normality, VIF for multicollinearity) and log the p-values/metrics."
+    action: Re-read the assumptions logged during methodology_selection. Run specific
+      tests (e.g., Shapiro-Wilk for normality, VIF for multicollinearity) and log
+      the p-values/metrics.
   causal_language:
     regex_patterns:
-      - "(?i)\\b(causes?|caused|causing)\\b"
-      - "(?i)\\b(leads? to|led to)\\b"
-      - "(?i)\\b(results? in|resulted in)\\b"
-      - "(?i)\\b(impacts?|impacted)\\b"
-    action: "Scan manuscript drafts using these regex patterns. If the study design is observational, flag these matches for manual review and suggest associative language instead."
+    - (?i)\b(causes?|caused|causing)\b
+    - (?i)\b(leads? to|led to)\b
+    - (?i)\b(results? in|resulted in)\b
+    - (?i)\b(impacts?|impacted)\b
+    action: Scan manuscript drafts using these regex patterns. If the study design
+      is observational, flag these matches for manual review and suggest associative
+      language instead.
   code_linter:
-    command_python: "ruff check workspace/*/scripts/ || pylint workspace/*/scripts/"
+    command_python: ruff check workspace/*/scripts/ || pylint workspace/*/scripts/
 steps:
-  - id: validate_citations
-    name: "Validate Citations"
-    description: "Execute the three-pass citation validator."
-  - id: check_assumptions
-    name: "Check Assumptions"
-    description: "Run statistical tests to verify the assumptions hold true on the actual data."
-  - id: lint_code
-    name: "Lint Code"
-    description: "Run code linters to ensure syntax and style compliance."
+- id: validate_citations
+  name: Validate Citations
+  description: Execute the three-pass citation validator.
+- id: check_assumptions
+  name: Check Assumptions
+  description: Run statistical tests to verify the assumptions hold true on the actual
+    data.
+- id: lint_code
+  name: Lint Code
+  description: Run code linters to ensure syntax and style compliance.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''audit_and_validation completed''.
+
+    5. Ask researcher: ''I''ve completed audit_and_validation. Want me to proceed
+    to the next protocol?'''
+next_protocol: synthesis/synthesis_paper

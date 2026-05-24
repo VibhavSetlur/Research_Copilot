@@ -1,34 +1,68 @@
 name: writing_conclusions
 version: 1.0.0
-description: "How to write per‑step conclusions.md."
-always_include: ["writing_core"]
-template: |
-  # {step_name} — Conclusions
-  
+description: How to write per‑step conclusions.md.
+always_include:
+- writing_core
+template: '# {step_name} — Conclusions
+
+
   ## Key Findings
+
   1. {finding_1_with_number}
+
   2. {finding_2_with_number}
-  
+
+
   ## Statistical Summary
+
   | Metric | Value | 95% CI | p-value |
+
   |--------|-------|--------|---------|
+
   | {metric} | {value} | [{lower}, {upper}] | {p} |
-  
+
+
   ## Bugs / Issues Encountered
+
   - {bug_or_none}
-  
+
+
   ## Routing Decision
+
   - **Next Step:** {next_step}
+
   - **Rationale:** {why}
+
   - **Continue in Same Path:** {yes/no}
+
   - **New Path Number (if applicable):** {path_number}
-  
+
+
   ## Data Changes
+
   - {new_data_or_none}
+
+  '
 rules:
-  - "Every finding must include a quantitative result."
-  - "If no bugs, write 'None.'"
+- Every finding must include a quantitative result.
+- If no bugs, write 'None.'
 steps:
-  - id: write_conclusions
-    name: "Write Conclusions"
-    description: "Populate conclusions.md using the template."
+- id: write_conclusions
+  name: Write Conclusions
+  description: Populate conclusions.md using the template.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_conclusions completed''.
+
+    5. Ask researcher: ''I''ve completed writing_conclusions. Want me to proceed to
+    the next protocol?'''
+schema_version: '1.0'

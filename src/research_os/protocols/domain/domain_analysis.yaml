@@ -1,89 +1,199 @@
 name: domain_analysis
 version: 2.0.0
-description: Analyze a research domain to identify trends, required reporting standards, and domain-specific biases.
-schema_version: "1.0"
+description: Analyze a research domain to identify trends, required reporting standards,
+  and domain-specific biases.
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/logs/domain_analysis.log: Log of domain mapping and decisions"
-  - "workspace/analysis.md: Appended domain assumptions and standard guidelines"
+- 'workspace/logs/domain_analysis.log: Log of domain mapping and decisions'
+- 'workspace/analysis.md: Appended domain assumptions and standard guidelines'
 decision_tree:
   mapping:
     clinical:
-      file_extensions: [".dcm", ".edf", ".nii", ".csv"]
-      columns: ["bp", "cholesterol", "patient_id", "diagnosis", "treatment", "bmi"]
-      reporting_standards: ["CONSORT (for RCTs)", "STROBE (for Observational Studies)", "PRISMA (for Systematic Reviews)"]
+      file_extensions:
+      - .dcm
+      - .edf
+      - .nii
+      - .csv
+      columns:
+      - bp
+      - cholesterol
+      - patient_id
+      - diagnosis
+      - treatment
+      - bmi
+      reporting_standards:
+      - CONSORT (for RCTs)
+      - STROBE (for Observational Studies)
+      - PRISMA (for Systematic Reviews)
       biases_checklist:
-        - "Selection bias (e.g., non-representative sample)"
-        - "Attrition bias (e.g., loss to follow-up)"
-        - "Confounding by indication"
-        - "Measurement bias"
+      - Selection bias (e.g., non-representative sample)
+      - Attrition bias (e.g., loss to follow-up)
+      - Confounding by indication
+      - Measurement bias
     finance:
-      file_extensions: [".csv", ".xml", ".json", ".xlsx"]
-      columns: ["ticker", "price", "volume", "market_cap", "pe_ratio", "yield"]
-      reporting_standards: ["GIPS (Global Investment Performance Standards)", "IFRS (International Financial Reporting Standards)"]
+      file_extensions:
+      - .csv
+      - .xml
+      - .json
+      - .xlsx
+      columns:
+      - ticker
+      - price
+      - volume
+      - market_cap
+      - pe_ratio
+      - yield
+      reporting_standards:
+      - GIPS (Global Investment Performance Standards)
+      - IFRS (International Financial Reporting Standards)
       biases_checklist:
-        - "Survivorship bias (ignoring delisted companies)"
-        - "Look-ahead bias (using data not available at the time)"
-        - "Time period bias"
-        - "Data snooping/overfitting"
+      - Survivorship bias (ignoring delisted companies)
+      - Look-ahead bias (using data not available at the time)
+      - Time period bias
+      - Data snooping/overfitting
     social_sciences:
-      file_extensions: [".sav", ".dta", ".csv"]
-      columns: ["survey", "likert", "demographics", "respondent", "age_group", "income_bracket"]
-      reporting_standards: ["APA Guidelines", "JARS (Journal Article Reporting Standards)"]
+      file_extensions:
+      - .sav
+      - .dta
+      - .csv
+      columns:
+      - survey
+      - likert
+      - demographics
+      - respondent
+      - age_group
+      - income_bracket
+      reporting_standards:
+      - APA Guidelines
+      - JARS (Journal Article Reporting Standards)
       biases_checklist:
-        - "Social desirability bias"
-        - "Non-response bias"
-        - "Sampling bias"
-        - "Recall bias"
+      - Social desirability bias
+      - Non-response bias
+      - Sampling bias
+      - Recall bias
     bioinformatics:
-      file_extensions: [".fasta", ".bam", ".vcf", ".fastq"]
-      columns: ["gene_id", "expression", "log2fc", "pvalue", "chromosome", "position"]
-      reporting_standards: ["MIAME (Microarray)", "MINSEQE (Sequencing)"]
+      file_extensions:
+      - .fasta
+      - .bam
+      - .vcf
+      - .fastq
+      columns:
+      - gene_id
+      - expression
+      - log2fc
+      - pvalue
+      - chromosome
+      - position
+      reporting_standards:
+      - MIAME (Microarray)
+      - MINSEQE (Sequencing)
       biases_checklist:
-        - "Batch effects"
-        - "GC bias in sequencing"
-        - "Library preparation bias"
+      - Batch effects
+      - GC bias in sequencing
+      - Library preparation bias
     nlp:
-      file_extensions: [".txt", ".json", ".jsonl", ".csv"]
-      columns: ["text", "tokens", "label", "sentiment", "document_id"]
-      reporting_standards: ["ACL guidelines", "Model Card guidelines"]
+      file_extensions:
+      - .txt
+      - .json
+      - .jsonl
+      - .csv
+      columns:
+      - text
+      - tokens
+      - label
+      - sentiment
+      - document_id
+      reporting_standards:
+      - ACL guidelines
+      - Model Card guidelines
       biases_checklist:
-        - "Representation bias in training corpora"
-        - "Annotator bias"
-        - "Language or dialect bias"
+      - Representation bias in training corpora
+      - Annotator bias
+      - Language or dialect bias
     engineering:
-      file_extensions: [".tdms", ".mat", ".csv", ".h5"]
-      columns: ["timestamp", "sensor_val", "voltage", "temperature", "pressure"]
-      reporting_standards: ["ISO/IEC standards depending on field"]
+      file_extensions:
+      - .tdms
+      - .mat
+      - .csv
+      - .h5
+      columns:
+      - timestamp
+      - sensor_val
+      - voltage
+      - temperature
+      - pressure
+      reporting_standards:
+      - ISO/IEC standards depending on field
       biases_checklist:
-        - "Sensor drift"
-        - "Sampling rate aliasing"
-        - "Calibration error"
+      - Sensor drift
+      - Sampling rate aliasing
+      - Calibration error
     environmental_science:
-      file_extensions: [".shp", ".tiff", ".nc", ".geojson"]
-      columns: ["latitude", "longitude", "elevation", "temperature", "precipitation"]
-      reporting_standards: ["CF Conventions (Climate and Forecast)"]
+      file_extensions:
+      - .shp
+      - .tiff
+      - .nc
+      - .geojson
+      columns:
+      - latitude
+      - longitude
+      - elevation
+      - temperature
+      - precipitation
+      reporting_standards:
+      - CF Conventions (Climate and Forecast)
       biases_checklist:
-        - "Spatial autocorrelation"
-        - "Modifiable areal unit problem (MAUP)"
-        - "Temporal aggregation bias"
+      - Spatial autocorrelation
+      - Modifiable areal unit problem (MAUP)
+      - Temporal aggregation bias
     economics:
-      file_extensions: [".dta", ".csv", ".xlsx"]
-      columns: ["year", "country", "gdp", "inflation", "unemployment", "interest_rate"]
-      reporting_standards: ["AEA Data and Code Availability Policy"]
+      file_extensions:
+      - .dta
+      - .csv
+      - .xlsx
+      columns:
+      - year
+      - country
+      - gdp
+      - inflation
+      - unemployment
+      - interest_rate
+      reporting_standards:
+      - AEA Data and Code Availability Policy
       biases_checklist:
-        - "Endogeneity"
-        - "Omitted variable bias"
-        - "Simultaneity bias"
+      - Endogeneity
+      - Omitted variable bias
+      - Simultaneity bias
 steps:
-  - id: identify_domain
-    name: "Identify Domain"
-    description: "Examine file extensions and column names to map to a specific domain using the decision_tree mapping."
-  - id: map_landscape
-    name: "Map Landscape"
-    description: "Identify major sub-fields and leading authors based on the problem statement."
-  - id: check_reporting_standards
-    name: "Check Reporting Standards"
-    description: "Ensure the identified domain's reporting standards are documented in methods.md."
-  - id: evaluate_biases
-    name: "Evaluate Biases"
-    description: "Run through the domain-specific biases checklist and note potential risks in analysis.md."
+- id: identify_domain
+  name: Identify Domain
+  description: Examine file extensions and column names to map to a specific domain
+    using the decision_tree mapping.
+- id: map_landscape
+  name: Map Landscape
+  description: Identify major sub-fields and leading authors based on the problem
+    statement.
+- id: check_reporting_standards
+  name: Check Reporting Standards
+  description: Ensure the identified domain's reporting standards are documented in
+    methods.md.
+- id: evaluate_biases
+  name: Evaluate Biases
+  description: Run through the domain-specific biases checklist and note potential
+    risks in analysis.md.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''domain_analysis completed''.
+
+    5. Ask researcher: ''I''ve completed domain_analysis. Want me to proceed to the
+    next protocol?'''
+next_protocol: domain/research_design

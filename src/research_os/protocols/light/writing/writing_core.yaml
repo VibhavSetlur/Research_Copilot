@@ -1,35 +1,46 @@
 name: writing_core
 version: 1.0.0
-description: "Universal writing rules for all Research OS outputs."
-schema_version: "1.0"
-
+description: Universal writing rules for all Research OS outputs.
+schema_version: '1.0'
 rules:
   banned_phrases:
-    - "It is important to note that"
-    - "Interestingly,"
-    - "Surprising as it may seem"
-    - "Delve into"
-    - "In this tapestry of"
-    - "As a language model"
-    - "Needless to say"
-    - "It goes without saying"
-    - "As shown above"
-    - "Due to the fact that"
-    - "In order to"
-
+  - It is important to note that
+  - Interestingly,
+  - Surprising as it may seem
+  - Delve into
+  - In this tapestry of
+  - As a language model
+  - Needless to say
+  - It goes without saying
+  - As shown above
+  - Due to the fact that
+  - In order to
   causal_language:
-    - "Do not use 'causes', 'proof', or 'proves' unless RCT/proof."
-    - "Use 'associated with', 'correlated with' for observational data."
-
+  - Do not use 'causes', 'proof', or 'proves' unless RCT/proof.
+  - Use 'associated with', 'correlated with' for observational data.
   number_formatting:
-    - "p-values with exactly 3 decimals (p = 0.042)."
-    - "Report 95% CI."
-
+  - p-values with exactly 3 decimals (p = 0.042).
+  - Report 95% CI.
   tense_rules:
-    - "Past tense for methods/results."
-    - "Present tense for facts/conclusions."
-
+  - Past tense for methods/results.
+  - Present tense for facts/conclusions.
 steps:
-  - id: verify_core_rules
-    name: "Verify Core Rules"
-    description: "Check for banned phrases, causal language, numbers, and tenses."
+- id: verify_core_rules
+  name: Verify Core Rules
+  description: Check for banned phrases, causal language, numbers, and tenses.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_core completed''.
+
+    5. Ask researcher: ''I''ve completed writing_core. Want me to proceed to the next
+    protocol?'''
+next_protocol: synthesis/synthesis_paper

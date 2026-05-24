@@ -1,37 +1,55 @@
 name: machine_learning
 version: 2.0.0
 description: TRIPOD-compliant workflow for predictive modelling.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/model_performance.json"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/roc_curve.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/shap_summary.png"
-_output_path_note: "{step_number}_{descriptive_name} is created by sys.path.create. Example names: 02_feature_engineering, 03_model_training_path_1."
+- workspace/{step_number}_{descriptive_name}/outputs/reports/model_performance.json
+- workspace/{step_number}_{descriptive_name}/outputs/figures/roc_curve.png
+- workspace/{step_number}_{descriptive_name}/outputs/figures/shap_summary.png
+_output_path_note: '{step_number}_{descriptive_name} is created by sys.path.create.
+  Example names: 02_feature_engineering, 03_model_training_path_1.'
 prerequisites:
-  - "Cleaned dataset."
-  - "Python libraries: scikit-learn, xgboost, shap."
+- Cleaned dataset.
+- 'Python libraries: scikit-learn, xgboost, shap.'
 decision_tree:
-  - "Is the dataset imbalanced? -> Use stratified splitting and consider SMOTE or class weights."
-  - "Are there non-linear relationships? -> Prefer tree-based models over linear models."
+- Is the dataset imbalanced? -> Use stratified splitting and consider SMOTE or class
+  weights.
+- Are there non-linear relationships? -> Prefer tree-based models over linear models.
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-    description: "Create a new path via sys.path.create to store scripts and outputs."
-  - id: data_splitting
-    name: "Data Splitting"
-    description: "Perform stratified train/validation/test splits."
-  - id: feature_engineering
-    name: "Feature Engineering"
-    description: "Impute missing values, scale features, and encode categoricals."
-  - id: model_selection
-    name: "Model Selection & Tuning"
-    description: "Select algorithms and perform hyperparameter tuning using cross-validation."
-  - id: performance_metrics
-    name: "Calculate Performance Metrics"
-    description: "Evaluate AUROC, AUPRC, Brier score, and calibration."
-  - id: model_interpretation
-    name: "Model Interpretation"
-    description: "Generate SHAP or LIME explanations for feature importance."
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Create a new path via sys.path.create to store scripts and outputs.
+- id: data_splitting
+  name: Data Splitting
+  description: Perform stratified train/validation/test splits.
+- id: feature_engineering
+  name: Feature Engineering
+  description: Impute missing values, scale features, and encode categoricals.
+- id: model_selection
+  name: Model Selection & Tuning
+  description: Select algorithms and perform hyperparameter tuning using cross-validation.
+- id: performance_metrics
+  name: Calculate Performance Metrics
+  description: Evaluate AUROC, AUPRC, Brier score, and calibration.
+- id: model_interpretation
+  name: Model Interpretation
+  description: Generate SHAP or LIME explanations for feature importance.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''machine_learning completed''.
+
+    5. Ask researcher: ''I''ve completed machine_learning. Want me to proceed to the
+    next protocol?'''
 checkpoints:
-  - "Ensure no data leakage between train and test sets."
-  - "Verify calibration of probabilities."
+- Ensure no data leakage between train and test sets.
+- Verify calibration of probabilities.
+next_protocol: methodology/methodology_selection

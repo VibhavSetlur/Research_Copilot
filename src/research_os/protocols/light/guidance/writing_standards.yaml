@@ -1,19 +1,40 @@
 name: writing_standards
 version: 3.0.0
-description: "Index of writing protocols. Load writing_core first, then the task‑specific protocol."
+description: Index of writing protocols. Load writing_core first, then the task‑specific
+  protocol.
 writing_protocols:
-  writing_core: "writing/writing_core"
-  methods: "writing/writing_methods"
-  citations: "writing/writing_citations"
-  analysis_log: "writing/writing_analysis_log"
-  conclusions: "writing/writing_conclusions"
-  readme: "writing/writing_readme"
-  paper: "synthesis/synthesis_paper"
-  abstract: "synthesis/synthesis_abstract"
-  poster: "synthesis/synthesis_poster"
-  dashboard: "synthesis/synthesis_dashboard"
+  writing_core: writing/writing_core
+  methods: writing/writing_methods
+  citations: writing/writing_citations
+  analysis_log: writing/writing_analysis_log
+  conclusions: writing/writing_conclusions
+  readme: writing/writing_readme
+  paper: synthesis/synthesis_paper
+  abstract: synthesis/synthesis_abstract
+  poster: synthesis/synthesis_poster
+  dashboard: synthesis/synthesis_dashboard
+steps:
+- id: identify_task
+  name: Identify Writing Task
+  description: Determine which writing task is needed (methods, citations, conclusions, etc).
+- id: load_protocol
+  name: Load Target Protocol
+  description: Load writing_core first, then the specific protocol from the writing_protocols index.
+- id: execute
+  name: Execute One Task
+  description: Execute ONE writing task per AI response using the loaded protocol.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call sys.checkpoint.create with description=''writing_standards completed''.
+
+    3. Ask researcher: ''I''ve completed the writing standards index. Which writing task should I proceed with?'''
 how_to_use:
-  - "Identify the writing task."
-  - "Load writing_core for universal rules."
-  - "Load the specific protocol from the list above."
-  - "Execute ONE writing task per AI response."
+- Identify the writing task.
+- Load writing_core for universal rules.
+- Load the specific protocol from the list above.
+- Execute ONE writing task per AI response.
+schema_version: '1.0'

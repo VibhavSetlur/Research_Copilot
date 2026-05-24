@@ -32,3 +32,19 @@ steps:
 - id: detect_contradictions
   name: Detect Contradictions
   description: Run the automated contradiction detector and log conflicts.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''evidence_synthesis completed''.
+
+    5. Ask researcher: ''I''ve completed evidence_synthesis. Want me to proceed to
+    the next protocol?'''
+next_protocol: methodology/methodology_selection

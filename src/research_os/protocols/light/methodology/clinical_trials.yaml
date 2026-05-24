@@ -1,21 +1,43 @@
 name: clinical_trials
 version: 2.0.0
-schema_version: "1.0"
-description: "Concise checklist for clinical trials"
+schema_version: '1.0'
+description: Concise checklist for clinical trials
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/efficacy_results.json"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/adverse_events_table.md"
+- workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png
+- workspace/{step_number}_{descriptive_name}/outputs/reports/efficacy_results.json
+- workspace/{step_number}_{descriptive_name}/outputs/reports/adverse_events_table.md
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-  - id: randomisation_checks
-    name: "Randomisation Checks"
-  - id: blinding_assessment
-    name: "Blinding Assessment"
-  - id: participant_flow
-    name: "Participant Flow Diagram"
-  - id: missing_data
-    name: "Handle Missing Data"
-  - id: adverse_events
-    name: "Adverse Events Reporting"
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Execute create_experiment_path step.
+- id: randomisation_checks
+  name: Randomisation Checks
+  description: Execute randomisation_checks step.
+- id: blinding_assessment
+  name: Blinding Assessment
+  description: Execute blinding_assessment step.
+- id: participant_flow
+  name: Participant Flow Diagram
+  description: Execute participant_flow step.
+- id: missing_data
+  name: Handle Missing Data
+  description: Execute missing_data step.
+- id: adverse_events
+  name: Adverse Events Reporting
+  description: Execute adverse_events step.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''clinical_trials completed''.
+
+    5. Ask researcher: ''I''ve completed clinical_trials. Want me to proceed to the
+    next protocol?'''
+next_protocol: methodology/methodology_selection

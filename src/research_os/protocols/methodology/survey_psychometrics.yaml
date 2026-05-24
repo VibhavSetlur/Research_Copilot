@@ -1,31 +1,51 @@
 name: survey_psychometrics
 version: 2.0.0
 description: Scale validation and survey analysis.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/confirmatory_factor_analysis.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/missingness_report.md"
-_output_path_note: "{step_number}_{descriptive_name} is created by sys.path.create. Example names: 02_scale_validation, 03_cfa_model_path_1."
+- workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json
+- workspace/{step_number}_{descriptive_name}/outputs/figures/confirmatory_factor_analysis.png
+- workspace/{step_number}_{descriptive_name}/outputs/reports/missingness_report.md
+_output_path_note: '{step_number}_{descriptive_name} is created by sys.path.create.
+  Example names: 02_scale_validation, 03_cfa_model_path_1.'
 prerequisites:
-  - "Survey responses data."
-  - "R with lavaan package or Python equivalent."
+- Survey responses data.
+- R with lavaan package or Python equivalent.
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-    description: "Create a new path via sys.path.create to store scripts and outputs."
-  - id: scale_validation
-    name: "Scale Validation"
-    description: "Calculate Cronbach's alpha, McDonald's omega, and perform Confirmatory Factor Analysis (CFA)."
-  - id: sampling_weights
-    name: "Apply Sampling Weights"
-    description: "Calculate and apply weights to adjust for complex survey designs."
-  - id: non_response_bias
-    name: "Non-Response Bias Analysis"
-    description: "Compare early vs late responders or responders vs known population margins."
-  - id: reporting
-    name: "Reporting Standards"
-    description: "Format outputs to comply with STROBE guidelines for cross-sectional studies."
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Create a new path via sys.path.create to store scripts and outputs.
+- id: scale_validation
+  name: Scale Validation
+  description: Calculate Cronbach's alpha, McDonald's omega, and perform Confirmatory
+    Factor Analysis (CFA).
+- id: sampling_weights
+  name: Apply Sampling Weights
+  description: Calculate and apply weights to adjust for complex survey designs.
+- id: non_response_bias
+  name: Non-Response Bias Analysis
+  description: Compare early vs late responders or responders vs known population
+    margins.
+- id: reporting
+  name: Reporting Standards
+  description: Format outputs to comply with STROBE guidelines for cross-sectional
+    studies.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''survey_psychometrics completed''.
+
+    5. Ask researcher: ''I''ve completed survey_psychometrics. Want me to proceed
+    to the next protocol?'''
 checkpoints:
-  - "Verify model fit indices (CFI, TLI, RMSEA) for CFA."
-  - "Ensure weights sum to population size or sample size appropriately."
+- Verify model fit indices (CFI, TLI, RMSEA) for CFA.
+- Ensure weights sum to population size or sample size appropriately.
+next_protocol: methodology/methodology_selection

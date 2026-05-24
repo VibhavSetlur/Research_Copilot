@@ -749,7 +749,16 @@ def _handle_sys_guidance_get(name: str, arguments: dict, root: Path) -> list[Tex
 
         try:
             import yaml
-            data = load_protocol(p_name, light=(profile == "small"))
+            light = (profile == "small")
+            data = load_protocol(p_name, light=light)
+            # Inject model adaptations if they exist for the current profile
+            if "model_adaptations" in data and profile in data["model_adaptations"]:
+                adaptations = data["model_adaptations"][profile]
+                for step_id, overrides in adaptations.items():
+                    for step in data.get("steps", []):
+                        if step.get("id") == step_id:
+                            step.update(overrides)
+                del data["model_adaptations"]
             res = {"content": yaml.dump(data)}
             if profile == "small":
                 res["note"] = "Loaded in step-by-step mode due to 'small' model profile."

@@ -1,24 +1,47 @@
 name: systematic_review
 version: 2.0.0
-schema_version: "1.0"
-description: "Concise checklist for systematic reviews"
+schema_version: '1.0'
+description: Concise checklist for systematic reviews
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/search_strategy.md"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/prisma_flow_diagram.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/extracted_data_table.csv"
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/rob_assessment.json"
+- workspace/{step_number}_{descriptive_name}/outputs/reports/search_strategy.md
+- workspace/{step_number}_{descriptive_name}/outputs/figures/prisma_flow_diagram.png
+- workspace/{step_number}_{descriptive_name}/outputs/reports/extracted_data_table.csv
+- workspace/{step_number}_{descriptive_name}/outputs/reports/rob_assessment.json
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-  - id: search_strategy
-    name: "Search Strategy Creation"
-  - id: deduplication
-    name: "Deduplication"
-  - id: screening
-    name: "Title/Abstract & Full-Text Screening"
-  - id: data_extraction
-    name: "Data Extraction"
-  - id: rob_assessment
-    name: "Risk of Bias Assessment"
-  - id: prisma_diagram
-    name: "Generate PRISMA Diagram"
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Execute create_experiment_path step.
+- id: search_strategy
+  name: Search Strategy Creation
+  description: Execute search_strategy step.
+- id: deduplication
+  name: Deduplication
+  description: Execute deduplication step.
+- id: screening
+  name: Title/Abstract & Full-Text Screening
+  description: Execute screening step.
+- id: data_extraction
+  name: Data Extraction
+  description: Execute data_extraction step.
+- id: rob_assessment
+  name: Risk of Bias Assessment
+  description: Execute rob_assessment step.
+- id: prisma_diagram
+  name: Generate PRISMA Diagram
+  description: Execute prisma_diagram step.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''systematic_review completed''.
+
+    5. Ask researcher: ''I''ve completed systematic_review. Want me to proceed to
+    the next protocol?'''
+next_protocol: literature/evidence_synthesis

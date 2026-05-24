@@ -3,10 +3,36 @@ version: 1.0.0
 description: How to write structured entries to workspace/analysis.
 always_include:
 - writing_core
-entry_template: "[{timestamp}] **{step_name} \u2014 {status}**\n- **Tools used:**\
-  \ {tool_list}\n- **Key result:** {quantitative_summary}\n- **Decision:** {next_action}\n\
-  - **Routing:** {continue_in_path_or_new_path}\n- **Warnings:** {warnings}\n"
+entry_template: '[{timestamp}] **{step_name} — {status}**
+
+  - **Tools used:** {tool_list}
+
+  - **Key result:** {quantitative_summary}
+
+  - **Decision:** {next_action}
+
+  - **Routing:** {continue_in_path_or_new_path}
+
+  - **Warnings:** {warnings}
+
+  '
 steps:
 - id: log_entry
   name: Log Analysis Entry
   description: Write an entry to analysis.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_analysis_log completed''.
+
+    5. Ask researcher: ''I''ve completed writing_analysis_log. Want me to proceed
+    to the next protocol?'''
+schema_version: '1.0'

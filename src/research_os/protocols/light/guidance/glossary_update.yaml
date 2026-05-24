@@ -1,0 +1,23 @@
+name: glossary_update
+version: 1.0.0
+description: Update docs/glossary.md with new domain-specific terms introduced during analysis.
+steps:
+- id: collect_terms
+  name: Collect Terms
+  description: Identify 3-10 domain-specific terms introduced in this step.
+- id: update_glossary
+  name: Update Glossary
+  description: Read docs/glossary.md, add new terms in table format, write back.
+- id: confirm
+  name: Confirm Update
+  description: Confirm update count to researcher.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call sys.checkpoint.create with description=''glossary_update completed''.
+
+    3. Ask researcher: ''I''ve completed glossary_update. Want me to proceed?'''
+schema_version: '1.0'

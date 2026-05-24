@@ -1,37 +1,55 @@
 name: analysis_plan
 version: 2.1.0
-schema_version: "1.0"
-
+schema_version: '1.0'
 structure:
   01_data_prep:
     purpose: Data cleaning, filtering, feature engineering.
   02_analysis:
     purpose: Statistical modelling, core computations.
-  note: "Do NOT create a synthesis step. Synthesis is handled by tool.synthesize into the top‑level synthesis/ folder. Step folders are named {step_number}_{descriptor} (e.g., 01_data_prep). Path tracking adds _path_N when starting a new research track."
-
+  note: Do NOT create a synthesis step. Synthesis is handled by tool.synthesize into
+    the top‑level synthesis/ folder. Step folders are named {step_number}_{descriptor}
+    (e.g., 01_data_prep). Path tracking adds _path_N when starting a new research
+    track.
 templates:
-  boilerplate_readme: '# {folder_name} **Objective**: {description} **Inputs**: {list} **Outputs**: {list} **Scripts**: {list} '
-
+  boilerplate_readme: '# {folder_name} **Objective**: {description} **Inputs**: {list}
+    **Outputs**: {list} **Scripts**: {list} '
 path_creation_criteria:
   create_new_path_when:
-    - Testing high‑risk data transformations.
-    - Trying an alternative model architecture.
-    - Beginning a new research track.
+  - Testing high‑risk data transformations.
+  - Trying an alternative model architecture.
+  - Beginning a new research track.
   continue_in_same_path_when:
-    - Adding robustness checks.
-    - Fixing bugs.
-    - Continuing the same research track.
-
+  - Adding robustness checks.
+  - Fixing bugs.
+  - Continuing the same research track.
 steps:
-  - id: setup_first_experiment
-    name: "Setup first experiment"
-    description: "Use sys.path.create to create the first experiment directory (e.g., 01_baseline_eda). Do not assume a numbered folder already exists."
-  - id: setup_directories
-    name: "Setup directories"
-    description: "Use sys.path.create to create each step folder with the format {step_number}_{descriptive_name}. Do not create a synthesis step."
-  - id: write_readmes
-    name: Write READMEs
-    description: Populate directories with boilerplate README.
-  - id: evaluate_path_creation
-    name: Evaluate path creation
-    description: Decide whether next step starts a new track or continues.
+- id: setup_first_experiment
+  name: Setup first experiment
+  description: Use sys.path.create to create the first experiment directory (e.g.,
+    01_baseline_eda). Do not assume a numbered folder already exists.
+- id: setup_directories
+  name: Setup directories
+  description: Use sys.path.create to create each step folder with the format {step_number}_{descriptive_name}.
+    Do not create a synthesis step.
+- id: write_readmes
+  name: Write READMEs
+  description: Populate directories with boilerplate README.
+- id: evaluate_path_creation
+  name: Evaluate path creation
+  description: Decide whether next step starts a new track or continues.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''analysis_plan completed''.
+
+    5. Ask researcher: ''I''ve completed analysis_plan. Want me to proceed to the
+    next protocol?'''
+next_protocol: methodology/methodology_selection

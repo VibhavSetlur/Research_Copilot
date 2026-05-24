@@ -1,51 +1,96 @@
 name: writing_readme
 version: 1.0.0
-description: "How to update project and per‑step README.md files."
-always_include: ["writing_core"]
-project_readme_template: |
-  # {project_name}
-  
+description: How to update project and per‑step README.md files.
+always_include:
+- writing_core
+project_readme_template: '# {project_name}
+
+
   **Research Question:** {question}
+
   **Status:** {status}
+
   **Last Updated:** {date}
-  
+
+
   ## Workflow Summary
+
   ![Workflow](synthesis/workflow_diagram.png)
-  
+
+
   ## Key Findings
+
   {top_3_findings}
-  
+
+
   ## Outputs
+
   - [Abstract](synthesis/abstract.md)
+
   - [Paper](synthesis/paper.pdf)
+
   {extra_outputs}
-  
+
+
   ## How to Reproduce
+
   1. Clone repository
+
   2. Restore environment: `pip install -r environment/requirements.txt`
+
   3. Run scripts in order: {script_order}
-per_step_readme_template: |
-  # {step_name}
+
+  '
+per_step_readme_template: '# {step_name}
+
   **Created:** {date}
-  
+
+
   ## Goal
+
   {goal}
-  
+
+
   ## Input Data
+
   - {input_1} (sha256:{hash})
-  
+
+
   ## Methods
+
   - {method_1}
-  
+
+
   ## Outputs
+
   - {output_1}
-  
+
+
   ## Next‑Step Decision
+
   {decision}
+
+  '
 steps:
-  - id: update_project_readme
-    name: "Update Project README"
-    description: "After final synthesis, update the project README."
-  - id: update_step_readme
-    name: "Update Step README"
-    description: "After completing a step, fill in the per‑step README."
+- id: update_project_readme
+  name: Update Project README
+  description: After final synthesis, update the project README.
+- id: update_step_readme
+  name: Update Step README
+  description: After completing a step, fill in the per‑step README.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_readme completed''.
+
+    5. Ask researcher: ''I''ve completed writing_readme. Want me to proceed to the
+    next protocol?'''
+schema_version: '1.0'

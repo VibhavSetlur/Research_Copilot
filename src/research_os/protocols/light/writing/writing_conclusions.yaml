@@ -1,16 +1,65 @@
 name: writing_conclusions
 version: 1.0.0
-description: "How to write per\u2011step conclusions."
+description: How to write per‑step conclusions.
 always_include:
 - writing_core
-template: "# {step_name} \u2014 Conclusions\n\n## Key Findings\n1. {finding_1_with_number}\n\
-  2. {finding_2_with_number}\n\n## Statistical Summary\n| Metric | Value | 95% CI\
-  \ | p-value |\n|--------|-------|--------|---------|\n| {metric} | {value} | [{lower},\
-  \ {upper}] | {p} |\n\n## Bugs / Issues Encountered\n- {bug_or_none}\n\n## Routing\
-  \ Decision\n- **Next Step:** {next_step}\n- **Rationale:** {why}\n- **Continue in\
-  \ Same Path:** {yes/no}\n- **New Path Number (if applicable):** {path_number}\n\n\
-  ## Data Changes\n- {new_data_or_none}\n"
+template: '# {step_name} — Conclusions
+
+
+  ## Key Findings
+
+  1. {finding_1_with_number}
+
+  2. {finding_2_with_number}
+
+
+  ## Statistical Summary
+
+  | Metric | Value | 95% CI | p-value |
+
+  |--------|-------|--------|---------|
+
+  | {metric} | {value} | [{lower}, {upper}] | {p} |
+
+
+  ## Bugs / Issues Encountered
+
+  - {bug_or_none}
+
+
+  ## Routing Decision
+
+  - **Next Step:** {next_step}
+
+  - **Rationale:** {why}
+
+  - **Continue in Same Path:** {yes/no}
+
+  - **New Path Number (if applicable):** {path_number}
+
+
+  ## Data Changes
+
+  - {new_data_or_none}
+
+  '
 steps:
 - id: write_conclusions
   name: Write Conclusions
   description: Populate conclusions.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_conclusions completed''.
+
+    5. Ask researcher: ''I''ve completed writing_conclusions. Want me to proceed to
+    the next protocol?'''
+schema_version: '1.0'

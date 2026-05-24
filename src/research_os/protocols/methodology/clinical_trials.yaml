@@ -1,34 +1,52 @@
 name: clinical_trials
 version: 2.0.0
 description: CONSORT guidelines for clinical trials.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/{step_number}_{descriptive_name}/outputs/reports/randomisation_check.md"
-  - "workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png"
-  - "workspace/{step_number}_{descriptive_name}/outputs/tables/adverse_events.csv"
-_output_path_note: "{step_number}_{descriptive_name} is created by sys.path.create. Example names: 02_randomisation_checks, 03_efficacy_analysis_path_1."
+- workspace/{step_number}_{descriptive_name}/outputs/reports/randomisation_check.md
+- workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png
+- workspace/{step_number}_{descriptive_name}/outputs/tables/adverse_events.csv
+_output_path_note: '{step_number}_{descriptive_name} is created by sys.path.create.
+  Example names: 02_randomisation_checks, 03_efficacy_analysis_path_1.'
 prerequisites:
-  - "Trial registry number and protocol."
-  - "Raw clinical trial data."
+- Trial registry number and protocol.
+- Raw clinical trial data.
 steps:
-  - id: create_experiment_path
-    name: "Create Experiment Path"
-    description: "Create a new path via sys.path.create to store scripts and outputs."
-  - id: randomisation_checks
-    name: "Randomisation Checks"
-    description: "Verify baseline characteristics are balanced between arms."
-  - id: blinding_assessment
-    name: "Blinding Assessment"
-    description: "Assess success of blinding if applicable."
-  - id: participant_flow
-    name: "Participant Flow Diagram"
-    description: "Generate CONSORT flow diagram detailing enrollment, allocation, follow-up, and analysis."
-  - id: missing_data
-    name: "Handle Missing Data"
-    description: "Apply multiple imputation (MICE) and perform sensitivity analysis."
-  - id: adverse_events
-    name: "Adverse Events Reporting"
-    description: "Tabulate adverse events by arm and severity."
+- id: create_experiment_path
+  name: Create Experiment Path
+  description: Create a new path via sys.path.create to store scripts and outputs.
+- id: randomisation_checks
+  name: Randomisation Checks
+  description: Verify baseline characteristics are balanced between arms.
+- id: blinding_assessment
+  name: Blinding Assessment
+  description: Assess success of blinding if applicable.
+- id: participant_flow
+  name: Participant Flow Diagram
+  description: Generate CONSORT flow diagram detailing enrollment, allocation, follow-up,
+    and analysis.
+- id: missing_data
+  name: Handle Missing Data
+  description: Apply multiple imputation (MICE) and perform sensitivity analysis.
+- id: adverse_events
+  name: Adverse Events Reporting
+  description: Tabulate adverse events by arm and severity.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''clinical_trials completed''.
+
+    5. Ask researcher: ''I''ve completed clinical_trials. Want me to proceed to the
+    next protocol?'''
 checkpoints:
-  - "Ensure intent-to-treat (ITT) analysis is primary."
-  - "Check that all protocol-specified outcomes are reported."
+- Ensure intent-to-treat (ITT) analysis is primary.
+- Check that all protocol-specified outcomes are reported.
+next_protocol: methodology/methodology_selection

@@ -1,19 +1,42 @@
 name: writing_analysis_log
 version: 1.0.0
-description: "How to write structured entries to workspace/analysis.md via mem.analysis.log."
-always_include: ["writing_core"]
-entry_template: |
-  [{timestamp}] **{step_name} — {status}**
+description: How to write structured entries to workspace/analysis.md via mem.analysis.log.
+always_include:
+- writing_core
+entry_template: '[{timestamp}] **{step_name} — {status}**
+
   - **Tools used:** {tool_list}
+
   - **Key result:** {quantitative_summary}
+
   - **Decision:** {next_action}
+
   - **Routing:** {continue_in_path_or_new_path}
+
   - **Warnings:** {warnings}
+
+  '
 rules:
-  - "Status must be: STARTED, COMPLETED, ABANDONED, PAUSED."
-  - "Key result must include a number or statistical finding."
-  - "After logging, update workspace/workflow.mermaid."
+- 'Status must be: STARTED, COMPLETED, ABANDONED, PAUSED.'
+- Key result must include a number or statistical finding.
+- After logging, update workspace/workflow.mermaid.
 steps:
-  - id: log_entry
-    name: "Log Analysis Entry"
-    description: "Write an entry to analysis.md using the template."
+- id: log_entry
+  name: Log Analysis Entry
+  description: Write an entry to analysis.md using the template.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''writing_analysis_log completed''.
+
+    5. Ask researcher: ''I''ve completed writing_analysis_log. Want me to proceed
+    to the next protocol?'''
+schema_version: '1.0'

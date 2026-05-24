@@ -1,99 +1,177 @@
 name: methodology_selection
 version: 2.0.0
 description: Three-layer decision matrix to select the best methodology and tools.
-schema_version: "1.0"
+schema_version: '1.0'
 expected_outputs:
-  - "workspace/methods.md: Appended methodological choices, libraries, and assumption checks"
-  - "workspace/logs/methodology.log"
+- 'workspace/methods.md: Appended methodological choices, libraries, and assumption
+  checks'
+- workspace/logs/methodology.log
 decision_matrix:
   layers:
-    1_outcome_type: ["continuous", "binary", "count", "time-to-event"]
-    2_data_structure: ["independent", "repeated", "nested", "spatial"]
-    3_number_of_variables: ["univariate", "multivariate", "high-dimensional"]
+    1_outcome_type:
+    - continuous
+    - binary
+    - count
+    - time-to-event
+    2_data_structure:
+    - independent
+    - repeated
+    - nested
+    - spatial
+    3_number_of_variables:
+    - univariate
+    - multivariate
+    - high-dimensional
   mappings:
     continuous_independent_multivariate:
-      method: "Multiple Linear Regression"
-      library: "statsmodels (Python) / lm (R)"
-      template: |
-        import statsmodels.api as sm
-        X = sm.add_constant(df[['var1', 'var2']])
-        model = sm.OLS(df['outcome'], X).fit()
+      method: Multiple Linear Regression
+      library: statsmodels (Python) / lm (R)
+      template: 'import statsmodels.api as sm
+
+        X = sm.add_constant(df[[''var1'', ''var2'']])
+
+        model = sm.OLS(df[''outcome''], X).fit()
+
         print(model.summary())
-      assumptions: ["Linearity", "Independence of errors", "Homoscedasticity", "Normality of residuals", "No multicollinearity"]
+
+        '
+      assumptions:
+      - Linearity
+      - Independence of errors
+      - Homoscedasticity
+      - Normality of residuals
+      - No multicollinearity
     binary_independent_multivariate:
-      method: "Logistic Regression"
-      library: "scikit-learn (Python) / glm (R)"
-      template: |
-        from sklearn.linear_model import LogisticRegression
+      method: Logistic Regression
+      library: scikit-learn (Python) / glm (R)
+      template: 'from sklearn.linear_model import LogisticRegression
+
         clf = LogisticRegression()
+
         clf.fit(X, y)
-      assumptions: ["Linearity of independent variables and log-odds", "Absence of multicollinearity"]
+
+        '
+      assumptions:
+      - Linearity of independent variables and log-odds
+      - Absence of multicollinearity
     time-to-event_independent_multivariate:
-      method: "Cox Proportional Hazards"
-      library: "lifelines (Python) / survival (R)"
-      template: |
-        from lifelines import CoxPHFitter
+      method: Cox Proportional Hazards
+      library: lifelines (Python) / survival (R)
+      template: 'from lifelines import CoxPHFitter
+
         cph = CoxPHFitter()
-        cph.fit(df, duration_col='T', event_col='E')
+
+        cph.fit(df, duration_col=''T'', event_col=''E'')
+
         cph.print_summary()
-      assumptions: ["Proportional hazards", "Non-informative censoring"]
+
+        '
+      assumptions:
+      - Proportional hazards
+      - Non-informative censoring
     fallback:
-      method: "Random Forest / Gradient Boosting (Non-parametric)"
-      library: "scikit-learn / xgboost"
-      template: |
-        from sklearn.ensemble import RandomForestRegressor
+      method: Random Forest / Gradient Boosting (Non-parametric)
+      library: scikit-learn / xgboost
+      template: 'from sklearn.ensemble import RandomForestRegressor
+
         rf = RandomForestRegressor().fit(X, y)
-      assumptions: ["Representative sampling", "Stationarity (if time series)"]
+
+        '
+      assumptions:
+      - Representative sampling
+      - Stationarity (if time series)
     count_independent_multivariate:
-      method: "Poisson / Negative Binomial Regression"
-      library: "statsmodels (Python) / MASS (R)"
-      template: |
-        import statsmodels.api as sm
+      method: Poisson / Negative Binomial Regression
+      library: statsmodels (Python) / MASS (R)
+      template: 'import statsmodels.api as sm
+
         model = sm.GLM(y, X, family=sm.families.Poisson()).fit()
-      assumptions: ["Events are independent", "Mean equals variance (Poisson) or variance > mean (NB)"]
+
+        '
+      assumptions:
+      - Events are independent
+      - Mean equals variance (Poisson) or variance > mean (NB)
     continuous_repeated_multivariate:
-      method: "Mixed Effects / GEE"
-      library: "statsmodels (Python) / lme4 (R)"
-      template: |
-        import statsmodels.formula.api as smf
+      method: Mixed Effects / GEE
+      library: statsmodels (Python) / lme4 (R)
+      template: 'import statsmodels.formula.api as smf
+
         model = smf.mixedlm("outcome ~ var1", df, groups=df["subject_id"]).fit()
-      assumptions: ["Random effects are normally distributed", "Independence between subjects"]
+
+        '
+      assumptions:
+      - Random effects are normally distributed
+      - Independence between subjects
     continuous_nested_multivariate:
-      method: "Multilevel Models (Hierarchical)"
-      library: "statsmodels (Python) / lme4 (R)"
-      template: |
-        import statsmodels.formula.api as smf
+      method: Multilevel Models (Hierarchical)
+      library: statsmodels (Python) / lme4 (R)
+      template: 'import statsmodels.formula.api as smf
+
         model = smf.mixedlm("outcome ~ var1", df, groups=df["school_id"]).fit()
-      assumptions: ["Linearity", "Normality at each level", "Homoscedasticity"]
+
+        '
+      assumptions:
+      - Linearity
+      - Normality at each level
+      - Homoscedasticity
     continuous_spatial_multivariate:
-      method: "Spatial Regression / Kriging"
-      library: "PySAL / sklearn.gaussian_process (Python) / spdep (R)"
-      template: |
-        from sklearn.gaussian_process import GaussianProcessRegressor
+      method: Spatial Regression / Kriging
+      library: PySAL / sklearn.gaussian_process (Python) / spdep (R)
+      template: 'from sklearn.gaussian_process import GaussianProcessRegressor
+
         gpr = GaussianProcessRegressor().fit(X_spatial, y)
-      assumptions: ["Spatial autocorrelation", "Stationarity"]
+
+        '
+      assumptions:
+      - Spatial autocorrelation
+      - Stationarity
     continuous_independent_high-dimensional:
-      method: "LASSO / Elastic Net / PCA+Regression"
-      library: "scikit-learn (Python) / glmnet (R)"
-      template: |
-        from sklearn.linear_model import ElasticNet
+      method: LASSO / Elastic Net / PCA+Regression
+      library: scikit-learn (Python) / glmnet (R)
+      template: 'from sklearn.linear_model import ElasticNet
+
         model = ElasticNet(alpha=1.0, l1_ratio=0.5).fit(X, y)
-      assumptions: ["Sparsity (LASSO)", "Linearity"]
+
+        '
+      assumptions:
+      - Sparsity (LASSO)
+      - Linearity
     time-to-event_independent_competing_risks:
-      method: "Fine-Gray Competing Risks"
-      library: "lifelines (Python) / cmprsk (R)"
-      template: |
-        from lifelines import AalenJohansenFitter
+      method: Fine-Gray Competing Risks
+      library: lifelines (Python) / cmprsk (R)
+      template: 'from lifelines import AalenJohansenFitter
+
         ajf = AalenJohansenFitter()
+
         ajf.fit(T, E, event_of_interest=1)
-      assumptions: ["Proportional subdistribution hazards", "Independent censoring"]
+
+        '
+      assumptions:
+      - Proportional subdistribution hazards
+      - Independent censoring
 steps:
-  - id: identify_layers
-    name: "Identify Matrix Layers"
-    description: "Determine outcome type, data structure, and number of variables."
-  - id: select_methodology
-    name: "Select Methodology"
-    description: "Use the decision matrix mapping to pick the method, library, and template."
-  - id: document_assumptions
-    name: "Document Assumptions"
-    description: "List the assumptions that must be tested during the analysis."
+- id: identify_layers
+  name: Identify Matrix Layers
+  description: Determine outcome type, data structure, and number of variables.
+- id: select_methodology
+  name: Select Methodology
+  description: Use the decision matrix mapping to pick the method, library, and template.
+- id: document_assumptions
+  name: Document Assumptions
+  description: List the assumptions that must be tested during the analysis.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''methodology_selection completed''.
+
+    5. Ask researcher: ''I''ve completed methodology_selection. Want me to proceed
+    to the next protocol?'''
+next_protocol: literature/literature_search

@@ -4,10 +4,10 @@ description: Generate a standalone structured abstract (250 words).
 always_include:
 - writing_core
 template:
-  background: "1\u20112 sentences on research gap."
-  methods: "2\u20113 sentences on design, sample, analysis."
-  results: "2\u20113 sentences with key numbers and confidence interval."
-  conclusion: "1\u20112 sentences on implications."
+  background: 1‑2 sentences on research gap.
+  methods: 2‑3 sentences on design, sample, analysis.
+  results: 2‑3 sentences with key numbers and confidence interval.
+  conclusion: 1‑2 sentences on implications.
   word_limit: 250
 steps:
 - id: gather_sources
@@ -19,3 +19,19 @@ steps:
 - id: apply_writing_core
   name: Apply Writing Core
   description: Check for banned phrases, causal language, number formatting.
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''synthesis_abstract completed''.
+
+    5. Ask researcher: ''I''ve completed synthesis_abstract. Want me to proceed to
+    the next protocol?'''
+schema_version: '1.0'

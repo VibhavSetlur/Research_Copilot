@@ -1,0 +1,41 @@
+name: glossary_update
+version: 1.0.0
+description: Update docs/glossary.md with new domain-specific terms introduced during
+  analysis.
+trigger: After domain_analysis, after literature_search, after any step that introduces
+  new technical terms
+steps:
+- id: collect_terms
+  description: Identify 3-10 domain-specific or project-specific terms introduced
+    in this step.
+  name: Collect New Terms
+- id: update_glossary
+  description: 'Read docs/glossary.md via sys.file.read.
+
+    For each new term not already in the glossary, add a row to the markdown table:
+
+    | Term | Definition | Source |
+
+    Write back via sys.file.write.
+
+    '
+  name: Update Glossary File
+- id: confirm
+  description: 'Confirm: ''Glossary updated with N new terms.'''
+  name: Confirm Update
+- id: protocol_completion
+  name: Complete Protocol & Update Workspace
+  description: 'After all steps above are done:
+
+    1. Call mem.analysis.log with completion summary.
+
+    2. Call mem.methods.append with any new methods or tools used.
+
+    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    step (green fill), write back.
+
+    4. Call sys.checkpoint.create with description=''glossary_update completed''.
+
+    5. Ask researcher: ''I''ve completed glossary_update. Want me to proceed to the
+    next protocol?'''
+schema_version: '1.0'
