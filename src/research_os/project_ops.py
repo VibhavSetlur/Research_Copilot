@@ -281,40 +281,15 @@ def scaffold_minimal_workspace(
     for doc_file, content in [
         (
             "research_overview.md",
-            f"# Research Overview
-
-## Research Area / Idea
-
-## Motivation & Background
-
-## Key Questions
-
-## Placeholder Section
-
-*Auto-generated: {now_iso()}*
-",
+            "# Research Overview\n\n*Write your motivation, background context, and prior knowledge here. The AI will not overwrite this file.*\n",
         ),
         (
             "research_question.md",
-            f"# Research Question
-
-*(to be determined)*
-
-## Last Updated
-
-{now_iso()}
-",
+            f"# Research Question\n\n*(to be determined)*\n\n## Last Updated\n\n{now_iso()}\n",
         ),
         (
             "glossary.md",
-            f"# Glossary
-
-| Term | Definition |
-|------|------------|
-| | |
-
-*Auto-generated: {now_iso()}*
-",
+            f"# Glossary\n\n| Term | Definition |\n|------|------------|\n| | |\n\n*Auto-generated: {now_iso()}*\n",
         ),
     ]:
         p = root / "docs" / doc_file
@@ -1236,6 +1211,61 @@ def render_workflow_diagram(root: Path) -> dict:
         }
     except Exception as e:
         return {"png_path": None, "rendered": False, "warning": f"mmdc error: {e}"}
+
+
+def _update_analysis_mermaid_block(root: Path, mermaid_content: str) -> None:
+    """Replace the mermaid diagram block inside workspace/analysis.md in-place."""
+    analysis_path = root / "workspace" / "analysis.md"
+    if not analysis_path.exists():
+        return
+    content = analysis_path.read_text()
+    start = content.find("```mermaid")
+    if start == -1:
+        return
+    end = content.find("```", start + 10)
+    if end == -1:
+        return
+    end += 3
+    new_block = f"```mermaid\n{mermaid_content}\n```"
+    new_content = content[:start] + new_block + content[end:]
+    analysis_path.write_text(new_content)
+
+
+def _update_workflow_mermaid(root: Path) -> None:
+    """Regenerate workflow.mermaid and the analysis.md mermaid block from current paths."""
+    from research_os.tools.actions.path import list_paths
+
+    paths_data = list_paths(root)
+    paths = paths_data.get("paths", [])
+    lines = ["graph TD"]
+    lines.append("    init[Initialize Project]:::complete")
+    for p in paths:
+        pid = p["path_id"].replace("-", "_").replace(" ", "_")
+        label = p.get("name", pid)
+        status = p.get("status", "active")
+        css = {"completed": "complete", "active": "running", "dead_end": "failed"}.get(status, "planned")
+        lines.append(f"    {pid}[{label}]:::{css}")
+        lines.append(f"    init --> {pid}")
+    lines.append("    classDef complete fill:#d4edda,stroke:#28a745")
+    lines.append("    classDef running fill:#fff3cd,stroke:#ffc107")
+    lines.append("    classDef failed fill:#f8d7da,stroke:#dc3545,stroke-dasharray: 5 5")
+    lines.append("    classDef planned fill:#e2e3e5,stroke:#6c757d")
+    mermaid_str = "\n".join(lines)
+    mermaid_path = root / "workspace" / "workflow.mermaid"
+    mermaid_path.write_text(mermaid_str + "\n")
+    _update_analysis_mermaid_block(root, mermaid_str)
+    # Silent mmdc render if available
+    try:
+        import shutil, subprocess
+        mmdc = shutil.which("mmdc")
+        if mmdc:
+            png_path = root / "workspace" / "workflow.png"
+            subprocess.run(
+                [mmdc, "-i", str(mermaid_path), "-o", str(png_path), "-b", "white"],
+                capture_output=True, timeout=60,
+            )
+    except Exception:
+        pass
 
 
 def generate_citations_md(root: Path) -> str:

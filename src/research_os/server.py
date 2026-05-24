@@ -24,6 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("research-os.server")
 
 from research_os.project_ops import (
+    _update_workflow_mermaid,
     compute_file_hash,
     load_state,
     now_iso,
@@ -490,11 +491,25 @@ TOOL_DEFINITIONS = {
         },
     },
     "mem.methods.append": {
-        "description": "Append to workspace/methods.md",
+        "description": "Append a method entry to workspace/methods.md with structured format.",
         "category": "memory",
         "inputSchema": {
             "type": "object",
-            "properties": {"method": {"type": "string"}},
+            "properties": {
+                "method": {"type": "string", "description": "Method name (required, all others optional)"},
+                "step_number": {"type": "string", "description": "Step number e.g. 01"},
+                "step_name": {"type": "string", "description": "Step name e.g. Baseline EDA"},
+                "dataset_name": {"type": "string", "description": "Dataset used"},
+                "dataset_hash": {"type": "string", "description": "SHA-256 of dataset"},
+                "implementation": {"type": "string", "description": "Tool/package and version e.g. pandas v2.0"},
+                "parameters": {"type": "string", "description": "Key parameters or settings"},
+                "justification": {"type": "string", "description": "Why this method was chosen"},
+                "assumptions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Assumptions checked before using this method",
+                },
+            },
             "required": ["method"],
         },
     },
@@ -1135,14 +1150,39 @@ def _handle_mem_analysis_log(name: str, arguments: dict, root: Path) -> list[Tex
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a") as f:
             f.write(f"[{now_iso()}] {arguments['entry']}\n")
+        _update_workflow_mermaid(root)
         return _text(_success_envelope({"logged": True}))
 
 
 def _handle_mem_methods_append(name: str, arguments: dict, root: Path) -> list[TextContent]:
         m_path = root / "workspace" / "methods.md"
         m_path.parent.mkdir(parents=True, exist_ok=True)
+        ts = now_iso()
+        method = arguments["method"]
+        # If only method is provided (bare string), write old format with deprecation note
+        if len(arguments) == 1:
+            line = f"- {method}\n"
+        else:
+            step_name = arguments.get("step_name", "Step")
+            step_number = arguments.get("step_number", "")
+            heading = f"{step_number} — {step_name}" if step_number else step_name
+            lines = [f"\n## {ts} — {heading}"]
+            lines.append(f"  - **Method**: {method}")
+            if arguments.get("dataset_name"):
+                h = arguments.get("dataset_hash", "N/A")
+                lines.append(f"  - **Dataset**: {arguments['dataset_name']} (sha256: {h})")
+            if arguments.get("implementation"):
+                lines.append(f"  - **Implementation**: {arguments['implementation']}")
+            if arguments.get("parameters"):
+                lines.append(f"  - **Parameters**: {arguments['parameters']}")
+            if arguments.get("justification"):
+                lines.append(f"  - **Justification**: {arguments['justification']}")
+            if arguments.get("assumptions"):
+                for a in arguments["assumptions"]:
+                    lines.append(f"  - **Assumption**: {a}")
+            line = "\n".join(lines) + "\n"
         with open(m_path, "a") as f:
-            f.write(f"- {arguments['method']}\n")
+            f.write(line)
         return _text(_success_envelope({"logged": True}))
 
 

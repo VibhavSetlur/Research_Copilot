@@ -96,7 +96,7 @@ steps:
 
     This creates workspace/01_baseline_eda/.
 
-    Update docs/research_overview.md with project title and question.
+    Update docs/research_question.md with the formalized research question.
 
     '
 - id: methods_research
