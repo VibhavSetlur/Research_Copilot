@@ -56,7 +56,7 @@ notify_researcher, checkpoint_pending, checkpoint_approve, session_handoff = _la
 discover_mcp, = _lazy_import("research_os.tools.actions.external_mcp", ["discover_mcp"])
 task_monitor, task_kill = _lazy_import("research_os.tools.actions.task", ["task_monitor", "task_kill"])
 search_semantic_scholar, search_pubmed, search_crossref = _lazy_import("research_os.tools.actions.search", ["search_semantic_scholar", "search_pubmed", "search_crossref"])
-load_protocol, list_protocols, validate_protocol = _lazy_import("research_os.tools.actions.protocol", ["load_protocol", "list_protocols", "validate_protocol"])
+load_protocol, list_protocols, validate_protocol, get_next_protocol = _lazy_import("research_os.tools.actions.protocol", ["load_protocol", "list_protocols", "validate_protocol", "get_next_protocol"])
 _profile_inputs, = _lazy_import("research_os.tools.actions.profiling", ["_profile_inputs"])
 
 try:
@@ -161,6 +161,11 @@ TOOL_DEFINITIONS = {
             },
             "required": ["protocol_name"],
         },
+    },
+    "sys.protocol.next": {
+        "description": "Returns the recommended next protocol based on pipeline stage and which expected outputs are present. Use after session_boot to confirm the right next action.",
+        "category": "guidance",
+        "inputSchema": {"type": "object", "properties": {}},
     },
     "sys.workspace.scaffold": {
         "description": "Create the full directory structure for a new project.",
@@ -382,6 +387,15 @@ TOOL_DEFINITIONS = {
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    "tool.task.create": {
+        "description": "Create a background task for long-running operations.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"task_description": {"type": "string"}},
+            "required": ["task_description"],
+        },
+    },
     "sys.task.monitor": {
         "description": "Monitor a background task.",
         "category": "execution",
@@ -522,6 +536,27 @@ TOOL_DEFINITIONS = {
                 },
             },
             "required": ["method"],
+        },
+    },
+    "mem.citations.generate": {
+        "description": "Generate workspace/citations.md from inputs/literature_index.yaml.",
+        "category": "memory",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "mem.intake.regenerate": {
+        "description": "Regenerate inputs/intake.md with current file hashes.",
+        "category": "memory",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "view.workspace.tree": {
+        "description": "Returns a structured tree of workspace/. Alias for sys.workspace.tree.",
+        "category": "workspace",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "depth": {"type": "number", "description": "Tree depth (default 3)"},
+                "include_files": {"type": "boolean", "description": "Include file names (default true)"},
+            },
         },
     },
     "tool.search.semantic_scholar": {
@@ -803,6 +838,11 @@ def _handle_sys_guidance_validate(name: str, arguments: dict, root: Path) -> lis
         return _text(_success_envelope(res))
 
 
+def _handle_sys_protocol_next(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        res = get_next_protocol(root)
+        return _text(_success_envelope(res))
+
+
 def _handle_sys_tool_info(name: str, arguments: dict, root: Path) -> list[TextContent]:
         t_name = arguments.get("tool_name")
         if t_name in TOOL_DEFINITIONS:
@@ -958,7 +998,7 @@ def _handle_sys_state_minimal_context(name: str, arguments: dict, root: Path) ->
 def _handle_sys_state_health(name: str, arguments: dict, root: Path) -> list[TextContent]:
         from research_os.state.state_ledger import ResearchLedger
         ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
-        result = ledger.health()
+        result = ledger.health(root=root)
         result["workspace_tree"] = _build_tree(root / "workspace", 2, True)
         return _text(_success_envelope(result))
 
@@ -1187,6 +1227,22 @@ def _handle_mem_analysis_log(name: str, arguments: dict, root: Path) -> list[Tex
             f.write(f"[{now_iso()}] {arguments['entry']}\n")
         _update_workflow_mermaid(root)
         return _text(_success_envelope({"logged": True}))
+
+
+def _handle_mem_citations_generate(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.project_ops import generate_citations_md
+        path = generate_citations_md(root)
+        return _text(_success_envelope({"citations_path": path}))
+
+
+def _handle_mem_intake_regenerate(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.project_ops import regenerate_intake
+        path = regenerate_intake(root)
+        return _text(_success_envelope({"intake_path": path}))
+
+
+def _handle_view_workspace_tree(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        return _handle_sys_workspace_tree(name, arguments, root)
 
 
 def _handle_mem_methods_append(name: str, arguments: dict, root: Path) -> list[TextContent]:
@@ -1420,6 +1476,7 @@ _HANDLERS = {
     "tool.r.exec": _handle_tool_r_exec_group,
     "tool.julia.exec": _handle_tool_r_exec_group,
     "tool.bash.exec": _handle_tool_r_exec_group,
+    "sys.protocol.next": _handle_sys_protocol_next,
     "sys.workspace.scaffold": _handle_sys_workspace_scaffold,
     "sys.workspace.tree": _handle_sys_workspace_tree,
     "sys.file.read": _handle_sys_file_read,
@@ -1458,6 +1515,9 @@ _HANDLERS = {
     "sys.task.kill": _handle_sys_task_kill,
     "mem.analysis.log": _handle_mem_analysis_log,
     "mem.methods.append": _handle_mem_methods_append,
+    "mem.citations.generate": _handle_mem_citations_generate,
+    "mem.intake.regenerate": _handle_mem_intake_regenerate,
+    "view.workspace.tree": _handle_view_workspace_tree,
     "tool.search.semantic_scholar": _handle_tool_search_semantic_scholar,
     "tool.search.pubmed": _handle_tool_search_pubmed,
     "tool.search.crossref": _handle_tool_search_crossref,
@@ -1484,7 +1544,7 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
     handler = _HANDLERS.get(name)
     if handler is None:
         if name.startswith("sys.") or name.startswith("tool.") or name.startswith("mem."):
-            return _text(_success_envelope({"message": f"{name} is a stub implementation."}))
+            return _text(_error_envelope(f"Tool '{name}' is not yet implemented. Use sys.tool.search to find an alternative."))
         return _text(_error_envelope(f"Unknown tool: {name}"))
     try:
         return handler(name, arguments, root)

@@ -6,12 +6,13 @@
 3. Call `sys.workspace.tree` to get a structural overview of all experiment paths and files.
 4. Call `sys.state.get` to understand current project phase.
 5. Load and follow `guidance/session_boot` protocol.
-6. DO NOT start working until these 5 steps are complete.
+6. After session_boot, call `sys.protocol.next` to confirm the recommended next action.
+7. DO NOT start working until these 6 steps are complete.
 
 ## 2. PROCESSING ANY REQUEST
 For every researcher message:
 a. Classify intent: NEW research task, CONTINUATION, QUESTION, or CORRECTION.
-b. Before acting, call `sys.state.health` if more than 4 turns have elapsed. This includes a workspace tree view.
+b. Before acting, call `sys.state.health` if more than 4 turns have elapsed. This includes a workspace tree view and actionable next steps. If `health.handoff_recommendation == "yes"`, immediately call `sys.session.handoff` before proceeding.
 c. Load the relevant protocol via `sys.guidance.get` before executing any multi-step workflow.
 d. Read the loaded protocol's `turn_structure` for your autonomy_level (manual/supervised/autopilot). Respect `steps_per_turn` and `approval_required_before`.
 e. Break multi-step work into turns. After every `steps_per_turn` steps, stop and report: "Completed: X. Next: Y. Shall I proceed?"

@@ -49,6 +49,40 @@ def list_protocols(light: bool = False) -> list[dict]:
         protocols.append({"name": name, "summary": summary})
     return protocols
 
+PIPELINE_ORDER = [
+    ("guidance/session_boot", []),
+    ("guidance/project_startup", ["workspace/01_baseline_eda/conclusions.md"]),
+    ("domain/domain_analysis", ["workspace/logs/domain_analysis.log"]),
+    ("domain/research_design", ["docs/research_question.md"]),
+    ("methodology/methodology_selection", ["workspace/methods.md"]),
+    ("literature/literature_search", ["inputs/literature_index.yaml"]),
+    ("guidance/analysis_plan", ["workspace/02_data_preparation/README.md"]),
+    ("reproducibility/reproducibility", ["workspace/*/environment/requirements.txt"]),
+    ("audit/audit_and_validation", ["workspace/logs/audit.log"]),
+    ("synthesis/synthesis_paper", ["synthesis/paper.md"]),
+]
+
+
+def get_next_protocol(root: Path) -> dict:
+    """Read current workspace state and return the recommended next protocol."""
+    for protocol_name, expected_outputs in PIPELINE_ORDER:
+        all_present = True
+        for output in expected_outputs:
+            if "*" in output:
+                matches = list(root.glob(output))
+                if not matches:
+                    all_present = False
+                    break
+            else:
+                if not (root / output).exists():
+                    all_present = False
+                    break
+        if not all_present:
+            reason = f"Expected output '{expected_outputs[0] if expected_outputs else 'none'}' not found"
+            return {"next_protocol": protocol_name, "reason": reason}
+    return {"next_protocol": None, "reason": "All pipeline phases complete — ready for synthesis"}
+
+
 def validate_protocol(name: str, root: Path = None) -> Dict[str, Any]:
     try:
         data = load_protocol(name)
@@ -91,6 +125,21 @@ def validate_protocol(name: str, root: Path = None) -> Dict[str, Any]:
                     else:
                         checklist.append({"item": path_str, "status": "fail"})
                         all_passed = False
+
+        # Also check required section headers in key files
+        if root:
+            for fpath, headers in [
+                ("workspace/methods.md", ["##", "Method"]),
+                ("workspace/analysis.md", ["##", "mermaid"]),
+            ]:
+                full = root / fpath
+                if full.exists():
+                    text = full.read_text()
+                    for h in headers:
+                        if h not in text:
+                            checklist.append({"item": f"{fpath} missing header '{h}'", "status": "fail"})
+                            all_passed = False
+                            break
 
         return {
             "protocol": name,

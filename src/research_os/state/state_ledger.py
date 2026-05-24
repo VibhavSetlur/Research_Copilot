@@ -490,20 +490,30 @@ class ResearchLedger:
         lines.append("")
         return "\n".join(lines)
 
-    def health(self) -> dict:
-        """Returns current qualitative indicators like paths, steps, and handoff recommendation."""
+    def health(self, root: Path | None = None) -> dict:
+        """Returns actionable health indicators: paths, stage, pending approvals, and next step."""
         state = self._load()
-        paths = list(state.get("paths", {}).keys())
+        paths = state.get("paths", {})
+        path_ids = list(paths.keys())
+        active_paths = [k for k, v in paths.items() if isinstance(v, dict) and v.get("status") == "active"]
         turns = len(state.get("conversation_turns", []))
         completed_steps = len(state.get("completed_steps", []))
-        
+        pending = False
+        if root:
+            pending = (root / ".os_state" / "pending_approval.txt").exists()
         recommend_handoff = turns >= 4
-        
+
         return {
-            "number_of_paths": len(paths),
-            "number_of_completed_steps": completed_steps,
+            "current_path": state.get("current_path", "main"),
+            "pipeline_stage": state.get("pipeline_stage", "init"),
+            "number_of_paths": len(path_ids),
+            "active_paths": active_paths,
+            "completed_steps": completed_steps,
+            "pending_approval": pending,
             "handoff_recommendation": "yes" if recommend_handoff else "no",
-            "message": "Handoff recommended due to conversation length." if recommend_handoff else "Workspace state is healthy."
+            "handoff_reason": "Conversation length exceeds 4 turns" if recommend_handoff else None,
+            "estimated_context_used_pct": min(100, turns * 12),
+            "next_suggested_action": "Call sys.session.handoff" if recommend_handoff else "Continue current protocol",
         }
 
     def get_project_summary(self, max_tokens: int = 500) -> str:
