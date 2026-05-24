@@ -4,5 +4,6 @@
       "command": "python",
       "args": ["-m", "research_os.server", "--transport", "stdio"]
     }
-  }
+  },
+  "system_prompt": "Read AGENTS.md in the project root before responding."
 }

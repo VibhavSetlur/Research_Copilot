@@ -1,57 +1,56 @@
-# Research OS Agent Guidelines
+# Research OS — Agent Operating Protocol
 
-0. **MANDATORY SESSION START**: Before ANYTHING else, run the session_boot protocol:
-   1. Call `sys.config.profile` to get your behavioral profile.
-   2. Call `sys.config.get` to read the full researcher_config.yaml.
-   3. Call `sys.state.get` to understand current project phase.
-   4. Call `sys.path.list` to know which experiment paths exist.
-   5. Load and follow `guidance/session_boot` protocol.
-   6. DO NOT start working until these steps are complete.
+## 1. MANDATORY SESSION START (Run before ANYTHING else)
+1. Call `sys.config.profile` to get your behavioral profile.
+2. Call `sys.config.get` to read the full researcher_config.yaml.
+3. Call `sys.state.get` to understand current project phase.
+4. Call `sys.path.list` to know which experiment paths exist.
+5. Load and follow `guidance/session_boot` protocol.
+6. DO NOT start working until these 5 steps are complete.
 
-1. **Immutability**: Do not modify `inputs/raw_data/` or `inputs/literature/`. Write new data to the current experiment step's `data/` directory.
-2. **State Logging**: Log significant methodological decisions using `tool.log.decision`.
-3. **Methodological Appends**: Append new analysis steps to `workspace/methods.md` using `mem.methods.append`.
-4. **Analysis Checkpointing**: Append chronologically to `workspace/analysis.md` using `mem.analysis.log`.
-5. **Experiment Paths**: Use `sys.path.create` for new steps. Use `sys.path.abandon` for dead ends (preserves files). The workspace does not contain a pre-built 01_ experiment folder. After understanding the data and research question, you must create the first experiment path using sys.path.create.
-6. **Execution Estimation**: Before running heavy scripts, check `data_inventory.json` and use `tool.data.sample` to test logic first.
-7. **Approval Gates**: In `supervised` mode, use `sys.checkpoint.pending` for major milestones.
-8. **Checkpointing**: Use `sys.checkpoint.create` before massive refactoring.
-9. **Model-Size Awareness**: Small models MUST use protocols from `protocols/light/` and `sys.state.minimal_context`.
-10. **Fact-Checking**: Cite sources via `tool.search.*` calls.
-11. **Autonomy Modes**:
-    - **manual**: Propose actions and wait for PI approval.
-    - **supervised**: Auto-execute routines; pause at key decisions.
-    - **autopilot**: Execute one numbered task per response, end with "Type continue". After 4+ continues, call `sys.session.handoff`.
-12. **Output-Driven Workflow**:
-    - **exploratory/dashboard**: Build interactive dashboards/summaries.
-    - **abstract**: 250-word abstract + key figure.
-    - **poster**: Call `tool.poster.create`.
-    - **paper**: Full IMRAD (section-by-section for complex work via `tool.synthesize section=...`).
+## 2. PROCESSING ANY REQUEST
+For every researcher message:
+a. Classify intent: NEW research task, CONTINUATION, QUESTION, or CORRECTION.
+b. Before acting, call `sys.state.health` if more than 4 turns have elapsed.
+c. Load the relevant protocol via `sys.guidance.get` before executing any multi-step workflow.
+d. Break multi-step work into STAGES. After each stage, report what was done and ASK before the next stage.
+e. NEVER stuff more than one logical step into one response.
 
-13. Session Management (Task Breaking):
-    - When the researcher gives a multi-step task, create a numbered task list
-      using mem.analysis.log. Execute ONE task per response.
-    - End each response with a clear status: "✅ Done: [task]. Next: [next task].
-      Type 'continue' to proceed."
-    - After 4+ consecutive "continues", call sys.session.handoff and instruct the
-      researcher to start a new chat with the handoff prompt.
-    - For writing tasks: NEVER combine methods, citations, conclusions, and
-      synthesis into one response. Load `writing_standards` (which is now an index) to discover the right
-      protocol.
-    - When undertaking any writing task, always load `writing_core` first, then load the specific protocol (e.g., `writing/methods`, `synthesis/paper`).
-    - If a writing task is complex, split it across multiple chat sessions using `sys.session.handoff`.
-    - After writing any MD file, verify it follows the template from the relevant writing protocol using sys.md.validate.
+## 3. AFTER COMPLETING ANY STEP
+Always do ALL of the following in order:
+1. `mem.analysis.log` — append a timestamped entry to workspace/analysis.md
+2. `mem.methods.append` — append any new method used to workspace/methods.md
+3. Update `workspace/workflow.mermaid` via `sys.file.write` — mark completed nodes green
+4. Call `sys.state.get` to verify the ledger updated
+5. Ask the researcher: "Step complete. Want me to [describe next logical step]?"
 
-14. Token Budget: Adjust your model_profile in inputs/researcher_config.yaml
-    (small/medium/large). Small models should use protocols/light/ and 
-    sys.state.minimal_context. Medium/large models can use full protocols.
+## 4. TOOL USAGE RULES
+- NEVER read or process `inputs/raw_data/` files directly — use `tool.data.sample` for all data exploration.
+- NEVER write to `inputs/` — use `workspace/<path>/data/` for all derived data.
+- ALWAYS call `sys.checkpoint.pending` before running scripts that generate output.
+- Use `sys.file.list` before `sys.file.read` to confirm a file exists.
+- For literature: search → download → add to `workspace/citations.md` (in that order).
 
+## 5. PROTOCOL COMPLIANCE
+Every research phase has a YAML protocol. You MUST load and follow it:
+| Phase               | Protocol to Load           |
+|---------------------|---------------------------|
+| Session start       | guidance/session_boot      |
+| First analysis      | guidance/project_startup   |
+| Domain check        | domain/domain_analysis     |
+| Method selection    | methodology/methodology_selection |
+| Literature          | literature/literature_search |
+| Writing methods     | writing/writing_methods    |
+| Writing conclusions | writing/writing_conclusions|
+| Synthesis           | synthesis/synthesis_paper  |
 
-15. **Project Startup**: When the researcher indicates they have placed data or context files in `inputs/`, immediately load the `project_startup` protocol (`guidance/project_startup`) and follow it step by step. Do not wait for further prompts to begin the domain analysis and EDA.
+## 6. MULTI-SESSION RULES
+- If `sys.state.health` recommends handoff, call `sys.session.handoff` before ending.
+- End every session with a brief "Session Summary" listing what was done and the exact first message for the next session.
+- NEVER assume the next session will remember anything — always write state to files.
 
-16. **Autonomy Gating**: If the `autonomy_level` in `inputs/researcher_config.yaml` is "supervised", before calling `tool.python.exec`, `tool.synthesize`, or `sys.path.create`, you must call `sys.checkpoint.pending` and wait for the researcher to approve via `sys.checkpoint.approve`.
-
-17. **Next Steps**: After completing any significant task, always end your response with:
-    - A one-sentence summary of what was done.
-    - "Next steps:" followed by 2-3 concrete options the researcher can choose from.
-    - If appropriate, mention which protocol would guide the next step.
+## 7. FORBIDDEN ACTIONS
+- Do NOT create synthesis/ files until ALL experiments are complete.
+- Do NOT use causal language ("causes", "proves") for observational data.
+- Do NOT call more than 3 tools consecutively without reporting to the researcher.
+- Do NOT create a new experiment path without telling the researcher why.

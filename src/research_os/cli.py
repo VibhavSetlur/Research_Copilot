@@ -897,6 +897,20 @@ def cmd_audit(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_pull(args: argparse.Namespace) -> None:
+    """Add IDE configuration to an existing Research OS workspace."""
+    from research_os.project_ops import _setup_mcp_configs, _copy_agents_md
+
+    root = Path(args.workspace).resolve() if args.workspace else Path.cwd()
+    if not (root / ".os_state").exists():
+        print("Error: Not a Research OS workspace. Run 'research-os init' first.")
+        sys.exit(1)
+    ide_flags = ["cursor", "claude", "opencode", "vscode", "antigravity"] if args.ide == "all" else [args.ide]
+    _setup_mcp_configs(root, ide_flags)
+    _copy_agents_md(root)
+    print(f"Added {args.ide} configuration to {root}")
+
+
 def cmd_start(args: argparse.Namespace) -> None:
     if getattr(args, "daemon", False):
         import subprocess
@@ -1008,6 +1022,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate the research plan and exit without executing loops.",
     )
+
+    p_pull = sub.add_parser("pull", help="Add IDE configuration to existing workspace")
+    p_pull.add_argument("ide", choices=["cursor", "claude", "opencode", "vscode", "antigravity", "all"],
+                        help="IDE to add configuration for")
+    p_pull.add_argument("--workspace", type=str, help="Project directory (default: current)")
 
     p_doctor = sub.add_parser(
         "doctor", help="Pre-flight check for API keys, LaTeX, and permissions"
@@ -1152,6 +1171,7 @@ def main() -> None:
         "paths": cmd_paths,
         "log-decision": cmd_log_decision,
         "save-artifact": cmd_save_artifact,
+        "pull": cmd_pull,
         "start": cmd_start,
         "env": cmd_env,
     }
