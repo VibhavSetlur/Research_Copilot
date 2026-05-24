@@ -3,6 +3,9 @@ version: 1.0.0
 description: 'MANDATORY: Run before any other protocol. Read researcher config and
   set behavioral mode.'
 steps:
+- id: read_protocol_history
+  description: "Call sys.protocol.history to see which protocols have already been executed in this project. This tells you what has been done (completed) and what still needs to be done."
+  name: Read Protocol History
 - id: read_config
   description: Call sys.config.get. Parse the result.
   name: Read Researcher Config

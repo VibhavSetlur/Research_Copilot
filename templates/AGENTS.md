@@ -47,6 +47,8 @@ Every research phase has a YAML protocol. You MUST load and follow it:
 | Writing conclusions | writing/writing_conclusions|
 | Synthesis           | synthesis/synthesis_paper  |
 
+**Synthesis workflow:** Before calling `tool.synthesize`, ALWAYS call `tool.synthesize.plan` first. The plan shows available section sources and recommended ordering. The AI must decide section order, generate sections one at a time, and present each for review before proceeding to the next. Only call `tool.synthesize` without a `section` parameter after ALL sections have been individually approved.
+
 ## 6. MULTI-SESSION RULES
 - If `sys.state.health` recommends handoff, call `sys.session.handoff` before ending. Display the generated "To Resume" prompt to the researcher.
 - End every session with a brief "Session Summary" listing what was done and the exact first message for the next session.

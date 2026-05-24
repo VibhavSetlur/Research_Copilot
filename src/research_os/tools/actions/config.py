@@ -89,7 +89,7 @@ research_goal:
     - "paper"                   # Options: paper | poster | dashboard | abstract | exploratory
   target_venue: "journal"       # journal | conference | preprint | dissertation | report
 
-# ── API Keys (stored securely, gitignored) ────────────────────────
+# ── API Keys (stored securely, gitignored; injected into env at server start) ───
 api_keys:
   firecrawl: ""                 # https://firecrawl.io — for web search
   semantic_scholar: ""          # https://www.semanticscholar.org/product/api
@@ -151,8 +151,8 @@ def explain_config(root: Path, key: str) -> Dict[str, Any]:
         "model_profile": "small | medium | large — controls protocol variant loaded. Small uses light protocols.",
         "research_goal.output_types": "List of outputs to produce: paper, poster, dashboard, abstract, exploratory.",
         "research_goal.target_venue": "journal | conference | preprint | dissertation | report.",
-        "api_keys.firecrawl": "API key for web search. Get from https://firecrawl.io",
-        "api_keys.semantic_scholar": "API key for literature search. Get from https://www.semanticscholar.org/product/api",
+        "api_keys.firecrawl": "API key for web search. Get from https://firecrawl.io. Injected as env FIRECRAWL at server start.",
+        "api_keys.semantic_scholar": "API key for literature search. Get from https://www.semanticscholar.org/product/api. Injected as env SEMANTIC_SCHOLAR at server start.",
     }
     doc = explanations.get(key)
     if doc:

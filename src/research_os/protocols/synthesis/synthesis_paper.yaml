@@ -6,13 +6,15 @@ always_include:
 - writing_core
 schema_version: '1.0'
 trigger: When the final task is to synthesize all research outputs into a paper.
+prerequisite: "Call tool.synthesize.plan first. Review the plan with the researcher before generating any section."
 section_order:
+  0: Plan & Review
   1: Methods
   2: Results
   3: Discussion
   4: Abstract
   5: Final Assembly
-tool_calls: Use tool.synthesize with section parameter (e.g. section='methods'). Call
+tool_calls: Use tool.synthesize.plan first, then tool.synthesize with section parameter (e.g. section='methods'). Call
   without section for final assembly.
 small_model_workflow: Treat EACH synthesis section as a separate chat session to avoid
   context bloat. Wait for user approval before moving to the next section. Use sys.session.handoff.

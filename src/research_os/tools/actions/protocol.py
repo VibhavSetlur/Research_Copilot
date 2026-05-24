@@ -1,9 +1,44 @@
+import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 import yaml
 from typing import Dict, Any
 
 logger = logging.getLogger("research.tools.protocol")
+
+PROTOCOL_LOG_FILE = "protocol_execution_log.jsonl"
+
+
+def log_protocol_execution(root: Path, protocol_name: str, status: str, details: str = "") -> dict:
+    """Append a structured entry to the protocol execution log."""
+    log_path = root / ".os_state" / PROTOCOL_LOG_FILE
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "protocol": protocol_name,
+        "status": status,
+        "details": details,
+    }
+    with open(log_path, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    return {"status": "success", "entry": entry}
+
+
+def get_protocol_history(root: Path, limit: int = 20) -> dict:
+    """Return the last N protocol execution log entries."""
+    log_path = root / ".os_state" / PROTOCOL_LOG_FILE
+    entries = []
+    if log_path.exists():
+        with open(log_path) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    return {"entries": entries[-limit:], "total": len(entries)}
 
 PROTOCOLS_DIR = Path(__file__).parent.parent.parent / "protocols"
 LIGHT_DIR = PROTOCOLS_DIR / "light"

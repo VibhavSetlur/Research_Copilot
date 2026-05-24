@@ -404,20 +404,80 @@ def cmd_status(args: argparse.Namespace) -> None:
     )
     manifest_exists = (root / ".os_state" / "manifest.json").exists()
 
+    # Determine pipeline stage
+    from research_os.tools.actions.protocol import get_next_protocol, PIPELINE_ORDER
+    next_proto = get_next_protocol(root)
+    current_pipeline_idx = -1
+    current_pipeline = None
+    if next_proto.get("next_protocol"):
+        name = next_proto["next_protocol"]
+        for i, (pname, _) in enumerate(PIPELINE_ORDER):
+            if pname == name:
+                current_pipeline_idx = i
+                current_pipeline = pname
+                break
+    elif next_proto.get("done"):
+        current_pipeline = "pipeline_complete"
+        current_pipeline_idx = len(PIPELINE_ORDER)
+
+    # Key files check
+    key_files = {
+        "docs/research_question.md": root / "docs" / "research_question.md",
+        "workspace/methods.md": root / "workspace" / "methods.md",
+        "workspace/analysis.md": root / "workspace" / "analysis.md",
+        "workspace/citations.md": root / "workspace" / "citations.md",
+        "synthesis/paper.md": root / "synthesis" / "paper.md",
+    }
+    key_status = {name: fp.exists() for name, fp in key_files.items()}
+
+    if getattr(args, "json", False):
+        result = {
+            "workspace": str(root),
+            "phase": state.get("phase", "unknown"),
+            "current_path": state.get("current_path", "main"),
+            "pipeline_stage": current_pipeline or "unknown",
+            "pipeline_index": current_pipeline_idx,
+            "experiments": experiments,
+            "experiment_count": len(experiments),
+            "hashes_count": len(hashes),
+            "manifest_present": manifest_exists,
+            "key_files": key_status,
+            "next_action": next_proto.get("next_protocol") if not next_proto.get("done") else "pipeline_complete",
+        }
+        print(json.dumps(result, indent=2))
+        return
+
     print("=" * 60)
     print("RESEARCH PROJECT STATUS")
     print("=" * 60)
-    print(f"Workspace: {root}")
+    print(f"Workspace : {root}")
+    print(f"Phase     : {state.get('phase', 'unknown')}")
     print(f"Current path: {state.get('current_path', 'main')}")
+    if current_pipeline:
+        pct = int((current_pipeline_idx / len(PIPELINE_ORDER)) * 100)
+        bar = "#" * (pct // 5) + "." * (20 - pct // 5)
+        print(f"Pipeline  : [{bar}] {pct}% — {current_pipeline}")
+    if not next_proto.get("done"):
+        print(f"Next step : {next_proto.get('next_protocol', 'unknown')}")
+    else:
+        print(f"Next step : pipeline complete")
     print(f"Experiment paths: {len(experiments)}")
-    for exp in experiments[:8]:
-        marker = "*" if exp == state.get("current_path") else "-"
-        print(f"  {marker} {exp}")
-    if len(experiments) > 8:
-        print(f"  ... and {len(experiments) - 8} more")
+    for exp in experiments[:10]:
+        marker = "*" if exp == state.get("current_path") else " "
+        is_dead = "DEAD_END" in exp
+        icon = "X" if is_dead else " "
+        print(f"  [{icon}] {marker} {exp}")
+    if len(experiments) > 10:
+        print(f"  ... and {len(experiments) - 10} more")
+    print()
+    print("Key files:")
+    for name, present in key_status.items():
+        icon = "+" if present else "-"
+        print(f"  [{icon}] {name}")
+    print()
     print(f"Input files hashed: {len(hashes)}")
     print(f"Manifest: {'present' if manifest_exists else 'missing'}")
-    print(f"Depth profile: {args.depth}")
+    print(f"Depth profile: {getattr(args, 'depth', 'standard')}")
 
 
 def cmd_agents(args: argparse.Namespace) -> None:
@@ -1011,7 +1071,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("preflight", help="Run environment preflight checks")
     sub.add_parser("scan", help="Scan inputs and build research map")
     sub.add_parser("setup", help="Verify package assets and local overrides")
-    sub.add_parser("status", help="Show clean workspace status")
+    p_status = sub.add_parser("status", help="Show clean workspace status")
+    p_status.add_argument("--json", action="store_true", help="Output as JSON")
 
     p_run = sub.add_parser(
         "run", help="Run the Research OS on a natural language query"

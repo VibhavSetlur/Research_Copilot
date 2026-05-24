@@ -6,6 +6,38 @@ from typing import Any
 logger = logging.getLogger("research.tools.synthesize")
 
 
+def synthesize_plan(root: Path) -> dict:
+    """Return a structured synthesis plan showing available sources and recommended order."""
+    methods_path = root / "workspace" / "methods.md"
+    citations_path = root / "workspace" / "citations.md"
+    analysis_path = root / "workspace" / "analysis.md"
+
+    conclusions = []
+    workspace_dir = root / "workspace"
+    if workspace_dir.exists():
+        for exp_dir in sorted(workspace_dir.iterdir()):
+            if exp_dir.is_dir() and exp_dir.name[:2].isdigit():
+                conc = exp_dir / "conclusions.md"
+                if conc.exists():
+                    conclusions.append(exp_dir.name)
+
+    sections = [
+        {"id": "methods", "source": "workspace/methods.md",
+         "status": "ready" if methods_path.exists() else "missing"},
+        {"id": "results", "source": "workspace/*/conclusions.md",
+         "status": "ready" if conclusions else "missing"},
+        {"id": "discussion", "source": "workspace/analysis.md + citations.md",
+         "status": "ready" if analysis_path.exists() or citations_path.exists() else "missing"},
+        {"id": "abstract", "source": "synthesis of all sections",
+         "status": "pending"},
+    ]
+    return {
+        "sections": sections,
+        "recommended_order": ["methods", "results", "discussion", "abstract"],
+        "note": "Call tool.synthesize with section parameter for each. Review each before proceeding.",
+    }
+
+
 def synthesize_workspace(
     root: Path, output_format: str = "markdown", section: str | None = None
 ) -> dict[str, Any]:

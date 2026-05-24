@@ -772,6 +772,39 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
+    "tool.synthesize.plan": {
+        "description": "Show synthesis plan: available source sections and recommended ordering. Always call this first before using tool.synthesize so the AI can decide the sequence of section generation.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    "sys.protocol.log": {
+        "description": "Log a protocol execution to the protocol execution log (.os_state/protocol_execution_log.jsonl).",
+        "category": "system",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "protocol_name": {"type": "string", "description": "Name of the protocol"},
+                "status": {"type": "string", "description": "Execution status: started | completed | failed | skipped"},
+                "details": {"type": "string", "description": "Optional details about the execution"},
+            },
+            "required": ["protocol_name", "status"],
+        },
+    },
+    "sys.protocol.history": {
+        "description": "Read recent protocol execution history.",
+        "category": "system",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "number", "description": "Number of recent entries to return (default: 20)"},
+            },
+            "required": [],
+        },
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -845,6 +878,23 @@ def _handle_sys_guidance_validate(name: str, arguments: dict, root: Path) -> lis
 
 def _handle_sys_protocol_next(name: str, arguments: dict, root: Path) -> list[TextContent]:
         res = get_next_protocol(root)
+        return _text(_success_envelope(res))
+
+
+def _handle_sys_protocol_log(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.tools.actions.protocol import log_protocol_execution
+        res = log_protocol_execution(
+            root,
+            arguments["protocol_name"],
+            arguments["status"],
+            arguments.get("details", ""),
+        )
+        return _text(_success_envelope(res))
+
+
+def _handle_sys_protocol_history(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.tools.actions.protocol import get_protocol_history
+        res = get_protocol_history(root, arguments.get("limit", 20))
         return _text(_success_envelope(res))
 
 
@@ -1052,14 +1102,10 @@ def _handle_tool_task_create(name: str, arguments: dict, root: Path) -> list[Tex
         )
 
 
-def _handle_tool_synthesize(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.synthesize import synthesize_workspace
-        res = synthesize_workspace(
-            root,
-            output_format=arguments.get("output_format", "markdown"),
-            section=arguments.get("section"),
-        )
-        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
+def _handle_tool_synthesize_plan(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.tools.actions.synthesize import synthesize_plan
+        res = synthesize_plan(root)
+        return _text(_success_envelope(res))
 
 
 def _handle_tool_audit_synthesis(name: str, arguments: dict, root: Path) -> list[TextContent]:
@@ -1508,6 +1554,8 @@ _HANDLERS = {
     "tool.julia.exec": _handle_tool_r_exec_group,
     "tool.bash.exec": _handle_tool_r_exec_group,
     "sys.protocol.next": _handle_sys_protocol_next,
+    "sys.protocol.log": _handle_sys_protocol_log,
+    "sys.protocol.history": _handle_sys_protocol_history,
     "sys.workspace.scaffold": _handle_sys_workspace_scaffold,
     "sys.workspace.tree": _handle_sys_workspace_tree,
     "sys.file.read": _handle_sys_file_read,
@@ -1522,6 +1570,7 @@ _HANDLERS = {
     "sys.session.handoff": _handle_sys_session_handoff,
     "tool.task.create": _handle_tool_task_create,
     "tool.synthesize": _handle_tool_synthesize,
+    "tool.synthesize.plan": _handle_tool_synthesize_plan,
     "tool.audit.synthesis": _handle_tool_audit_synthesis,
     "tool.audit.statistical_power": _handle_tool_audit_statistical_power,
     "tool.audit.assumptions": _handle_tool_audit_assumptions,
@@ -1629,6 +1678,21 @@ def main() -> None:
 
     if args.workspace:
         os.chdir(args.workspace)
+
+    # Inject API keys from researcher_config.yaml into environment
+    try:
+        root = Path(os.getcwd())
+        import yaml
+        config_file = root / "researcher_config.yaml"
+        if config_file.exists():
+            with open(config_file) as f:
+                cfg = yaml.safe_load(f)
+            api_keys = cfg.get("api_keys", {}) if cfg else {}
+            for key, value in api_keys.items():
+                if value:
+                    os.environ[key.upper()] = value
+    except Exception:
+        pass  # Non-fatal — keys simply won't be injected
 
     if HAS_MCP:
         import asyncio
