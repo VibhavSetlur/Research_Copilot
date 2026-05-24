@@ -5,6 +5,17 @@ next_protocol: domain/domain_analysis
 pre_conditions:
 - researcher_config.yaml has been read (session_boot completed)
 - At least one file exists in inputs/
+turn_structure:
+  autonomy_manual:
+    steps_per_turn: 1
+    approval_required_before: all
+  autonomy_supervised:
+    steps_per_turn: 2
+    approval_required_before:
+      - create_baseline_path
+  autonomy_autopilot:
+    steps_per_turn: 5
+    approval_required_before: []
 steps:
 - id: scan_inputs
   description: sys.file.list inputs/, read notes via sys.file.read, profile raw data

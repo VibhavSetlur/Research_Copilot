@@ -159,6 +159,17 @@ decision_tree:
       - Endogeneity
       - Omitted variable bias
       - Simultaneity bias
+turn_structure:
+  autonomy_manual:
+    steps_per_turn: 1
+    approval_required_before: all
+  autonomy_supervised:
+    steps_per_turn: 2
+    approval_required_before:
+      - evaluate_biases
+  autonomy_autopilot:
+    steps_per_turn: 4
+    approval_required_before: []
 steps:
 - id: identify_domain
   name: Identify Domain

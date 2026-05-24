@@ -10,12 +10,18 @@ steps:
   description: 'Based on interaction.autonomy_level:
 
     - manual: Ask for explicit approval before every tool call. Explain each step.
+      steps_per_turn=1, approval_required_before=all.
 
     - supervised: Ask for approval before destructive or creative steps (path creation,
-    synthesis). Run reads and logs autonomously.
+    synthesis, writing). Run reads and logs autonomously.
+      steps_per_turn=2, approval_required_before=check protocol turn_structure.
 
     - autopilot: Run all steps autonomously. Notify researcher on completion only.
+      steps_per_turn=5, approval_required_before=check protocol turn_structure.
 
+    For supervised and autopilot, read the loaded protocol''s turn_structure to
+    determine exactly which steps require approval. After every steps_per_turn steps,
+    stop and report: "Completed: X. Next: Y. Shall I proceed?"
     '
   name: Set Autonomy
 - id: set_depth

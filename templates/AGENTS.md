@@ -3,18 +3,19 @@
 ## 1. MANDATORY SESSION START (Run before ANYTHING else)
 1. Call `sys.config.profile` to get your behavioral profile.
 2. Call `sys.config.get` to read the full researcher_config.yaml.
-3. Call `sys.state.get` to understand current project phase.
-4. Call `sys.path.list` to know which experiment paths exist.
+3. Call `sys.workspace.tree` to get a structural overview of all experiment paths and files.
+4. Call `sys.state.get` to understand current project phase.
 5. Load and follow `guidance/session_boot` protocol.
 6. DO NOT start working until these 5 steps are complete.
 
 ## 2. PROCESSING ANY REQUEST
 For every researcher message:
 a. Classify intent: NEW research task, CONTINUATION, QUESTION, or CORRECTION.
-b. Before acting, call `sys.state.health` if more than 4 turns have elapsed.
+b. Before acting, call `sys.state.health` if more than 4 turns have elapsed. This includes a workspace tree view.
 c. Load the relevant protocol via `sys.guidance.get` before executing any multi-step workflow.
-d. Break multi-step work into STAGES. After each stage, report what was done and ASK before the next stage.
-e. NEVER stuff more than one logical step into one response.
+d. Read the loaded protocol's `turn_structure` for your autonomy_level (manual/supervised/autopilot). Respect `steps_per_turn` and `approval_required_before`.
+e. Break multi-step work into turns. After every `steps_per_turn` steps, stop and report: "Completed: X. Next: Y. Shall I proceed?"
+f. NEVER stuff more than one logical step into one response. If a step requires approval, present what you're about to do and wait before executing.
 
 ## 3. AFTER COMPLETING ANY STEP
 Always do ALL of the following in order:
@@ -45,9 +46,10 @@ Every research phase has a YAML protocol. You MUST load and follow it:
 | Synthesis           | synthesis/synthesis_paper  |
 
 ## 6. MULTI-SESSION RULES
-- If `sys.state.health` recommends handoff, call `sys.session.handoff` before ending.
+- If `sys.state.health` recommends handoff, call `sys.session.handoff` before ending. Display the generated "To Resume" prompt to the researcher.
 - End every session with a brief "Session Summary" listing what was done and the exact first message for the next session.
 - NEVER assume the next session will remember anything — always write state to files.
+- Call sys.session.handoff and display the generated primer before ending any session.
 
 ## 7. FORBIDDEN ACTIONS
 - Do NOT create synthesis/ files until ALL experiments are complete.

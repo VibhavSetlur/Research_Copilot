@@ -225,6 +225,17 @@ TOOL_DEFINITIONS = {
             "required": ["filepath"],
         },
     },
+    "sys.workspace.tree": {
+        "description": "Returns a structured tree of workspace/ showing experiment paths, scripts, outputs, and key files. Use at session start for orientation.",
+        "category": "workspace",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "depth": {"type": "number", "description": "Tree depth (default 3)"},
+                "include_files": {"type": "boolean", "description": "Include file names (default true)"},
+            },
+        },
+    },
     "sys.state.get": {
         "description": "Get full workspace state.",
         "category": "state",
@@ -895,6 +906,30 @@ def _handle_sys_file_delete(name: str, arguments: dict, root: Path) -> list[Text
         return _text(_error_envelope("File not found"))
 
 
+def _handle_sys_workspace_tree(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        depth = arguments.get("depth", 3)
+        include_files = arguments.get("include_files", True)
+        tree = _build_tree(root / "workspace", depth, include_files)
+        return _text(_success_envelope({"tree": tree}))
+
+
+def _build_tree(path: Path, depth: int, include_files: bool) -> dict:
+    if depth == 0:
+        return {"_truncated": True}
+    result: dict = {}
+    try:
+        for item in sorted(path.iterdir()):
+            if item.name.startswith("."):
+                continue
+            if item.is_dir():
+                result[f"{item.name}/"] = _build_tree(item, depth - 1, include_files)
+            elif include_files:
+                result[item.name] = item.stat().st_size
+    except PermissionError:
+        pass
+    return result
+
+
 def _handle_sys_state_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
         return _text(_success_envelope(load_state(root)))
 
@@ -923,16 +958,16 @@ def _handle_sys_state_minimal_context(name: str, arguments: dict, root: Path) ->
 def _handle_sys_state_health(name: str, arguments: dict, root: Path) -> list[TextContent]:
         from research_os.state.state_ledger import ResearchLedger
         ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
-        return _text(_success_envelope(ledger.health()))
+        result = ledger.health()
+        result["workspace_tree"] = _build_tree(root / "workspace", 2, True)
+        return _text(_success_envelope(result))
 
 
 def _handle_sys_session_handoff(name: str, arguments: dict, root: Path) -> list[TextContent]:
         res = session_handoff(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
+        if res["status"] == "success":
+            return _text(res["content"])
+        return _text(_error_envelope(res["message"]))
 
 
 def _handle_tool_task_create(name: str, arguments: dict, root: Path) -> list[TextContent]:
@@ -1386,6 +1421,7 @@ _HANDLERS = {
     "tool.julia.exec": _handle_tool_r_exec_group,
     "tool.bash.exec": _handle_tool_r_exec_group,
     "sys.workspace.scaffold": _handle_sys_workspace_scaffold,
+    "sys.workspace.tree": _handle_sys_workspace_tree,
     "sys.file.read": _handle_sys_file_read,
     "sys.file.write": _handle_sys_file_write,
     "sys.file.list": _handle_sys_file_list,

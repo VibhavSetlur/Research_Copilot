@@ -17,6 +17,20 @@ model_adaptations:
     run_eda:
       description: Full dataset EDA. Generate complete plot battery. Read full analysis.md
         history.
+turn_structure:
+  autonomy_manual:
+    steps_per_turn: 1
+    approval_required_before: all
+  autonomy_supervised:
+    steps_per_turn: 2
+    approval_required_before:
+      - create_baseline_path
+      - run_eda
+      - write_conclusions
+  autonomy_autopilot:
+    steps_per_turn: 5
+    approval_required_before:
+      - write_conclusions
 steps:
 - id: scan_inputs
   name: Scan All Input Files
