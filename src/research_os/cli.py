@@ -306,6 +306,19 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     print(f"Project config: {target_dir / 'inputs' / 'researcher_config.yaml'}")
 
+    # Auto-run MCP check
+    print()
+    print("  Checking MCP server...")
+    import subprocess
+    result = subprocess.run(
+        ["research-os", "doctor", "--quiet"],
+        cwd=str(target_dir), capture_output=True, text=True
+    )
+    if result.returncode == 0:
+        print("  MCP server: READY")
+    else:
+        print("  MCP server check found issues. Run `research-os doctor` to see details.")
+
 
 def cmd_preflight(args: argparse.Namespace) -> None:
     try:
@@ -483,11 +496,15 @@ def cmd_run(args: argparse.Namespace) -> None:
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Run comprehensive pre-flight checks and output READY / NOT READY status."""
     import os
+    import subprocess
     from research_os.config import settings
 
-    print("=" * 60)
-    print("RESEARCH OS — DOCTOR (Pre-Flight Check)")
-    print("=" * 60)
+    quiet = getattr(args, "quiet", False)
+
+    if not quiet:
+        print("=" * 60)
+        print("RESEARCH OS — DOCTOR (Pre-Flight Check)")
+        print("=" * 60)
 
     checks: list[dict] = []
     all_ok = True
@@ -662,7 +679,55 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         else "pandoc not found (manuscript compilation may fail)",
     )
 
+    # ── 10. MCP Server Smoke Test ────────────────────────────────────
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-m", "research_os.server", "--transport", "stdio"],
+            input=b'{"jsonrpc":"2.0","id":1,"method":"list_tools","params":{}}\n',
+            capture_output=True, timeout=10, cwd=str(root) if "root" in dir() else None,
+        )
+        lines = [l for l in probe.stdout.splitlines() if l.strip().startswith(b"{")]
+        if lines:
+            resp = json.loads(lines[-1])
+            tool_count = len(resp.get("result", {}).get("tools", []))
+            _check("MCP server smoke test", tool_count > 0, f"MCP server responds with {tool_count} tools")
+        else:
+            _check("MCP server smoke test", False, "MCP server produced no JSON output")
+    except Exception as e:
+        _check("MCP server smoke test", False, f"MCP server failed to start: {e}")
+
+    # ── 11. Protocols Directory ──────────────────────────────────────
+    try:
+        protocols_root = Path(__file__).resolve().parent / "protocols"
+        if protocols_root.exists():
+            yaml_files = list(protocols_root.rglob("*.yaml"))
+            _check("Protocols directory", len(yaml_files) > 0, f"{len(yaml_files)} protocol YAML files found")
+        else:
+            _check("Protocols directory", False, "Protocols directory not found — reinstall package")
+    except Exception:
+        _check("Protocols directory", False, "Could not check protocols directory")
+
+    # ── 12. Researcher Config YAML ──────────────────────────────────
+    try:
+        if "root" in dir():
+            config_path = root / "inputs" / "researcher_config.yaml"
+            if config_path.exists():
+                import yaml as _yaml
+                _yaml.safe_load(config_path.read_text())
+                _check("Researcher config YAML", True, "Valid YAML")
+            else:
+                _check("Researcher config YAML", False, "Run: research-os init")
+        else:
+            _check("Researcher config YAML", False, "Run: research-os init")
+    except Exception:
+        _check("Researcher config YAML", False, "Invalid YAML — check syntax")
+
     # ── Print Results ──────────────────────────────────────────────
+    if quiet:
+        if not all_ok:
+            sys.exit(1)
+        sys.exit(0)
+
     print()
     for c in checks:
         icon = "✅" if c["ok"] else "❌"
@@ -944,8 +1009,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate the research plan and exit without executing loops.",
     )
 
-    sub.add_parser(
+    p_doctor = sub.add_parser(
         "doctor", help="Pre-flight check for API keys, LaTeX, and permissions"
+    )
+    p_doctor.add_argument(
+        "--quiet", action="store_true", help="Suppress output, return exit code only"
     )
 
     p_compress = sub.add_parser(
