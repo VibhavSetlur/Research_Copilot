@@ -1,0 +1,23 @@
+name: session_boot
+version: 1.0.0
+description: "MANDATORY: Run before any other protocol. Read researcher config and set behavioral mode."
+steps:
+  - id: read_config
+    description: "Call sys.config.get. Parse the result."
+  - id: set_autonomy
+    description: |
+      Based on interaction.autonomy_level:
+      - manual: Ask for explicit approval before every tool call. Explain each step.
+      - supervised: Ask for approval before destructive or creative steps (path creation, synthesis). Run reads and logs autonomously.
+      - autopilot: Run all steps autonomously. Notify researcher on completion only.
+  - id: set_depth
+    description: |
+      Based on researcher.expertise_level:
+      - beginner: Explain every concept, use plain language, ask clarifying questions freely.
+      - intermediate: Standard explanation depth. Define jargon once.
+      - advanced: Skip basics. Focus on decisions and results.
+      - pi: Minimal explanation. Present options and outcomes only.
+  - id: set_model_profile
+    description: "Note model_profile (small/medium/large). This determines protocol variant loaded."
+  - id: confirm_ready
+    description: "State: 'I have loaded your researcher profile. Autonomy: X, Expertise: Y, Model: Z. Ready to begin.'"

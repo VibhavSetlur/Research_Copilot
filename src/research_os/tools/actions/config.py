@@ -69,58 +69,54 @@ def set_config(key: str, value: Any, root: Path) -> Dict[str, Any]:
 def init_config(root: Path, overrides: dict | None = None) -> Dict[str, Any]:
     config_path = root / "inputs" / "researcher_config.yaml"
     if not config_path.exists():
-        template = '''# ============================================================
-# Researcher Configuration
-# Uncomment and fill in the options below.
-# ============================================================
+        template = '''# ── Researcher Identity ──────────────────────────────────────────
+researcher:
+  name: ""                     # Your name (used in paper authorship)
+  expertise_level: "intermediate"  # beginner | intermediate | advanced | pi
+  field: ""                    # e.g., "environmental epidemiology"
 
-# researcher:
-#   name: "Your Name"
-#   expertise_level: "intermediate"   # beginner, intermediate, advanced, pi
-#   field: "environmental epidemiology"
-#   institution: ""
-#   orcid: ""
+# ── Interaction Behavior ─────────────────────────────────────────
+interaction:
+  autonomy_level: "supervised"  # manual | supervised | autopilot
+  # manual    = AI asks before every action
+  # supervised = AI asks before creating paths, writing papers, running scripts
+  # autopilot  = AI runs everything, notifies on completion
 
-# interaction:
-#   autonomy_level: "supervised"   # manual, supervised, autopilot
+# ── Model & Output ────────────────────────────────────────────────
+model_profile: "medium"         # small | medium | large
+research_goal:
+  output_types:                 # What you want to produce
+    - "paper"                   # Options: paper | poster | dashboard | abstract | exploratory
+  target_venue: "journal"       # journal | conference | preprint | dissertation | report
 
-# research_goal:
-#   output_types: ["paper", "poster", "dashboard"]   # paper, poster, dashboard, abstract, exploratory
-#   target_venue: "journal"   # journal, conference, preprint, dissertation, report, exploratory
-#   poster_dimensions: "36x48"
-
-# model_profile: "medium"   # small, medium, large
-
-# api_keys:
-#   firecrawl: ""   # Get from https://firecrawl.io
-#   semantic_scholar: ""
-#   pubmed: ""
-#   crossref: ""
-#   serpapi: ""
-
-# external_mcp_servers: []
-
-# writing_preferences:
-#   citation_style: "apa"
-#   default_reporting_standard: "strobe"
+# ── API Keys (stored securely, gitignored) ────────────────────────
+api_keys:
+  firecrawl: ""                 # https://firecrawl.io — for web search
+  semantic_scholar: ""          # https://www.semanticscholar.org/product/api
+  pubmed: ""                    # https://www.ncbi.nlm.nih.gov/account/
+  crossref: ""                  # https://www.crossref.org
+  serpapi: ""                   # https://serpapi.com
 '''
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(template)
 
     if overrides:
-        config = yaml.safe_load(config_path.read_text()) or {}
-        if "project_name" in overrides:
-            config["project_name"] = overrides["project_name"]
-        if "domain" in overrides:
-            config["domain"] = overrides["domain"]
-        if "depth" in overrides:
-            config["default_depth"] = overrides["depth"]
-        if "research_question" in overrides:
-            config["research_question"] = overrides["research_question"]
-        if "provider" in overrides:
-            config["model_profile"] = "medium"
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        try:
+            config = yaml.safe_load(config_path.read_text()) or {}
+            if "project_name" in overrides:
+                config["project_name"] = overrides["project_name"]
+            if "domain" in overrides:
+                config["domain"] = overrides["domain"]
+            if "depth" in overrides:
+                config["default_depth"] = overrides["depth"]
+            if "research_question" in overrides:
+                config["research_question"] = overrides["research_question"]
+            if "provider" in overrides:
+                config["model_profile"] = "medium"
+            with open(config_path, "w") as f:
+                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        except Exception:
+            pass
 
     # Restrict permissions
     if os.name != "nt":
@@ -141,8 +137,27 @@ def init_config(root: Path, overrides: dict | None = None) -> Dict[str, Any]:
 
     return {
         "status": "success",
-        "message": "Initialized default config and secured it. Please populate api keys.",
+        "message": "Initialized default config and secured it. Edit inputs/researcher_config.yaml to add your API keys.",
     }
+
+
+def explain_config(root: Path, key: str) -> Dict[str, Any]:
+    """Return documentation for a config key."""
+    explanations = {
+        "researcher.name": "Your name, used in paper authorship.",
+        "researcher.expertise_level": "beginner | intermediate | advanced | pi — controls how deeply the AI explains concepts.",
+        "researcher.field": 'Your research field, e.g. "environmental epidemiology".',
+        "interaction.autonomy_level": "manual | supervised | autopilot — controls how much the AI acts without approval.",
+        "model_profile": "small | medium | large — controls protocol variant loaded. Small uses light protocols.",
+        "research_goal.output_types": "List of outputs to produce: paper, poster, dashboard, abstract, exploratory.",
+        "research_goal.target_venue": "journal | conference | preprint | dissertation | report.",
+        "api_keys.firecrawl": "API key for web search. Get from https://firecrawl.io",
+        "api_keys.semantic_scholar": "API key for literature search. Get from https://www.semanticscholar.org/product/api",
+    }
+    doc = explanations.get(key)
+    if doc:
+        return {"status": "success", "key": key, "documentation": doc}
+    return {"status": "error", "message": f"No documentation for config key: {key}"}
 
 
 def validate_config(root: Path) -> Dict[str, Any]:

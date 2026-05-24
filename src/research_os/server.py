@@ -340,6 +340,22 @@ TOOL_DEFINITIONS = {
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    "sys.config.profile": {
+        "description": "Return only behavioral profile fields (autonomy, expertise, model_profile) in <100 tokens. Use at session start instead of full config.get.",
+        "category": "workspace",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "sys.config.explain": {
+        "description": "Return documentation for any config key, e.g. interaction.autonomy_level.",
+        "category": "workspace",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Dot-notation config key, e.g. interaction.autonomy_level"}
+            },
+            "required": ["key"],
+        },
+    },
     "sys.notify": {
         "description": "Notify researcher.",
         "category": "workspace",
@@ -737,6 +753,8 @@ def _handle_sys_guidance_get(name: str, arguments: dict, root: Path) -> list[Tex
             res = {"content": yaml.dump(data)}
             if profile == "small":
                 res["note"] = "Loaded in step-by-step mode due to 'small' model profile."
+            if p_name != "guidance/session_boot":
+                res["_reminder"] = "Check your session_boot profile before executing these steps if you haven't already."
             return _text(_success_envelope(res))
         except Exception as e:
             return _text(_error_envelope(str(e)))
@@ -1056,6 +1074,25 @@ def _handle_sys_config_validate(name: str, arguments: dict, root: Path) -> list[
         )
 
 
+def _handle_sys_config_profile(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        res = get_config(root)
+        if res["status"] == "success":
+            config = res.get("config", {})
+            profile = {
+                "autonomy_level": config.get("interaction", {}).get("autonomy_level", "supervised"),
+                "expertise_level": config.get("researcher", {}).get("expertise_level", "intermediate"),
+                "model_profile": config.get("model_profile", "medium"),
+            }
+            return _text(_success_envelope(profile))
+        return _text(_success_envelope({"autonomy_level": "supervised", "expertise_level": "intermediate", "model_profile": "medium"}))
+
+
+def _handle_sys_config_explain(name: str, arguments: dict, root: Path) -> list[TextContent]:
+        from research_os.tools.actions.config import explain_config as _explain
+        res = _explain(root, arguments.get("key", ""))
+        return _text(_success_envelope(res)) if res["status"] == "success" else _text(_error_envelope(res["message"]))
+
+
 def _handle_sys_notify(name: str, arguments: dict, root: Path) -> list[TextContent]:
         res = notify_researcher(arguments["message"], arguments["level"], root)
         return (
@@ -1328,6 +1365,8 @@ _HANDLERS = {
     "sys.config.get": _handle_sys_config_get,
     "sys.config.set": _handle_sys_config_set,
     "sys.config.validate": _handle_sys_config_validate,
+    "sys.config.profile": _handle_sys_config_profile,
+    "sys.config.explain": _handle_sys_config_explain,
     "sys.notify": _handle_sys_notify,
     "sys.external_mcp.discover": _handle_sys_external_mcp_discover,
     "sys.task.monitor": _handle_sys_task_monitor,

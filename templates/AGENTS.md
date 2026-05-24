@@ -1,5 +1,13 @@
 # Research OS Agent Guidelines
 
+0. **MANDATORY SESSION START**: Before ANYTHING else, run the session_boot protocol:
+   1. Call `sys.config.profile` to get your behavioral profile.
+   2. Call `sys.config.get` to read the full researcher_config.yaml.
+   3. Call `sys.state.get` to understand current project phase.
+   4. Call `sys.path.list` to know which experiment paths exist.
+   5. Load and follow `guidance/session_boot` protocol.
+   6. DO NOT start working until these steps are complete.
+
 1. **Immutability**: Do not modify `inputs/raw_data/` or `inputs/literature/`. Write new data to the current experiment step's `data/` directory.
 2. **State Logging**: Log significant methodological decisions using `tool.log.decision`.
 3. **Methodological Appends**: Append new analysis steps to `workspace/methods.md` using `mem.methods.append`.
