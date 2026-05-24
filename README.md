@@ -14,8 +14,8 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 2. **Initialize your Project**
    ```bash
    # Creates the folder and scaffolds the workspace
-   research-os init --name "research_project_folder"
-   cd my-research-project
+   research-os init --name "my_research_project_folder"
+   cd my_research_project_folder
    ```
 
 3. **Start the MCP Server**
