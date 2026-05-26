@@ -1,10 +1,20 @@
 name: project_startup
-version: 2.0.0
-description: 'End-to-end startup protocol: from empty inputs/ to baseline EDA complete.'
+version: 2.1.0
+description: 'End-to-end startup protocol: from raw inputs to baseline EDA complete.'
 next_protocol: domain/domain_analysis
 pre_conditions:
 - researcher_config.yaml has been read (session_boot completed)
 - At least one file exists in inputs/
+model_adaptations:
+  small:
+    run_eda:
+      description: Use sys_state_minimal_context. Sample only first 20 rows. Generate top 3 most important plots only.
+  medium:
+    run_eda:
+      description: Standard EDA — full sample, standard plot set.
+  large:
+    run_eda:
+      description: Full dataset EDA. Generate complete plot battery. Read full analysis.md history.
 turn_structure:
   autonomy_manual:
     steps_per_turn: 1
@@ -13,55 +23,160 @@ turn_structure:
     steps_per_turn: 2
     approval_required_before:
       - create_baseline_path
+      - run_eda
+      - write_conclusions
   autonomy_autopilot:
     steps_per_turn: 5
-    approval_required_before: []
+    approval_required_before:
+      - write_conclusions
 steps:
 - id: scan_inputs
-  description: sys.file.list inputs/, read notes via sys.file.read, profile raw data
-    via tool.data.sample.
-  name: Scan Inputs
-- id: read_researcher_config
-  description: Call sys.config.get. Extract output_types, expertise_level, autonomy_level.
-  name: Read Researcher Config
+  name: Scan All Input Files
+  description: |
+    Call sys_file_list on inputs/raw_data/, inputs/literature/, inputs/context/.
+    For EACH data file found, call tool_data_sample (n_rows=20, strategy=head).
+    Read any .md/.txt/.yaml files in inputs/context/ via sys_file_read.
+    Read inputs/intake.md if it exists.
+    DO NOT call sys_state_get or sys_config_get here — session_boot already did that.
+
 - id: domain_analysis
-  description: Load domain/domain_analysis. Classify domain, note pitfalls.
-  name: Domain Analysis
+  name: Classify Domain
+  description: |
+    Call sys_guidance_get with protocol_name="domain/domain_analysis" and follow it.
+    Map file types and column names to a domain. Log result to workspace/analysis.md
+    via mem_analysis_log.
+
 - id: formalize_research_question
-  description: Propose 1-2 candidate questions from data columns. Write to docs/research_question.md.
-    Wait for confirmation.
   name: Formalize Research Question
+  description: |
+    If researcher_config has a research_question, use it.
+    If not, propose 2-3 candidate questions based on data columns and domain.
+    Write finalized question to docs/research_question.md via sys_file_write.
+    DO NOT proceed until researcher confirms the question.
+
 - id: present_summary
-  description: 'Present brief summary: data count, domain, question. Ask to proceed.'
-  name: Present Summary to Researcher
+  name: Present Structured Summary
+  description: |
+    Present in this exact format:
+
+    ---
+    **Project Startup Summary**
+    - Data: {N files, total size, key columns}
+    - Domain: {classified domain} → Reporting standards: {e.g., APA/JARS}
+    - Research Question: {confirmed question}
+    - Data Quality: {missing values %, any issues}
+    - Suggested First Experiment: 01_baseline_eda — explore {specific aspect}
+
+    **Shall I create the baseline experiment path and start the EDA?**
+    ---
+    Wait for explicit YES before proceeding.
+
 - id: create_baseline_path
-  description: sys.path.create name='baseline_eda'.
-  name: Create Baseline Path
+  name: Create First Experiment Path
+  description: |
+    After researcher approval, call sys_path_create with name="baseline_eda".
+    This creates workspace/01_baseline_eda/ with all subdirectories.
+    Update docs/research_question.md with the finalized research question.
+
 - id: methods_research
-  description: Research EDA methods. Write to 01_baseline_eda/methods_research.md.
-  name: Methods Research
+  name: Research EDA Methods
+  description: |
+    Research appropriate EDA methods for the data type. Write concise findings to
+    workspace/01_baseline_eda/methods_research.md via sys_file_write.
+    Include: objectives, chosen tools (with version), and justification.
+    DO NOT use sys_guidance_get for tool_discovery unless genuinely uncertain —
+    use your knowledge for standard pandas/scipy/seaborn EDA.
+
 - id: run_eda
-  description: Write and execute a short EDA script. Save key outputs.
-  name: Run Eda
+  name: Execute Baseline EDA
+  description: |
+    Write a Python script at workspace/01_baseline_eda/scripts/01_baseline_eda.py.
+    The script MUST:
+    - Read data from data/input/ (which is symlinked to inputs/raw_data/)
+    - Produce: shape, dtypes, missing value % table, basic descriptive stats
+    - Save a clean Markdown summary table to outputs/reports/01_eda_summary.md
+    - Save 2-3 distribution/overview figures to outputs/figures/ (PNG, 150dpi minimum)
+    - Save any structured CSV data outputs to data/output/
+    - NOT save empty files — if a figure or table is empty, skip it entirely
+
+    Run the script via tool_python_exec.
+    After execution:
+    - Call mem_analysis_log with a summary of findings
+    - Call mem_methods_append for each tool/library used
+
+- id: fill_readme
+  name: Fill Step README
+  description: |
+    After EDA is complete, update workspace/01_baseline_eda/README.md using
+    sys_file_write to replace the template with actual content:
+
+    # 01_baseline_eda
+
+    *Created: {date}*
+
+    ## Goal
+    Baseline exploratory data analysis of {dataset name}.
+
+    ## Input Data
+    - {list actual input files with size/shape}
+
+    ## Methods Used
+    - {list actual methods and libraries used}
+
+    ## Key Outputs
+    - outputs/reports/01_eda_summary.md — {describe contents}
+    - outputs/figures/ — {list figure names and what they show}
+    - data/output/ — {list any saved data files}
+
+    ## Actual Findings
+    - {2-3 bullet point summary of key findings}
+
+    ## Next-Step Decision
+    - Proceed to 02_data_preparation
+
+- id: cleanup_empty_outputs
+  name: Remove Empty Output Directories
+  description: |
+    After EDA is complete, check each subdirectory in outputs/ and data/output/.
+    Use sys_file_list on each. If a directory is completely empty (no files),
+    use sys_file_delete to remove it. Do not delete directories that have files.
+    Typical empty dirs after EDA: outputs/dashboards/, outputs/tables/ if not used.
+
+- id: snapshot_environment
+  name: Snapshot Environment
+  description: |
+    Call sys_env_snapshot. This writes requirements.txt and session.yaml to
+    workspace/01_baseline_eda/environment/ for reproducibility.
+
 - id: write_conclusions
-  description: Write conclusions.md with key findings and next step ideas.
-  name: Write Conclusions
+  name: Document EDA Conclusions
+  description: |
+    Populate workspace/01_baseline_eda/conclusions.md with:
+    - Key Findings: specific quantitative findings (N rows, columns, missing%, etc.)
+    - Data Quality Verdict: ready for analysis / needs cleaning / issues found
+    - Next Steps: 2-3 concrete numbered ideas based on what was found
+
 - id: suggest_next
-  description: Suggest 2-3 next steps. Ask researcher for direction.
-  name: Suggest Next Steps
+  name: Propose Next Steps
+  description: |
+    Present 2-3 numbered options with one-line descriptions, e.g.:
+    1. Data preparation — handle missing values, encode Likert scales as integers
+    2. Descriptive statistics by group — compare Gen Ed vs Special Ed teachers
+    3. Correlation analysis — Likert attitude vs self-efficacy scales
+
+    Ask: "Which direction would you like to go?"
+
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem.analysis.log with completion summary.
-
-    2. Call mem.methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys.checkpoint.create with description=''project_startup completed''.
-
-    5. Ask researcher: ''I''ve completed project_startup. Want me to proceed to the
-    next protocol?'''
+  description: |
+    1. Update workspace/workflow.mermaid via sys_file_read then sys_file_write:
+       - Add node for 01_baseline_eda with green fill (:::complete class)
+       - Connect it to the init node
+       Example node to append:
+         01_baseline_eda[01 Baseline EDA]:::complete
+         init --> 01_baseline_eda
+    2. Call sys_checkpoint_create with description="project_startup completed".
+       Then immediately call sys_checkpoint_create again to keep only the latest —
+       NO MORE than 2 total checkpoints should exist at any time.
+    3. Present final summary to researcher.
 schema_version: '1.0'

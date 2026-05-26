@@ -991,6 +991,22 @@ EXPERIMENT_SUBDIRS = [
 ]
 
 
+def _prune_old_checkpoints(root: Path, keep: int = 2) -> None:
+    """Keep only the `keep` most recent checkpoints; delete older ones."""
+    checkpoint_dir = root / ".os_state" / "checkpoints"
+    if not checkpoint_dir.exists():
+        return
+    json_files = sorted(
+        [f for f in checkpoint_dir.glob("*.json")],
+        key=lambda f: f.stat().st_mtime,
+    )
+    to_delete = json_files[: max(0, len(json_files) - keep)]
+    for jf in to_delete:
+        jf.unlink(missing_ok=True)
+        zip_sibling = jf.with_name(jf.stem + "_workspace.zip")
+        zip_sibling.unlink(missing_ok=True)
+
+
 def create_numbered_experiment(
     root: Path,
     name: str,
@@ -1136,18 +1152,21 @@ def create_numbered_experiment(
     if not from_step:
         paths_created += [str(readme.absolute()), str(conclusions.absolute())]
 
-    # Update state ledger
+    # Update state ledger — advance pipeline beyond init when first experiment is created
+    new_stage = "exploration" if state.get("pipeline_stage") in ("init", "planned") else state.get("pipeline_stage", "exploration")
     state["paths"][branch_id] = {
         "path_id": branch_id,
         "experiment_number": next_num,
-        "status": status,
+        "status": "active",
         "hypothesis": hypothesis or name,
         "experiment_dir": f"workspace/{branch_id}",
         "created_at": now_iso(),
     }
     state["current_path"] = branch_id
-    state["pipeline_stage"] = status
+    state["pipeline_stage"] = new_stage
+    state["step"] = next_num
     save_state(root, state)
+    _prune_old_checkpoints(root, keep=2)
 
     return {
         "path_id": branch_id,
