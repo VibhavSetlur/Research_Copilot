@@ -1,6 +1,6 @@
 name: project_startup
-version: 2.1.0
-description: 'End-to-end startup protocol: from raw inputs to baseline EDA complete.'
+version: 3.0.0
+description: 'Project Initialization: Read inputs, setup root documentation, and propose first analysis step.'
 next_protocol: guidance/analysis_plan
 pre_conditions:
 - researcher_config.yaml has been read (session_boot completed)
@@ -51,6 +51,12 @@ steps:
     If not, propose 2-3 candidate questions based on data columns and domain.
     Write finalized question to docs/research_question.md via sys_file_write.
     DO NOT proceed until researcher confirms the question.
+
+- id: initialize_global_environment
+  name: Initialize Global Environment
+  description: |
+    Call sys_env_snapshot to create the base global environment at workspace/environment/.
+    This will serve as the root environment that individual analysis steps will inherit from.
 
 - id: initialize_root_readme
   name: Initialize Root README

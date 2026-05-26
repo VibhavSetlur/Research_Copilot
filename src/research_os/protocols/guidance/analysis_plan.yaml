@@ -1,14 +1,27 @@
 name: analysis_plan
-version: 3.0.0
-description: Core execution loop for planning, grounding, and executing a single analysis step modularly.
+version: 4.0.0
+description: Core execution loop for planning, grounding, and executing a single analysis step modularly. Tailored dynamically to researcher config, autonomy level, and model capabilities.
 schema_version: '1.0'
 expected_outputs:
 - workspace/{step_number}_{step_name}/README.md
-- workspace/{step_number}_{step_name}/scripts/{step_number}_{step_name}_v1.{ext}
+- workspace/{step_number}_{step_name}/scripts/{step_number}_{step_name}_{version_number}.{ext}
+- workspace/{step_number}_{step_name}/environment/
 - workspace/{step_number}_{step_name}/conclusions.md
 - workspace/logs/methods_research.log
 structure:
   note: Steps are chronological. Synthesis is NOT a workspace step, but a separate top-level folder populated by tool_synthesize.
+model_adaptations:
+  small:
+    scope_analysis:
+      description: Force breakdown of the analysis into small, distinct, atomic sub-tasks (1-2 methods per script). Heavily rely on the user for frequent verification.
+    execute_analysis:
+      description: Write simple, highly commented scripts. Iterate frequently with the user after every small code block.
+  medium:
+    scope_analysis:
+      description: Break down complex analyses into 2-3 logical sub-tasks. Standard analyses can be one-shot.
+  large:
+    scope_analysis:
+      description: You have high context capability. Plan the entire analysis step comprehensively and execute it in one highly robust shot unless it is exceptionally massive.
 turn_structure:
   autonomy_manual:
     steps_per_turn: 1
@@ -26,31 +39,38 @@ steps:
 - id: scope_analysis
   name: Scope Analysis and Sub-Tasks
   description: |
-    Evaluate the complexity of the requested analysis step. Decide whether it is a small, atomic
-    task that can be done in one shot, or a large analysis that should be broken down into sub-tasks.
+    Evaluate the complexity of the requested analysis step. Check your model profile via sys_config_get.
+    Decide whether to execute it in one shot or break it down into separate sub-tasks.
     Discuss your plan with the user: "This analysis seems complex. I plan to break it into X and Y."
     OR "This analysis is straightforward, I will execute it in one shot."
-    DO NOT proceed until the user approves the scope and plan.
+    Wait for the user's approval before proceeding.
 
 - id: setup_step_workspace
-  name: Setup Step Workspace
+  name: Setup Step Workspace and Environment
   description: |
     Once the scope is approved, use sys_path_create to create the directory for this step
     (e.g., name="baseline_eda", name="random_forest_model", etc.).
     Initialize the workspace/{current_step}/README.md with a boilerplate structure.
+    
+    ENVIRONMENT SETUP:
+    Check if workspace/environment/ exists. If it does, symlink it to workspace/{current_step}/environment/ 
+    OR explicitly document that this step shares the root environment. If this step requires completely isolated
+    dependencies, initialize a new environment snapshot here via sys_env_snapshot.
 
 - id: methodology_grounding
   name: Ground Methodology via Literature Search
   description: |
-    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. DO NOT hallucinate methods based on pre-trained knowledge.
+    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. 
+    DO NOT hallucinate methods based on pre-trained knowledge.
     Find appropriate methods for this specific analysis step, log the tools and versions, and append your findings and citations to workspace/logs/methods_research.log and workspace/methods.md.
 
 - id: execute_analysis
   name: Execute Analysis Scripts
   description: |
     Write the analysis script following the exact naming convention:
-    workspace/{current_step}/scripts/{step_number}_{step_name}_v1.{ext}
-    (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py, or .R, .jl, etc.).
+    workspace/{current_step}/scripts/{step_number}_{step_name}_{version_number}.{ext}
+    (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py).
+    If iterating and changing the script significantly, increment the {version_number} (v2, v3, etc.).
     
     The script MUST:
     - Read input data properly.
@@ -77,7 +97,7 @@ steps:
   description: |
     Check each subdirectory in outputs/ and data/output/ within this step.
     Use sys_file_delete to remove any directories that are completely empty.
-    Call sys_env_snapshot to write requirements.txt and session.yaml to workspace/{current_step}/environment/ for reproducibility.
+    If you modified the environment (installed new packages), call sys_env_snapshot to write the updated requirements.txt and session.yaml to workspace/{current_step}/environment/ for reproducibility.
 
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
@@ -87,7 +107,8 @@ steps:
        - Connect it to the previous node
     2. Call sys_checkpoint_create with description="analysis_plan completed for {current_step}".
     3. Suggest 2-3 logical next analysis steps to the user based on the conclusions.
-    4. Ask researcher: "Which analysis step should we plan and execute next?"
+    4. If the conversation context is getting too long or the session is ending, suggest a handoff.
+    5. Ask researcher: "Which analysis step should we plan and execute next?"
 
     - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted to the step's environment file.
     - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log. Do not rely solely on pre-trained knowledge!
