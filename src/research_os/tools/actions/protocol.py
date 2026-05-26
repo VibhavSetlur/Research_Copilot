@@ -58,6 +58,8 @@ def _find_protocol_file(name: str, light: bool = False) -> Path | None:
 
 def load_protocol(name: str, light: bool = False) -> dict:
     file = _find_protocol_file(name, light)
+    if not file and light:
+        file = _find_protocol_file(name, False)
     if not file:
         raise FileNotFoundError(f"Protocol {name} not found")
     with open(file) as f:
