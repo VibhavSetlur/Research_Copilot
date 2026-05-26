@@ -741,9 +741,14 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
     # ── 10. MCP Server Smoke Test ────────────────────────────────────
     try:
+        handshake = (
+            b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}\n'
+            b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n'
+            b'{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n'
+        )
         probe = subprocess.run(
             [sys.executable, "-m", "research_os.server", "--transport", "stdio"],
-            input=b'{"jsonrpc":"2.0","id":1,"method":"list_tools","params":{}}\n',
+            input=handshake,
             capture_output=True, timeout=10, cwd=str(root) if "root" in dir() else None,
         )
         lines = [l for l in probe.stdout.splitlines() if l.strip().startswith(b"{")]
