@@ -75,9 +75,10 @@ steps:
     The script MUST:
     - Read input data properly.
     - Perform meaningful analysis relevant to this step.
-    - YOU MUST generate appropriate and meaningful outputs for this step. Do not leave the output directories empty.
-    - Save a clean Markdown summary table or report to outputs/reports/
-    - Save relevant and insightful figures to outputs/figures/ (PNG, 150dpi minimum)
+    - CRITICAL OUTPUT REQUIREMENT: You MUST generate rich, informative outputs that clearly communicate the findings of this analysis step to the researcher.
+    - DO NOT leave the output directories empty. The script MUST actively generate and write data/artifacts to them.
+    - Save comprehensive Markdown summary tables or detailed text reports to outputs/reports/
+    - Save highly relevant, labeled, and insightful figures to outputs/figures/ (PNG, 150dpi minimum). If you are exploring data, visualizing distributions, or modeling, you MUST save visual representations of the results.
     
     Run the script via tool_python_exec, tool_r_exec, or tool_julia_exec as appropriate.
     Iterate with the user if there are errors or if sub-tasks require review.
