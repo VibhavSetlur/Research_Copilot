@@ -1030,7 +1030,29 @@ def _build_tree(path: Path, depth: int, include_files: bool) -> dict:
 
 
 def _handle_sys_state_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        return _text(_success_envelope(load_state(root)))
+        full_state = load_state(root)
+        
+        # Strip heavy objects to reduce token waste
+        lean_state = {
+            "project": full_state.get("project", ""),
+            "pipeline_stage": full_state.get("pipeline_stage", full_state.get("phase", "init")),
+            "step": full_state.get("step", 0),
+            "current_path": full_state.get("current_path", "main"),
+            "resumable_from": full_state.get("resumable_from"),
+        }
+        
+        # Only include active or recently completed paths
+        paths = full_state.get("paths", {})
+        lean_state["paths_summary"] = {
+            k: v.get("status") for k, v in paths.items()
+        }
+        
+        # Add hypotheses if they exist
+        hyp = full_state.get("active_hypotheses", [])
+        if hyp:
+            lean_state["active_hypotheses"] = hyp
+            
+        return _text(_success_envelope(lean_state))
 
 
 def _handle_sys_state_summary(name: str, arguments: dict, root: Path) -> list[TextContent]:
