@@ -47,30 +47,31 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 ## Workspace File Tree
 ```text
 <user-project>/
-├── AGENTS.md                       # AI agent instructions
+├── AGENTS.md                       # AI agent operating protocol (8 sections)
 ├── README.md                       # Auto-generated project overview
 ├── .os_state/                      # INTERNAL — OS state
-│   ├── state_ledger.json           # Source of truth
-│   ├── manifest.json               # Full file inventory with checksums
+│   ├── state_ledger.json           # Source of truth (YAML + JSON)
+│   ├── manifest.json               # Auto-synced workspace file inventory
+│   ├── os_state.md                 # Human-readable status snapshot
+│   ├── protocol_execution_log.jsonl # Protocol execution history
 │   ├── checkpoints/                # Workspace snapshots
 │   └── cache/                      # API response cache
 ├── docs/                           # Human-written research docs
-│   ├── research_overview.md
-│   ├── research_question.md
-│   └── glossary.md
+│   ├── research_question.md        # Main question + sub-questions
+│   └── glossary.md                 # Term definitions
 ├── inputs/                         # IMMUTABLE — researcher provided
-│   ├── researcher_config.yaml      # Researcher preferences & API keys
+│   ├── researcher_config.yaml      # Researcher preferences, autonomy, API keys
 │   ├── raw_data/                   # Source data (or symlinks)
 │   ├── literature/                 # PDFs
 │   ├── context/                    # Notes, past results, text files
-│   ├── intake.md                   # Auto-generated research brief
+│   ├── intake.md                   # Auto-generated research brief (SHA-256 table)
 │   └── literature_index.yaml       # Filename → citation key mapping
 ├── workspace/                      # ACTIVE — iterative experiments
-│   ├── methods.md                  # Append-only method log
+│   ├── methods.md                  # Append-only method log (structured entries)
 │   ├── analysis.md                 # Chronological log + Mermaid workflow
 │   ├── citations.md                # Running bibliography with verified flags
-│   ├── workflow.mermaid            # Auto-updated workflow diagram
-│   ├── workflow.png                # Rendered diagram
+│   ├── workflow.mermaid            # Auto-updated workflow diagram (colored nodes)
+│   ├── workflow.png                # Rendered diagram (via mmdc)
 │   ├── logs/                       # Execution logs
 │   │   ├── searches.log            # Every web search logged (JSON lines)
 │   │   ├── state_changes.log       # Before/after state diffs
@@ -80,7 +81,6 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 │   ├── 01_experiment_baseline/
 │   │   ├── README.md               # Goal, hypotheses, outcomes
 │   │   ├── conclusions.md          # Key findings, bugs, routing decisions
-│   │   ├── methods_research.md     # AI's research into methods for this step
 │   │   ├── data/                   # Derived data
 │   │   ├── scripts/                # Versioned (01_load_v1.py, 02_eda_v1.py)
 │   │   ├── outputs/
@@ -108,23 +108,29 @@ Research OS is a Model Context Protocol (MCP) server designed to manage and guid
 Why use Research OS?
 - **Immutability First:** Your raw data (`inputs/raw_data/`) is strictly write-protected. All transformations are safely saved as derived data.
 - **Methodological Provenance:** Every critical decision, applied method, and statistical result is atomically logged via strict append-only decision logging.
+- **Pipeline Guidance:** 65 YAML protocols (33 full + 32 light) guide the AI through each research phase. `sys.protocol.next` recommends the next step based on what's been completed.
+- **Turn Structure:** Protocols enforce `steps_per_turn` and `approval_required_before` gates per autonomy level (manual/supervised/autopilot), preventing information overload.
 - **Chronological Experiment Paths:** Experiments run as numbered consecutive steps (`01_experiment_baseline/`, `02_data_preparation/`). Abandoned paths are renamed (e.g., `__DEAD_END__`) rather than deleted, preserving full history.
-- **Model-Size Adaptability:** Supports `small`, `medium`, and `large` LLM profiles to optimize token economy and context window limits.
+- **Model-Size Adaptability:** Supports `small`, `medium`, and `large` LLM profiles to optimize token economy and context window limits. Protocols auto-select light/full variants.
+- **73 MCP Tools:** From `sys.state.health` (full pipeline state with workspace tree) to `tool.synthesize.plan` (section-by-section synthesis) to `sys.protocol.log` (execution history).
+- **CLI Utilities:** `research-os status` (pipeline progress bar, key file health), `research-os pull <ide>` (add IDE config), `research-os doctor` (MCP server smoke test).
 
 ## Documentation
-- **Manuals**: [Researcher Guide (Operational Manual)](docs/RESEARCHER_GUIDE.md) - Learn how to run your first project.
-- **Tutorials**: [Quickstart](docs/QUICKSTART.md), [Example Walkthrough](docs/tutorials/EXAMPLE_WALKTHROUGH.md)
-- **Architecture**: [AI Integration](docs/architecture/AI_INTEGRATION.md), [Guidance System](docs/architecture/GUIDANCE_SYSTEM.md)
-- **Templates**: [Agents Guide](templates/AGENTS.md) - Strict rules for LLM agents operating in this workspace.
+- **[GUIDE.md](docs/GUIDE.md)** — Installation, workspace layout, all 73 tools, 10-stage pipeline, AI session start procedure, workflow walkthrough, troubleshooting.
 - **Project**: [Contributing](CONTRIBUTING.md) | [Changelog](CHANGELOG.md) | [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## File Index
 
 To help you navigate this repository:
-- `src/research_os/server.py` - Core MCP server and tool definitions.
-- `src/research_os/protocols/` - The YAML-based methodology guidelines.
-- `src/research_os/tools/` - Implementation of all OS actions (search, path creation, literature, etc.).
+- `src/research_os/server.py` - Core MCP server, 73 tool definitions, and handlers.
+- `src/research_os/protocols/` - 65 YAML-based methodology protocols (33 full + 32 light).
+- `src/research_os/tools/actions/` - Implementation of all OS actions (search, path, literature, config, synthesize, protocol).
 - `src/research_os/state/` - State ledger and checkpoint logic.
+- `src/research_os/project_ops.py` - Workspace scaffold, manifest sync, os_state.md, workflow mermaid, checkpointing.
+- `src/research_os/cli.py` - CLI commands: `init`, `status`, `doctor`, `pull`, `start`.
+- `scratch/smoke_test.py` - Checks all 73 tools, 65 protocols, CLI, pipeline.
+- `scratch/researcher_session.py` - End-to-end simulation of a real research session.
+- `scratch/RESEARCHER_WORKFLOW.md` - Documented researcher workflow example.
 - `templates/` - Default rules and guides to feed to agents.
 
 [![PyPI version](https://badge.fury.io/py/research-os.svg)](https://badge.fury.io/py/research-os)
