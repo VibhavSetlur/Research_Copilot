@@ -65,7 +65,7 @@ steps:
     - Domain: {classified domain} → Reporting standards: {e.g., APA/JARS}
     - Research Question: {confirmed question}
     - Data Quality: {missing values %, any issues}
-    - Suggested First Experiment: 01_baseline_eda — explore {specific aspect}
+    - Suggested First Experiment: {suggested_experiment_path} — explore {specific aspect}
 
     **Shall I create the baseline experiment path and start the EDA?**
     ---
@@ -74,15 +74,15 @@ steps:
 - id: create_baseline_path
   name: Create First Experiment Path
   description: |
-    After researcher approval, call sys_path_create with name="baseline_eda".
-    This creates workspace/01_baseline_eda/ with all subdirectories.
+    After researcher approval, call sys_path_create with the suggested experiment name.
+    This creates workspace/{current_step}/ with all subdirectories.
     Update docs/research_question.md with the finalized research question.
 
 - id: methods_research
   name: Research EDA Methods
   description: |
     Research appropriate EDA methods for the data type. Write concise findings to
-    workspace/01_baseline_eda/methods_research.md via sys_file_write.
+    workspace/{current_step}/methods_research.md via sys_file_write.
     Include: objectives, chosen tools (with version), and justification.
     DO NOT use sys_guidance_get for tool_discovery unless genuinely uncertain —
     use your knowledge for standard pandas/scipy/seaborn EDA.
@@ -90,16 +90,22 @@ steps:
 - id: run_eda
   name: Execute Baseline EDA
   description: |
-    Write a Python script EXACTLY at workspace/01_baseline_eda/scripts/01_baseline_eda.py.
-    DO NOT name it eda.py or anything else. The script MUST:
+    Write the analysis script following the exact naming convention:
+    workspace/{current_step}/scripts/{step_number}_{step_name}_v1.{ext}
+    (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py, or .R, .jl, etc.).
+    The language and libraries (pandas, scipy, tidyverse, etc.) should match the
+    domain and researcher config.
+    
+    The script MUST:
     - Read data from data/input/ (which is symlinked to inputs/raw_data/)
-    - Produce: shape, dtypes, missing value % table, basic descriptive stats
-    - Save a clean Markdown summary table to outputs/reports/01_eda_summary.md
-    - Save 2-3 distribution/overview figures to outputs/figures/ (PNG, 150dpi minimum)
-    - Save any structured CSV data outputs to data/output/
-    - NOT save empty files — if a figure or table is empty, skip it entirely
+    - Perform meaningful analysis relevant to the step (e.g., missing values, distributions)
+    - YOU MUST generate appropriate and meaningful outputs for this step. Do not leave the output directories empty.
+    - Save a clean Markdown summary table or report to outputs/reports/
+    - Save relevant and insightful figures to outputs/figures/ (PNG, 150dpi minimum)
+    - Save any structured data outputs to data/output/
+    - Save any dashboards or interactive HTML to outputs/dashboards/ (if applicable)
 
-    Run the script via tool_python_exec.
+    Run the script via tool_python_exec, tool_r_exec, or tool_julia_exec as appropriate.
     After execution:
     - Call mem_analysis_log with a summary of findings
     - Call mem_methods_append for each tool/library used
@@ -107,15 +113,15 @@ steps:
 - id: fill_readme
   name: Fill Step README
   description: |
-    After EDA is complete, update workspace/01_baseline_eda/README.md using
+    After EDA is complete, update workspace/{current_step}/README.md using
     sys_file_write to replace the template with actual content:
 
-    # 01_baseline_eda
+    # {current_step}
 
     *Created: {date}*
 
     ## Goal
-    Baseline exploratory data analysis of {dataset name}.
+    Exploratory data analysis of {dataset name}.
 
     ## Input Data
     - {list actual input files with size/shape}
@@ -124,7 +130,7 @@ steps:
     - {list actual methods and libraries used}
 
     ## Key Outputs
-    - outputs/reports/01_eda_summary.md — {describe contents}
+    - outputs/reports/{step_number}_eda_summary.md — {describe contents}
     - outputs/figures/ — {list figure names and what they show}
     - data/output/ — {list any saved data files}
 
@@ -146,12 +152,12 @@ steps:
   name: Snapshot Environment
   description: |
     Call sys_env_snapshot. This writes requirements.txt and session.yaml to
-    workspace/01_baseline_eda/environment/ for reproducibility.
+    workspace/{current_step}/environment/ for reproducibility.
 
 - id: write_conclusions
   name: Document EDA Conclusions
   description: |
-    Populate workspace/01_baseline_eda/conclusions.md with:
+    Populate workspace/{current_step}/conclusions.md with:
     - Key Findings: specific quantitative findings (N rows, columns, missing%, etc.)
     - Data Quality Verdict: ready for analysis / needs cleaning / issues found
     - Next Steps: 2-3 concrete numbered ideas based on what was found
@@ -170,11 +176,11 @@ steps:
   name: Complete Protocol & Update Workspace
   description: |
     1. Update workspace/workflow.mermaid via sys_file_read then sys_file_write:
-       - Add node for 01_baseline_eda with green fill (:::complete class)
+       - Add node for {current_step} with green fill (:::complete class)
        - Connect it to the init node
        Example node to append:
-         01_baseline_eda[01 Baseline EDA]:::complete
-         init --> 01_baseline_eda
+         {current_step}[{Human Readable Step Name}]:::complete
+         init --> {current_step}
     2. Call sys_checkpoint_create with description="project_startup completed".
        Then immediately call sys_checkpoint_create again to keep only the latest —
        NO MORE than 2 total checkpoints should exist at any time.
