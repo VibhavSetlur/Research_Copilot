@@ -90,8 +90,8 @@ steps:
 - id: run_eda
   name: Execute Baseline EDA
   description: |
-    Write a Python script at workspace/01_baseline_eda/scripts/01_baseline_eda.py.
-    The script MUST:
+    Write a Python script EXACTLY at workspace/01_baseline_eda/scripts/01_baseline_eda.py.
+    DO NOT name it eda.py or anything else. The script MUST:
     - Read data from data/input/ (which is symlinked to inputs/raw_data/)
     - Produce: shape, dtypes, missing value % table, basic descriptive stats
     - Save a clean Markdown summary table to outputs/reports/01_eda_summary.md

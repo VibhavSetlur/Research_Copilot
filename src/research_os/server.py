@@ -223,7 +223,7 @@ TOOL_DEFINITIONS = {
         },
     },
     "sys_file_delete": {
-        "description": "Delete a file.",
+        "description": "Delete a file or an empty directory.",
         "category": "workspace",
         "inputSchema": {
             "type": "object",
@@ -999,10 +999,17 @@ def _handle_sys_file_list(name: str, arguments: dict, root: Path) -> list[TextCo
 
 def _handle_sys_file_delete(name: str, arguments: dict, root: Path) -> list[TextContent]:
         p = root / arguments["filepath"]
-        if p.exists() and p.is_file():
-            p.unlink()
-            return _text(_success_envelope({"deleted": True}))
-        return _text(_error_envelope("File not found"))
+        if p.exists():
+            if p.is_file():
+                p.unlink()
+                return _text(_success_envelope({"deleted": True}))
+            elif p.is_dir():
+                try:
+                    p.rmdir()
+                    return _text(_success_envelope({"deleted": True, "type": "directory"}))
+                except OSError as e:
+                    return _text(_error_envelope(f"Cannot delete directory: {e}"))
+        return _text(_error_envelope("File or directory not found"))
 
 
 def _handle_sys_workspace_tree(name: str, arguments: dict, root: Path) -> list[TextContent]:
