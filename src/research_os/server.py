@@ -130,7 +130,7 @@ def _text(payload: Any) -> list[TextContent]:
 # ---------------------------------------------------------------------------
 
 TOOL_DEFINITIONS = {
-    "sys.guidance.get": {
+    "sys_guidance_get": {
         "description": "Returns the full YAML content of a guidance protocol.",
         "category": "guidance",
         "inputSchema": {
@@ -144,12 +144,12 @@ TOOL_DEFINITIONS = {
             "required": ["protocol_name"],
         },
     },
-    "sys.guidance.list": {
+    "sys_guidance_list": {
         "description": "Lists all available protocols with one-line summaries.",
         "category": "guidance",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.guidance.validate": {
+    "sys_guidance_validate": {
         "description": "Validates if the expected outputs of a protocol exist in the workspace.",
         "category": "guidance",
         "inputSchema": {
@@ -163,12 +163,12 @@ TOOL_DEFINITIONS = {
             "required": ["protocol_name"],
         },
     },
-    "sys.protocol.next": {
+    "sys_protocol_next": {
         "description": "Returns the recommended next protocol based on pipeline stage and which expected outputs are present. Use after session_boot to confirm the right next action.",
         "category": "guidance",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.workspace.scaffold": {
+    "sys_workspace_scaffold": {
         "description": "Create the full directory structure for a new project.",
         "category": "workspace",
         "inputSchema": {
@@ -188,7 +188,7 @@ TOOL_DEFINITIONS = {
             },
         },
     },
-    "sys.file.read": {
+    "sys_file_read": {
         "description": "Securely read a file from the workspace.",
         "category": "workspace",
         "inputSchema": {
@@ -197,7 +197,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath"],
         },
     },
-    "sys.file.write": {
+    "sys_file_write": {
         "description": "Securely write to a file in the workspace.",
         "category": "workspace",
         "inputSchema": {
@@ -213,7 +213,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "content"],
         },
     },
-    "sys.file.list": {
+    "sys_file_list": {
         "description": "List files in a directory.",
         "category": "workspace",
         "inputSchema": {
@@ -222,7 +222,7 @@ TOOL_DEFINITIONS = {
             "required": ["directory"],
         },
     },
-    "sys.file.delete": {
+    "sys_file_delete": {
         "description": "Delete a file.",
         "category": "workspace",
         "inputSchema": {
@@ -231,7 +231,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath"],
         },
     },
-    "sys.workspace.tree": {
+    "sys_workspace_tree": {
         "description": "Returns a structured tree of workspace/ showing experiment paths, scripts, outputs, and key files. Use at session start for orientation.",
         "category": "workspace",
         "inputSchema": {
@@ -242,37 +242,37 @@ TOOL_DEFINITIONS = {
             },
         },
     },
-    "sys.state.get": {
+    "sys_state_get": {
         "description": "Get full workspace state.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.state.summary": {
+    "sys_state_summary": {
         "description": "Get a brief summary of the state.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.state.summary_md": {
+    "sys_state_summary_md": {
         "description": "Return .os_state/os_state.md content — a human-readable project status snapshot.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.state.health": {
+    "sys_state_health": {
         "description": "Returns current context estimate, paths, and handoff recommendation.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.session.handoff": {
+    "sys_session_handoff": {
         "description": "Creates a structured markdown summary + next step prompt for session handoff.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.state.minimal_context": {
+    "sys_state_minimal_context": {
         "description": "Get a <=500 token snapshot of the current state, optimized for small models.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.checkpoint.create": {
+    "sys_checkpoint_create": {
         "description": "Snapshot workspace state.",
         "category": "state",
         "inputSchema": {
@@ -280,7 +280,7 @@ TOOL_DEFINITIONS = {
             "properties": {"description": {"type": "string"}},
         },
     },
-    "sys.checkpoint.rollback": {
+    "sys_checkpoint_rollback": {
         "description": "Rollback to a checkpoint.",
         "category": "state",
         "inputSchema": {
@@ -289,12 +289,12 @@ TOOL_DEFINITIONS = {
             "required": ["checkpoint_id"],
         },
     },
-    "sys.checkpoint.list": {
+    "sys_checkpoint_list": {
         "description": "List all checkpoints.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.checkpoint.pending": {
+    "sys_checkpoint_pending": {
         "description": "Register a pending action for approval.",
         "category": "state",
         "inputSchema": {
@@ -306,12 +306,12 @@ TOOL_DEFINITIONS = {
             "required": ["description", "requires_approval"],
         },
     },
-    "sys.checkpoint.approve": {
+    "sys_checkpoint_approve": {
         "description": "Approve a pending action.",
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.path.create": {
+    "sys_path_create": {
         "description": "Create the next numbered experiment folder with a unique descriptive name (format: {step_number}_{descriptor}). Optionally append _path_{N} to start a new research track.",
         "category": "workspace",
         "inputSchema": {
@@ -322,7 +322,7 @@ TOOL_DEFINITIONS = {
             "required": ["name"],
         },
     },
-    "sys.path.abandon": {
+    "sys_path_abandon": {
         "description": "Mark an experiment path as a dead end (renames directory with __DEAD_END suffix).",
         "category": "workspace",
         "inputSchema": {
@@ -334,22 +334,22 @@ TOOL_DEFINITIONS = {
             "required": ["path_name", "rationale"],
         },
     },
-    "sys.path.list": {
+    "sys_path_list": {
         "description": "List all numbered experiment paths with their status.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.config.init": {
+    "sys_config_init": {
         "description": "Initialize researcher configuration.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.config.get": {
+    "sys_config_get": {
         "description": "Get researcher configuration.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.config.set": {
+    "sys_config_set": {
         "description": "Set a specific config value.",
         "category": "workspace",
         "inputSchema": {
@@ -358,17 +358,17 @@ TOOL_DEFINITIONS = {
             "required": ["key", "value"],
         },
     },
-    "sys.config.validate": {
+    "sys_config_validate": {
         "description": "Validate configuration and API keys.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.config.profile": {
+    "sys_config_profile": {
         "description": "Return only behavioral profile fields (autonomy, expertise, model_profile) in <100 tokens. Use at session start instead of full config.get.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys.config.explain": {
+    "sys_config_explain": {
         "description": "Return documentation for any config key, e.g. interaction.autonomy_level.",
         "category": "workspace",
         "inputSchema": {
@@ -379,7 +379,7 @@ TOOL_DEFINITIONS = {
             "required": ["key"],
         },
     },
-    "sys.notify": {
+    "sys_notify": {
         "description": "Notify researcher.",
         "category": "workspace",
         "inputSchema": {
@@ -388,12 +388,12 @@ TOOL_DEFINITIONS = {
             "required": ["message", "level"],
         },
     },
-    "sys.external_mcp.discover": {
+    "sys_external_mcp_discover": {
         "description": "Discover external MCP servers.",
         "category": "workspace",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool.task.create": {
+    "tool_task_create": {
         "description": "Create a background task for long-running operations.",
         "category": "execution",
         "inputSchema": {
@@ -402,7 +402,7 @@ TOOL_DEFINITIONS = {
             "required": ["task_description"],
         },
     },
-    "sys.task.monitor": {
+    "sys_task_monitor": {
         "description": "Monitor a background task.",
         "category": "execution",
         "inputSchema": {
@@ -411,7 +411,7 @@ TOOL_DEFINITIONS = {
             "required": ["task_id"],
         },
     },
-    "sys.task.kill": {
+    "sys_task_kill": {
         "description": "Kill a background task.",
         "category": "execution",
         "inputSchema": {
@@ -420,7 +420,7 @@ TOOL_DEFINITIONS = {
             "required": ["task_id"],
         },
     },
-    "sys.tool.info": {
+    "sys_tool_info": {
         "description": "Get full schema for a tool.",
         "category": "workspace",
         "inputSchema": {
@@ -429,7 +429,7 @@ TOOL_DEFINITIONS = {
             "required": ["tool_name"],
         },
     },
-    "sys.tool.search": {
+    "sys_tool_search": {
         "description": "Search tools by description.",
         "category": "workspace",
         "inputSchema": {
@@ -438,7 +438,7 @@ TOOL_DEFINITIONS = {
             "required": ["query"],
         },
     },
-    "tool.audit.synthesis": {
+    "tool_audit_synthesis": {
         "description": "Audit a generated manuscript for completeness and scientific claims.",
         "category": "execution",
         "inputSchema": {
@@ -447,7 +447,7 @@ TOOL_DEFINITIONS = {
             "required": ["paper_path"],
         },
     },
-    "tool.audit.statistical_power": {
+    "tool_audit_statistical_power": {
         "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
@@ -461,7 +461,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "alpha", "n"],
         },
     },
-    "sys.md.validate": {
+    "sys_md_validate": {
         "description": "Validates a written MD file against a writing protocol template.",
         "category": "audit",
         "inputSchema": {
@@ -473,7 +473,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "protocol_name"],
         },
     },
-    "tool.audit.md_consistency": {
+    "tool_audit_md_consistency": {
         "description": "Scans written MD files and verifies they follow templates (alias for sys.md.validate).",
         "category": "audit",
         "inputSchema": {
@@ -485,7 +485,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "protocol_name"],
         },
     },
-    "tool.audit.assumptions": {
+    "tool_audit_assumptions": {
         "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
@@ -494,7 +494,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath"],
         },
     },
-    "tool.audit.figure_quality": {
+    "tool_audit_figure_quality": {
         "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to the current experiment step's outputs/reports directory.",
         "category": "audit",
         "inputSchema": {
@@ -503,7 +503,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath"],
         },
     },
-    "tool.audit.reproducibility_full": {
+    "tool_audit_reproducibility_full": {
         "description": "Run a full reproducibility check using Docker. Writes to workspace/logs/reproducibility_report.md.",
         "category": "audit",
         "inputSchema": {
@@ -512,7 +512,7 @@ TOOL_DEFINITIONS = {
             "required": []
         },
     },
-    "mem.analysis.log": {
+    "mem_analysis_log": {
         "description": "Append to workspace/analysis.md",
         "category": "memory",
         "inputSchema": {
@@ -521,7 +521,7 @@ TOOL_DEFINITIONS = {
             "required": ["entry"],
         },
     },
-    "mem.methods.append": {
+    "mem_methods_append": {
         "description": "Append a method entry to workspace/methods.md with structured format.",
         "category": "memory",
         "inputSchema": {
@@ -544,17 +544,17 @@ TOOL_DEFINITIONS = {
             "required": ["method"],
         },
     },
-    "mem.citations.generate": {
+    "mem_citations_generate": {
         "description": "Generate workspace/citations.md from inputs/literature_index.yaml.",
         "category": "memory",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "mem.intake.regenerate": {
+    "mem_intake_regenerate": {
         "description": "Regenerate inputs/intake.md with current file hashes.",
         "category": "memory",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "view.workspace.tree": {
+    "view_workspace_tree": {
         "description": "Returns a structured tree of workspace/. Alias for sys.workspace.tree.",
         "category": "workspace",
         "inputSchema": {
@@ -565,7 +565,7 @@ TOOL_DEFINITIONS = {
             },
         },
     },
-    "tool.search.semantic_scholar": {
+    "tool_search_semantic_scholar": {
         "description": "Search Semantic Scholar.",
         "category": "search",
         "inputSchema": {
@@ -574,7 +574,7 @@ TOOL_DEFINITIONS = {
             "required": ["query"],
         },
     },
-    "tool.search.pubmed": {
+    "tool_search_pubmed": {
         "description": "Search PubMed.",
         "category": "search",
         "inputSchema": {
@@ -583,7 +583,7 @@ TOOL_DEFINITIONS = {
             "required": ["query"],
         },
     },
-    "tool.search.crossref": {
+    "tool_search_crossref": {
         "description": "Search Crossref.",
         "category": "search",
         "inputSchema": {
@@ -592,7 +592,7 @@ TOOL_DEFINITIONS = {
             "required": ["query"],
         },
     },
-    "tool.search.web": {
+    "tool_search_web": {
         "description": "Search the web.",
         "category": "search",
         "inputSchema": {
@@ -601,7 +601,7 @@ TOOL_DEFINITIONS = {
             "required": ["query"],
         },
     },
-    "tool.web.scrape": {
+    "tool_web_scrape": {
         "description": "Scrape a webpage.",
         "category": "search",
         "inputSchema": {
@@ -610,7 +610,7 @@ TOOL_DEFINITIONS = {
             "required": ["url"],
         },
     },
-    "tool.literature.download": {
+    "tool_literature_download": {
         "description": "Download a paper PDF.",
         "category": "search",
         "inputSchema": {
@@ -619,7 +619,7 @@ TOOL_DEFINITIONS = {
             "required": ["url", "filename"],
         },
     },
-    "tool.python.exec": {
+    "tool_python_exec": {
         "description": "Execute a Python script. WARNING: runs with host permissions — use Docker for sandboxing.",
         "category": "execution",
         "inputSchema": {
@@ -628,7 +628,7 @@ TOOL_DEFINITIONS = {
             "required": ["script_path"],
         },
     },
-    "tool.r.exec": {
+    "tool_r_exec": {
         "description": "Execute an R script in the workspace.",
         "category": "execution",
         "inputSchema": {
@@ -640,7 +640,7 @@ TOOL_DEFINITIONS = {
             "required": ["script_path"],
         },
     },
-    "tool.julia.exec": {
+    "tool_julia_exec": {
         "description": "Execute a Julia script in the workspace.",
         "category": "execution",
         "inputSchema": {
@@ -652,7 +652,7 @@ TOOL_DEFINITIONS = {
             "required": ["script_path"],
         },
     },
-    "tool.bash.exec": {
+    "tool_bash_exec": {
         "description": "Execute a Bash script in the workspace.",
         "category": "execution",
         "inputSchema": {
@@ -664,7 +664,7 @@ TOOL_DEFINITIONS = {
             "required": ["script_path"],
         },
     },
-    "tool.package.install": {
+    "tool_package_install": {
         "description": "Install Python packages.",
         "category": "execution",
         "inputSchema": {
@@ -673,17 +673,17 @@ TOOL_DEFINITIONS = {
             "required": ["packages"],
         },
     },
-    "sys.env.snapshot": {
+    "sys_env_snapshot": {
         "description": "Snapshot current multi-language environment (Python, R, Julia).",
         "category": "execution",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool.env.freeze": {
+    "tool_env_freeze": {
         "description": "Freeze current environment (Deprecated, use sys.env.snapshot).",
         "category": "execution",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool.env.restore": {
+    "tool_env_restore": {
         "description": "Restore a frozen environment.",
         "category": "execution",
         "inputSchema": {
@@ -697,12 +697,12 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
-    "sys.env.docker.generate": {
+    "sys_env_docker_generate": {
         "description": "Generates a Dockerfile to run all snapshotted environments.",
         "category": "execution",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool.latex.compile": {
+    "tool_latex_compile": {
         "description": "Compile paper.tex in the synthesis directory to PDF using pdflatex and bibtex.",
         "category": "execution",
         "inputSchema": {
@@ -711,12 +711,12 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
-    "tool.poster.create": {
+    "tool_poster_create": {
         "description": "Generate a professional LaTeX poster in synthesis/poster.pdf using tikzposter.",
         "category": "execution",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool.data.sample": {
+    "tool_data_sample": {
         "description": "Sample data.",
         "category": "execution",
         "inputSchema": {
@@ -729,7 +729,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "n_rows", "strategy"],
         },
     },
-    "tool.data.convert": {
+    "tool_data_convert": {
         "description": "Convert data between common formats (CSV, RDS, Feather, Parquet).",
         "category": "execution",
         "inputSchema": {
@@ -741,7 +741,7 @@ TOOL_DEFINITIONS = {
             "required": ["filepath", "output_format"],
         },
     },
-    "tool.log.decision": {
+    "tool_log_decision": {
         "description": "Log a key reasoning step.",
         "category": "memory",
         "inputSchema": {
@@ -754,7 +754,7 @@ TOOL_DEFINITIONS = {
             "required": ["context", "selected", "rationale"],
         },
     },
-    "tool.synthesize": {
+    "tool_synthesize": {
         "description": "Compile workspace findings into synthesis/paper.md. For complex papers, call section-by-section: section='methods', section='results', section='discussion', then call without section for final assembly.",
         "category": "execution",
         "inputSchema": {
@@ -773,7 +773,7 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
-    "tool.synthesize.plan": {
+    "tool_synthesize_plan": {
         "description": "Show synthesis plan: available source sections and recommended ordering. Always call this first before using tool.synthesize so the AI can decide the sequence of section generation.",
         "category": "execution",
         "inputSchema": {
@@ -782,7 +782,7 @@ TOOL_DEFINITIONS = {
             "required": [],
         },
     },
-    "sys.protocol.log": {
+    "sys_protocol_log": {
         "description": "Log a protocol execution to the protocol execution log (.os_state/protocol_execution_log.jsonl).",
         "category": "system",
         "inputSchema": {
@@ -795,7 +795,7 @@ TOOL_DEFINITIONS = {
             "required": ["protocol_name", "status"],
         },
     },
-    "sys.protocol.history": {
+    "sys_protocol_history": {
         "description": "Read recent protocol execution history.",
         "category": "system",
         "inputSchema": {
@@ -1435,9 +1435,9 @@ def _handle_tool_r_exec_group(name: str, arguments: dict, root: Path) -> list[Te
         timeout = arguments.get("timeout", 300)
         script_path = arguments["script_path"]
 
-        if name == "tool.r.exec":
+        if name == "tool_r_exec":
             res = execute_r_script(script_path, root, timeout)
-        elif name == "tool.julia.exec":
+        elif name == "tool_julia_exec":
             res = execute_julia_script(script_path, root, timeout)
         else:
             res = execute_bash_script(script_path, root, timeout)
@@ -1544,79 +1544,79 @@ def _handle_sys_md_validate(name: str, arguments: dict, root: Path) -> list[Text
     return _text(_error_envelope(res.get("message", "Validation failed") + str(res.get("errors", ""))))
 
 _HANDLERS = {
-    "sys.md.validate": _handle_sys_md_validate,
-    "tool.audit.md_consistency": _handle_sys_md_validate,
-    "sys.guidance.list": _handle_sys_guidance_list,
-    "sys.guidance.get": _handle_sys_guidance_get,
-    "sys.guidance.validate": _handle_sys_guidance_validate,
-    "sys.tool.info": _handle_sys_tool_info,
-    "sys.tool.search": _handle_sys_tool_search,
-    "tool.r.exec": _handle_tool_r_exec_group,
-    "tool.julia.exec": _handle_tool_r_exec_group,
-    "tool.bash.exec": _handle_tool_r_exec_group,
-    "sys.protocol.next": _handle_sys_protocol_next,
-    "sys.protocol.log": _handle_sys_protocol_log,
-    "sys.protocol.history": _handle_sys_protocol_history,
-    "sys.workspace.scaffold": _handle_sys_workspace_scaffold,
-    "sys.workspace.tree": _handle_sys_workspace_tree,
-    "sys.file.read": _handle_sys_file_read,
-    "sys.file.write": _handle_sys_file_write,
-    "sys.file.list": _handle_sys_file_list,
-    "sys.file.delete": _handle_sys_file_delete,
-    "sys.state.get": _handle_sys_state_get,
-    "sys.state.summary": _handle_sys_state_summary,
-    "sys.state.summary_md": _handle_sys_state_summary_md,
-    "sys.state.minimal_context": _handle_sys_state_minimal_context,
-    "sys.state.health": _handle_sys_state_health,
-    "sys.session.handoff": _handle_sys_session_handoff,
-    "tool.task.create": _handle_tool_task_create,
-    "tool.synthesize": _handle_tool_synthesize,
-    "tool.synthesize.plan": _handle_tool_synthesize_plan,
-    "tool.audit.synthesis": _handle_tool_audit_synthesis,
-    "tool.audit.statistical_power": _handle_tool_audit_statistical_power,
-    "tool.audit.assumptions": _handle_tool_audit_assumptions,
-    "tool.audit.figure_quality": _handle_tool_audit_figure_quality,
-    "tool.audit.reproducibility_full": _handle_tool_audit_reproducibility_full,
-    "sys.checkpoint.create": _handle_sys_checkpoint_create,
-    "sys.checkpoint.rollback": _handle_sys_checkpoint_rollback,
-    "sys.checkpoint.list": _handle_sys_checkpoint_list,
-    "sys.checkpoint.pending": _handle_sys_checkpoint_pending,
-    "sys.checkpoint.approve": _handle_sys_checkpoint_approve,
-    "sys.path.create": _handle_sys_path_create,
-    "sys.path.abandon": _handle_sys_path_abandon,
-    "sys.path.list": _handle_sys_path_list,
-    "sys.config.init": _handle_sys_config_init,
-    "sys.config.get": _handle_sys_config_get,
-    "sys.config.set": _handle_sys_config_set,
-    "sys.config.validate": _handle_sys_config_validate,
-    "sys.config.profile": _handle_sys_config_profile,
-    "sys.config.explain": _handle_sys_config_explain,
-    "sys.notify": _handle_sys_notify,
-    "sys.external_mcp.discover": _handle_sys_external_mcp_discover,
-    "sys.task.monitor": _handle_sys_task_monitor,
-    "sys.task.kill": _handle_sys_task_kill,
-    "mem.analysis.log": _handle_mem_analysis_log,
-    "mem.methods.append": _handle_mem_methods_append,
-    "mem.citations.generate": _handle_mem_citations_generate,
-    "mem.intake.regenerate": _handle_mem_intake_regenerate,
-    "view.workspace.tree": _handle_view_workspace_tree,
-    "tool.search.semantic_scholar": _handle_tool_search_semantic_scholar,
-    "tool.search.pubmed": _handle_tool_search_pubmed,
-    "tool.search.crossref": _handle_tool_search_crossref,
-    "tool.search.web": _handle_tool_search_web,
-    "tool.web.scrape": _handle_tool_web_scrape,
-    "tool.literature.download": _handle_tool_literature_download,
-    "tool.python.exec": _handle_tool_python_exec,
-    "tool.package.install": _handle_tool_package_install,
-    "tool.env.freeze": _handle_tool_env_freeze_group,
-    "sys.env.snapshot": _handle_tool_env_freeze_group,
-    "tool.env.restore": _handle_tool_env_restore,
-    "sys.env.docker.generate": _handle_sys_env_docker_generate,
-    "tool.latex.compile": _handle_tool_latex_compile,
-    "tool.poster.create": _handle_tool_poster_create,
-    "tool.data.sample": _handle_tool_data_sample,
-    "tool.data.convert": _handle_tool_data_convert,
-    "tool.log.decision": _handle_tool_log_decision,
+    "sys_md_validate": _handle_sys_md_validate,
+    "tool_audit_md_consistency": _handle_sys_md_validate,
+    "sys_guidance_list": _handle_sys_guidance_list,
+    "sys_guidance_get": _handle_sys_guidance_get,
+    "sys_guidance_validate": _handle_sys_guidance_validate,
+    "sys_tool_info": _handle_sys_tool_info,
+    "sys_tool_search": _handle_sys_tool_search,
+    "tool_r_exec": _handle_tool_r_exec_group,
+    "tool_julia_exec": _handle_tool_r_exec_group,
+    "tool_bash_exec": _handle_tool_r_exec_group,
+    "sys_protocol_next": _handle_sys_protocol_next,
+    "sys_protocol_log": _handle_sys_protocol_log,
+    "sys_protocol_history": _handle_sys_protocol_history,
+    "sys_workspace_scaffold": _handle_sys_workspace_scaffold,
+    "sys_workspace_tree": _handle_sys_workspace_tree,
+    "sys_file_read": _handle_sys_file_read,
+    "sys_file_write": _handle_sys_file_write,
+    "sys_file_list": _handle_sys_file_list,
+    "sys_file_delete": _handle_sys_file_delete,
+    "sys_state_get": _handle_sys_state_get,
+    "sys_state_summary": _handle_sys_state_summary,
+    "sys_state_summary_md": _handle_sys_state_summary_md,
+    "sys_state_minimal_context": _handle_sys_state_minimal_context,
+    "sys_state_health": _handle_sys_state_health,
+    "sys_session_handoff": _handle_sys_session_handoff,
+    "tool_task_create": _handle_tool_task_create,
+    "tool_synthesize": _handle_tool_synthesize,
+    "tool_synthesize_plan": _handle_tool_synthesize_plan,
+    "tool_audit_synthesis": _handle_tool_audit_synthesis,
+    "tool_audit_statistical_power": _handle_tool_audit_statistical_power,
+    "tool_audit_assumptions": _handle_tool_audit_assumptions,
+    "tool_audit_figure_quality": _handle_tool_audit_figure_quality,
+    "tool_audit_reproducibility_full": _handle_tool_audit_reproducibility_full,
+    "sys_checkpoint_create": _handle_sys_checkpoint_create,
+    "sys_checkpoint_rollback": _handle_sys_checkpoint_rollback,
+    "sys_checkpoint_list": _handle_sys_checkpoint_list,
+    "sys_checkpoint_pending": _handle_sys_checkpoint_pending,
+    "sys_checkpoint_approve": _handle_sys_checkpoint_approve,
+    "sys_path_create": _handle_sys_path_create,
+    "sys_path_abandon": _handle_sys_path_abandon,
+    "sys_path_list": _handle_sys_path_list,
+    "sys_config_init": _handle_sys_config_init,
+    "sys_config_get": _handle_sys_config_get,
+    "sys_config_set": _handle_sys_config_set,
+    "sys_config_validate": _handle_sys_config_validate,
+    "sys_config_profile": _handle_sys_config_profile,
+    "sys_config_explain": _handle_sys_config_explain,
+    "sys_notify": _handle_sys_notify,
+    "sys_external_mcp_discover": _handle_sys_external_mcp_discover,
+    "sys_task_monitor": _handle_sys_task_monitor,
+    "sys_task_kill": _handle_sys_task_kill,
+    "mem_analysis_log": _handle_mem_analysis_log,
+    "mem_methods_append": _handle_mem_methods_append,
+    "mem_citations_generate": _handle_mem_citations_generate,
+    "mem_intake_regenerate": _handle_mem_intake_regenerate,
+    "view_workspace_tree": _handle_view_workspace_tree,
+    "tool_search_semantic_scholar": _handle_tool_search_semantic_scholar,
+    "tool_search_pubmed": _handle_tool_search_pubmed,
+    "tool_search_crossref": _handle_tool_search_crossref,
+    "tool_search_web": _handle_tool_search_web,
+    "tool_web_scrape": _handle_tool_web_scrape,
+    "tool_literature_download": _handle_tool_literature_download,
+    "tool_python_exec": _handle_tool_python_exec,
+    "tool_package_install": _handle_tool_package_install,
+    "tool_env_freeze": _handle_tool_env_freeze_group,
+    "sys_env_snapshot": _handle_tool_env_freeze_group,
+    "tool_env_restore": _handle_tool_env_restore,
+    "sys_env_docker_generate": _handle_sys_env_docker_generate,
+    "tool_latex_compile": _handle_tool_latex_compile,
+    "tool_poster_create": _handle_tool_poster_create,
+    "tool_data_sample": _handle_tool_data_sample,
+    "tool_data_convert": _handle_tool_data_convert,
+    "tool_log_decision": _handle_tool_log_decision,
 }
 
 def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextContent]:
@@ -1625,7 +1625,7 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
     logger.info(f"Tool call: {name}")
     handler = _HANDLERS.get(name)
     if handler is None:
-        if name.startswith("sys.") or name.startswith("tool.") or name.startswith("mem."):
+        if name.startswith("sys_") or name.startswith("tool_") or name.startswith("mem_"):
             return _text(_error_envelope(f"Tool '{name}' is not yet implemented. Use sys.tool.search to find an alternative."))
         return _text(_error_envelope(f"Unknown tool: {name}"))
     try:

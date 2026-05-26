@@ -33,19 +33,19 @@ def test_full_workflow(workspace_root):
 
     # 1. Initialize project
     res = _handle_tool_call(
-        "sys.workspace.scaffold", {"project_name": "Test Project"}, root
+        "sys_workspace_scaffold", {"project_name": "Test Project"}, root
     )
     assert "success" in res[0].text
 
     # 2. Get guidance
     res = _handle_tool_call(
-        "sys.guidance.get", {"protocol_name": "domain_analysis"}, root
+        "sys_guidance_get", {"protocol_name": "domain_analysis"}, root
     )
     assert "success" in res[0].text
 
     # 3. Create experiment path using numbered experiment
     res = _handle_tool_call(
-        "sys.path.create", {"name": "baseline", "hypothesis": "Test H"}, root
+        "sys_path_create", {"name": "baseline", "hypothesis": "Test H"}, root
     )
     assert "success" in res[0].text
 
@@ -61,7 +61,7 @@ with open('data/result.txt', 'w') as f:
     f.write(str(total))
 """
     res = _handle_tool_call(
-        "sys.file.write",
+        "sys_file_write",
         {"filepath": "workspace/analysis.py", "content": script_content},
         root,
     )
@@ -69,12 +69,12 @@ with open('data/result.txt', 'w') as f:
 
     # 5. Run script
     res = _handle_tool_call(
-        "tool.python.exec", {"script_path": "workspace/analysis.py"}, root
+        "tool_python_exec", {"script_path": "workspace/analysis.py"}, root
     )
     assert "success" in res[0].text
 
     # 6. Log findings
-    res = _handle_tool_call("mem.analysis.log", {"entry": "The sum is 21."}, root)
+    res = _handle_tool_call("mem_analysis_log", {"entry": "The sum is 21."}, root)
     assert "success" in res[0].text
 
     # 7. Synthesize paper
@@ -95,7 +95,7 @@ References
 [1] Smith et al.
 """
     res = _handle_tool_call(
-        "sys.file.write",
+        "sys_file_write",
         {"filepath": "synthesis/paper.md", "content": paper_content, "force": True},
         root,
     )
@@ -103,7 +103,7 @@ References
 
     # 8. Audit synthesis
     res = _handle_tool_call(
-        "tool.audit.synthesis", {"paper_path": "synthesis/paper.md"}, root
+        "tool_audit_synthesis", {"paper_path": "synthesis/paper.md"}, root
     )
     assert "warning" in res[0].text or "success" in res[0].text
 
@@ -125,7 +125,7 @@ def test_multi_lang_workflow_and_env(workspace_root):
 print("Multi-lang workflow test")
 """
     _handle_tool_call(
-        "sys.file.write",
+        "sys_file_write",
         {"filepath": "workspace/analysis.R", "content": script_content},
         root,
     )
@@ -141,7 +141,7 @@ print("Multi-lang workflow test")
         mock_run.return_value = mock_res
         
         res = _handle_tool_call(
-            "tool.r.exec", {"script_path": "workspace/analysis.R"}, root
+            "tool_r_exec", {"script_path": "workspace/analysis.R"}, root
         )
         assert "success" in res[0].text
     
@@ -156,7 +156,7 @@ print("Multi-lang workflow test")
         # Write dummy renv.lock to simulate R project
         (root / "renv.lock").write_text('{"R": {"Version": "4.1.0"}}')
         
-        res = _handle_tool_call("sys.env.snapshot", {}, root)
+        res = _handle_tool_call("sys_env_snapshot", {}, root)
         assert "success" in res[0].text
         
         # Verify snapshot files
@@ -174,7 +174,7 @@ def test_project_startup_protocol(workspace_root):
     
     # 1. Initialize project
     res = _handle_tool_call(
-        "sys.workspace.scaffold", {"project_name": "Test Project"}, root
+        "sys_workspace_scaffold", {"project_name": "Test Project"}, root
     )
     assert "success" in res[0].text
     
@@ -194,7 +194,7 @@ steps:
     
     # 2. Get the startup protocol
     res = _handle_tool_call(
-        "sys.guidance.get", {"protocol_name": "project_startup"}, root
+        "sys_guidance_get", {"protocol_name": "project_startup"}, root
     )
     assert "success" in res[0].text
     data = json.loads(res[0].text)
@@ -205,13 +205,13 @@ steps:
     
     # Simulate step 1
     res = _handle_tool_call(
-        "sys.file.list", {"directory": "inputs/"}, root
+        "sys_file_list", {"directory": "inputs/"}, root
     )
     assert "success" in res[0].text
     
     # Simulate step 2
     res = _handle_tool_call(
-        "sys.path.create", {"name": "baseline_eda"}, root
+        "sys_path_create", {"name": "baseline_eda"}, root
     )
     assert "success" in res[0].text
     path_data = json.loads(res[0].text)

@@ -12,19 +12,19 @@ Do not read files directly. Do not write files without a tool call. Do not skip 
 
 This applies regardless of how the researcher phrases their request. If they say
 "look at the data" or "start the analysis" or "what's in the file" — that means:
-use `tool.data.sample`, follow `guidance/project_startup`, call `sys.file.list`.
+use `tool_data_sample`, follow `guidance/project_startup`, call `sys_file_list`.
 
 ---
 
 ## 1. SESSION START (do this before responding to anything)
 
 On every new conversation, before doing anything else:
-1. `sys.config.get` → read researcher_config.yaml for autonomy level, expertise, goals
-2. `sys.state.get` → understand current project phase and what has been done
-3. `sys.workspace.tree` → see all experiment folders and files
-4. `sys.protocol.history` → check which protocols are complete
+1. `sys_config_get` → read researcher_config.yaml for autonomy level, expertise, goals
+2. `sys_state_get` → understand current project phase and what has been done
+3. `sys_workspace_tree` → see all experiment folders and files
+4. `sys_protocol_history` → check which protocols are complete
 5. Load and follow `guidance/session_boot` protocol
-6. After session_boot, call `sys.protocol.next` for the recommended next step
+6. After session_boot, call `sys_protocol_next` for the recommended next step
 
 Do NOT respond to the researcher's message until these 6 steps are complete.
 Then say: "I've reviewed your project. Here's where we are: [summary]. Ready to continue."
@@ -63,7 +63,7 @@ For every message:
 ## 3. EXPERIMENT FOLDER RULES
 
 When the researcher asks to "start the baseline" or "create a new analysis step":
-1. Call `sys.path.create name="<descriptive_name>"` — this creates the numbered folder
+1. Call `sys_path_create name="<descriptive_name>"` — this creates the numbered folder
 2. The system creates: `workspace/01_<name>/data/input/` (linked to raw data) and `data/output/`
 3. Write scripts to `workspace/01_<name>/scripts/`
 4. All output goes to `workspace/01_<name>/data/output/` and `outputs/`
@@ -79,7 +79,7 @@ When the researcher asks to "start the baseline" or "create a new analysis step"
 
 ## 4. DATA RULES
 - **NEVER** access `inputs/raw_data/` files directly with file reading tools
-- Use `tool.data.sample` (n_rows=50, strategy=head) to explore data
+- Use `tool_data_sample` (n_rows=50, strategy=head) to explore data
 - All derived data writes go to `workspace/<step>/data/output/`
 - Scripts read from `data/input/` (which is linked to the right source automatically)
 
@@ -87,15 +87,15 @@ When the researcher asks to "start the baseline" or "create a new analysis step"
 
 ## 5. AFTER EVERY STEP
 Always do all of these before responding:
-1. `mem.analysis.log` — log what was done to `workspace/analysis.md`
-2. `mem.methods.append` — log any method used to `workspace/methods.md`
-3. `sys.checkpoint.create` — snapshot the workspace state
+1. `mem_analysis_log` — log what was done to `workspace/analysis.md`
+2. `mem_methods_append` — log any method used to `workspace/methods.md`
+3. `sys_checkpoint_create` — snapshot the workspace state
 4. Report to researcher: "Done: [what]. Found: [key insight]. Next: [options]."
 
 ---
 
 ## 6. MULTI-SESSION CONTINUITY
-- End every session: call `sys.session.handoff` and show the researcher the resume prompt
+- End every session: call `sys_session_handoff` and show the researcher the resume prompt
 - Start every session: follow Rule 1 (session start) before anything else
 - Never assume the next session remembers context — always read state files first
 

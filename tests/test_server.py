@@ -94,11 +94,11 @@ def test_text_dict():
 
 
 def test_log_search_creates_file(tmp_path):
-    _log_search(tmp_path, "tool.search.web", "test query", 3)
+    _log_search(tmp_path, "tool_search_web", "test query", 3)
     log_file = tmp_path / "workspace" / "logs" / "searches.log"
     assert log_file.exists()
     data = json.loads(log_file.read_text().strip())
-    assert data["tool"] == "tool.search.web"
+    assert data["tool"] == "tool_search_web"
     assert data["query"] == "test query"
     assert data["results_count"] == 3
 

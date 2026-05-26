@@ -324,3 +324,7 @@ def main() -> None:
         print()
         print("  Tip: Run 'research-os init' to create a workspace, then open")
         print("  your AI IDE and just start talking — no Research OS commands needed.")
+
+if __name__ == "__main__":
+    main()
+
