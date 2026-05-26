@@ -1,52 +1,94 @@
 name: analysis_plan
-version: 2.1.0
+version: 3.0.0
+description: Core execution loop for planning, grounding, and executing a single analysis step modularly.
 schema_version: '1.0'
+expected_outputs:
+- workspace/{step_number}_{step_name}/README.md
+- workspace/{step_number}_{step_name}/scripts/{step_number}_{step_name}_v1.{ext}
+- workspace/{step_number}_{step_name}/conclusions.md
+- workspace/logs/methods_research.log
 structure:
-  01_data_prep:
-    purpose: Data cleaning, filtering, feature engineering.
-  02_analysis:
-    purpose: Statistical modelling, core computations.
-  note: Do NOT create a synthesis step. Synthesis is handled by tool_synthesize 
-    into the top‑level synthesis/ folder. Step folders are named 
-    {step_number}_{descriptor} (e.g., 01_data_prep). Path tracking adds _path_N 
-    when starting a new research track.
-templates:
-  boilerplate_readme: '# {folder_name} **Objective**: {description} **Inputs**: {list}
-    **Outputs**: {list} **Scripts**: {list} '
-path_creation_criteria:
-  create_new_path_when:
-  - Testing high‑risk data transformations.
-  - Trying an alternative model architecture.
-  - Beginning a new research track.
-  continue_in_same_path_when:
-  - Adding robustness checks.
-  - Fixing bugs.
-  - Continuing the same research track.
+  note: Steps are chronological. Synthesis is NOT a workspace step, but a separate top-level folder populated by tool_synthesize.
+turn_structure:
+  autonomy_manual:
+    steps_per_turn: 1
+    approval_required_before: all
+  autonomy_supervised:
+    steps_per_turn: 2
+    approval_required_before:
+    - setup_step_workspace
+    - execute_analysis
+  autonomy_autopilot:
+    steps_per_turn: 5
+    approval_required_before:
+    - protocol_completion
 steps:
-- id: setup_first_experiment
-  name: Setup first experiment
-  description: Use sys_path.create to create the first experiment directory 
-    (e.g., 01_baseline_eda). Do not assume a numbered folder already exists.
-- id: setup_directories
-  name: Setup directories
-  description: Use sys_path.create to create each step folder with the format 
-    {step_number}_{descriptive_name}. Do not create a synthesis step.
-- id: write_readmes
-  name: Write READMEs
-  description: Populate directories with boilerplate README.
-- id: evaluate_path_creation
-  name: Evaluate path creation
-  description: Decide whether next step starts a new track or continues.
+- id: scope_analysis
+  name: Scope Analysis and Sub-Tasks
+  description: |
+    Evaluate the complexity of the requested analysis step. Decide whether it is a small, atomic
+    task that can be done in one shot, or a large analysis that should be broken down into sub-tasks.
+    Discuss your plan with the user: "This analysis seems complex. I plan to break it into X and Y."
+    OR "This analysis is straightforward, I will execute it in one shot."
+    DO NOT proceed until the user approves the scope and plan.
+
+- id: setup_step_workspace
+  name: Setup Step Workspace
+  description: |
+    Once the scope is approved, use sys_path_create to create the directory for this step
+    (e.g., name="baseline_eda", name="random_forest_model", etc.).
+    Initialize the workspace/{current_step}/README.md with a boilerplate structure.
+
+- id: methodology_grounding
+  name: Ground Methodology via Literature Search
+  description: |
+    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. DO NOT hallucinate methods based on pre-trained knowledge.
+    Find appropriate methods for this specific analysis step, log the tools and versions, and append your findings and citations to workspace/logs/methods_research.log and workspace/methods.md.
+
+- id: execute_analysis
+  name: Execute Analysis Scripts
+  description: |
+    Write the analysis script following the exact naming convention:
+    workspace/{current_step}/scripts/{step_number}_{step_name}_v1.{ext}
+    (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py, or .R, .jl, etc.).
+    
+    The script MUST:
+    - Read input data properly.
+    - Perform meaningful analysis relevant to this step.
+    - YOU MUST generate appropriate and meaningful outputs for this step. Do not leave the output directories empty.
+    - Save a clean Markdown summary table or report to outputs/reports/
+    - Save relevant and insightful figures to outputs/figures/ (PNG, 150dpi minimum)
+    
+    Run the script via tool_python_exec, tool_r_exec, or tool_julia_exec as appropriate.
+    Iterate with the user if there are errors or if sub-tasks require review.
+
+- id: document_conclusions
+  name: Document Step Conclusions
+  description: |
+    Populate workspace/{current_step}/conclusions.md with:
+    - Key Findings: specific quantitative findings
+    - Data Quality Verdict / Model Performance
+    - Next Steps: 2-3 concrete numbered ideas based on what was found
+
+    Update workspace/{current_step}/README.md fully with actual inputs, methods used, and key outputs.
+
+- id: cleanup_and_snapshot
+  name: Cleanup and Environment Snapshot
+  description: |
+    Check each subdirectory in outputs/ and data/output/ within this step.
+    Use sys_file_delete to remove any directories that are completely empty.
+    Call sys_env_snapshot to write requirements.txt and session.yaml to workspace/{current_step}/environment/ for reproducibility.
+
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='analysis_plan
-    completed'.\n5. Ask researcher: 'I've completed analysis_plan. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-next_protocol: methodology/methodology_selection
+  description: |
+    1. Update workspace/workflow.mermaid via sys_file_read then sys_file_write:
+       - Add node for {current_step} with green fill (:::complete class)
+       - Connect it to the previous node
+    2. Call sys_checkpoint_create with description="analysis_plan completed for {current_step}".
+    3. Suggest 2-3 logical next analysis steps to the user based on the conclusions.
+    4. Ask researcher: "Which analysis step should we plan and execute next?"
+
+    - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted to the step's environment file.
+    - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log. Do not rely solely on pre-trained knowledge!
+next_protocol: guidance/analysis_plan
