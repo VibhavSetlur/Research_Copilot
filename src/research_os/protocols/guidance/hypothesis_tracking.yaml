@@ -1,9 +1,11 @@
 name: hypothesis_tracking
 version: 1.0.0
-description: Track, update, and validate research hypotheses throughout analysis.
+description: Track, update, and validate research hypotheses throughout 
+  analysis.
 steps:
 - id: read_hypotheses
-  description: Read docs/hypotheses.md (create if not exists from docs/research_question.md).
+  description: Read docs/hypotheses.md (create if not exists from 
+    docs/research_question.md).
   name: Read Hypothesis File
 - id: update_status
   description: 'For each hypothesis, assess its current status:
@@ -25,17 +27,14 @@ steps:
   name: Log Hypothesis Update
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''hypothesis_tracking completed''.
-
-    5. Ask researcher: ''I''ve completed hypothesis_tracking. Want me to proceed to
-    the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='hypothesis_tracking
+    completed'.\n5. Ask researcher: 'I've completed hypothesis_tracking. Want me to
+    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
+    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
+    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 schema_version: '1.0'

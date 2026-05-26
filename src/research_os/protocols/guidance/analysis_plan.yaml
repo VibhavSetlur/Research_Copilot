@@ -1,13 +1,14 @@
 name: analysis_plan
 version: 2.1.0
-description: Plan workspace structure, manage step folders, and experiment paths.
+description: Plan workspace structure, manage step folders, and experiment 
+  paths.
 schema_version: '1.0'
 expected_outputs:
 - workspace/{step_number}_{descriptive_name}/README.md
 - workspace/{step_number}_{descriptive_name}/scripts/analysis.py
 structure:
-  note: Steps are chronological and uniquely named. Synthesis is NOT a workspace step
-    – it is a separate top‑level folder populated by tool_synthesize.
+  note: Steps are chronological and uniquely named. Synthesis is NOT a workspace
+    step – it is a separate top‑level folder populated by tool_synthesize.
 templates:
   boilerplate_readme: '# {folder_name}
 
@@ -35,8 +36,8 @@ model_adaptations:
     setup_first_experiment:
       description: Create only the first experiment path. Skip writing READMEs.
     setup_directories:
-      description: Create one directory at a time. Use sys_file.list after each to
-        confirm.
+      description: Create one directory at a time. Use sys_file.list after each 
+        to confirm.
     write_readmes:
       description: Write a single-line README. Skip boilerplate template.
   medium:
@@ -44,42 +45,41 @@ model_adaptations:
       description: Create directories in batches of 2. Write READMEs.
   large:
     setup_directories:
-      description: Create all directories at once. Write full boilerplate READMEs.
+      description: Create all directories at once. Write full boilerplate 
+        READMEs.
 steps:
 - id: setup_first_experiment
   name: Setup first experiment
-  description: Use sys_path.create to create the first experiment directory (e.g.,
-    01_baseline_eda). Do not assume a numbered folder already exists.
+  description: Use sys_path.create to create the first experiment directory 
+    (e.g., 01_baseline_eda). Do not assume a numbered folder already exists.
 - id: setup_directories
   name: Setup directories
-  description: Use sys_path.create to create each step folder with the format {step_number}_{descriptive_name}.
-    Do not create a synthesis step.
+  description: Use sys_path.create to create each step folder with the format 
+    {step_number}_{descriptive_name}. Do not create a synthesis step.
 - id: write_readmes
   name: Write READMEs
   description: Populate each step folder with the boilerplate README.
 - id: evaluate_path_creation
   name: Evaluate path creation
-  description: Review path_creation_criteria to decide whether the next step starts
-    a new track (new path number) or continues on the current one.
+  description: Review path_creation_criteria to decide whether the next step 
+    starts a new track (new path number) or continues on the current one.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''analysis_plan completed''.
-
-    5. Ask researcher: ''I''ve completed analysis_plan. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='analysis_plan
+    completed'.\n5. Ask researcher: 'I've completed analysis_plan. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 multi_language_workflow:
   description: Guidelines for multi‑language workflows.
   best_practices:
-  - Use tool_data.convert to move data between R, Python, Julia (e.g., .csv ↔ .feather).
+  - Use tool_data.convert to move data between R, Python, Julia (e.g., .csv ↔ 
+    .feather).
   - Run language‑specific scripts sequentially inside the same step folder.
   - Snapshot all environments with sys_env.snapshot when ready.
 next_protocol: methodology/methodology_selection

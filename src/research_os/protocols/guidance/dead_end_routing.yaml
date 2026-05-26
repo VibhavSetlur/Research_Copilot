@@ -1,8 +1,8 @@
 name: dead_end_routing
 version: 1.0.0
 description: Structured protocol when an experiment path fails or is abandoned.
-trigger: When an experiment path fails, produces invalid results, or researcher decides
-  to abandon it
+trigger: When an experiment path fails, produces invalid results, or researcher 
+  decides to abandon it
 steps:
 - id: document_failure
   description: 'Write to workspace/{path_name}/conclusions.md under "## Why This Failed":
@@ -27,25 +27,22 @@ steps:
     '
   name: Propose Alternative Approaches
 - id: create_new_path
-  description: After researcher chooses, call sys_path.create with the chosen alternative
-    name.
+  description: After researcher chooses, call sys_path.create with the chosen 
+    alternative name.
   name: Create New Path
 - id: update_logs
   description: Call mem_analysis.log to note the dead end and new direction.
   name: Update Analysis Logs
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''dead_end_routing completed''.
-
-    5. Ask researcher: ''I''ve completed dead_end_routing. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='dead_end_routing
+    completed'.\n5. Ask researcher: 'I've completed dead_end_routing. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 schema_version: '1.0'

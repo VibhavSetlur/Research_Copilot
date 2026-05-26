@@ -1,7 +1,7 @@
 name: writing_methods
 version: 1.0.0
-description: Guide to documenting research methods, tools, and algorithms in workspace/methods.md
-  and methods_research.md.
+description: Guide to documenting research methods, tools, and algorithms in 
+  workspace/methods.md and methods_research.md.
 always_include:
 - writing_core
 schema_version: '1.0'
@@ -27,37 +27,35 @@ templates:
     \n## Required Data Format\n{input_format_details}\n"
 rules:
   checksums:
-  - Every dataset referenced MUST include its sha256 checksum to ensure exact reproducibility.
+  - Every dataset referenced MUST include its sha256 checksum to ensure exact 
+    reproducibility.
 steps:
 - id: gather_info
   name: Gather Methodology Information
-  description: Collect details about the tools, parameters, and datasets used in the
-    current step.
+  description: Collect details about the tools, parameters, and datasets used in
+    the current step.
 - id: write_methods_research
   name: Draft Methods Research
-  description: If choosing a method, populate workspace/{step}/methods_research.md
-    using the methods_research template.
+  description: If choosing a method, populate 
+    workspace/{step}/methods_research.md using the methods_research template.
 - id: append_workspace_methods
   name: Append to Main Methods
-  description: Append the methodological details to workspace/methods.md using the
-    workspace_methods template.
+  description: Append the methodological details to workspace/methods.md using 
+    the workspace_methods template.
 - id: verify_methods
   name: Verify Methods Output
-  description: Check that all templates are filled correctly and checksums are included
-    for all datasets.
+  description: Check that all templates are filled correctly and checksums are 
+    included for all datasets.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''writing_methods completed''.
-
-    5. Ask researcher: ''I''ve completed writing_methods. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_methods
+    completed'.\n5. Ask researcher: 'I've completed writing_methods. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 next_protocol: writing/writing_core

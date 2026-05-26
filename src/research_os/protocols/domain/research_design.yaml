@@ -1,6 +1,7 @@
 name: research_design
 version: 2.0.0
-description: Select the appropriate research design and compute sample size justification.
+description: Select the appropriate research design and compute sample size 
+  justification.
 schema_version: '1.0'
 expected_outputs:
 - 'workspace/methods.md: Appended chosen research design and sample size justification'
@@ -35,29 +36,27 @@ sample_size_justification:
       description: Comparing two proportions.
       power: 0.8
       alpha: 0.05
-      formula: n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - p2)
-        )^2
+      formula: n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - 
+        p2) )^2
 steps:
 - id: traverse_flowchart
   name: Traverse Design Flowchart
-  description: Answer the flowchart questions to determine the correct research design.
+  description: Answer the flowchart questions to determine the correct research 
+    design.
 - id: calculate_sample_size
   name: Calculate Sample Size
-  description: Use the provided formulae to compute and justify the required sample
-    size, given power=0.8 and alpha=0.05.
+  description: Use the provided formulae to compute and justify the required 
+    sample size, given power=0.8 and alpha=0.05.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''research_design completed''.
-
-    5. Ask researcher: ''I''ve completed research_design. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='research_design
+    completed'.\n5. Ask researcher: 'I've completed research_design. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 next_protocol: methodology/methodology_selection

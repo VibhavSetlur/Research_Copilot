@@ -33,38 +33,37 @@ formatting:
     min_font_size: 8pt (for publication)
     title_font_size: 10pt
   layouts:
-    forest_plot: Ensure lines for 95% CI are distinct, align study names left, align
-      OR/RR values right.
-    funnel_plot: Symmetrical pseudo-95% confidence limits must be drawn as dashed
-      lines.
+    forest_plot: Ensure lines for 95% CI are distinct, align study names left, 
+      align OR/RR values right.
+    funnel_plot: Symmetrical pseudo-95% confidence limits must be drawn as 
+      dashed lines.
   technical:
-    dpi_requirements: Minimum 300 DPI for print publication, 600 DPI for line art.
-    axis_labeling: Always include units in parentheses, e.g., 'Blood Pressure (mmHg)'.
-      Do not use variable names like 'bp_sys'.
+    dpi_requirements: Minimum 300 DPI for print publication, 600 DPI for line 
+      art.
+    axis_labeling: Always include units in parentheses, e.g., 'Blood Pressure 
+      (mmHg)'. Do not use variable names like 'bp_sys'.
     error_bars_vs_confidence_bands:
-      error_bars: Use standard error (SE) or 95% CI for point estimates (e.g., bar
-        charts of means). Explicitly state which one in the caption.
-      confidence_bands: Use shaded 95% confidence bands for continuous trends (e.g.,
-        regression lines or survival curves).
+      error_bars: Use standard error (SE) or 95% CI for point estimates (e.g., 
+        bar charts of means). Explicitly state which one in the caption.
+      confidence_bands: Use shaded 95% confidence bands for continuous trends 
+        (e.g., regression lines or survival curves).
 steps:
 - id: select_chart
   name: Select Chart Type
   description: Use the chart chooser decision tree.
 - id: apply_formatting
   name: Apply Formatting
-  description: Ensure color-blind friendly palettes and minimum font sizes are used.
+  description: Ensure color-blind friendly palettes and minimum font sizes are 
+    used.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''figure_guidelines completed''.
-
-    5. Ask researcher: ''I''ve completed figure_guidelines. Want me to proceed to
-    the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='figure_guidelines
+    completed'.\n5. Ask researcher: 'I've completed figure_guidelines. Want me to
+    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
+    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
+    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"

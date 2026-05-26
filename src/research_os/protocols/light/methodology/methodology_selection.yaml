@@ -88,23 +88,23 @@ steps:
   description: Determine outcome type, data structure, and number of variables.
 - id: select_methodology
   name: Select Methodology
-  description: Use the decision matrix mapping to pick the method, library, and template.
+  description: "Use the decision matrix mapping to pick the method, library, and template.\n\
+    \nCRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.)
+    to ground your methodological choices. DO NOT hallucinate methods based on pre-trained
+    knowledge."
 - id: document_assumptions
   name: Document Assumptions
   description: List the assumptions that must be tested during the analysis.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''methodology_selection completed''.
-
-    5. Ask researcher: ''I''ve completed methodology_selection. Want me to proceed
-    to the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='methodology_selection
+    completed'.\n5. Ask researcher: 'I've completed methodology_selection. Want me
+    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
+    new tools/libraries have been snapshotted to the step's environment file.\n  \
+    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 next_protocol: literature/literature_search

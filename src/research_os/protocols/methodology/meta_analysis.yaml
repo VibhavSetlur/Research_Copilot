@@ -1,7 +1,7 @@
 name: meta_analysis
 version: 2.0.0
-description: Guide for extracting effect sizes, assessing heterogeneity, and performing
-  meta-analysis.
+description: Guide for extracting effect sizes, assessing heterogeneity, and 
+  performing meta-analysis.
 schema_version: '1.0'
 expected_outputs:
 - workspace/{step_number}_{descriptive_name}/outputs/figures/forest_plot.png
@@ -10,8 +10,8 @@ expected_outputs:
 _output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
   Example names: 02_effect_size_extraction, 03_meta_analysis_path_1 (with path track).'
 decision_tree:
-- Are studies highly heterogeneous? If yes -> Use random-effects model. If no -> Fixed-effects
-  model.
+- Are studies highly heterogeneous? If yes -> Use random-effects model. If no ->
+  Fixed-effects model.
 - Is there risk of publication bias? -> Run Egger's test and build funnel plot.
 prerequisites:
 - Extracted effect sizes and variances/standard errors from primary studies.
@@ -19,41 +19,39 @@ prerequisites:
 steps:
 - id: create_experiment_path
   name: Create Experiment Path
-  description: Create a new path via sys_path.create (e.g., 02_meta_analysis) to store
-    scripts and outputs.
+  description: Create a new path via sys_path.create (e.g., 02_meta_analysis) to
+    store scripts and outputs.
 - id: extract_effect_sizes
   name: Extract Effect Sizes
-  description: Standardize effect sizes across heterogeneous studies (e.g., Cohen's
-    d, Odds Ratios).
+  description: Standardize effect sizes across heterogeneous studies (e.g., 
+    Cohen's d, Odds Ratios).
 - id: assess_heterogeneity
   name: Assess Heterogeneity
-  description: Compute I² and Q-test statistics to evaluate between-study variance.
+  description: Compute I² and Q-test statistics to evaluate between-study 
+    variance.
 - id: perform_meta_analysis
   name: Perform Meta-Analysis
-  description: Run fixed or random-effects meta-analysis using PyMARE or R's metafor
-    via tool_python.exec/tool_r.exec.
+  description: Run fixed or random-effects meta-analysis using PyMARE or R's 
+    metafor via tool_python.exec/tool_r.exec.
 - id: generate_plots
   name: Generate Plots
-  description: Create forest plots for effect sizes and funnel plots for publication
-    bias.
+  description: Create forest plots for effect sizes and funnel plots for 
+    publication bias.
 - id: test_publication_bias
   name: Test Publication Bias
   description: Perform Egger's test or trim-and-fill method.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''meta_analysis completed''.
-
-    5. Ask researcher: ''I''ve completed meta_analysis. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='meta_analysis
+    completed'.\n5. Ask researcher: 'I've completed meta_analysis. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 checkpoints:
 - Verify that all standard errors are positive.
 - Confirm I² interpretation is documented.

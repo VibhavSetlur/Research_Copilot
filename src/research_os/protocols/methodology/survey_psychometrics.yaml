@@ -14,37 +14,35 @@ prerequisites:
 steps:
 - id: create_experiment_path
   name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and outputs.
+  description: Create a new path via sys_path.create to store scripts and 
+    outputs.
 - id: scale_validation
   name: Scale Validation
-  description: Calculate Cronbach's alpha, McDonald's omega, and perform Confirmatory
-    Factor Analysis (CFA).
+  description: Calculate Cronbach's alpha, McDonald's omega, and perform 
+    Confirmatory Factor Analysis (CFA).
 - id: sampling_weights
   name: Apply Sampling Weights
   description: Calculate and apply weights to adjust for complex survey designs.
 - id: non_response_bias
   name: Non-Response Bias Analysis
-  description: Compare early vs late responders or responders vs known population
-    margins.
+  description: Compare early vs late responders or responders vs known 
+    population margins.
 - id: reporting
   name: Reporting Standards
-  description: Format outputs to comply with STROBE guidelines for cross-sectional
-    studies.
+  description: Format outputs to comply with STROBE guidelines for 
+    cross-sectional studies.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''survey_psychometrics completed''.
-
-    5. Ask researcher: ''I''ve completed survey_psychometrics. Want me to proceed
-    to the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='survey_psychometrics
+    completed'.\n5. Ask researcher: 'I've completed survey_psychometrics. Want me
+    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
+    new tools/libraries have been snapshotted to the step's environment file.\n  \
+    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 checkpoints:
 - Verify model fit indices (CFI, TLI, RMSEA) for CFA.
 - Ensure weights sum to population size or sample size appropriately.

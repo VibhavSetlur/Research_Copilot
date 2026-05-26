@@ -1,6 +1,7 @@
 name: glossary_update
 version: 1.0.0
-description: Update docs/glossary.md with new domain-specific terms introduced during analysis.
+description: Update docs/glossary.md with new domain-specific terms introduced 
+  during analysis.
 steps:
 - id: collect_terms
   name: Collect Terms
@@ -13,11 +14,12 @@ steps:
   description: Confirm update count to researcher.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call sys_checkpoint.create with description=''glossary_update completed''.
-
-    3. Ask researcher: ''I''ve completed glossary_update. Want me to proceed?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call sys_checkpoint.create with description='glossary_update completed'.\n\
+    3. Ask researcher: 'I've completed glossary_update. Want me to proceed?'\n\n \
+    \   - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted
+    to the step's environment file.\n    - GROUNDING CHECK: Ensure you have ACTUALLY
+    called search tools (search_semantic_scholar, search_web, etc.) to ground your
+    decisions, and updated workspace/logs/methods_research.log. Do not rely solely
+    on pre-trained knowledge!"
 schema_version: '1.0'

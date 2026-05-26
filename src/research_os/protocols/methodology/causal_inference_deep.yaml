@@ -12,46 +12,45 @@ prerequisites:
 - Observational dataset.
 - 'Python libraries: dowhy, econml.'
 decision_tree:
-- Are there unobserved confounders? -> Use instrumental variables if available, or
-  compute E-values.
+- Are there unobserved confounders? -> Use instrumental variables if available, 
+  or compute E-values.
 steps:
 - id: create_experiment_path
   name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and outputs.
+  description: Create a new path via sys_path.create to store scripts and 
+    outputs.
 - id: dag_creation
   name: DAG Creation
-  description: Define causal graph and identify backdoor/frontdoor paths. (Integration
-    with DAGitty)
+  description: Define causal graph and identify backdoor/frontdoor paths. 
+    (Integration with DAGitty)
 - id: identification
   name: Identification
-  description: Identify the causal estimand using backdoor or instrumental variable
-    criteria.
+  description: Identify the causal estimand using backdoor or instrumental 
+    variable criteria.
 - id: estimation
   name: Estimation
-  description: Estimate the causal effect using methods like IPW, Double Machine Learning
-    (DML), or matching.
+  description: Estimate the causal effect using methods like IPW, Double Machine
+    Learning (DML), or matching.
 - id: refutation
   name: Refutation Tests
   description: 'Perform robustness checks: placebo treatment, random common cause,
     subset data.'
 - id: evalue
   name: E-value Calculation
-  description: Calculate E-value to quantify robustness to unmeasured confounding.
+  description: Calculate E-value to quantify robustness to unmeasured 
+    confounding.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''causal_inference_deep completed''.
-
-    5. Ask researcher: ''I''ve completed causal_inference_deep. Want me to proceed
-    to the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='causal_inference_deep
+    completed'.\n5. Ask researcher: 'I've completed causal_inference_deep. Want me
+    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
+    new tools/libraries have been snapshotted to the step's environment file.\n  \
+    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 checkpoints:
 - Verify covariate balance after matching or weighting.
 - Ensure refutation tests do not significantly alter the estimate.

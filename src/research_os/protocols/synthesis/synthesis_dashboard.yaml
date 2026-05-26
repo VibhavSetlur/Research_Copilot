@@ -13,20 +13,18 @@ steps:
   description: Collect figures and tables from all completed experiment steps.
 - id: create_dashboard
   name: Create Dashboard
-  description: Call tool_dashboard.create to generate an interactive HTML dashboard.
+  description: Call tool_dashboard.create to generate an interactive HTML 
+    dashboard.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''synthesis_dashboard completed''.
-
-    5. Ask researcher: ''I''ve completed synthesis_dashboard. Want me to proceed to
-    the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='synthesis_dashboard
+    completed'.\n5. Ask researcher: 'I've completed synthesis_dashboard. Want me to
+    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
+    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
+    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 schema_version: '1.0'

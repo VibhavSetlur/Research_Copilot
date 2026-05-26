@@ -6,10 +6,10 @@ structure:
     purpose: Data cleaning, filtering, feature engineering.
   02_analysis:
     purpose: Statistical modelling, core computations.
-  note: Do NOT create a synthesis step. Synthesis is handled by tool_synthesize into
-    the top‑level synthesis/ folder. Step folders are named {step_number}_{descriptor}
-    (e.g., 01_data_prep). Path tracking adds _path_N when starting a new research
-    track.
+  note: Do NOT create a synthesis step. Synthesis is handled by tool_synthesize 
+    into the top‑level synthesis/ folder. Step folders are named 
+    {step_number}_{descriptor} (e.g., 01_data_prep). Path tracking adds _path_N 
+    when starting a new research track.
 templates:
   boilerplate_readme: '# {folder_name} **Objective**: {description} **Inputs**: {list}
     **Outputs**: {list} **Scripts**: {list} '
@@ -25,12 +25,12 @@ path_creation_criteria:
 steps:
 - id: setup_first_experiment
   name: Setup first experiment
-  description: Use sys_path.create to create the first experiment directory (e.g.,
-    01_baseline_eda). Do not assume a numbered folder already exists.
+  description: Use sys_path.create to create the first experiment directory 
+    (e.g., 01_baseline_eda). Do not assume a numbered folder already exists.
 - id: setup_directories
   name: Setup directories
-  description: Use sys_path.create to create each step folder with the format {step_number}_{descriptive_name}.
-    Do not create a synthesis step.
+  description: Use sys_path.create to create each step folder with the format 
+    {step_number}_{descriptive_name}. Do not create a synthesis step.
 - id: write_readmes
   name: Write READMEs
   description: Populate directories with boilerplate README.
@@ -39,17 +39,14 @@ steps:
   description: Decide whether next step starts a new track or continues.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''analysis_plan completed''.
-
-    5. Ask researcher: ''I''ve completed analysis_plan. Want me to proceed to the
-    next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='analysis_plan
+    completed'.\n5. Ask researcher: 'I've completed analysis_plan. Want me to proceed
+    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
+    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
+    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
+    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 next_protocol: methodology/methodology_selection

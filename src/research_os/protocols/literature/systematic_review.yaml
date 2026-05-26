@@ -14,7 +14,8 @@ prerequisites:
 steps:
 - id: create_experiment_path
   name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and outputs.
+  description: Create a new path via sys_path.create to store scripts and 
+    outputs.
 - id: search_strategy
   name: Search Strategy Creation
   description: Formulate boolean queries and execute database querying.
@@ -23,8 +24,8 @@ steps:
   description: Apply deduplication algorithm to combined search results.
 - id: screening
   name: Title/Abstract & Full-Text Screening
-  description: Screen records based on inclusion/exclusion criteria. Track counts
-    for PRISMA.
+  description: Screen records based on inclusion/exclusion criteria. Track 
+    counts for PRISMA.
 - id: data_extraction
   name: Data Extraction
   description: Extract study characteristics into a standardized table.
@@ -36,19 +37,16 @@ steps:
   description: Create a PRISMA flow diagram summarizing the screening process.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''systematic_review completed''.
-
-    5. Ask researcher: ''I''ve completed systematic_review. Want me to proceed to
-    the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='systematic_review
+    completed'.\n5. Ask researcher: 'I've completed systematic_review. Want me to
+    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
+    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
+    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 checkpoints:
 - Ensure inclusion/exclusion criteria were applied consistently.
 - Verify PRISMA counts match total retrieved.

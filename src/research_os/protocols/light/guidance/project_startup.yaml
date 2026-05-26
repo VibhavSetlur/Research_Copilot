@@ -8,13 +8,15 @@ pre_conditions:
 model_adaptations:
   small:
     run_eda:
-      description: Use sys_state_minimal_context. Sample only first 20 rows. Generate top 3 most important plots only.
+      description: Use sys_state_minimal_context. Sample only first 20 rows. 
+        Generate top 3 most important plots only.
   medium:
     run_eda:
       description: Standard EDA — full sample, standard plot set.
   large:
     run_eda:
-      description: Full dataset EDA. Generate complete plot battery. Read full analysis.md history.
+      description: Full dataset EDA. Generate complete plot battery. Read full 
+        analysis.md history.
 turn_structure:
   autonomy_manual:
     steps_per_turn: 1
@@ -22,13 +24,13 @@ turn_structure:
   autonomy_supervised:
     steps_per_turn: 2
     approval_required_before:
-      - create_baseline_path
-      - run_eda
-      - write_conclusions
+    - create_baseline_path
+    - run_eda
+    - write_conclusions
   autonomy_autopilot:
     steps_per_turn: 5
     approval_required_before:
-      - write_conclusions
+    - write_conclusions
 steps:
 - id: scan_inputs
   name: Scan All Input Files
@@ -80,22 +82,25 @@ steps:
 
 - id: methods_research
   name: Research EDA Methods
-  description: |
+  description: |-
     Research appropriate EDA methods for the data type. Write concise findings to
     workspace/{current_step}/methods_research.md via sys_file_write.
     Include: objectives, chosen tools (with version), and justification.
     DO NOT use sys_guidance_get for tool_discovery unless genuinely uncertain —
     use your knowledge for standard pandas/scipy/seaborn EDA.
 
+
+    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. DO NOT hallucinate methods based on pre-trained knowledge.
+
 - id: run_eda
   name: Execute Baseline EDA
-  description: |
+  description: |-
     Write the analysis script following the exact naming convention:
     workspace/{current_step}/scripts/{step_number}_{step_name}_v1.{ext}
     (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py, or .R, .jl, etc.).
     The language and libraries (pandas, scipy, tidyverse, etc.) should match the
     domain and researcher config.
-    
+
     The script MUST:
     - Read data from data/input/ (which is symlinked to inputs/raw_data/)
     - Perform meaningful analysis relevant to the step (e.g., missing values, distributions)
@@ -109,6 +114,9 @@ steps:
     After execution:
     - Call mem_analysis_log with a summary of findings
     - Call mem_methods_append for each tool/library used
+
+
+    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. DO NOT hallucinate methods based on pre-trained knowledge.
 
 - id: fill_readme
   name: Fill Step README
@@ -174,7 +182,7 @@ steps:
 
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: |
+  description: |-
     1. Update workspace/workflow.mermaid via sys_file_read then sys_file_write:
        - Add node for {current_step} with green fill (:::complete class)
        - Connect it to the init node
@@ -185,4 +193,8 @@ steps:
        Then immediately call sys_checkpoint_create again to keep only the latest —
        NO MORE than 2 total checkpoints should exist at any time.
     3. Present final summary to researcher.
+
+
+        - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted to the step's environment file.
+        - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log. Do not rely solely on pre-trained knowledge!
 schema_version: '1.0'

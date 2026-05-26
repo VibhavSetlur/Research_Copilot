@@ -8,25 +8,27 @@ expected_outputs:
 - 'workspace/analysis.md: Appended PRISMA flow steps'
 search_strategies:
   mesh_discovery:
-    description: Use PubMed MeSH database to find official terms before building the
-      hedge.
-    example: If searching for 'heart attack', discover 'Myocardial Infarction'[Mesh].
+    description: Use PubMed MeSH database to find official terms before building
+      the hedge.
+    example: If searching for 'heart attack', discover 'Myocardial 
+      Infarction'[Mesh].
   synonym_expansion:
-    description: Combine MeSH terms with Title/Abstract (tiab) free-text synonyms
-      using OR.
-    example: ('Myocardial Infarction'[Mesh] OR 'heart attack'[tiab] OR 'myocardial
-      infarction'[tiab])
+    description: Combine MeSH terms with Title/Abstract (tiab) free-text 
+      synonyms using OR.
+    example: ('Myocardial Infarction'[Mesh] OR 'heart attack'[tiab] OR 
+      'myocardial infarction'[tiab])
   pubmed_hedge:
-    string_template: ("{concept1_mesh}"[Mesh] OR "{concept1_syn1}"[tiab] OR "{concept1_syn2}"[tiab])
-      AND ("{concept2_mesh}"[Mesh] OR "{concept2_syn1}"[tiab]) AND (2018:2024[dp])
-    example: ("Neoplasms"[Mesh] OR "cancer"[tiab] OR "tumor"[tiab]) AND ("Immunotherapy"[Mesh]
-      OR "immunotherapy"[tiab]) AND (English[la])
+    string_template: ("{concept1_mesh}"[Mesh] OR "{concept1_syn1}"[tiab] OR 
+      "{concept1_syn2}"[tiab]) AND ("{concept2_mesh}"[Mesh] OR 
+      "{concept2_syn1}"[tiab]) AND (2018:2024[dp])
+    example: ("Neoplasms"[Mesh] OR "cancer"[tiab] OR "tumor"[tiab]) AND 
+      ("Immunotherapy"[Mesh] OR "immunotherapy"[tiab]) AND (English[la])
   semantic_scholar:
     string_template: '"{concept1}" AND ("{concept2_syn1}" | "{concept2_syn2}")'
     citation_chasing:
-      description: Once key seed papers are found, use `tool_search.semantic_scholar`
-        to retrieve their `citations` (forward chasing) and `references` (backward
-        chasing) via their DOI or CorpusID.
+      description: Once key seed papers are found, use 
+        `tool_search.semantic_scholar` to retrieve their `citations` (forward 
+        chasing) and `references` (backward chasing) via their DOI or CorpusID.
   arxiv:
     string_template: all:"{concept1}" AND all:"{concept2}"
 filters:
@@ -35,15 +37,16 @@ filters:
     exception_years_recent: 2
   deduplication_algorithm:
     step1: Exact match on DOI
-    step2: Fuzzy match on Title (Levenshtein distance < 3) AND exact match on first
-      author's last name
-prisma_flow: null
+    step2: Fuzzy match on Title (Levenshtein distance < 3) AND exact match on 
+      first author's last name
+prisma_flow:
 model_adaptations:
   small:
     generate_search_strings:
       description: Generate 1 search string only. Use only the primary concept.
     execute_search:
-      description: Search only Semantic Scholar. Limit to 3 results. Do not deduplicate.
+      description: Search only Semantic Scholar. Limit to 3 results. Do not 
+        deduplicate.
     build_prisma_flow:
       description: Log search query and result count only.
   medium:
@@ -51,8 +54,8 @@ model_adaptations:
       description: Search Semantic Scholar and PubMed. Apply deduplication.
   large:
     execute_search:
-      description: Search all configured databases. Apply full deduplication algorithm
-        and quality filters.
+      description: Search all configured databases. Apply full deduplication 
+        algorithm and quality filters.
 steps:
 - id: generate_search_strings
   name: Generate Search Strings
@@ -68,17 +71,14 @@ steps:
   description: Document the PRISMA step counts in analysis.md.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
-  description: 'After all steps above are done:
-
-    1. Call mem_analysis.log with completion summary.
-
-    2. Call mem_methods.append with any new methods or tools used.
-
-    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
-    step (green fill), write back.
-
-    4. Call sys_checkpoint.create with description=''literature_search completed''.
-
-    5. Ask researcher: ''I''ve completed literature_search. Want me to proceed to
-    the next protocol?'''
+  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
+    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
+    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
+    (green fill), write back.\n4. Call sys_checkpoint.create with description='literature_search
+    completed'.\n5. Ask researcher: 'I've completed literature_search. Want me to
+    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
+    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
+    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
+    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
+    Do not rely solely on pre-trained knowledge!"
 next_protocol: literature/evidence_synthesis
