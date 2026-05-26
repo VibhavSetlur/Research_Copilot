@@ -7,7 +7,7 @@ expected_outputs:
 - workspace/{step_number}_{descriptive_name}/scripts/analysis.py
 structure:
   note: Steps are chronological and uniquely named. Synthesis is NOT a workspace step
-    – it is a separate top‑level folder populated by tool.synthesize.
+    – it is a separate top‑level folder populated by tool_synthesize.
 templates:
   boilerplate_readme: '# {folder_name}
 
@@ -35,7 +35,7 @@ model_adaptations:
     setup_first_experiment:
       description: Create only the first experiment path. Skip writing READMEs.
     setup_directories:
-      description: Create one directory at a time. Use sys.file.list after each to
+      description: Create one directory at a time. Use sys_file.list after each to
         confirm.
     write_readmes:
       description: Write a single-line README. Skip boilerplate template.
@@ -48,11 +48,11 @@ model_adaptations:
 steps:
 - id: setup_first_experiment
   name: Setup first experiment
-  description: Use sys.path.create to create the first experiment directory (e.g.,
+  description: Use sys_path.create to create the first experiment directory (e.g.,
     01_baseline_eda). Do not assume a numbered folder already exists.
 - id: setup_directories
   name: Setup directories
-  description: Use sys.path.create to create each step folder with the format {step_number}_{descriptive_name}.
+  description: Use sys_path.create to create each step folder with the format {step_number}_{descriptive_name}.
     Do not create a synthesis step.
 - id: write_readmes
   name: Write READMEs
@@ -65,21 +65,21 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''analysis_plan completed''.
+    4. Call sys_checkpoint.create with description=''analysis_plan completed''.
 
     5. Ask researcher: ''I''ve completed analysis_plan. Want me to proceed to the
     next protocol?'''
 multi_language_workflow:
   description: Guidelines for multi‑language workflows.
   best_practices:
-  - Use tool.data.convert to move data between R, Python, Julia (e.g., .csv ↔ .feather).
+  - Use tool_data.convert to move data between R, Python, Julia (e.g., .csv ↔ .feather).
   - Run language‑specific scripts sequentially inside the same step folder.
-  - Snapshot all environments with sys.env.snapshot when ready.
+  - Snapshot all environments with sys_env.snapshot when ready.
 next_protocol: methodology/methodology_selection

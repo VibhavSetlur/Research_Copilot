@@ -10,14 +10,14 @@ steps:
   description: 'For each hypothesis, assess and update status: TESTING, SUPPORTED, REJECTED, or INCONCLUSIVE.'
 - id: log_update
   name: Log Update
-  description: Call mem.analysis.log with hypothesis status summary.
+  description: Call mem_analysis.log with hypothesis status summary.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call sys.checkpoint.create with description=''hypothesis_tracking completed''.
+    2. Call sys_checkpoint.create with description=''hypothesis_tracking completed''.
 
     3. Ask researcher: ''I''ve completed hypothesis_tracking. Want me to proceed?'''
 schema_version: '1.0'

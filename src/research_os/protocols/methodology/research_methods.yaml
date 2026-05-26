@@ -10,7 +10,7 @@ steps:
 - id: understand_data
   name: Understand Data Characteristics
   description: 'Use the data inventory (workspace/logs/data_inventory.json) and data
-    profiling tools (tool.data.profile) to extract:
+    profiling tools (tool_data.profile) to extract:
 
     - Outcome variable type (continuous, binary, count, time‑to‑event)
 
@@ -34,7 +34,7 @@ steps:
   description: '- Construct a query for Semantic Scholar: "[domain] [goal] statistical
     method"
 
-    - Call tool.search.semantic_scholar with the query and retrieve top 5 relevant
+    - Call tool_search.semantic_scholar with the query and retrieve top 5 relevant
     papers.
 
     - For each paper, note: method name, why it was used, and its assumptions.
@@ -42,7 +42,7 @@ steps:
     '
 - id: search_documentation
   name: Search for Tool/Library Documentation
-  description: '- Use tool.search.web to find official documentation for candidate
+  description: '- Use tool_search.web to find official documentation for candidate
     methods (e.g., "statsmodels logistic regression documentation").
 
     - Verify library version, maintenance status, and community support.
@@ -73,14 +73,14 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''research_methods completed''.
+    4. Call sys_checkpoint.create with description=''research_methods completed''.
 
     5. Ask researcher: ''I''ve completed research_methods. Want me to proceed to the
     next protocol?'''

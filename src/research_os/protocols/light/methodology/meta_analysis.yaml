@@ -7,10 +7,10 @@ expected_outputs:
 - workspace/{step_number}_{descriptive_name}/outputs/figures/funnel_plot.png
 - workspace/{step_number}_{descriptive_name}/outputs/reports/meta_analysis_report.md
 _output_path_note: '{step_number}_{descriptive_name} is the numbered experiment directory
-  created by sys.path.create (e.g., 02_meta_analysis).'
+  created by sys_path.create (e.g., 02_meta_analysis).'
 steps:
 - id: create_experiment_path
-  description: Create a new path via sys.path.create (e.g., 02_meta_analysis) to store
+  description: Create a new path via sys_path.create (e.g., 02_meta_analysis) to store
     scripts and outputs.
   name: Create Experiment Path
 - id: extract_effect_sizes
@@ -32,14 +32,14 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''meta_analysis completed''.
+    4. Call sys_checkpoint.create with description=''meta_analysis completed''.
 
     5. Ask researcher: ''I''ve completed meta_analysis. Want me to proceed to the
     next protocol?'''

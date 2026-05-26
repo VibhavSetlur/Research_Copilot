@@ -6,7 +6,7 @@ always_include:
 - writing_core
 schema_version: '1.0'
 trigger: When the final task is to synthesize all research outputs into a paper.
-prerequisite: "Call tool.synthesize.plan first. Review the plan with the researcher before generating any section."
+prerequisite: "Call tool_synthesize.plan first. Review the plan with the researcher before generating any section."
 section_order:
   0: Plan & Review
   1: Methods
@@ -14,10 +14,10 @@ section_order:
   3: Discussion
   4: Abstract
   5: Final Assembly
-tool_calls: Use tool.synthesize.plan first, then tool.synthesize with section parameter (e.g. section='methods'). Call
+tool_calls: Use tool_synthesize.plan first, then tool_synthesize with section parameter (e.g. section='methods'). Call
   without section for final assembly.
 small_model_workflow: Treat EACH synthesis section as a separate chat session to avoid
-  context bloat. Wait for user approval before moving to the next section. Use sys.session.handoff.
+  context bloat. Wait for user approval before moving to the next section. Use sys_session.handoff.
 sources:
 - workspace/methods.md
 - workspace/analysis.md
@@ -34,7 +34,7 @@ review_prompts:
 model_adaptations:
   small:
     draft_methods:
-      description: Use sys.state.minimal_context. Read only workspace/methods.md.
+      description: Use sys_state.minimal_context. Read only workspace/methods.md.
         Generate a single paragraph.
     draft_results:
       description: Read only the last 3 conclusions.md entries. Generate 2-3 key bullet
@@ -88,20 +88,20 @@ steps:
   description: Summarize the entire paper into a 250-word abstract following writing_core.
 - id: final_assembly
   name: Final Assembly
-  description: Combine all sections into synthesis/paper.md. Call tool.audit.synthesis
+  description: Combine all sections into synthesis/paper.md. Call tool_audit.synthesis
     for final checks.
 - id: protocol_completion
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''synthesis_paper completed''.
+    4. Call sys_checkpoint.create with description=''synthesis_paper completed''.
 
     5. Ask researcher: ''I''ve completed synthesis_paper. Want me to proceed to the
     next protocol?'''

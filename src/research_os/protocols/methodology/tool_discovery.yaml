@@ -16,7 +16,7 @@ steps:
     '
 - id: search_web
   name: Search the Web
-  description: 'Use tool.search.web with the query. Gather top 5 results.
+  description: 'Use tool_search.web with the query. Gather top 5 results.
 
     For each, extract: library name, official documentation URL, GitHub repository
     URL.
@@ -24,7 +24,7 @@ steps:
     '
 - id: evaluate_library
   name: Evaluate Library Quality
-  description: 'For each candidate, check (via tool.search.web or direct GitHub API):
+  description: 'For each candidate, check (via tool_search.web or direct GitHub API):
 
     - Last commit date (should be within 12 months)
 
@@ -37,7 +37,7 @@ steps:
     '
 - id: test_installation
   name: Test Installation Feasibility
-  description: 'Call tool.package.install with the library name.
+  description: 'Call tool_package.install with the library name.
 
     If installation fails, note the error and consider the next candidate.
 
@@ -52,14 +52,14 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''tool_discovery completed''.
+    4. Call sys_checkpoint.create with description=''tool_discovery completed''.
 
     5. Ask researcher: ''I''ve completed tool_discovery. Want me to proceed to the
     next protocol?'''

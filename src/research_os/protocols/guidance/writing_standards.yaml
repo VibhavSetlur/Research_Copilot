@@ -27,9 +27,9 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call sys.checkpoint.create with description=''writing_standards completed''.
+    2. Call sys_checkpoint.create with description=''writing_standards completed''.
 
     3. Ask researcher: ''I''ve completed the writing standards index. Which writing task should I proceed with?'''
 how_to_use:

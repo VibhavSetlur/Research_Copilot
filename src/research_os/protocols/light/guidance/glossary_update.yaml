@@ -15,9 +15,9 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call sys.checkpoint.create with description=''glossary_update completed''.
+    2. Call sys_checkpoint.create with description=''glossary_update completed''.
 
     3. Ask researcher: ''I''ve completed glossary_update. Want me to proceed?'''
 schema_version: '1.0'

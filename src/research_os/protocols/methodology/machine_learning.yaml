@@ -6,7 +6,7 @@ expected_outputs:
 - workspace/{step_number}_{descriptive_name}/outputs/reports/model_performance.json
 - workspace/{step_number}_{descriptive_name}/outputs/figures/roc_curve.png
 - workspace/{step_number}_{descriptive_name}/outputs/figures/shap_summary.png
-_output_path_note: '{step_number}_{descriptive_name} is created by sys.path.create.
+_output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
   Example names: 02_feature_engineering, 03_model_training_path_1.'
 prerequisites:
 - Cleaned dataset.
@@ -18,7 +18,7 @@ decision_tree:
 steps:
 - id: create_experiment_path
   name: Create Experiment Path
-  description: Create a new path via sys.path.create to store scripts and outputs.
+  description: Create a new path via sys_path.create to store scripts and outputs.
 - id: data_splitting
   name: Data Splitting
   description: Perform stratified train/validation/test splits.
@@ -38,14 +38,14 @@ steps:
   name: Complete Protocol & Update Workspace
   description: 'After all steps above are done:
 
-    1. Call mem.analysis.log with completion summary.
+    1. Call mem_analysis.log with completion summary.
 
-    2. Call mem.methods.append with any new methods or tools used.
+    2. Call mem_methods.append with any new methods or tools used.
 
-    3. Read workspace/workflow.mermaid via sys.file.read, add a node for this completed
+    3. Read workspace/workflow.mermaid via sys_file.read, add a node for this completed
     step (green fill), write back.
 
-    4. Call sys.checkpoint.create with description=''machine_learning completed''.
+    4. Call sys_checkpoint.create with description=''machine_learning completed''.
 
     5. Ask researcher: ''I''ve completed machine_learning. Want me to proceed to the
     next protocol?'''
