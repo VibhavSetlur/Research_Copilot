@@ -14,14 +14,25 @@ def test_research_method_runs_and_writes_report(tmp_path):
     (tmp_path / ".os_state").mkdir()
     (tmp_path / "workspace" / "logs").mkdir(parents=True)
 
-    with patch("research_os.tools.actions.search.search_semantic_scholar", return_value=[
-        {"title": "Paper 1", "authors": ["A B"], "year": 2024, "url": "http://x",
-         "doi": "10.1/x", "abstract": "About logistic regression."}
-    ]), patch("research_os.tools.actions.search.search_crossref", return_value=[]), \
-         patch("research_os.tools.actions.search.search_pubmed", return_value=[]), \
-         patch("research_os.tools.actions.search.search_web", return_value={
-             "results": [{"title": "Web", "url": "http://web", "description": "doc"}]
-         }):
+    # Patch the inner submodule (where research.py imports from), not the
+    # package re-export.
+    with patch(
+        "research_os.tools.actions.search.search.search_semantic_scholar",
+        return_value=[{"title": "Paper 1", "authors": ["A B"], "year": 2024,
+                       "url": "http://x", "doi": "10.1/x",
+                       "abstract": "About logistic regression."}],
+    ), patch(
+        "research_os.tools.actions.search.search.search_crossref",
+        return_value=[],
+    ), patch(
+        "research_os.tools.actions.search.search.search_pubmed",
+        return_value=[],
+    ), patch(
+        "research_os.tools.actions.search.search.search_web",
+        return_value={"results": [
+            {"title": "Web", "url": "http://web", "description": "doc"}
+        ]},
+    ):
         res = research_method("logistic regression", tmp_path, limit=3)
 
     assert res["status"] == "success"
@@ -37,7 +48,7 @@ def test_research_tool_tags_external(tmp_path):
     (tmp_path / ".os_state").mkdir()
     (tmp_path / "workspace" / "logs").mkdir(parents=True)
 
-    with patch("research_os.tools.actions.search.search_web") as mock_search:
+    with patch("research_os.tools.actions.search.search.search_web") as mock_search:
         mock_search.return_value = {
             "results": [
                 {"title": "PyPI page", "url": "https://pypi.org/project/foo",

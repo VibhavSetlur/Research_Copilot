@@ -1,7 +1,5 @@
 """State ledger and checkpoint tests."""
 
-from pathlib import Path
-
 from research_os.project_ops import (
     create_numbered_experiment,
     default_state,

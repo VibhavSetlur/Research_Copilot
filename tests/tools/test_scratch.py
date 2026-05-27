@@ -1,7 +1,5 @@
 """Tests for the workspace/scratch sandbox."""
 
-import sys
-
 from research_os.project_ops import scaffold_minimal_workspace
 from research_os.tools.actions.state.scratch import (
     scratch_clear,

@@ -40,9 +40,10 @@ EXPERIMENT_SUBDIRS = (
     "outputs/reports",
     "outputs/figures",
     "outputs/tables",
-    "outputs/dashboards",
     "environment",
 )
+# NOTE: no `outputs/dashboards` here on purpose. Dashboards are a *project-level*
+# synthesis output (synthesis/dashboard.html), not a per-step artifact.
 
 TOP_LEVEL_DIRS = (
     ".os_state",
@@ -392,6 +393,24 @@ def scaffold_minimal_workspace(
             "graph TD\n"
             "    init[Initialised]:::complete\n"
             "    classDef complete fill:#d4edda,stroke:#28a745\n"
+        )
+
+    # 5b. workspace/scratch/ — AI sandbox. Gitignored.
+    scratch_dir = root / "workspace" / "scratch"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    scratch_gi = scratch_dir / ".gitignore"
+    if not scratch_gi.exists():
+        scratch_gi.write_text("*\n!.gitignore\n!README.md\n")
+    scratch_readme = scratch_dir / "README.md"
+    if not scratch_readme.exists():
+        scratch_readme.write_text(
+            "# Scratch\n\n"
+            "AI sandbox for one-off tests (syntax checks, smoke runs, parameter\n"
+            "sweeps, throw-away queries). Contents are gitignored.\n\n"
+            "Anything that produces **research** must be moved into a proper\n"
+            "numbered experiment folder via `sys_path_create` before it counts.\n\n"
+            "Tools: `tool_scratch_write`, `tool_scratch_run`,\n"
+            "`tool_scratch_list`, `tool_scratch_clear`.\n"
         )
 
     # 6. researcher_config.yaml — source of truth for AI behaviour.

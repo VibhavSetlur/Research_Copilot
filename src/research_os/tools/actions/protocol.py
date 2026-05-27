@@ -274,10 +274,19 @@ def _has_real_research_question(root: Path) -> bool:
     p = root / "docs" / "research_question.md"
     if not p.exists():
         return False
-    text = p.read_text()
-    if "(to be" in text.lower() or "(to be confirmed)" in text:
+    text = p.read_text().lower()
+    # Any of these substrings signals an unfilled placeholder.
+    placeholder_markers = (
+        "(to be",
+        "(blank",
+        "(to be confirmed",
+        "fill out the intake",
+        "*(to be determined)*",
+    )
+    if any(marker in text for marker in placeholder_markers):
         return False
-    return len(text.strip()) > 80
+    # Beyond a placeholder, require at least some real prose.
+    return len(text.strip()) > 200
 
 
 # Each step is considered done when EITHER the protocol logged completion OR

@@ -40,10 +40,15 @@ def test_path_create_creates_full_subtree():
         assert res["path_id"].startswith("01_")
         exp = root / "workspace" / res["path_id"]
         assert exp.exists()
+        # Per-step subdirs — note: NO outputs/dashboards (dashboards are
+        # synthesis-level, not per-step).
         for sub in ("scripts", "literature", "data/input", "data/output",
                     "outputs/reports", "outputs/figures", "outputs/tables",
-                    "outputs/dashboards", "environment"):
+                    "environment"):
             assert (exp / sub).exists(), sub
+        # Confirm no per-step dashboards folder.
+        assert not (exp / "outputs" / "dashboards").exists(), \
+            "outputs/dashboards should not be created per-step"
         assert (exp / "README.md").exists()
         assert (exp / "conclusions.md").exists()
 

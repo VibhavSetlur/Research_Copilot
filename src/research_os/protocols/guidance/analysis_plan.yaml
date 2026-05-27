@@ -73,7 +73,7 @@ steps:
     name: Create the Numbered Experiment Folder
     description: |
       sys_path_create name="<slug>" hypothesis="<H<id>: <text>>"
-      Creates workspace/NN_<slug>/{scripts,data,outputs/{reports,figures,tables,dashboards},environment}
+      Creates workspace/NN_<slug>/{scripts,literature,data/{input,output},outputs/{reports,figures,tables},environment}
       and sets it as current_path.
 
   - id: write_atomic_scripts

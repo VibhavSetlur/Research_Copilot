@@ -28,11 +28,8 @@ Section caps
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-import urllib.request
-import urllib.parse
 from pathlib import Path
 from typing import Any
 

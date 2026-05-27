@@ -27,6 +27,7 @@ def test_scaffold_creates_required_directories():
             "inputs/context",
             "workspace",
             "workspace/logs",
+            "workspace/scratch",
             "synthesis",
             "docs",
             "environment",
@@ -42,6 +43,7 @@ def test_scaffold_creates_key_files():
         # Required for session_boot + project_startup.
         for rel in (
             "AGENTS.md",
+            "GETTING_STARTED.md",
             "inputs/intake.md",
             "inputs/researcher_config.yaml",
             "docs/research_question.md",
@@ -50,6 +52,8 @@ def test_scaffold_creates_key_files():
             "workspace/analysis.md",
             "workspace/citations.md",
             "workspace/workflow.mermaid",
+            "workspace/scratch/README.md",
+            "workspace/scratch/.gitignore",
             ".os_state/state_ledger.json",
             ".os_state/manifest.json",
             ".os_state/os_state.md",

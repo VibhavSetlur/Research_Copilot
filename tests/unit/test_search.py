@@ -1,7 +1,7 @@
 """Literature & web search tests — all network calls mocked."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from research_os.tools.actions.search.search import (
     search_crossref,
