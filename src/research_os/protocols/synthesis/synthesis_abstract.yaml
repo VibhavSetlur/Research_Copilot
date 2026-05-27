@@ -1,34 +1,80 @@
 id: synthesis_abstract
-name: Synthesis — Abstract
-version: '4.0.0'
+name: Synthesis — Abstract (venue-tailored)
+version: '5.0.0'
 schema_version: '2.0'
-description: Generate a structured ~250-word abstract.
-trigger: After the main results/discussion are drafted, or whenever output_types includes "abstract".
+description: Generate a structured / unstructured abstract tuned to the target venue.
+trigger: Researcher asks for "an abstract", OR `research_goal.output_types` includes "abstract", OR called from synthesis_paper.
+
+quality_bar:
+  causal_language_check: required
+  citation_count_max: 3
+  every_number_has_unit: true
+
+venue_profile:
+  journal:
+    style: structured
+    sections: [Background, Methods, Results, Conclusion]
+    word_target: [200, 300]
+    notes: |
+      Default. ~250 words. 50 per section is a good rule of thumb.
+  conference:
+    style: unstructured
+    sections: []
+    word_target: [150, 250]
+    notes: |
+      Single paragraph. State problem → approach → results → significance.
+  preprint:
+    style: structured
+    sections: [Background, Methods, Results, Conclusion]
+    word_target: [250, 350]
+    notes: |
+      arXiv/bioRxiv. Slightly longer than journal abstract.
+  poster:
+    style: unstructured
+    sections: []
+    word_target: [80, 150]
+    notes: |
+      Very short — drives traffic to the poster.
+  grant:
+    style: structured
+    sections: [Specific_Aims, Background, Approach, Innovation, Impact]
+    word_target: [400, 500]
+    notes: |
+      NIH-style Project Summary / Specific Aims preview.
 
 steps:
-  - id: gather
+  - id: select_profile
+    name: Select Venue Profile
+    description: |
+      Read research_goal.target_venue. If "abstract" was the only output type
+      and no venue specified, ask: "Conference, journal, preprint, poster, or grant?"
+
+  - id: gather_sources
     name: Gather Sources
     description: |
-      Read synthesis/methods.md, synthesis/results.md, synthesis/discussion.md
-      (if present) via sys_file_read. Optionally also workspace/methods.md and
-      the latest conclusions.md if synthesis sections aren't drafted yet.
+      sys_file_read each of synthesis/methods.md, synthesis/results.md,
+      synthesis/discussion.md if present; otherwise fall back to
+      workspace/methods.md + latest conclusions.md.
 
   - id: draft
-    name: Draft Abstract — Structured
+    name: Draft Abstract
     description: |
-      Follow the structure (~250 words total, ~50/section):
-        ## Background     1-2 sentences on the gap or motivation.
-        ## Methods        Design, sample/dataset, primary analysis.
-        ## Results        2-3 sentences with quantitative findings + CIs.
-        ## Conclusion     Implications + key limitation.
-      Save via sys_file_write to synthesis/abstract.md.
+      tool_synthesize section="abstract" output_type="abstract"
+      The synthesize tool applies the venue's section structure and pulls ≤3
+      verified citations only when an anchor reference is essential.
+
+      QUALITY CHECK:
+        - Word count inside venue.word_target.
+        - For structured: every required section heading present.
+        - At least one quantitative finding with unit.
+        - No causal language unless design supports it.
+        - No banned phrases (validate via sys_file_validate_md).
 
   - id: validate
-    name: Validate Against Writing Standards
+    name: Validate
     description: |
       sys_file_validate_md filepath="synthesis/abstract.md" protocol_name="writing_core"
-      Apply fixes: no banned phrases, exact p-value formatting, no causal
-      over-reach unless the design supports it.
+      Address any errors (banned phrases, missing required sections) and re-draft.
 
 expected_outputs:
   - synthesis/abstract.md

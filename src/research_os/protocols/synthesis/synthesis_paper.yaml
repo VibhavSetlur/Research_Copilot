@@ -1,66 +1,186 @@
 id: synthesis_paper
-name: Synthesis — Paper (IMRAD)
-version: '4.0.0'
+name: Synthesis — Paper (IMRAD, venue-tailored)
+version: '5.0.0'
 schema_version: '2.0'
-description: Compile the final IMRAD paper into synthesis/paper.md (and optionally synthesis/paper.tex → PDF).
-trigger: After audit_and_validation passes. Final pipeline step.
+description: Compile the final IMRAD paper into synthesis/paper.md (and synthesis/paper.tex → PDF when requested), tuned to the target venue.
+trigger: After audit_and_validation passes. Final pipeline step. The researcher asks "write the paper" / "draft the manuscript".
 prerequisites:
   - workspace/logs/audit_report.md exists with no BLOCKER lines
-  - At least one experiment step has a non-empty conclusions.md
-  - workspace/methods.md, workspace/citations.md exist
+  - At least one experiment step has a substantive conclusions.md (>200 chars under "## Findings")
+  - workspace/methods.md, workspace/citations.md exist with real content
+  - inputs/literature_index.yaml has at least 3 entries
+
+# ── Quality bars — every paper must meet ALL ─────────────────────────
+quality_bar:
+  abstract_words: [200, 300]            # APA / most journals
+  introduction_words: [400, 800]
+  methods_words_minimum: 400
+  results_words_minimum: 400
+  discussion_words_minimum: 500
+  conclusion_words_minimum: 100
+  figures_minimum: 1
+  tables_minimum: 0
+  citations_minimum: 8
+  citations_maximum: 40                 # capped by output_type
+  every_claim_grounded: true            # quantitative claim → workspace artifact OR cited paper
+  no_causal_language_for_observational: true
+  reproducibility_block_present: true
+
+# ── Venue-specific overrides ─────────────────────────────────────────
+venue_profile:
+  journal:                              # default
+    structure: [abstract, introduction, methods, results, discussion, conclusion, references]
+    abstract_style: structured           # Background / Methods / Results / Conclusion
+    sample_length_words: 4000
+    figure_dpi_minimum: 300
+    file_format: [markdown, latex]
+    notes: |
+      Default. Long-form, exhaustive methods, structured abstract, ~30-40 citations.
+  conference:
+    structure: [abstract, introduction, related_work, methods, results, discussion, references]
+    abstract_style: unstructured         # one paragraph
+    sample_length_words: 3000
+    figure_dpi_minimum: 300
+    file_format: [latex]                # most CS confs require LaTeX
+    notes: |
+      Tighter abstract; "Related Work" replaces deep "Discussion". ACL/NeurIPS-style.
+  preprint:
+    structure: [abstract, introduction, methods, results, discussion, conclusion, references]
+    abstract_style: structured
+    sample_length_words: 5000
+    figure_dpi_minimum: 150              # web display ok
+    file_format: [markdown, latex]
+    notes: |
+      arXiv / bioRxiv / SSRN. Longer; can include extended appendix.
+  dissertation:
+    structure: [abstract, introduction, literature_review, methods, results, discussion, conclusion, references]
+    abstract_style: structured
+    sample_length_words: 15000          # per chapter
+    figure_dpi_minimum: 300
+    file_format: [latex]
+    notes: |
+      Massive. Explicit "Literature review" chapter. Often per-chapter abstracts.
+  report:                                # internal / technical
+    structure: [executive_summary, background, methods, results, recommendations, references]
+    abstract_style: executive_summary    # ~150 words, business focus
+    sample_length_words: 2500
+    figure_dpi_minimum: 150
+    file_format: [markdown]
+    notes: |
+      Internal / industry. Prefers "Executive summary" + "Recommendations". Lighter on citations.
 
 steps:
+  - id: select_venue_profile
+    name: Select Venue Profile
+    description: |
+      Read research_goal.target_venue from researcher_config.yaml.
+      Pick the matching venue_profile (default: journal). Tell the researcher:
+        "Targeting: <venue> · structure: <list> · length: ~<words>w
+         · figure DPI: ≥<dpi> · output format: <fmt>"
+      Confirm before any drafting.
+
   - id: plan_sections
     name: Plan the Synthesis
     description: |
-      tool_synthesize_plan — returns the available sources and recommended order
-      (methods → results → discussion → abstract → final). Read it. Discuss the
-      structure with the researcher in autopilot/supervised mode if it deviates
-      from the default.
+      tool_synthesize_plan — returns the available sources and recommended ordering.
+      Read it. In supervised/autopilot, discuss any deviation from the default
+      ordering (methods → results → discussion → introduction → abstract).
 
   - id: draft_methods
     name: Draft Methods Section
     description: |
-      tool_synthesize section="methods"
-      Reads workspace/methods.md verbatim into synthesis/methods.md.
-      Review: does it provide enough detail that an independent researcher could
-      replicate the study? Tools + versions + parameters + datasets + seeds.
+      tool_synthesize section="methods" output_type="paper"
+      Pulls workspace/methods.md verbatim into synthesis/methods.md, attaches
+      verified citations relevant to the methodology.
+
+      QUALITY CHECK after generation:
+        - Word count ≥ methods_words_minimum.
+        - Every method block has implementation + version + parameters + assumptions.
+        - Every cited reference resolves (tool_citations_verify called).
+      Iterate via mem_methods_append if the word/grounding bar fails.
 
   - id: draft_results
     name: Draft Results Section
     description: |
-      tool_synthesize section="results"
-      Aggregates workspace/*/conclusions.md and outputs/reports/*.md.
-      Review: every p-value with 3 decimals (or <0.001), every CI explicit,
-      every figure referenced by its path.
+      tool_synthesize section="results" output_type="paper"
+      Aggregates workspace/*/conclusions.md + outputs/reports/*.md.
+
+      QUALITY CHECK:
+        - Every p-value formatted to 3 decimals (or "p < 0.001").
+        - Every effect estimate paired with 95% CI.
+        - Every figure cited and present in synthesis/figures/.
+        - Word count ≥ results_words_minimum.
 
   - id: draft_discussion
     name: Draft Discussion Section
     description: |
-      tool_synthesize section="discussion"
-      Combines conclusions + citations + evidence_table (if present).
-      Review: directly answers the research question without overstating.
+      tool_synthesize section="discussion" output_type="paper"
+
+      QUALITY CHECK:
+        - Directly answers research_question.md.
+        - Mentions limitations (from conclusions.md > Limitations + audit warnings).
+        - For observational designs: ZERO causal-language hits (the audit will flag this).
+        - At least 5 citations.
+
+  - id: draft_introduction
+    name: Draft Introduction Section
+    description: |
+      tool_synthesize section="introduction" output_type="paper"
+
+      QUALITY CHECK:
+        - Cites at least 3 prior works that frame the research question.
+        - Ends with explicit "In this study, we …" sentence.
+        - Word count within introduction_words range.
 
   - id: draft_abstract
-    name: Draft Abstract
+    name: Draft Abstract Section
     description: |
-      load synthesis/synthesis_abstract protocol and follow it (~250 words,
-      structured: background / methods / results / conclusion).
+      tool_synthesize section="abstract" output_type="paper"
+      Apply venue_profile.abstract_style (structured for journals/preprints,
+      unstructured for conferences).
+
+      QUALITY CHECK:
+        - Word count within abstract_words range.
+        - At most 3 citations (often 0).
+        - Includes one quantitative finding.
 
   - id: final_assembly
-    name: Final Assembly
+    name: Final Assembly + Audit
     description: |
-      tool_synthesize     # no section → assembles full paper.md + figures
-      Then tool_audit_synthesis paper_path="synthesis/paper.md".
-      Read the audit, fix any BLOCKER warnings, re-assemble. If output_format
-      requires LaTeX/PDF: call tool_latex_compile.
+      tool_synthesize (no section) output_type="paper" output_format=<fmt>
+      Assembles paper.md (+ paper.tex if requested), writes synthesis/references.bib
+      with deduplicated verified citations capped at 40.
+
+      Then:
+        tool_audit_synthesis paper_path="synthesis/paper.md"
+        tool_citations_verify
+      Read both reports. Address BLOCKER warnings (missing sections, hallucinated
+      citations, causal-language hits). Re-assemble.
+
+  - id: compile_pdf
+    name: Compile to PDF (when requested)
+    description: |
+      If venue_profile.file_format includes "latex" OR researcher asked for PDF:
+        tool_latex_compile
+      Verify synthesis/paper.pdf exists; show warnings from compile log.
+
+  - id: report_to_researcher
+    name: Report to Researcher
+    description: |
+      Report:
+        - Word count by section
+        - Citation count + verified ratio
+        - Figure count
+        - Output files (paper.md, paper.tex, paper.pdf, references.bib)
+        - Audit summary (any non-BLOCKER warnings to address)
 
 expected_outputs:
   - synthesis/paper.md
+  - synthesis/abstract.md
   - synthesis/methods.md
   - synthesis/results.md
   - synthesis/discussion.md
-  - synthesis/abstract.md
+  - synthesis/references.bib
 
 next_protocol: null
 on_failure: guidance/dead_end_routing

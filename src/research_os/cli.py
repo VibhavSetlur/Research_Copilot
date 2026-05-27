@@ -26,7 +26,10 @@ from pathlib import Path
 from research_os.project_ops import scaffold_minimal_workspace
 from research_os.utils.asset_manager import AssetManager
 
-VALID_IDES = ("cursor", "claude", "antigravity", "opencode", "vscode")
+VALID_IDES = (
+    "cursor", "claude", "antigravity", "opencode", "vscode",
+    "windsurf", "continue", "aider",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -199,17 +202,28 @@ def cmd_init(args: argparse.Namespace) -> None:
     if created_new_folder:
         print(f"  {n}. cd {target_dir}")
         n += 1
-    print(f"  {n}. Drop your data into  inputs/raw_data/  and any PDFs into  inputs/literature/")
+    print(f"  {n}. Drop your files:")
+    print( "       data    → inputs/raw_data/")
+    print( "       PDFs    → inputs/literature/")
+    print( "       notes   → inputs/context/")
     n += 1
-    print(f"  {n}. Edit (or have the AI fill in) inputs/researcher_config.yaml")
+    print(f"  {n}. Open your AI IDE on this folder. The MCP server is pre-configured")
+    print( "     for Claude Code, OpenCode, Antigravity, Cursor, Claude Desktop, VS Code,")
+    print( "     Windsurf, Continue, and Aider. Restart your IDE if it doesn't auto-detect.")
     n += 1
-    print(f"  {n}. Open your AI IDE — the MCP server is pre-configured.")
-    print( "       Then just say: \"start the project\" or \"analyse my data\".")
+    print(f"  {n}. Start chatting. Try any of:")
+    print( "       \"fill out the intake\"            (AI reads inputs/, proposes question + hypotheses)")
+    print( "       \"what should I do next?\"         (iterative planning)")
+    print( "       \"run a baseline EDA\"             (creates workspace/01_*, runs scripts)")
+    print( "       \"write the paper for a journal\"  (verified citations only)")
+    print( "       \"make me an executive dashboard\"")
+    print()
     if args.ide == "claude" or args.ide == "all":
-        print(f"  {n+1}. For Claude Desktop, paste this snippet into claude_desktop_config.json:")
+        print("  Claude Desktop only (global config — DO NOT modify if you don't use Claude Desktop):")
         _print_mcp_snippet(target_dir, "claude")
+    print(f"  Read first: {target_dir / 'GETTING_STARTED.md'}")
+    print(f"  AGENTS.md : {target_dir / 'AGENTS.md'}     (canonical AI operating rules)")
     print(f"  Config    : {target_dir / 'inputs' / 'researcher_config.yaml'}")
-    print(f"  AGENTS    : {target_dir / 'AGENTS.md'}    ← the AI reads this first.")
     print()
 
 
@@ -246,9 +260,14 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Research OS — an MCP-native research operating system.\n\n"
             "Two commands:\n"
-            "  research-os init     scaffold a workspace\n"
-            "  research-os start    run the MCP server (your IDE connects to it)\n\n"
-            "Everything else happens by talking to the AI in your IDE."
+            "  research-os init     scaffold a workspace ready for any AI IDE\n"
+            "  research-os start    run the MCP server (your IDE auto-launches it)\n\n"
+            "Research OS does NOT manage LLM provider keys. Your AI client\n"
+            "(Claude Code, OpenCode, Antigravity, Cursor, Claude Desktop,\n"
+            "VS Code, Windsurf, Continue, Aider, ...) owns model access.\n\n"
+            "Everything beyond `init` happens by talking to the AI in your IDE.\n\n"
+            "Documentation: docs/QUICKSTART.md (5 min) · docs/RESEARCHER_GUIDE.md\n"
+            "               docs/GUIDE.md · docs/TOOLS.md · docs/PROTOCOLS.md · docs/FAQ.md"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -257,7 +276,35 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = sub.add_parser(
         "init",
         help="Initialise a Research OS workspace.",
-        description="Scaffold a workspace directory ready for AI-driven research.",
+        description=(
+            "Scaffold a workspace directory ready for AI-driven research.\n\n"
+            "Drops:\n"
+            "  AGENTS.md                          canonical AI operating rules\n"
+            "  GETTING_STARTED.md                 friendly intro for the researcher\n"
+            "  inputs/researcher_config.yaml      source of truth for AI behaviour (all fields optional)\n"
+            "  inputs/{raw_data,literature,context}/   where the researcher drops files\n"
+            "  workspace/{methods,analysis,citations}.md + workflow.mermaid\n"
+            "  workspace/scratch/                 AI sandbox (gitignored)\n"
+            "  synthesis/                         final outputs (empty until requested)\n"
+            "  .os_state/                         internal state ledger\n"
+            "  Per-IDE MCP configs:\n"
+            "    .cursor/mcp.json + rules         (Cursor)\n"
+            "    .claude/mcp.json + rules + commands  (Claude Desktop)\n"
+            "    CLAUDE.md                        (Claude Code)\n"
+            "    .antigravity/mcp.json + rules    (Antigravity)\n"
+            "    opencode.json                    (OpenCode)\n"
+            "    .vscode/mcp.json                 (VS Code + MCP extension)\n"
+            "    .windsurfrules                   (Windsurf)\n"
+            "    .continuerules                   (Continue)\n"
+            "    .aider.conf.yml                  (Aider)\n\n"
+            "Examples:\n"
+            "  research-os init                                  # scaffold cwd\n"
+            "  research-os init my-project                       # scaffold ./my-project\n"
+            "  research-os init my-project --name 'Cohort 2024'  # explicit name\n"
+            "  research-os init . --force                        # re-scaffold an existing folder\n"
+            "  research-os init --ide cursor,claude              # only those two IDEs"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_init.add_argument(
         "directory",
@@ -268,16 +315,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("--name", help="Project name (default: directory name).")
     p_init.add_argument(
         "--domain",
-        help="Domain hint (clinical / finance / nlp / genomics / ...). Optional.",
+        help="Domain hint (clinical / finance / nlp / genomics / ...). Optional — AI infers from data otherwise.",
     )
     p_init.add_argument(
         "--question",
-        help="Initial research question. The AI will refine it during project_startup.",
+        help="Initial research question. AI refines it via tool_intake_autofill.",
     )
     p_init.add_argument(
         "--ide",
         default="all",
-        help="IDE(s) to wire up: all | cursor | claude | antigravity | opencode | vscode | comma-separated.",
+        help=(
+            "IDE(s) to wire up: 'all' (default) or comma-separated list from "
+            "cursor, claude, antigravity, opencode, vscode, windsurf, continue, aider."
+        ),
     )
     p_init.add_argument(
         "--force",

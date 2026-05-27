@@ -1,0 +1,94 @@
+id: synthesis_report
+name: Synthesis — Internal / Technical Report
+version: '1.0.0'
+schema_version: '2.0'
+description: Compile a non-journal report for internal stakeholders, clients, or a technical audience.
+trigger: Researcher asks "write a report" / "write up findings for my PI / client / team"; OR `research_goal.output_types` includes "report".
+
+quality_bar:
+  executive_summary_words: [100, 250]
+  recommendations_section_required: true
+  citations_minimum: 5
+  citations_maximum: 25
+  every_recommendation_has_evidence: true
+  must_include_limitations: true
+
+audience_profile:
+  internal_team:
+    sections: [Executive_Summary, Background, Methods, Results, Limitations, Recommendations, References]
+    tone: informal_technical
+    notes: |
+      For the PI, lab, or team. Plain technical language. Show your work.
+  client:
+    sections: [Executive_Summary, Problem_Statement, Approach, Findings, Recommendations, Next_Steps, References]
+    tone: formal_concise
+    notes: |
+      External client. Cut the academic jargon. Methods are a 1-paragraph
+      summary, not a chapter. Recommendations are concrete + costed if possible.
+  technical_audit:
+    sections: [Executive_Summary, System_Overview, Methodology, Findings, Risk_Register, Recommendations, Appendix]
+    tone: structured_formal
+    notes: |
+      For technical audits / due diligence. Each finding gets severity (Low /
+      Medium / High / Critical) and a recommended remediation.
+  policy_brief:
+    sections: [Issue, Background, Findings, Policy_Options, Recommendation, References]
+    tone: policy_concise
+    notes: |
+      For policymakers. Short (3-5 pages). Clear single recommendation backed
+      by 2-3 policy options.
+
+steps:
+  - id: select_audience
+    name: Select Audience Profile
+    description: |
+      Ask: "Audience? internal_team | client | technical_audit | policy_brief"
+
+  - id: draft_executive_summary
+    name: Draft Executive Summary FIRST
+    description: |
+      Single paragraph (or ≤5 bullets), max 250 words. Cover:
+        - What we were asked to do.
+        - What we found (the headline numbers).
+        - What we recommend.
+      This is the only section many readers will read.
+
+  - id: gather_workspace_content
+    name: Gather Content from workspace
+    description: |
+      Pull every conclusions.md + reports/*.md from active experiments.
+      Pull workspace/methods.md.
+      Pull citations.md.
+
+  - id: draft_each_section
+    name: Draft Each Audience Section
+    description: |
+      For each section in audience.sections:
+        tool_synthesize section="<name>" output_type="report"
+      Apply tone (informal_technical / formal_concise / structured_formal /
+      policy_concise). For technical_audit, each Finding entry MUST include
+      severity + remediation.
+
+  - id: draft_recommendations
+    name: Draft Recommendations (evidence-linked)
+    description: |
+      Every recommendation MUST cite either:
+        - a specific workspace experiment (link conclusions.md path), OR
+        - a verified citation from workspace/citations.md.
+      No vague "explore further" without evidence backing.
+
+  - id: assemble
+    name: Assemble + Audit
+    description: |
+      tool_synthesize output_type="report" output_format=markdown
+      Writes synthesis/report.md + synthesis/report_references.bib.
+
+      tool_audit_synthesis paper_path="synthesis/report.md"
+      Check banned phrases, missing sections, ungrounded claims.
+      tool_citations_verify
+
+expected_outputs:
+  - synthesis/report.md
+
+next_protocol: null
+on_failure: null

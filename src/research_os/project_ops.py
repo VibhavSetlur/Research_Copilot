@@ -436,12 +436,106 @@ def scaffold_minimal_workspace(
     _copy_agents_md(root, copy_agents)
     _setup_mcp_configs(root, ide_flags)
     _setup_gitignore(root)
+    _write_getting_started(root, project_name)
     _update_manifest(root)
     if git_init and not (root / ".git").exists():
         try:
             subprocess.run(["git", "init"], cwd=root, capture_output=True)
         except Exception:
             pass
+
+
+def _write_getting_started(root: Path, project_name: str) -> None:
+    """Drop a friendly GETTING_STARTED.md the researcher reads first."""
+    dest = root / "GETTING_STARTED.md"
+    if dest.exists():
+        return
+    dest.write_text(
+        f"""# Getting started with **{project_name}**
+
+This is a Research OS workspace. Two files matter most to you:
+
+* `AGENTS.md` — what the AI is told to do (you almost never edit this).
+* `inputs/researcher_config.yaml` — how the AI should behave for **you**.
+  Every field is optional; defaults work.
+
+## 1. Drop your files
+
+| Where | What goes here |
+|---|---|
+| `inputs/raw_data/`  | Data files (CSV, Parquet, FASTQ, NIfTI, JSON, Excel, ...) |
+| `inputs/literature/`| PDFs of papers you want the AI to know about |
+| `inputs/context/`   | Notes, drafts, prior reports — anything text |
+
+`inputs/` is **immutable** — the AI can read it but cannot modify it.
+Derived data lives under `workspace/`.
+
+## 2. Open your AI IDE on this folder
+
+The MCP config was already dropped for whichever IDE you use:
+Claude Code, OpenCode, Antigravity, Cursor, Claude Desktop, VS Code,
+Windsurf, Continue, Aider. Restart your IDE if it doesn't auto-detect.
+
+The MCP server should show as connected. If it doesn't, run
+`research-os start` in a terminal at the project root.
+
+## 3. Start a chat. Try any of:
+
+```
+fill out the intake               (AI reads inputs/, proposes question + hypotheses)
+what should I do next?            (iterative planning — AI assesses + searches + proposes)
+run a baseline EDA                (creates workspace/01_baseline_eda/ with figures + report)
+fit a logistic regression         (methodology selection → analysis_plan)
+find papers about <topic>         (literature search across S2 + Crossref + PubMed + arXiv)
+write the methods section
+write the paper for a journal     (verified citations only — no hallucinations)
+make me an executive dashboard
+draft an NIH R01 narrative
+check reproducibility
+fix my workspace                  (heals missing dirs / corrupted state, never deletes)
+wrap up the session
+```
+
+The AI loads the right protocol and walks through it. Interrupt anytime;
+"keep going" or "switch to autopilot" both work.
+
+## 4. Where outputs end up
+
+| Folder | What's inside |
+|---|---|
+| `workspace/01_<slug>/`, `02_<slug>/`, ... | Numbered experiment folders. Scripts + data + outputs + per-step conclusions. |
+| `workspace/methods.md`, `analysis.md`, `citations.md` | Append-only logs (the project's narrative). |
+| `workspace/scratch/`  | AI sandbox for quick tests (gitignored). |
+| `synthesis/`          | Final outputs — paper.md, abstract.md, poster.pdf, dashboard.html (only created when you ask). |
+
+## 5. Controls
+
+In `inputs/researcher_config.yaml`:
+
+* `interaction.autonomy_level: manual | supervised | autopilot`
+* `model_profile: small | medium | large` (affects how the AI batches work)
+* `runtime.shared_server: true` if you're on HPC / a shared box
+
+You can change these mid-session by telling the AI ("switch to autopilot").
+
+## 6. When things go wrong
+
+| Problem | Say to the AI... |
+|---|---|
+| Something seems broken | "Run `tool_workspace_repair`." |
+| Lost work | "Show me checkpoints and roll back to <id>." |
+| Conversation too long | "Hand off the session." |
+| AI making bad calls | "Switch to manual mode and walk me through each step." |
+
+## More
+
+* Quickstart: `docs/QUICKSTART.md`
+* Full guide: `docs/GUIDE.md`
+* All tools: `docs/TOOLS.md`
+* All protocols: `docs/PROTOCOLS.md`
+* FAQ: `docs/FAQ.md`
+"""
+    )
 
 
 def _copy_agents_md(root: Path, copy: bool) -> None:
@@ -533,6 +627,20 @@ def _setup_mcp_configs(root: Path, ide_flags: list[str]) -> None:
         f = d / "mcp.json"
         if not f.exists():
             f.write_text(json.dumps({"mcpServers": {"research-os": mcp_entry}}, indent=2) + "\n")
+
+    if "windsurf" in ide_flags:
+        # Project-level rules file Windsurf reads automatically.
+        _copy_rule(".windsurfrules", root / ".windsurfrules")
+
+    if "continue" in ide_flags:
+        _copy_rule(".continuerules", root / ".continuerules")
+
+    if "aider" in ide_flags:
+        _copy_rule(".aider.conf.yml", root / ".aider.conf.yml")
+
+    if "claude_code" in ide_flags or "claude" in ide_flags:
+        # Claude Code reads CLAUDE.md at the project root.
+        _copy_rule("CLAUDE.md", root / "CLAUDE.md")
 
 
 # ---------------------------------------------------------------------------

@@ -1,30 +1,99 @@
 id: synthesis_dashboard
-name: Synthesis — Dashboard
-version: '4.0.0'
+name: Synthesis — Dashboard (audience-tailored)
+version: '5.0.0'
 schema_version: '2.0'
-description: Generate a standalone HTML dashboard summarising all experiments, figures, conclusions, and citations.
-trigger: output_types includes "dashboard", or the researcher asks for an interactive overview.
+description: Generate a standalone HTML dashboard summarising the project, tuned to the audience (academic, executive, technical, teaching).
+trigger: Researcher asks for "a dashboard"; OR `research_goal.output_types` includes "dashboard".
+
+quality_bar:
+  must_be_offline: true                 # single-file HTML, no network calls
+  must_be_accessible: true              # semantic HTML, labelled images
+  must_print_well: true                 # print stylesheet
+  sections_minimum: 3
+  figures_minimum: 1
+  citations_maximum: 12
+
+audience_profile:
+  academic:
+    title_focus: research_question
+    sections: [Project, Methods, Figures, Conclusions, References]
+    cta: null                           # no call to action
+    chart_density: high
+    notes: |
+      Default. For PIs / collaborators / lab meetings. Methods + figures + citations heavy.
+  executive:
+    title_focus: headline_finding
+    sections: [Headline, Impact, Methods_Summary, Next_Steps]
+    cta: "request_followup"             # button-style block at bottom
+    chart_density: low
+    notes: |
+      For decision-makers. ONE headline number, business-relevance focus,
+      ≤2 figures, explicit recommendations.
+  technical:
+    title_focus: project_name
+    sections: [Project, Pipeline, Methods, Outputs, Reproducibility, References]
+    cta: null
+    chart_density: high
+    notes: |
+      For engineers / data scientists. Adds Pipeline (mermaid) and
+      Reproducibility (env snapshots + reruns) blocks.
+  teaching:
+    title_focus: research_question
+    sections: [Big_Idea, Process, Findings, Try_It_Yourself]
+    cta: "open_scratch_demo"            # link to a scratch notebook
+    chart_density: medium
+    notes: |
+      For students. Plain language, narrative ordering, optional "try it"
+      pointer to a workspace/scratch/ demo.
 
 steps:
-  - id: gather
-    name: Confirm Sources Exist
+  - id: select_audience
+    name: Select Audience Profile
+    description: |
+      Ask: "Audience? academic | executive | technical | teaching."
+      If output_type includes both "paper" and "dashboard", default to academic.
+
+  - id: confirm_sources_exist
+    name: Confirm Sources
     description: |
       sys_path_list — verify at least one experiment has outputs/figures/ or
-      outputs/reports/. If nothing exists yet, dashboard will be largely empty
-      (warn the researcher).
+      outputs/reports/ content. If nothing exists yet, warn the researcher:
+        "Dashboard would be empty — run at least one experiment first."
 
-  - id: build
+  - id: build_dashboard
     name: Build Dashboard
     description: |
-      tool_dashboard_create title="<short title>"
-      Produces synthesis/dashboard.html plus a synthesis/figures/<step>/ tree
-      of copied figures. Single file — opens directly in any browser.
+      tool_dashboard_create title="<headline>" audience="<profile>"
+      Produces:
+        synthesis/dashboard.html      — single-file (all CSS + JS embedded)
+        synthesis/dashboard_figures/  — copied figures (so the HTML opens
+                                        directly without server)
+      The HTML includes:
+        - sortable tables for paths/citations,
+        - lightbox-style image gallery,
+        - light/dark toggle,
+        - print stylesheet,
+        - semantic landmarks (header / main / aside / footer).
+
+  - id: verify_quality
+    name: Verify Quality
+    description: |
+      sys_file_read filepath="synthesis/dashboard.html"
+      Spot-check:
+        - <title> contains the project title.
+        - At least audience.sections_minimum sections present.
+        - At least one <img> tag.
+        - No <script src="http..."> (must be offline).
+      tool_citations_verify (citations under "References" section must all resolve).
 
   - id: share
-    name: Tell the Researcher Where to Find It
+    name: Tell the Researcher Where to Open It
     description: |
-      Report the absolute path so the researcher can open it. If running in a
-      remote workspace (SSH / container), advise download or port forward.
+      Report:
+        "Dashboard written to <abs path>/synthesis/dashboard.html. Open in
+         any browser — it's fully offline."
+      If they're on a remote / shared server, suggest downloading or port-
+      forwarding to view locally.
 
 expected_outputs:
   - synthesis/dashboard.html

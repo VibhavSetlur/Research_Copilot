@@ -237,7 +237,7 @@ research question / hypotheses given the new context?"
 
 ---
 
-## RULE 13 — Workspace repair (never break, always heal)
+## RULE 13 — Workspace repair + recovery (never break, always heal)
 
 If state looks inconsistent or a directory is missing:
 
@@ -248,6 +248,40 @@ tool_workspace_repair
 Recreates missing dirs, regenerates manifest + mermaid, backs up corrupted
 state, marks stale path entries. NEVER deletes anything. Call BEFORE
 proceeding when any `sys_*` tool returns "missing path" errors.
+
+For accidental file loss / wrong direction taken:
+
+* `sys_checkpoint_list` — show all snapshots (Research OS auto-checkpoints
+  at every `protocol_completion`).
+* `sys_checkpoint_rollback checkpoint_id=<id>` — restore (the current state
+  is backed up first; never destructive).
+* `sys_file_delete` — for genuine cleanup; refuses inputs/ paths.
+
+For configuration changes mid-session:
+
+* `sys_config_set key="interaction.autonomy_level" value="autopilot"` —
+  e.g. when the researcher says "switch to autopilot".
+* `sys_config_validate` — quick sanity check of researcher_config.yaml.
+
+For protocol introspection:
+
+* `sys_protocol_list` — show every available protocol.
+* `sys_protocol_validate protocol_name=<name>` — check whether a protocol's
+  expected_outputs already exist (handy after `tool_workspace_repair`).
+* `sys_protocol_log` — auto-called by the injected `protocol_completion`;
+  manually use only when finalising a protocol you loaded by hand.
+
+For surfaces protocols don't cover:
+
+* `sys_notify message=<...> level=info|warn|action_required` — surface a
+  message to the researcher (appears in workspace/logs/notifications.log).
+* `sys_workspace_scaffold` — only call when the researcher explicitly asks
+  to re-scaffold (this is normally a CLI-time action).
+* `tool_data_convert` — CSV ↔ Parquet ↔ Feather ↔ RDS conversions.
+* `tool_web_scrape url=<...>` — when a methodology doc lives on a webpage
+  rather than in a paper.
+* `mem_intake_regenerate` — manually refresh `inputs/intake.md` file hashes
+  (auto-called by `tool_intake_autofill` / `tool_context_intake`).
 
 ---
 

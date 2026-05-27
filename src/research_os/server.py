@@ -766,11 +766,17 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "tool_dashboard_create": {
-        "description": "Generate a standalone HTML dashboard summarising the project (key figures, tables, conclusions). Written to synthesis/dashboard.html.",
+        "description": "Generate a standalone, offline HTML dashboard (sortable tables, lightbox gallery, light/dark toggle, print-friendly) at synthesis/dashboard.html. Tailored to audience: academic | executive | technical | teaching.",
         "category": "synthesis",
         "inputSchema": {
             "type": "object",
-            "properties": {"title": {"type": "string"}},
+            "properties": {
+                "title": {"type": "string"},
+                "audience": {
+                    "type": "string",
+                    "description": "academic (default) | executive | technical | teaching",
+                },
+            },
         },
     },
 
@@ -1646,7 +1652,11 @@ def _handle_tool_poster_create(name, arguments, root):
 def _handle_tool_dashboard_create(name, arguments, root):
     from research_os.tools.actions.latex import create_dashboard
 
-    res = create_dashboard(root, title=arguments.get("title"))
+    res = create_dashboard(
+        root,
+        title=arguments.get("title"),
+        audience=arguments.get("audience", "academic"),
+    )
     if res.get("status") == "success":
         return _text(_success(res))
     return _text(_error(res.get("message", "dashboard create failed")))
