@@ -1,91 +1,71 @@
-name: project_startup
-version: 3.0.0
-description: 'Project Initialization: Read inputs, setup root documentation, and propose first analysis step.'
-next_protocol: guidance/analysis_plan
-pre_conditions:
-- researcher_config.yaml has been read (session_boot completed)
-- At least one file exists in inputs/
-model_adaptations:
-  small:
-    scan_inputs:
-      description: Sample only first 10 rows.
-  medium:
-    scan_inputs:
-      description: Sample first 20 rows.
-  large:
-    scan_inputs:
-      description: Full dataset initial profiling if possible.
-turn_structure:
-  autonomy_manual:
-    steps_per_turn: 1
-    approval_required_before: all
-  autonomy_supervised:
-    steps_per_turn: 2
-    approval_required_before:
-    - formalize_research_question
-  autonomy_autopilot:
-    steps_per_turn: 5
-    approval_required_before:
-    - present_summary
+id: project_startup
+name: Project Startup
+version: '4.0.0'
+schema_version: '2.0'
+description: Initial scan of researcher inputs, intake regeneration, research question lock-in, and global environment baseline.
+trigger: Second protocol every NEW project (or whenever inputs change substantially).
+prerequisites:
+  - session_boot has completed this session
+  - inputs/researcher_config.yaml exists
+
 steps:
-- id: scan_inputs
-  name: Scan All Input Files
-  description: |
-    Call sys_file_list on inputs/raw_data/, inputs/literature/, inputs/context/.
-    For EACH data file found, call tool_data_sample (n_rows=20, strategy=head).
-    Read any .md/.txt/.yaml files in inputs/context/ via sys_file_read.
-    Read inputs/intake.md if it exists.
-    DO NOT call sys_state_get or sys_config_get here — session_boot already did that.
+  - id: scan_inputs
+    name: Scan inputs/ Completely
+    description: |
+      1. sys_file_list directory="inputs/raw_data"   → enumerate data files.
+      2. sys_file_list directory="inputs/literature" → enumerate PDFs.
+      3. sys_file_list directory="inputs/context"    → enumerate notes/context.
+      4. For each tabular file in raw_data/ (csv|tsv|parquet|feather|xlsx|json):
+            tool_data_profile filepath=<that file>
+         The profile writes a markdown report to workspace/<step>/outputs/reports/
+         when an experiment exists, otherwise workspace/logs/. Read each profile.
+      5. For every .md / .txt in inputs/context/: sys_file_read it.
+      6. mem_intake_regenerate — this rewrites inputs/intake.md with SHA-256 hashes,
+         file sizes, and the current researcher_config values.
 
-- id: domain_analysis
-  name: Classify Domain
-  description: |
-    Call sys_guidance_get with protocol_name="domain/domain_analysis" and follow it.
-    Map file types and column names to a domain. Log result to workspace/analysis.md
-    via mem_analysis_log.
+  - id: classify_domain_quick
+    name: Domain & Study-Type Snapshot
+    description: |
+      Inspect column names, file types, and any context notes. Write a ONE-paragraph
+      domain classification to docs/domain_summary.md via sys_file_write. Cover:
+        - Likely field (e.g. environmental epidemiology, NLP, finance).
+        - Study type (observational | experimental | survey | simulation | secondary).
+        - Reporting standard to follow (e.g. STROBE, CONSORT, PRISMA, JARS, ARRIVE).
 
-- id: formalize_research_question
-  name: Formalize Research Question
-  description: |
-    If researcher_config has a research_question, use it.
-    If not, propose 2-3 candidate questions based on data columns and domain.
-    Write finalized question to docs/research_question.md via sys_file_write.
-    DO NOT proceed until researcher confirms the question.
+  - id: lock_research_question
+    name: Confirm Research Question
+    description: |
+      Read researcher_config.research_question. If empty:
+        - Propose 2-3 candidate questions tied directly to columns/files you observed.
+        - Wait for the researcher to choose or rewrite.
+      Once a single question is confirmed:
+        - sys_file_write filepath="docs/research_question.md" with sections
+          Question, Sub-questions, Operational definitions, Population, Outcome.
+        - sys_config_set key="research_question" value="<final wording>"
 
-- id: initialize_global_environment
-  name: Initialize Global Environment
-  description: |
-    Call sys_env_snapshot to create the base global environment at workspace/environment/.
-    This will serve as the root environment that individual analysis steps will inherit from.
+  - id: snapshot_global_environment
+    name: Initialise Global Environment
+    description: |
+      sys_env_snapshot to seed the project-level environment/requirements.txt
+      with the current interpreter's packages. Per-experiment environments
+      inherit from this baseline.
 
-- id: initialize_root_readme
-  name: Initialize Root README
-  description: |
-    Update the workspace/README.md with the project summary, research question,
-    and a list of the data files available. Provide a high-level overview of the goal.
+  - id: present_summary
+    name: Summarise to Researcher
+    description: |
+      Reply in this exact shape:
+        **Startup summary**
+        - Data: <N files; key columns / units>
+        - Domain: <classified domain> · standard: <e.g. STROBE>
+        - Question: <confirmed question>
+        - Data quality flags: <missingness / outliers / sample size warnings>
+        - First experiment suggested: <slug> — <one-line scope>
+      Then ask: "Move to analysis_plan to scope the first experiment?"
 
-- id: present_summary
-  name: Present Structured Summary
-  description: |
-    Present in this exact format:
+expected_outputs:
+  - inputs/intake.md
+  - docs/domain_summary.md
+  - docs/research_question.md
 
-    ---
-    **Project Startup Summary**
-    - Data: {N files, total size, key columns}
-    - Domain: {classified domain} → Reporting standards: {e.g., APA/JARS}
-    - Research Question: {confirmed question}
-    - Data Quality: {missing values %, any issues}
-    - Suggested First Experiment: {suggested_experiment_path} — explore {specific aspect}
-    ---
-    Ask: "Shall I begin planning this analysis step using the analysis_plan protocol?"
-    Wait for explicit YES before proceeding.
-
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: |
-    1. Call sys_checkpoint_create with description="project_startup completed".
-    2. Suggest moving to guidance/analysis_plan for the proposed first experiment.
-
-    - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted to the step's environment file.
-    - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log. Do not rely solely on pre-trained knowledge!
-schema_version: '1.0'
+next_protocol: domain/domain_analysis
+on_failure: guidance/dead_end_routing

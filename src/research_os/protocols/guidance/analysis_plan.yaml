@@ -1,116 +1,110 @@
-name: analysis_plan
-version: 4.0.0
-description: Core execution loop for planning, grounding, and executing a single analysis step modularly. Tailored dynamically to researcher config, autonomy level, and model capabilities.
-schema_version: '1.0'
-expected_outputs:
-- workspace/{step_number}_{step_name}/README.md
-- workspace/{step_number}_{step_name}/scripts/{step_number}_{step_name}_{version_number}.{ext}
-- workspace/{step_number}_{step_name}/environment/
-- workspace/{step_number}_{step_name}/conclusions.md
-- workspace/logs/methods_research.log
-structure:
-  note: Steps are chronological. Synthesis is NOT a workspace step, but a separate top-level folder populated by tool_synthesize.
-model_adaptations:
-  small:
-    scope_analysis:
-      description: Force breakdown of the analysis into small, distinct, atomic sub-tasks (1-2 methods per script). Heavily rely on the user for frequent verification.
-    execute_analysis:
-      description: Write simple, highly commented scripts. Iterate frequently with the user after every small code block.
-  medium:
-    scope_analysis:
-      description: Break down complex analyses into 2-3 logical sub-tasks. Standard analyses can be one-shot.
-  large:
-    scope_analysis:
-      description: You have high context capability. Plan the entire analysis step comprehensively and execute it in one highly robust shot unless it is exceptionally massive.
-turn_structure:
-  autonomy_manual:
-    steps_per_turn: 1
-    approval_required_before: all
-  autonomy_supervised:
-    steps_per_turn: 2
-    approval_required_before:
-    - setup_step_workspace
-    - execute_analysis
-  autonomy_autopilot:
-    steps_per_turn: 5
-    approval_required_before:
-    - protocol_completion
+id: analysis_plan
+name: Analysis Plan (Core Loop)
+version: '4.0.0'
+schema_version: '2.0'
+description: The core per-step loop. Scope, ground methods in literature, execute, document, environment-snapshot. Iterates once per experiment step.
+trigger: After methodology_selection — or whenever the researcher asks for a new experiment step.
+prerequisites:
+  - workspace/methods.md exists with at least one method entry
+  - workspace/citations.md exists (literature_search has been run at least once)
+
 steps:
-- id: scope_analysis
-  name: Scope Analysis and Sub-Tasks
-  description: |
-    Evaluate the complexity of the requested analysis step. Check your model profile via sys_config_get.
-    Decide whether to execute it in one shot or break it down into separate sub-tasks.
-    Discuss your plan with the user: "This analysis seems complex. I plan to break it into X and Y."
-    OR "This analysis is straightforward, I will execute it in one shot."
-    Wait for the user's approval before proceeding.
+  - id: scope_step
+    name: Scope the Step
+    description: |
+      Determine the goal of this step in ≤2 sentences. Examples:
+        - "Baseline EDA: distributions, missingness, basic correlations."
+        - "Fit a logistic regression with covariates X1..Xk, evaluate AUC and calibration."
+      Decide:
+        - One-shot script vs sub-steps (use sub-steps if >3 distinct methods).
+        - Inputs (from previous step's data/output/ — symlinked automatically).
+      For supervised/manual autonomy, ask the researcher to confirm the scope.
 
-- id: setup_step_workspace
-  name: Setup Step Workspace and Environment
-  description: |
-    Once the scope is approved, use sys_path_create to create the directory for this step
-    (e.g., name="baseline_eda", name="random_forest_model", etc.).
-    Initialize the workspace/{current_step}/README.md with a boilerplate structure.
-    
-    ENVIRONMENT SETUP:
-    Check if workspace/environment/ exists. If it does, symlink it to workspace/{current_step}/environment/ 
-    OR explicitly document that this step shares the root environment. If this step requires completely isolated
-    dependencies, initialize a new environment snapshot here via sys_env_snapshot.
+  - id: ground_methods
+    name: Ground Methods in Literature
+    description: |
+      You MUST search literature before choosing a method. In ONE turn:
+        - tool_search_semantic_scholar query=<methodology question>
+        - tool_search_web query=<methodology question + year>
+        - Optionally tool_search_arxiv / tool_search_pubmed / tool_search_crossref.
+      For each method you intend to use, append to workspace/methods.md via
+      mem_methods_append with at minimum: method, implementation, parameters,
+      justification, assumptions, and 1-3 citation references. Also call
+      mem_decision_log to record the methodological choice and rejected alternatives.
 
-- id: methodology_grounding
-  name: Ground Methodology via Literature Search
-  description: |
-    CRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.) to ground your methodological choices. 
-    DO NOT hallucinate methods based on pre-trained knowledge.
-    Find appropriate methods for this specific analysis step, log the tools and versions, and append your findings and citations to workspace/logs/methods_research.log and workspace/methods.md.
+  - id: create_step
+    name: Create the Numbered Experiment Folder
+    description: |
+      sys_path_create name="<slug>" hypothesis="<one-sentence hypothesis>".
+      This creates workspace/NN_<slug>/{scripts,data,outputs/{reports,figures,tables,dashboards},environment}
+      and updates state. The new step becomes current_path.
 
-- id: execute_analysis
-  name: Execute Analysis Scripts
-  description: |
-    Write the analysis script following the exact naming convention:
-    workspace/{current_step}/scripts/{step_number}_{step_name}_{version_number}.{ext}
-    (e.g., workspace/01_baseline_eda/scripts/01_baseline_eda_v1.py).
-    If iterating and changing the script significantly, increment the {version_number} (v2, v3, etc.).
-    
-    The script MUST:
-    - Read input data properly.
-    - Perform meaningful analysis relevant to this step.
-    - CRITICAL OUTPUT REQUIREMENT: You MUST generate rich, informative outputs that clearly communicate the findings of this analysis step to the researcher.
-    - DO NOT leave the output directories empty. The script MUST actively generate and write data/artifacts to them.
-    - Save comprehensive Markdown summary tables or detailed text reports to outputs/reports/
-    - Save highly relevant, labeled, and insightful figures to outputs/figures/ (PNG, 150dpi minimum). If you are exploring data, visualizing distributions, or modeling, you MUST save visual representations of the results.
-    
-    Run the script via tool_python_exec, tool_r_exec, or tool_julia_exec as appropriate.
-    Iterate with the user if there are errors or if sub-tasks require review.
+  - id: write_and_run_script
+    name: Write + Run the Analysis Script
+    description: |
+      Write the analysis script(s) to workspace/<step>/scripts/. Naming convention:
+        <step_number>_<step_name>_v<n>.<ext>     e.g. 03_logistic_baseline_v1.py
+      Bump the version number when you change the script meaningfully.
 
-- id: document_conclusions
-  name: Document Step Conclusions
-  description: |
-    Populate workspace/{current_step}/conclusions.md with:
-    - Key Findings: specific quantitative findings
-    - Data Quality Verdict / Model Performance
-    - Next Steps: 2-3 concrete numbered ideas based on what was found
+      Every script MUST:
+        - Read from workspace/<step>/data/input/  (symlinked to prior data/output/).
+        - Write derived data to workspace/<step>/data/output/.
+        - Write at least one markdown report to outputs/reports/ summarising findings.
+        - Write at least one figure (PNG ≥150 DPI) to outputs/figures/ — unless the
+          step is purely textual; in that case generate a table to outputs/tables/.
+        - Set random seeds explicitly; print library versions to stderr.
 
-    Update workspace/{current_step}/README.md fully with actual inputs, methods used, and key outputs.
+      Run via tool_python_exec / tool_r_exec / tool_julia_exec / tool_bash_exec.
+      If the script fails, iterate (next version) and re-run; do NOT silently swallow errors.
 
-- id: cleanup_and_snapshot
-  name: Cleanup and Environment Snapshot
-  description: |
-    Check each subdirectory in outputs/ and data/output/ within this step.
-    Use sys_file_delete to remove any directories that are completely empty.
-    If you modified the environment (installed new packages), call sys_env_snapshot to write the updated requirements.txt and session.yaml to workspace/{current_step}/environment/ for reproducibility.
+  - id: document_conclusions
+    name: Document Conclusions & Update Workspace Logs
+    description: |
+      Populate workspace/<step>/conclusions.md with:
+        ## Findings
+          - 2-5 concrete quantitative bullets (with numbers and units).
+        ## Limitations
+          - Assumption checks performed and their result.
+        ## Decision
+          - One of: proceed | branch (new experiment) | dead-end.
+        ## Next steps
+          - 2-3 candidate next analysis steps (with brief rationale).
+      Then update workspace/<step>/README.md with the actual inputs/methods/outputs.
+      mem_analysis_log with a one-line summary of what was done.
 
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: |
-    1. Update workspace/workflow.mermaid via sys_file_read then sys_file_write:
-       - Add node for {current_step} with green fill (:::complete class)
-       - Connect it to the previous node
-    2. Call sys_checkpoint_create with description="analysis_plan completed for {current_step}".
-    3. Suggest 2-3 logical next analysis steps to the user based on the conclusions.
-    4. If the conversation context is getting too long or the session is ending, suggest a handoff.
-    5. Ask researcher: "Which analysis step should we plan and execute next?"
+  - id: snapshot_step_environment
+    name: Snapshot Step Environment
+    description: |
+      sys_env_snapshot — this writes the current interpreter's packages into
+      workspace/<step>/environment/requirements.txt (and Project.toml / renv.lock
+      if R or Julia were used).
 
-    - ENVIRONMENT CHECK: Validate that any new tools/libraries have been snapshotted to the step's environment file.
-    - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log. Do not rely solely on pre-trained knowledge!
-next_protocol: guidance/analysis_plan
+  - id: audit_step
+    name: Lightweight Step Audit
+    description: |
+      If outputs/figures has a primary figure, call tool_audit_figure on it.
+      If a statistical test was run with a known n, call tool_audit_power
+      (effect_size hint can be Cohen's small-medium defaults if unknown).
+      If model residuals were saved, call tool_audit_assumptions on them.
+      Add any warnings to the conclusions.md "Limitations" section.
+
+  - id: decide_next
+    name: Decide Next Step
+    description: |
+      Based on conclusions, recommend ONE of:
+        - Proceed to a new analysis step → return to scope_step (this protocol again).
+        - Abandon: sys_path_abandon path_name=<id> rationale=<short>.
+          Then run guidance/dead_end_routing.
+        - Advance to reproducibility: only when ALL planned experiments are
+          completed (conclusions.md decisions are "proceed" or "branch", none "dead-end")
+          and you have at least one terminal experiment with publishable findings.
+
+expected_outputs:
+  - workspace/*/README.md
+  - workspace/*/conclusions.md
+  - workspace/*/scripts
+  - workspace/*/environment
+  - workspace/logs
+
+next_protocol: reproducibility/reproducibility
+on_failure: guidance/dead_end_routing

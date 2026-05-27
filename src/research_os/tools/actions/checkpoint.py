@@ -1,75 +1,114 @@
-import zipfile
+"""Checkpoints — fast hardlinked workspace snapshots managed by ResearchLedger."""
+
+from __future__ import annotations
+
+import json
 import logging
-from typing import Dict, Any
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-logger = logging.getLogger("research.tools.checkpoint")
+from research_os.state.state_ledger import ResearchLedger
 
-
-def _snapshot_workspace(root: Path, checkpoint_id: str):
-    workspace = root / "workspace"
-    if not workspace.exists():
-        return
-    zip_path = root / ".os_state" / "checkpoints" / f"{checkpoint_id}_workspace.zip"
-    zip_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for p in workspace.rglob("*"):
-            # Exclude data/ directory
-            if "workspace/data" in str(p) or "workspace/.os_state" in str(p):
-                continue
-            if p.is_file():
-                zipf.write(p, p.relative_to(root))
+logger = logging.getLogger("research_os.tools.checkpoint")
 
 
-def _restore_workspace(root: Path, checkpoint_id: str):
-    zip_path = root / ".os_state" / "checkpoints" / f"{checkpoint_id}_workspace.zip"
-    if not zip_path.exists():
-        return
-    with zipfile.ZipFile(zip_path, "r") as zipf:
-        zipf.extractall(root)
+def _ledger(root: Path) -> ResearchLedger:
+    return ResearchLedger(root / ".os_state" / "state_ledger.json")
 
 
-def create_checkpoint(description: str, root: Path) -> Dict[str, Any]:
-    from research_os.state.checkpoint_manager import CheckpointManager
-
+def create_checkpoint(description: str, root: Path) -> dict[str, Any]:
+    """Snapshot the workspace via hardlinks and record metadata in state."""
     try:
-        cm = CheckpointManager(root / ".os_state" / "checkpoints")
-        metadata = {"description": description}
-        path = cm.save(phase="manual", data={}, metadata=metadata)
-        _snapshot_workspace(root, path.stem)
+        checkpoint_id = f"ckpt_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        ledger = _ledger(root)
+        snap = ledger.snapshot_workspace(checkpoint_id, root=root)
+
+        # Record description in a sidecar metadata file
+        meta_path = root / ".os_state" / "checkpoints" / f"{checkpoint_id}.meta.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "checkpoint_id": checkpoint_id,
+                    "description": description,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "files_snapshotted": snap.get("files_snapshotted"),
+                    "files_ref_only": snap.get("files_ref_only"),
+                },
+                indent=2,
+            )
+        )
+
+        # Add to ledger's checkpoint history
+        state = ledger.get()
+        state.setdefault("checkpoint_history", []).append(
+            {
+                "id": checkpoint_id,
+                "description": description,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "files": snap.get("files_snapshotted", 0),
+            }
+        )
+        ledger._save(state)
+
         return {
             "status": "success",
-            "checkpoint_id": path.stem,
-            "message": f"Checkpoint created: {path.stem}",
+            "checkpoint_id": checkpoint_id,
+            "description": description,
+            "files_snapshotted": snap.get("files_snapshotted"),
+            "message": f"Checkpoint created: {checkpoint_id}",
         }
     except Exception as e:
-        logger.error(f"Checkpoint create failed: {e}")
+        logger.exception("create_checkpoint failed")
         return {"status": "error", "message": str(e)}
 
 
-def rollback_checkpoint(checkpoint_id: str, root: Path) -> Dict[str, Any]:
-
+def rollback_checkpoint(checkpoint_id: str, root: Path) -> dict[str, Any]:
+    """Restore the workspace to a checkpoint (creates a backup first)."""
     try:
-        files = list((root / ".os_state" / "checkpoints").glob(f"{checkpoint_id}.json"))
-        if not files:
-            return {
-                "status": "error",
-                "message": f"Checkpoint {checkpoint_id} not found.",
-            }
-        _restore_workspace(root, checkpoint_id)
-        return {"status": "success", "message": f"Rolled back to {checkpoint_id}"}
+        ledger = _ledger(root)
+        res = ledger.rollback(checkpoint_id, root=root)
+        return {
+            "status": "success",
+            "checkpoint_id": res.get("checkpoint_id"),
+            "backup_id": res.get("backup_id"),
+            "files_restored": res.get("files_restored"),
+            "message": f"Rolled back to {checkpoint_id}",
+        }
+    except FileNotFoundError as e:
+        return {"status": "error", "message": str(e)}
     except Exception as e:
-        logger.error(f"Checkpoint rollback failed: {e}")
+        logger.exception("rollback_checkpoint failed")
         return {"status": "error", "message": str(e)}
 
 
-def list_checkpoints(root: Path) -> Dict[str, Any]:
-    from research_os.state.checkpoint_manager import CheckpointManager
-
+def list_checkpoints(root: Path) -> dict[str, Any]:
+    """List every checkpoint with its description."""
     try:
-        cm = CheckpointManager(root / ".os_state" / "checkpoints")
-        cps = cm.list_all()
-        return {"status": "success", "checkpoints": cps}
+        checkpoints_dir = root / ".os_state" / "checkpoints"
+        if not checkpoints_dir.exists():
+            return {"status": "success", "checkpoints": []}
+
+        out: list[dict[str, Any]] = []
+        for meta in sorted(checkpoints_dir.glob("*.meta.json")):
+            try:
+                data = json.loads(meta.read_text())
+                out.append(
+                    {
+                        "id": data.get("checkpoint_id"),
+                        "description": data.get("description", ""),
+                        "created_at": data.get("created_at"),
+                        "files": data.get("files_snapshotted", 0),
+                    }
+                )
+            except Exception:
+                continue
+        # Fallback: list directories that have no sidecar
+        for d in sorted(checkpoints_dir.iterdir()):
+            if d.is_dir() and not any(c["id"] == d.name for c in out):
+                out.append({"id": d.name, "description": "(no metadata)"})
+        return {"status": "success", "checkpoints": out}
     except Exception as e:
-        logger.error(f"Checkpoint list failed: {e}")
+        logger.exception("list_checkpoints failed")
         return {"status": "error", "message": str(e)}

@@ -1,12 +1,22 @@
 ---
-description: Research OS operating rules — active for all files in this workspace
+description: Research OS workspace operating rules. Always loaded.
 globs: ["**/*"]
 alwaysApply: true
 ---
-This is a Research OS workspace. Before responding to any message:
-1. Read AGENTS.md in the project root.
-2. Call sys.config.profile via the research-os MCP server.
-3. Follow the protocol for the current phase.
 
-The MCP server is configured in .cursor/mcp.json. All research tools are accessed through it.
-Never modify files in inputs/ directly.
+# Research OS workspace
+
+This is a Research OS workspace. The full operating rules live in `AGENTS.md`
+at the project root — read it once per session and follow it.
+
+Quick start every session:
+
+1. `sys_config_get` (in parallel with #2)
+2. `sys_state_get`
+3. `sys_protocol_next` → load the recommended protocol via `sys_protocol_get`
+4. Follow the protocol; end with `protocol_completion`.
+
+Tools use underscores: `sys_state_get`, `tool_data_profile`, `mem_analysis_log`.
+
+Never write to `inputs/raw_data/` or `inputs/literature/` (immutable).
+Always go through the MCP tools.

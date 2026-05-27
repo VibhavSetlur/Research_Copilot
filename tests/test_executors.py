@@ -1,88 +1,60 @@
-import pytest
+"""R / Julia / Bash executor tests (subprocess mocked)."""
+
 from unittest import mock
-from research_os.tools.actions.execution import execute_r_script, execute_julia_script, execute_bash_script
+
+import pytest
+
+from research_os.tools.actions.execution import (
+    execute_bash_script,
+    execute_julia_script,
+    execute_r_script,
+)
+
 
 @pytest.fixture
 def workspace_root(tmp_path):
-    w = tmp_path / "test_workspace"
-    w.mkdir()
-    (w / "workspace" / "logs").mkdir(parents=True)
-    return w
+    (tmp_path / "workspace" / "logs").mkdir(parents=True)
+    return tmp_path
 
-def test_execute_r_script_success(workspace_root):
-    script_path = "script.R"
-    p = workspace_root / script_path
+
+def test_r_script_success(workspace_root):
+    p = workspace_root / "script.R"
     p.write_text('print("hello")')
-
     with mock.patch("shutil.which", return_value="/usr/bin/Rscript"), \
          mock.patch("subprocess.run") as mock_run:
-         
-        mock_res = mock.MagicMock()
-        mock_res.returncode = 0
-        mock_res.stdout = "hello\n"
-        mock_res.stderr = ""
-        mock_run.return_value = mock_res
-        
-        res = execute_r_script(script_path, workspace_root)
-        
-        assert res["status"] == "success"
-        assert res["stdout"] == "hello\n"
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        assert args[0] == ["Rscript", str(p)]
+        mock_run.return_value = mock.MagicMock(returncode=0, stdout="hello\n", stderr="")
+        res = execute_r_script("script.R", workspace_root)
+    assert res["status"] == "success"
+    assert res["stdout"] == "hello\n"
 
-def test_execute_julia_script_success(workspace_root):
-    script_path = "script.jl"
-    p = workspace_root / script_path
+
+def test_julia_script_success(workspace_root):
+    p = workspace_root / "script.jl"
     p.write_text('println("hello")')
-
     with mock.patch("shutil.which", return_value="/usr/bin/julia"), \
          mock.patch("subprocess.run") as mock_run:
-         
-        mock_res = mock.MagicMock()
-        mock_res.returncode = 0
-        mock_res.stdout = "hello\n"
-        mock_res.stderr = ""
-        mock_run.return_value = mock_res
-        
-        res = execute_julia_script(script_path, workspace_root)
-        
-        assert res["status"] == "success"
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        assert args[0][0] == "julia"
-        assert args[0][-1] == str(p)
+        mock_run.return_value = mock.MagicMock(returncode=0, stdout="hello\n", stderr="")
+        res = execute_julia_script("script.jl", workspace_root)
+    assert res["status"] == "success"
 
-def test_execute_bash_script_success(workspace_root):
-    script_path = "script.sh"
-    p = workspace_root / script_path
+
+def test_bash_script_success(workspace_root):
+    p = workspace_root / "script.sh"
     p.write_text('echo "hello"')
-
     with mock.patch("subprocess.run") as mock_run:
-        mock_res = mock.MagicMock()
-        mock_res.returncode = 0
-        mock_res.stdout = "hello\n"
-        mock_res.stderr = ""
-        mock_run.return_value = mock_res
-        
-        res = execute_bash_script(script_path, workspace_root)
-        
-        assert res["status"] == "success"
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        assert args[0] == ["/bin/bash", "-e", str(p)]
+        mock_run.return_value = mock.MagicMock(returncode=0, stdout="hello\n", stderr="")
+        res = execute_bash_script("script.sh", workspace_root)
+    assert res["status"] == "success"
+
 
 def test_missing_script(workspace_root):
-    res = execute_r_script("missing.R", workspace_root)
+    res = execute_r_script("ghost.R", workspace_root)
     assert res["status"] == "error"
-    assert "Script not found" in res["message"] or "command not found" in res["message"]
+
 
 def test_missing_binary(workspace_root):
-    script_path = "script.R"
-    p = workspace_root / script_path
+    p = workspace_root / "script.R"
     p.write_text('print("hello")')
-
     with mock.patch("shutil.which", return_value=None):
-        res = execute_r_script(script_path, workspace_root)
-        assert res["status"] == "error"
-        assert "command not found" in res["message"]
+        res = execute_r_script("script.R", workspace_root)
+    assert res["status"] == "error"

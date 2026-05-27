@@ -1,7 +1,7 @@
-"""Tests: workspace init creates the expected directory/file structure."""
-from __future__ import annotations
+"""Workspace scaffolding tests."""
 
-import json
+import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -9,134 +9,145 @@ from pathlib import Path
 
 import pytest
 
-from research_os.project_ops import scaffold_minimal_workspace, load_state
+from research_os.project_ops import load_state, scaffold_minimal_workspace
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _scaffold(tmp: Path, name: str = "Test Project", **kwargs) -> Path:
-    """Call scaffold and return the root."""
     scaffold_minimal_workspace(tmp, name, **kwargs)
     return tmp
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Directory structure
-# ─────────────────────────────────────────────────────────────────────────────
-
 def test_scaffold_creates_required_directories():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d))
-        for directory in ("inputs", "workspace", "synthesis", "docs", "environment", ".os_state"):
-            assert (root / directory).is_dir(), f"Missing directory: {directory}"
+        for directory in (
+            "inputs",
+            "inputs/raw_data",
+            "inputs/literature",
+            "inputs/context",
+            "workspace",
+            "workspace/logs",
+            "synthesis",
+            "docs",
+            "environment",
+            ".os_state",
+        ):
+            assert (root / directory).is_dir(), f"missing {directory}"
 
 
-def test_scaffold_creates_key_markdown_files():
+def test_scaffold_creates_key_files():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d))
-        expected = [
+        for rel in (
+            "AGENTS.md",
             "synthesis/paper.md",
             "inputs/intake.md",
+            "inputs/researcher_config.yaml",
             "docs/research_question.md",
             "docs/research_overview.md",
+            "docs/glossary.md",
             "workspace/methods.md",
             "workspace/analysis.md",
             "workspace/citations.md",
-        ]
-        for rel in expected:
-            assert (root / rel).exists(), f"Missing file: {rel}"
+            "workspace/workflow.mermaid",
+            ".os_state/state_ledger.json",
+            ".os_state/manifest.json",
+            ".os_state/os_state.md",
+            ".gitignore",
+        ):
+            assert (root / rel).exists(), f"missing {rel}"
 
 
-def test_scaffold_creates_state_files():
-    with tempfile.TemporaryDirectory() as d:
-        root = _scaffold(Path(d))
-        assert (root / ".os_state" / "state.json").exists() or \
-               (root / ".os_state" / "manifest.json").exists(), \
-               ".os_state should contain state or manifest JSON"
-
-
-def test_scaffold_creates_researcher_config():
+def test_researcher_config_permissions_locked_to_600():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d))
         cfg = root / "inputs" / "researcher_config.yaml"
-        assert cfg.exists(), "researcher_config.yaml must be created"
-        # Should not be world-readable (permissions checked via stat)
-        import os, stat
         mode = os.stat(cfg).st_mode
-        assert not bool(mode & stat.S_IROTH), "researcher_config.yaml should not be world-readable"
+        if os.name != "nt":
+            assert not bool(mode & stat.S_IROTH)
+            assert (mode & 0o777) == 0o600
 
 
-def test_scaffold_creates_gitignore():
+def test_gitignore_excludes_secrets_and_raw_data():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d))
-        gi = root / ".gitignore"
-        assert gi.exists(), ".gitignore must be created"
-        content = gi.read_text()
+        content = (root / ".gitignore").read_text()
         assert "researcher_config.yaml" in content
+        assert "inputs/raw_data/" in content
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# State
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_scaffold_state_has_project_name():
+def test_state_has_project_name():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d), name="My Research Project")
         state = load_state(root)
         assert state.get("project_name") == "My Research Project"
 
 
-def test_scaffold_with_overrides_populates_intake():
+def test_intake_reflects_overrides():
     with tempfile.TemporaryDirectory() as d:
         overrides = {
-            "research_question": "Does intervention X reduce outcome Y?",
-            "domain": "Clinical Research",
-            "depth": "deep",
+            "research_question": "Does X reduce Y?",
+            "domain": "clinical",
         }
         root = _scaffold(Path(d), config_overrides=overrides)
         intake = (root / "inputs" / "intake.md").read_text()
-        assert "Does intervention X reduce outcome Y?" in intake
-        assert "Clinical Research" in intake
+        assert "Does X reduce Y?" in intake
+        assert "clinical" in intake
 
 
-def test_scaffold_paper_md_has_content():
+def test_paper_md_has_outline():
     with tempfile.TemporaryDirectory() as d:
         root = _scaffold(Path(d))
         paper = (root / "synthesis" / "paper.md").read_text()
-        assert "# " in paper  # Has at least one heading
-        assert len(paper) > 50  # More than a stub
+        for section in ("Abstract", "Methods", "Results", "Discussion"):
+            assert f"## {section}" in paper or f"# {section}" in paper
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CLI integration — runs research-os init in a subprocess
-# ─────────────────────────────────────────────────────────────────────────────
+# ── CLI integration ────────────────────────────────────────────────────
+
 
 @pytest.mark.integration
 def test_cli_init_creates_workspace():
-    """End-to-end: 'research-os init' should scaffold correctly."""
     with tempfile.TemporaryDirectory() as d:
         target = Path(d) / "my_project"
         result = subprocess.run(
-            [sys.executable, "-m", "research_os.cli", "init", str(target), "--name", "CLI Test"],
-            capture_output=True, text=True, timeout=30,
+            [
+                sys.executable,
+                "-m",
+                "research_os.cli",
+                "init",
+                str(target),
+                "--name",
+                "CLI Test",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
-        assert result.returncode == 0, f"CLI init failed:\n{result.stderr}"
-        assert target.is_dir(), "Target directory was not created"
-        assert (target / ".os_state").exists(), ".os_state not found after init"
-        assert (target / "inputs" / "intake.md").exists(), "intake.md not found"
-        assert (target / "synthesis" / "paper.md").exists(), "paper.md not found"
+        assert result.returncode == 0, result.stderr
+        assert (target / ".os_state").exists()
+        assert (target / "inputs" / "intake.md").exists()
+        assert (target / "synthesis" / "paper.md").exists()
 
 
 @pytest.mark.integration
 def test_cli_init_with_name_flag():
-    """--name should be used as project_name in the state."""
     with tempfile.TemporaryDirectory() as d:
         target = Path(d) / "proj"
         subprocess.run(
-            [sys.executable, "-m", "research_os.cli", "init", str(target), "--name", "Named Project"],
-            capture_output=True, text=True, timeout=30, check=True,
+            [
+                sys.executable,
+                "-m",
+                "research_os.cli",
+                "init",
+                str(target),
+                "--name",
+                "Named Project",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
         )
         state = load_state(target)
         assert state.get("project_name") == "Named Project"

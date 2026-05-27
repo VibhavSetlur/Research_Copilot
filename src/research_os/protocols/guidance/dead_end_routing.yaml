@@ -1,48 +1,46 @@
-name: dead_end_routing
-version: 1.0.0
-description: Structured protocol when an experiment path fails or is abandoned.
-trigger: When an experiment path fails, produces invalid results, or researcher 
-  decides to abandon it
+id: dead_end_routing
+name: Dead-End Routing
+version: '4.0.0'
+schema_version: '2.0'
+description: What to do when an experiment path fails or a methodology proves unworkable. Preserves the failed path and routes back into the pipeline.
+trigger: An experiment's conclusions.md decision is "dead-end", or the researcher asks to abandon the current direction.
+
 steps:
-- id: document_failure
-  description: 'Write to workspace/{path_name}/conclusions.md under "## Why This Failed":
+  - id: document_failure
+    name: Document the Failure
+    description: |
+      Append to workspace/<step>/conclusions.md a clearly headed `## Why this path failed`
+      with at minimum: hypothesis tested, what was tried, the result that ruled it out,
+      and what we learned that applies to OTHER paths.
 
-    - What was tried
+  - id: mark_dead_end
+    name: Mark the Path Dead
+    description: |
+      sys_path_abandon path_name="<NN_slug>" rationale="<one-paragraph summary>"
+      This renames the folder to NN_<slug>__DEAD_END (files preserved), updates
+      state.paths[name].status=dead_end, and removes it from the active path list.
 
-    - What went wrong (statistical, logical, data quality)
+  - id: log_decision
+    name: Log the Routing Decision
+    description: |
+      mem_decision_log
+        context="Abandoning experiment <NN_slug>"
+        selected="<new direction OR pause for researcher input>"
+        rationale="<what we learned + why the new direction>"
 
-    - What was learned
+  - id: pick_next_direction
+    name: Choose Where to Resume
+    description: |
+      Options, in order of preference:
+        1. Start a fresh experiment path (sys_path_create) targeting the same
+           research question with a different method.
+        2. Loop back to methodology_selection if the methodology itself was wrong.
+        3. Loop back to domain/research_design if the framing was wrong.
+        4. If the researcher prefers, pause and wait for input.
+      Whichever you pick, immediately load that protocol (sys_protocol_get) and run
+      its first step.
 
-    '
-  name: Document Failure Details
-- id: abandon_path
-  description: Call sys_path.abandon with path_name and rationale.
-  name: Abandon Current Path
-- id: propose_alternatives
-  description: 'Based on what was learned from the dead end, propose 2-3 alternative
-    approaches.
+expected_outputs: []
 
-    Present to researcher before creating a new path.
-
-    '
-  name: Propose Alternative Approaches
-- id: create_new_path
-  description: After researcher chooses, call sys_path.create with the chosen 
-    alternative name.
-  name: Create New Path
-- id: update_logs
-  description: Call mem_analysis.log to note the dead end and new direction.
-  name: Update Analysis Logs
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='dead_end_routing
-    completed'.\n5. Ask researcher: 'I've completed dead_end_routing. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+next_protocol: guidance/analysis_plan
+on_failure: null

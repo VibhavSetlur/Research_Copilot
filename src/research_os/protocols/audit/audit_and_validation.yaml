@@ -1,54 +1,61 @@
-name: audit_and_validation
-version: 2.0.0
-description: Protocol to audit citations, assumptions, and code quality.
-schema_version: '1.0'
-expected_outputs:
-- 'workspace/logs/audit.log: Detailed report of validation passes'
-- 'workspace/analysis.md: Final validation summary'
-validators:
-  citation_validator:
-    pass_1_doi: Attempt to resolve all DOIs. Flag broken links.
-    pass_2_abstract: Verify that the claim in the text matches the abstract's 
-      conclusion.
-    pass_3_retraction: Query the Retraction Watch database or Crossref for 
-      retracted status.
-  statistical_assumptions:
-    action: Re-read the assumptions logged during methodology_selection. Run 
-      specific tests (e.g., Shapiro-Wilk for normality, VIF for 
-      multicollinearity) and log the p-values/metrics.
-  causal_language:
-    regex_patterns:
-    - (?i)\b(causes?|caused|causing)\b
-    - (?i)\b(leads? to|led to)\b
-    - (?i)\b(results? in|resulted in)\b
-    - (?i)\b(impacts?|impacted)\b
-    action: Scan manuscript drafts using these regex patterns. If the study 
-      design is observational, flag these matches for manual review and suggest 
-      associative language instead.
-  code_linter:
-    command_python: ruff check workspace/*/scripts/ || pylint 
-      workspace/*/scripts/
+id: audit_and_validation
+name: Audit & Validation
+version: '4.0.0'
+schema_version: '2.0'
+description: Validate citations, statistical assumptions, figure quality, and code style across the project.
+trigger: After every experiment completes and reproducibility has been recorded. Re-run before synthesis.
+prerequisites:
+  - At least one workspace/<step>/conclusions.md exists
+  - workspace/citations.md exists
+
 steps:
-- id: validate_citations
-  name: Validate Citations
-  description: Execute the three-pass citation validator.
-- id: check_assumptions
-  name: Check Assumptions
-  description: Run statistical tests to verify the assumptions hold true on the 
-    actual data.
-- id: lint_code
-  name: Lint Code
-  description: Run code linters to ensure syntax and style compliance.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='audit_and_validation
-    completed'.\n5. Ask researcher: 'I've completed audit_and_validation. Want me
-    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
-    new tools/libraries have been snapshotted to the step's environment file.\n  \
-    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
+  - id: audit_citations
+    name: Audit Citations
+    description: |
+      tool_audit_citations
+      Reads workspace/citations.md, queries Crossref / Semantic Scholar for each
+      entry, flags those that don't resolve. Writes report to the current step's
+      outputs/reports/citation_audit.md (or workspace/logs/ if no active step).
+
+  - id: audit_assumptions
+    name: Re-test Statistical Assumptions
+    description: |
+      For each experiment step that ran a statistical model, find the residuals
+      file (typically workspace/<step>/data/output/residuals.csv) and call:
+        tool_audit_assumptions filepath=<that file>
+      Then read the report and append any FAILED assumptions to the step's
+      conclusions.md under "## Limitations".
+
+  - id: audit_figures
+    name: Audit Figure Quality
+    description: |
+      For every PNG in workspace/<step>/outputs/figures/, call:
+        tool_audit_figure filepath=<png>
+      Aggregate warnings (low DPI, small size) into workspace/logs/figure_audit_summary.md.
+
+  - id: audit_causal_language
+    name: Scan for Causal Over-Reach
+    description: |
+      Only if the study design is NOT causal (no RCT / IV / RDD / DiD), grep the
+      drafts for: "causes", "leads to", "results in", "impacts".
+      For each hit, propose an associational rewrite ("is associated with",
+      "is correlated with"). Append a list of findings + suggested fixes to
+      workspace/logs/causal_language_audit.md.
+
+  - id: audit_code_style
+    name: Lint Code (optional)
+    description: |
+      If ruff or pylint is available in the env, run on workspace/*/scripts/.
+      Otherwise skip. Save warnings to workspace/logs/code_lint.md.
+
+  - id: write_audit_summary
+    name: Aggregate Audit Report
+    description: |
+      Write workspace/logs/audit_report.md combining all findings + counts.
+      One section per audit. Mark blocking issues with "BLOCKER:" prefix.
+
+expected_outputs:
+  - workspace/logs/audit_report.md
+
 next_protocol: synthesis/synthesis_paper
+on_failure: guidance/dead_end_routing

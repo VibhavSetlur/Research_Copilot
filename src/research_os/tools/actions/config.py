@@ -1,203 +1,225 @@
+"""Researcher config — read/write/validate ``inputs/researcher_config.yaml``.
+
+This file is the source of truth for how the AI behaves in the workspace.
+The config is created on init via ``init_config`` and edited by the researcher
+(or by the AI on the researcher's behalf during ``project_startup``).
+"""
+
+from __future__ import annotations
+
+import copy
 import logging
-from typing import Dict, Any
-from pathlib import Path
-import yaml
 import os
+from pathlib import Path
+from typing import Any
 
-logger = logging.getLogger("research.tools.config")
+import yaml
+
+logger = logging.getLogger("research_os.tools.config")
 
 
-def get_config(root: Path) -> Dict[str, Any]:
+CONFIG_TEMPLATE = """# Research OS — Researcher Configuration
+# This file is the SOURCE OF TRUTH for AI behaviour in this workspace.
+# Edit any time. Research OS does not call any LLM itself — your AI client owns the model.
+
+# ── Project ──────────────────────────────────────────────────────────────
+project_name: "{project_name}"
+research_question: "{research_question}"
+domain: "{domain}"
+
+# ── Who you are ──────────────────────────────────────────────────────────
+researcher:
+  name: ""
+  field: ""
+  expertise_level: "intermediate"   # beginner | intermediate | advanced | pi
+  institution: ""
+  orcid: ""
+
+# ── How the AI should behave ────────────────────────────────────────────
+interaction:
+  autonomy_level: "supervised"      # manual | supervised | autopilot
+
+# ── Model profile (controls protocol verbosity) ─────────────────────────
+model_profile: "medium"             # small | medium | large
+
+# ── What you want to produce ────────────────────────────────────────────
+research_goal:
+  output_types:
+    - "paper"                       # any of: paper | abstract | poster | dashboard | report | exploratory
+  target_venue: "journal"           # journal | conference | preprint | dissertation | report
+  reporting_standard: ""            # auto-filled by domain_analysis
+  poster_dimensions: "36x48"
+
+# ── Writing preferences ──────────────────────────────────────────────────
+writing_preferences:
+  citation_style: "apa"             # apa | vancouver | acm | ieee | nature
+  language: "en-US"
+
+# ── API keys (optional — leave blank for free public endpoints) ──────────
+api_keys:
+  firecrawl: ""                     # https://firecrawl.io
+  semantic_scholar: ""              # https://www.semanticscholar.org/product/api
+  pubmed: ""                        # https://www.ncbi.nlm.nih.gov/account/
+  crossref: ""
+  serpapi: ""
+
+# ── Notification preferences ────────────────────────────────────────────
+notifications:
+  on_step_complete: true
+  on_error: true
+  on_decision_required: true
+"""
+
+
+def _config_path(root: Path) -> Path:
+    return root / "inputs" / "researcher_config.yaml"
+
+
+def _mask_api_keys(config: dict[str, Any]) -> dict[str, Any]:
+    safe = copy.deepcopy(config)
+    keys = safe.get("api_keys")
+    if isinstance(keys, dict):
+        for k, v in keys.items():
+            if not isinstance(v, str) or not v:
+                continue
+            if len(v) > 8:
+                safe["api_keys"][k] = f"{v[:4]}…{v[-4:]}"
+            else:
+                safe["api_keys"][k] = "***"
+    return safe
+
+
+def get_config(root: Path) -> dict[str, Any]:
     try:
-        config_path = root / "inputs" / "researcher_config.yaml"
-        if not config_path.exists():
-            return {"status": "error", "message": "Config not found"}
+        cfg_path = _config_path(root)
+        if not cfg_path.exists():
+            return {"status": "error", "message": "researcher_config.yaml not found — run `research-os init`."}
 
-        # Check permissions (warning if world-readable)
         warning = None
         if os.name != "nt":
             try:
-                mode = os.stat(config_path).st_mode
-                if bool(mode & 0o004):  # Others have read permission
-                    warning = "WARNING: inputs/researcher_config.yaml is world-readable! Please run `chmod 600 inputs/researcher_config.yaml` to secure your API keys."
+                mode = os.stat(cfg_path).st_mode
+                if mode & 0o004:
+                    warning = (
+                        "WARNING: inputs/researcher_config.yaml is world-readable. "
+                        "Run `chmod 600 inputs/researcher_config.yaml` to protect API keys."
+                    )
             except Exception:
                 pass
 
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
+        config = yaml.safe_load(cfg_path.read_text()) or {}
+        safe = _mask_api_keys(config)
 
-        # Mask API keys before returning
-        safe_config = _mask_api_keys(config)
-
-        res = {"status": "success", "config": safe_config}
+        result: dict[str, Any] = {"status": "success", "config": safe}
         if warning:
-            res["warning"] = warning
-        return res
+            result["warning"] = warning
+        return result
     except Exception as e:
-        logger.error(f"Get config failed: {e}")
+        logger.exception("get_config failed")
         return {"status": "error", "message": str(e)}
 
 
-def set_config(key: str, value: Any, root: Path) -> Dict[str, Any]:
+def set_config(key: str, value: Any, root: Path) -> dict[str, Any]:
+    """Set a single config value with dot notation (e.g. researcher.expertise_level)."""
     try:
-        config_path = root / "inputs" / "researcher_config.yaml"
-        if not config_path.exists():
-            config = {}
-        else:
-            with open(config_path, "r") as f:
-                config = yaml.safe_load(f) or {}
+        cfg_path = _config_path(root)
+        config = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
+        config = config or {}
 
-        # Simple dot notation support for key
         parts = key.split(".")
-        current = config
+        cursor = config
         for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-        current[parts[-1]] = value
+            if part not in cursor or not isinstance(cursor[part], dict):
+                cursor[part] = {}
+            cursor = cursor[part]
+        cursor[parts[-1]] = value
 
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
-
-        return {"status": "success", "message": f"Set {key} = {value}"}
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg_path.write_text(yaml.dump(config, default_flow_style=False, sort_keys=False))
+        return {"status": "success", "key": key, "value": value}
     except Exception as e:
-        logger.error(f"Set config failed: {e}")
+        logger.exception("set_config failed")
         return {"status": "error", "message": str(e)}
 
 
-def init_config(root: Path, overrides: dict | None = None) -> Dict[str, Any]:
-    config_path = root / "inputs" / "researcher_config.yaml"
-    already_exists = config_path.exists()
+def init_config(root: Path, overrides: dict | None = None) -> dict[str, Any]:
+    """Create ``inputs/researcher_config.yaml`` if missing, then merge overrides."""
+    overrides = overrides or {}
+    cfg_path = _config_path(root)
+    already_exists = cfg_path.exists()
     if not already_exists:
-        template = '''# Research OS — Researcher Configuration
-# This file tells the AI HOW to behave during your research session.
-# Research OS does NOT call any LLM. Your AI lives in the IDE (Antigravity,
-# Cursor, Claude, etc.). No LLM API keys needed here.
-
-# ── Who You Are ───────────────────────────────────────────────────
-researcher:
-  name: ""                     # Your name (appears in paper authorship)
-  expertise_level: "intermediate"  # beginner | intermediate | advanced | pi
-  field: ""                    # e.g., "clinical psychology", "epidemiology"
-
-# ── How the AI Should Behave ──────────────────────────────────────
-interaction:
-  autonomy_level: "supervised"  # manual | supervised | autopilot
-  # manual     = AI explains and asks before every action
-  # supervised = AI asks before creating files or running scripts (recommended)
-  # autopilot  = AI runs everything and reports on completion
-
-# ── What You Want to Produce ──────────────────────────────────────
-model_profile: "medium"         # small | medium | large (protocol complexity)
-research_goal:
-  output_types:
-    - "paper"                   # paper | poster | report | abstract | exploratory
-  target_venue: "journal"       # journal | conference | preprint | dissertation | report
-
-# ── Optional: Literature & Search API Keys ────────────────────────
-# Leave blank to use free public endpoints. Keys increase rate limits.
-api_keys:
-  firecrawl: ""                 # https://firecrawl.io — web search & scraping
-  semantic_scholar: ""          # https://www.semanticscholar.org/product/api
-  pubmed: ""                    # https://www.ncbi.nlm.nih.gov/account/
-  crossref: ""                  # https://www.crossref.org
-  serpapi: ""                   # https://serpapi.com
-'''
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(template)
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg_path.write_text(
+            CONFIG_TEMPLATE.format(
+                project_name=overrides.get("project_name", ""),
+                research_question=overrides.get("research_question", ""),
+                domain=overrides.get("domain", ""),
+            )
+        )
 
     if overrides:
         try:
-            config = yaml.safe_load(config_path.read_text()) or {}
-            if "project_name" in overrides:
+            config = yaml.safe_load(cfg_path.read_text()) or {}
+            if overrides.get("project_name"):
                 config["project_name"] = overrides["project_name"]
-            if "domain" in overrides:
+            if overrides.get("domain"):
                 config["domain"] = overrides["domain"]
-            if "depth" in overrides:
-                config["default_depth"] = overrides["depth"]
-            if "research_question" in overrides:
+            if overrides.get("research_question"):
                 config["research_question"] = overrides["research_question"]
-            if "provider" in overrides:
-                config["model_profile"] = "medium"
-            with open(config_path, "w") as f:
-                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-        except Exception:
-            pass
+            if overrides.get("depth"):
+                config.setdefault("research_goal", {})["target_venue"] = overrides["depth"]
+            cfg_path.write_text(yaml.dump(config, default_flow_style=False, sort_keys=False))
+        except Exception as e:
+            logger.warning(f"Failed to apply config overrides: {e}")
 
-    # Restrict permissions
     if os.name != "nt":
         try:
-            os.chmod(config_path, 0o600)
+            os.chmod(cfg_path, 0o600)
         except Exception:
             pass
 
-    # Add to .gitignore
-    gitignore_path = root / ".gitignore"
-    gitignore_content = ""
-    if gitignore_path.exists():
-        gitignore_content = gitignore_path.read_text()
-
-    if "inputs/researcher_config.yaml" not in gitignore_content:
-        with open(gitignore_path, "a") as gf:
-            gf.write("\n# Secure config\ninputs/researcher_config.yaml\n")
+    gitignore = root / ".gitignore"
+    if gitignore.exists():
+        content = gitignore.read_text()
+        if "inputs/researcher_config.yaml" not in content:
+            with open(gitignore, "a") as f:
+                f.write("\n# secrets\ninputs/researcher_config.yaml\n")
 
     if already_exists:
-        return {
-            "status": "success",
-            "message": "Config already exists.",
-        }
+        return {"status": "success", "message": "Config already exists; overrides applied."}
+    return {
+        "status": "success",
+        "message": "Initialised researcher_config.yaml and locked permissions to 600.",
+    }
+
+
+def validate_config(root: Path) -> dict[str, Any]:
+    """Report which keys are present + whether API keys are configured."""
+    res = get_config(root)
+    if res.get("status") != "success":
+        return res
+    config = res.get("config", {}) or {}
+
+    required_paths = [
+        ("project_name", config.get("project_name")),
+        ("researcher.expertise_level", (config.get("researcher") or {}).get("expertise_level")),
+        ("interaction.autonomy_level", (config.get("interaction") or {}).get("autonomy_level")),
+        ("model_profile", config.get("model_profile")),
+        ("research_goal.output_types", (config.get("research_goal") or {}).get("output_types")),
+    ]
+
+    missing = [k for k, v in required_paths if not v]
+
+    api_keys = config.get("api_keys") or {}
+    keys_present = sorted(k for k, v in api_keys.items() if v and v != "***" and not str(v).endswith("…"))
+    keys_missing = sorted(k for k, v in api_keys.items() if not v)
 
     return {
         "status": "success",
-        "message": "Initialized default config and secured it. Edit inputs/researcher_config.yaml to add your API keys.",
+        "required_fields_missing": missing,
+        "api_keys_configured": keys_present,
+        "api_keys_blank": keys_missing,
+        "message": (
+            "Config OK." if not missing else f"Missing required fields: {', '.join(missing)}"
+        ),
     }
-
-
-def explain_config(root: Path, key: str) -> Dict[str, Any]:
-    """Return documentation for a config key."""
-    explanations = {
-        "researcher.name": "Your name, used in paper authorship.",
-        "researcher.expertise_level": "beginner | intermediate | advanced | pi — controls how deeply the AI explains concepts.",
-        "researcher.field": 'Your research field, e.g. "environmental epidemiology".',
-        "interaction.autonomy_level": "manual | supervised | autopilot — controls how much the AI acts without approval.",
-        "model_profile": "small | medium | large — controls protocol variant loaded. Small uses light protocols.",
-        "research_goal.output_types": "List of outputs to produce: paper, poster, dashboard, abstract, exploratory.",
-        "research_goal.target_venue": "journal | conference | preprint | dissertation | report.",
-        "api_keys.firecrawl": "API key for web search. Get from https://firecrawl.io. Injected as env FIRECRAWL at server start.",
-        "api_keys.semantic_scholar": "API key for literature search. Get from https://www.semanticscholar.org/product/api. Injected as env SEMANTIC_SCHOLAR at server start.",
-    }
-    doc = explanations.get(key)
-    if doc:
-        return {"status": "success", "key": key, "documentation": doc}
-    return {"status": "error", "message": f"No documentation for config key: {key}"}
-
-
-def validate_config(root: Path) -> Dict[str, Any]:
-    # Validate keys/connections
-    res = get_config(root)
-    if res["status"] == "error":
-        return res
-    config = res["config"]
-    validations = []
-    # Test Firecrawl
-    fc_key = config.get("api_keys", {}).get("firecrawl")
-    if fc_key:
-        validations.append("Firecrawl API Key: Present")
-    else:
-        validations.append("Firecrawl API Key: Missing")
-
-    return {"status": "success", "validations": validations}
-
-
-def _mask_api_keys(config: Dict[str, Any]) -> Dict[str, Any]:
-    import copy
-
-    safe_config = copy.deepcopy(config)
-    if "api_keys" in safe_config and isinstance(safe_config["api_keys"], dict):
-        for k, v in safe_config["api_keys"].items():
-            if isinstance(v, str) and len(v) > 8:
-                safe_config["api_keys"][k] = f"{v[:4]}...{v[-4:]}"
-            elif isinstance(v, str) and len(v) > 0:
-                safe_config["api_keys"][k] = "***"
-    return safe_config

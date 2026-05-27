@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""Research OS MCP server v0.1.0 — Research Guidance Engine"""
+"""Research OS MCP server.
+
+Exposes a focused set of MCP tools that an AI IDE (Cursor, Claude, Antigravity,
+OpenCode, etc.) uses to drive a reproducible research workflow.
+
+Conventions
+-----------
+* Tool names use underscores (e.g. ``sys_state_get``). For backward compatibility
+  the dispatcher also accepts dot notation (``sys.state.get``) and rewrites it.
+* Every handler returns a JSON envelope of the shape::
+      {"status": "success"|"error", "data": {...}, "error": "..."}
+* Errors are caught at the dispatcher; handlers may raise freely.
+"""
 
 from __future__ import annotations
 
@@ -35,30 +47,65 @@ from research_os.project_ops import (
 
 
 class _MissingDependency:
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
-    def __call__(self, *args, **kwargs):
-        raise RuntimeError(f"Optional dependency missing for {self.name}. Please install required extras.")
 
-def _lazy_import(module_name, names):
+    def __call__(self, *args, **kwargs):
+        raise RuntimeError(
+            f"Optional dependency missing for {self.name}. "
+            "Install with: pip install 'research-os[all]'"
+        )
+
+
+def _lazy_import(module_name: str, names: list[str]):
     try:
         mod = __import__(module_name, fromlist=names)
         return [getattr(mod, name) for name in names]
     except ImportError:
         return [_MissingDependency(name) for name in names]
 
-search_web, scrape_web = _lazy_import("research_os.tools.actions.web_search", ["search_web", "scrape_web"])
-package_install, = _lazy_import("research_os.tools.actions.environment", ["package_install"])
-create_checkpoint, rollback_checkpoint, list_checkpoints = _lazy_import("research_os.tools.actions.checkpoint", ["create_checkpoint", "rollback_checkpoint", "list_checkpoints"])
-create_path, abandon_path, list_paths = _lazy_import("research_os.tools.actions.path", ["create_path", "abandon_path", "list_paths"])
-download_literature, = _lazy_import("research_os.tools.actions.literature", ["download_literature"])
-get_config, set_config, init_config, validate_config = _lazy_import("research_os.tools.actions.config", ["get_config", "set_config", "init_config", "validate_config"])
-notify_researcher, checkpoint_pending, checkpoint_approve, session_handoff = _lazy_import("research_os.tools.actions.interaction", ["notify_researcher", "checkpoint_pending", "checkpoint_approve", "session_handoff"])
-discover_mcp, = _lazy_import("research_os.tools.actions.external_mcp", ["discover_mcp"])
-task_monitor, task_kill = _lazy_import("research_os.tools.actions.task", ["task_monitor", "task_kill"])
-search_semantic_scholar, search_pubmed, search_crossref = _lazy_import("research_os.tools.actions.search", ["search_semantic_scholar", "search_pubmed", "search_crossref"])
-load_protocol, list_protocols, validate_protocol, get_next_protocol = _lazy_import("research_os.tools.actions.protocol", ["load_protocol", "list_protocols", "validate_protocol", "get_next_protocol"])
-_profile_inputs, = _lazy_import("research_os.tools.actions.profiling", ["_profile_inputs"])
+
+search_web, scrape_web = _lazy_import(
+    "research_os.tools.actions.web_search", ["search_web", "scrape_web"]
+)
+package_install, env_snapshot, env_docker_generate = _lazy_import(
+    "research_os.tools.actions.environment",
+    ["package_install", "env_snapshot", "env_docker_generate"],
+)
+create_checkpoint, rollback_checkpoint, list_checkpoints = _lazy_import(
+    "research_os.tools.actions.checkpoint",
+    ["create_checkpoint", "rollback_checkpoint", "list_checkpoints"],
+)
+create_path, abandon_path, list_paths = _lazy_import(
+    "research_os.tools.actions.path", ["create_path", "abandon_path", "list_paths"]
+)
+download_literature, = _lazy_import(
+    "research_os.tools.actions.literature", ["download_literature"]
+)
+get_config, set_config, init_config, validate_config = _lazy_import(
+    "research_os.tools.actions.config",
+    ["get_config", "set_config", "init_config", "validate_config"],
+)
+notify_researcher, session_handoff = _lazy_import(
+    "research_os.tools.actions.interaction",
+    ["notify_researcher", "session_handoff"],
+)
+search_semantic_scholar, search_pubmed, search_crossref, search_arxiv = _lazy_import(
+    "research_os.tools.actions.search",
+    [
+        "search_semantic_scholar",
+        "search_pubmed",
+        "search_crossref",
+        "search_arxiv",
+    ],
+)
+load_protocol, list_protocols, validate_protocol, get_next_protocol = _lazy_import(
+    "research_os.tools.actions.protocol",
+    ["load_protocol", "list_protocols", "validate_protocol", "get_next_protocol"],
+)
+_profile_inputs, = _lazy_import(
+    "research_os.tools.actions.profiling", ["_profile_inputs"]
+)
 
 try:
     from mcp.server import Server
@@ -77,16 +124,17 @@ except ImportError:
 
 _START_TIME = time.time()
 
+
 # ---------------------------------------------------------------------------
-# Rate Limiter
+# Rate limiter
 # ---------------------------------------------------------------------------
 
 
 class RateLimiter:
-    def __init__(self, max_calls: int = 100, window_seconds: int = 60):
+    def __init__(self, max_calls: int = 200, window_seconds: int = 60) -> None:
         self.max_calls = max_calls
         self.window_seconds = window_seconds
-        self.calls = defaultdict(list)
+        self.calls: dict[str, list[float]] = defaultdict(list)
 
     def is_allowed(self, client_id: str = "default") -> bool:
         now = time.time()
@@ -102,12 +150,24 @@ class RateLimiter:
 
 _rate_limiter = RateLimiter()
 
+
 # ---------------------------------------------------------------------------
-# Envelope
+# Response envelope
 # ---------------------------------------------------------------------------
 
 
+def _success(data: Any = None) -> dict:
+    return {"status": "success", "data": data or {}}
+
+
+def _error(message: str) -> dict:
+    return {"status": "error", "error": message}
+
+
+# Backward-compatible aliases for older callers / tests.
 def _envelope(data: Any = None, *, status: str = "success") -> dict:
+    if status == "error":
+        return {"status": "error", "data": {"error": data if isinstance(data, str) else (data or {})}}
     return {"status": status, "data": data or {}}
 
 
@@ -116,7 +176,7 @@ def _success_envelope(data: Any = None) -> dict:
 
 
 def _error_envelope(message: str) -> dict:
-    return _envelope({"error": message}, status="error")
+    return _envelope(message, status="error")
 
 
 def _text(payload: Any) -> list[TextContent]:
@@ -126,71 +186,106 @@ def _text(payload: Any) -> list[TextContent]:
 
 
 # ---------------------------------------------------------------------------
-# Tool Definitions
+# Tool definitions — keep the surface tight: one tool per concept.
 # ---------------------------------------------------------------------------
 
-TOOL_DEFINITIONS = {
-    "sys_guidance_get": {
-        "description": "Returns the full YAML content of a guidance protocol.",
-        "category": "guidance",
+TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
+    # ── Protocols / guidance ──────────────────────────────────────────
+    "sys_protocol_get": {
+        "description": "Load a protocol YAML by name (e.g. 'guidance/project_startup'). Returns the steps, expected_outputs, and next_protocol the AI should follow.",
+        "category": "protocol",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "protocol_name": {
-                    "type": "string",
-                    "description": "Protocol name (e.g., domain_analysis)",
-                }
-            },
+            "properties": {"protocol_name": {"type": "string"}},
             "required": ["protocol_name"],
         },
     },
-    "sys_guidance_list": {
-        "description": "Lists all available protocols with one-line summaries.",
-        "category": "guidance",
+    "sys_protocol_list": {
+        "description": "List every available protocol with a one-line summary.",
+        "category": "protocol",
         "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_guidance_validate": {
-        "description": "Validates if the expected outputs of a protocol exist in the workspace.",
-        "category": "guidance",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "protocol_name": {
-                    "type": "string",
-                    "description": "Protocol name (e.g., domain_analysis)",
-                }
-            },
-            "required": ["protocol_name"],
-        },
     },
     "sys_protocol_next": {
-        "description": "Returns the recommended next protocol based on pipeline stage and which expected outputs are present. Use after session_boot to confirm the right next action.",
-        "category": "guidance",
+        "description": "Recommend the next protocol to run based on current workspace state and the pipeline.",
+        "category": "protocol",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    "sys_protocol_validate": {
+        "description": "Check whether the expected outputs of a protocol are present in the workspace.",
+        "category": "protocol",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"protocol_name": {"type": "string"}},
+            "required": ["protocol_name"],
+        },
+    },
+    "sys_protocol_log": {
+        "description": "Record a protocol execution (started|completed|failed|skipped) to the pipeline log.",
+        "category": "protocol",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "protocol_name": {"type": "string"},
+                "status": {"type": "string"},
+                "details": {"type": "string"},
+            },
+            "required": ["protocol_name", "status"],
+        },
+    },
+    "sys_protocol_history": {
+        "description": "Return the most recent protocol execution log entries.",
+        "category": "protocol",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"limit": {"type": "number"}},
+        },
+    },
+
+    # ── State & workspace ─────────────────────────────────────────────
+    "sys_state_get": {
+        "description": "Return the full workspace state: project name, pipeline stage, current path, all experiment paths, and active hypotheses.",
+        "category": "state",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "type": "string",
+                    "description": "full | minimal | markdown — controls verbosity (default: full).",
+                }
+            },
+        },
+    },
     "sys_workspace_scaffold": {
-        "description": "Create the full directory structure for a new project.",
+        "description": "Create the standard Research OS directory layout. Used by `research-os init`; only call from inside the MCP if the researcher explicitly asks for a re-scaffold.",
         "category": "workspace",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "project_name": {"type": "string"},
-                "git_init": {
-                    "type": "boolean",
-                    "description": "Initialize a git repository (default: false)",
-                    "default": False,
-                },
                 "ide": {
                     "type": "string",
-                    "description": "IDE(s) to configure. Use 'all' for all supported IDEs, or comma-separated: 'cursor,claude,opencode,vscode,antigravity'. Default: all",
+                    "description": "all | cursor | claude | antigravity | opencode | vscode",
                     "default": "all",
                 },
             },
         },
     },
-    "sys_file_read": {
-        "description": "Securely read a file from the workspace.",
+    "sys_workspace_tree": {
+        "description": "Return a structured tree of workspace/ — experiment paths, scripts, outputs. Call at session start for orientation.",
         "category": "workspace",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "depth": {"type": "number"},
+                "include_files": {"type": "boolean"},
+            },
+        },
+    },
+
+    # ── File I/O ──────────────────────────────────────────────────────
+    "sys_file_read": {
+        "description": "Read a workspace file. Up to 50 MB; use tool_data_sample for larger datasets.",
+        "category": "file",
         "inputSchema": {
             "type": "object",
             "properties": {"filepath": {"type": "string"}},
@@ -198,24 +293,21 @@ TOOL_DEFINITIONS = {
         },
     },
     "sys_file_write": {
-        "description": "Securely write to a file in the workspace.",
-        "category": "workspace",
+        "description": "Write a file. Refuses to write into inputs/raw_data/ or inputs/literature/ (immutable). Use force=true to overwrite a file in synthesis/.",
+        "category": "file",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "filepath": {"type": "string"},
                 "content": {"type": "string"},
-                "force": {
-                    "type": "boolean",
-                    "description": "Force overwrite even in protected directories like synthesis/",
-                },
+                "force": {"type": "boolean"},
             },
             "required": ["filepath", "content"],
         },
     },
     "sys_file_list": {
-        "description": "List files in a directory.",
-        "category": "workspace",
+        "description": "List files in a workspace directory (recursive).",
+        "category": "file",
         "inputSchema": {
             "type": "object",
             "properties": {"directory": {"type": "string"}},
@@ -223,66 +315,70 @@ TOOL_DEFINITIONS = {
         },
     },
     "sys_file_delete": {
-        "description": "Delete a file or an empty directory.",
-        "category": "workspace",
+        "description": "Delete a workspace file or an empty directory.",
+        "category": "file",
         "inputSchema": {
             "type": "object",
             "properties": {"filepath": {"type": "string"}},
             "required": ["filepath"],
         },
     },
-    "sys_workspace_tree": {
-        "description": "Returns a structured tree of workspace/ showing experiment paths, scripts, outputs, and key files. Use at session start for orientation.",
-        "category": "workspace",
+    "sys_file_validate_md": {
+        "description": "Validate a markdown file against the headings/sections expected by a writing protocol.",
+        "category": "file",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "depth": {"type": "number", "description": "Tree depth (default 3)"},
-                "include_files": {"type": "boolean", "description": "Include file names (default true)"},
+                "filepath": {"type": "string"},
+                "protocol_name": {"type": "string"},
             },
+            "required": ["filepath", "protocol_name"],
         },
     },
-    "sys_state_get": {
-        "description": "Get full workspace state.",
-        "category": "state",
+
+    # ── Experiment paths ──────────────────────────────────────────────
+    "sys_path_create": {
+        "description": "Create the next numbered experiment folder (workspace/NN_<slug>/). Populates README, conclusions, scripts/, data/, outputs/, environment/ subdirs. Updates state.",
+        "category": "path",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Short slug, e.g. baseline_eda"},
+                "hypothesis": {"type": "string"},
+            },
+            "required": ["name"],
+        },
+    },
+    "sys_path_abandon": {
+        "description": "Mark an experiment as a dead end. Renames the folder to NN_<slug>__DEAD_END and writes the rationale to analysis.md.",
+        "category": "path",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path_name": {"type": "string"},
+                "rationale": {"type": "string"},
+            },
+            "required": ["path_name", "rationale"],
+        },
+    },
+    "sys_path_list": {
+        "description": "List all numbered experiment folders with their status (active|completed|dead_end).",
+        "category": "path",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_state_summary": {
-        "description": "Get a brief summary of the state.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_state_summary_md": {
-        "description": "Return .os_state/os_state.md content — a human-readable project status snapshot.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_state_health": {
-        "description": "Returns current context estimate, paths, and handoff recommendation.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_session_handoff": {
-        "description": "Creates a structured markdown summary + next step prompt for session handoff.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_state_minimal_context": {
-        "description": "Get a <=500 token snapshot of the current state, optimized for small models.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
+
+    # ── Checkpoints ───────────────────────────────────────────────────
     "sys_checkpoint_create": {
-        "description": "Snapshot workspace state.",
-        "category": "state",
+        "description": "Snapshot the current workspace (hardlinked, fast). Returns checkpoint_id.",
+        "category": "checkpoint",
         "inputSchema": {
             "type": "object",
             "properties": {"description": {"type": "string"}},
         },
     },
     "sys_checkpoint_rollback": {
-        "description": "Rollback to a checkpoint.",
-        "category": "state",
+        "description": "Restore the workspace to a checkpoint. The current state is backed up first.",
+        "category": "checkpoint",
         "inputSchema": {
             "type": "object",
             "properties": {"checkpoint_id": {"type": "string"}},
@@ -290,230 +386,69 @@ TOOL_DEFINITIONS = {
         },
     },
     "sys_checkpoint_list": {
-        "description": "List all checkpoints.",
-        "category": "state",
+        "description": "List all checkpoints with descriptions and timestamps.",
+        "category": "checkpoint",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_checkpoint_pending": {
-        "description": "Register a pending action for approval.",
-        "category": "state",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "description": {"type": "string"},
-                "requires_approval": {"type": "boolean"},
-            },
-            "required": ["description", "requires_approval"],
-        },
-    },
-    "sys_checkpoint_approve": {
-        "description": "Approve a pending action.",
-        "category": "state",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_path_create": {
-        "description": "Create the next numbered experiment folder with a unique descriptive name (format: {step_number}_{descriptor}). Optionally append _path_{N} to start a new research track.",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "Short name for the experiment (e.g. bayesian_model)"},
-            },
-            "required": ["name"],
-        },
-    },
-    "sys_path_abandon": {
-        "description": "Mark an experiment path as a dead end (renames directory with __DEAD_END suffix).",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "path_name": {"type": "string", "description": "Name of the path directory (e.g. 03_bayesian_model)"},
-                "rationale": {"type": "string", "description": "Why this path was abandoned"},
-            },
-            "required": ["path_name", "rationale"],
-        },
-    },
-    "sys_path_list": {
-        "description": "List all numbered experiment paths with their status.",
-        "category": "workspace",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_config_init": {
-        "description": "Initialize researcher configuration.",
-        "category": "workspace",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
+
+    # ── Researcher config ─────────────────────────────────────────────
     "sys_config_get": {
-        "description": "Get researcher configuration.",
-        "category": "workspace",
+        "description": "Read inputs/researcher_config.yaml — the source of truth for autonomy level, expertise, model profile, research goal, and API keys (masked).",
+        "category": "config",
         "inputSchema": {"type": "object", "properties": {}},
     },
     "sys_config_set": {
-        "description": "Set a specific config value.",
-        "category": "workspace",
+        "description": "Set a single config value (dot notation, e.g. researcher.expertise_level=advanced).",
+        "category": "config",
         "inputSchema": {
             "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
+            "properties": {
+                "key": {"type": "string"},
+                "value": {"type": "string"},
+            },
             "required": ["key", "value"],
         },
     },
     "sys_config_validate": {
-        "description": "Validate configuration and API keys.",
-        "category": "workspace",
+        "description": "Validate the config schema and report which API keys are present.",
+        "category": "config",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_config_profile": {
-        "description": "Return only behavioral profile fields (autonomy, expertise, model_profile) in <100 tokens. Use at session start instead of full config.get.",
-        "category": "workspace",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "sys_config_explain": {
-        "description": "Return documentation for any config key, e.g. interaction.autonomy_level.",
-        "category": "workspace",
+
+    # ── Notification / handoff ────────────────────────────────────────
+    "sys_notify": {
+        "description": "Notify the researcher (logged to workspace/logs/notifications.log).",
+        "category": "interaction",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "key": {"type": "string", "description": "Dot-notation config key, e.g. interaction.autonomy_level"}
+                "message": {"type": "string"},
+                "level": {"type": "string", "description": "info|warn|action_required"},
             },
-            "required": ["key"],
-        },
-    },
-    "sys_notify": {
-        "description": "Notify researcher.",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"message": {"type": "string"}, "level": {"type": "string"}},
             "required": ["message", "level"],
         },
     },
-    "sys_external_mcp_discover": {
-        "description": "Discover external MCP servers.",
-        "category": "workspace",
+    "sys_session_handoff": {
+        "description": "Generate a structured markdown handoff describing the project state, last action, and next step. Use at session end.",
+        "category": "interaction",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "tool_task_create": {
-        "description": "Create a background task for long-running operations.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"task_description": {"type": "string"}},
-            "required": ["task_description"],
-        },
+
+    # ── Environment ───────────────────────────────────────────────────
+    "sys_env_snapshot": {
+        "description": "Snapshot the current Python (and optionally R/Julia) environment to workspace/<step>/environment/requirements.txt.",
+        "category": "environment",
+        "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_task_monitor": {
-        "description": "Monitor a background task.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"task_id": {"type": "string"}},
-            "required": ["task_id"],
-        },
+    "sys_env_docker_generate": {
+        "description": "Generate a Dockerfile from the environment snapshot for full reproducibility.",
+        "category": "environment",
+        "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_task_kill": {
-        "description": "Kill a background task.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"task_id": {"type": "string"}},
-            "required": ["task_id"],
-        },
-    },
-    "sys_tool_info": {
-        "description": "Get full schema for a tool.",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"tool_name": {"type": "string"}},
-            "required": ["tool_name"],
-        },
-    },
-    "sys_tool_search": {
-        "description": "Search tools by description.",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"],
-        },
-    },
-    "tool_audit_synthesis": {
-        "description": "Audit a generated manuscript for completeness and scientific claims.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"paper_path": {"type": "string"}},
-            "required": ["paper_path"],
-        },
-    },
-    "tool_audit_statistical_power": {
-        "description": "Compute post-hoc power for statistical tests. Warns if power < 0.8. Writes to the current experiment step's outputs/reports directory.",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string"},
-                "effect_size": {"type": "number"},
-                "alpha": {"type": "number"},
-                "n": {"type": "number"}
-            },
-            "required": ["filepath", "alpha", "n"],
-        },
-    },
-    "sys_md_validate": {
-        "description": "Validates a written MD file against a writing protocol template.",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string", "description": "Path to MD file"},
-                "protocol_name": {"type": "string", "description": "Writing protocol to check against (e.g., writing_methods)"}
-            },
-            "required": ["filepath", "protocol_name"],
-        },
-    },
-    "tool_audit_md_consistency": {
-        "description": "Scans written MD files and verifies they follow templates (alias for sys.md.validate).",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string"},
-                "protocol_name": {"type": "string"}
-            },
-            "required": ["filepath", "protocol_name"],
-        },
-    },
-    "tool_audit_assumptions": {
-        "description": "Re-run assumption checks on the fitted model or residuals. Writes to the current experiment step's outputs/reports directory.",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"filepath": {"type": "string"}},
-            "required": ["filepath"],
-        },
-    },
-    "tool_audit_figure_quality": {
-        "description": "Check figure quality (DPI, colorblind-friendly, labels, error bars). Writes to the current experiment step's outputs/reports directory.",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"filepath": {"type": "string"}},
-            "required": ["filepath"],
-        },
-    },
-    "tool_audit_reproducibility_full": {
-        "description": "Run a full reproducibility check using Docker. Writes to workspace/logs/reproducibility_report.md.",
-        "category": "audit",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        },
-    },
+
+    # ── Memory / append-only logs ─────────────────────────────────────
     "mem_analysis_log": {
-        "description": "Append to workspace/analysis.md",
+        "description": "Append an entry to workspace/analysis.md (chronological narrative log).",
         "category": "memory",
         "inputSchema": {
             "type": "object",
@@ -522,227 +457,36 @@ TOOL_DEFINITIONS = {
         },
     },
     "mem_methods_append": {
-        "description": "Append a method entry to workspace/methods.md with structured format.",
+        "description": "Append a structured method entry (step, dataset, implementation, parameters, justification, assumptions) to workspace/methods.md.",
         "category": "memory",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "method": {"type": "string", "description": "Method name (required, all others optional)"},
-                "step_number": {"type": "string", "description": "Step number e.g. 01"},
-                "step_name": {"type": "string", "description": "Step name e.g. Baseline EDA"},
-                "dataset_name": {"type": "string", "description": "Dataset used"},
-                "dataset_hash": {"type": "string", "description": "SHA-256 of dataset"},
-                "implementation": {"type": "string", "description": "Tool/package and version e.g. pandas v2.0"},
-                "parameters": {"type": "string", "description": "Key parameters or settings"},
-                "justification": {"type": "string", "description": "Why this method was chosen"},
-                "assumptions": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Assumptions checked before using this method",
-                },
+                "method": {"type": "string"},
+                "step_number": {"type": "string"},
+                "step_name": {"type": "string"},
+                "dataset_name": {"type": "string"},
+                "dataset_hash": {"type": "string"},
+                "implementation": {"type": "string"},
+                "parameters": {"type": "string"},
+                "justification": {"type": "string"},
+                "assumptions": {"type": "array", "items": {"type": "string"}},
             },
             "required": ["method"],
         },
     },
     "mem_citations_generate": {
-        "description": "Generate workspace/citations.md from inputs/literature_index.yaml.",
+        "description": "Refresh workspace/citations.md from inputs/literature_index.yaml.",
         "category": "memory",
         "inputSchema": {"type": "object", "properties": {}},
     },
     "mem_intake_regenerate": {
-        "description": "Regenerate inputs/intake.md with current file hashes.",
+        "description": "Regenerate inputs/intake.md (file inventory with SHA-256 hashes).",
         "category": "memory",
         "inputSchema": {"type": "object", "properties": {}},
     },
-    "view_workspace_tree": {
-        "description": "Returns a structured tree of workspace/. Alias for sys.workspace.tree.",
-        "category": "workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "depth": {"type": "number", "description": "Tree depth (default 3)"},
-                "include_files": {"type": "boolean", "description": "Include file names (default true)"},
-            },
-        },
-    },
-    "tool_search_semantic_scholar": {
-        "description": "Search Semantic Scholar.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "limit": {"type": "number"}},
-            "required": ["query"],
-        },
-    },
-    "tool_search_pubmed": {
-        "description": "Search PubMed.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "limit": {"type": "number"}},
-            "required": ["query"],
-        },
-    },
-    "tool_search_crossref": {
-        "description": "Search Crossref.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "limit": {"type": "number"}},
-            "required": ["query"],
-        },
-    },
-    "tool_search_web": {
-        "description": "Search the web.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": {"type": "string"}, "limit": {"type": "number"}},
-            "required": ["query"],
-        },
-    },
-    "tool_web_scrape": {
-        "description": "Scrape a webpage.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}},
-            "required": ["url"],
-        },
-    },
-    "tool_literature_download": {
-        "description": "Download a paper PDF.",
-        "category": "search",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"url": {"type": "string"}, "filename": {"type": "string"}},
-            "required": ["url", "filename"],
-        },
-    },
-    "tool_python_exec": {
-        "description": "Execute a Python script. WARNING: runs with host permissions — use Docker for sandboxing.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"script_path": {"type": "string"}},
-            "required": ["script_path"],
-        },
-    },
-    "tool_r_exec": {
-        "description": "Execute an R script in the workspace.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "script_path": {"type": "string"},
-                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
-            },
-            "required": ["script_path"],
-        },
-    },
-    "tool_julia_exec": {
-        "description": "Execute a Julia script in the workspace.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "script_path": {"type": "string"},
-                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
-            },
-            "required": ["script_path"],
-        },
-    },
-    "tool_bash_exec": {
-        "description": "Execute a Bash script in the workspace.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "script_path": {"type": "string"},
-                "timeout": {"type": "number", "description": "Timeout in seconds (default 300)"}
-            },
-            "required": ["script_path"],
-        },
-    },
-    "tool_package_install": {
-        "description": "Install Python packages.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"packages": {"type": "array", "items": {"type": "string"}}},
-            "required": ["packages"],
-        },
-    },
-    "sys_env_snapshot": {
-        "description": "Snapshot current multi-language environment (Python, R, Julia).",
-        "category": "execution",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "tool_env_freeze": {
-        "description": "Freeze current environment (Deprecated, use sys.env.snapshot).",
-        "category": "execution",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "tool_env_restore": {
-        "description": "Restore a frozen environment.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "requirements": {
-                    "type": "string",
-                    "description": "Requirements format text"
-                }
-            },
-            "required": [],
-        },
-    },
-    "sys_env_docker_generate": {
-        "description": "Generates a Dockerfile to run all snapshotted environments.",
-        "category": "execution",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "tool_latex_compile": {
-        "description": "Compile paper.tex in the synthesis directory to PDF using pdflatex and bibtex.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
-    },
-    "tool_poster_create": {
-        "description": "Generate a professional LaTeX poster in synthesis/poster.pdf using tikzposter.",
-        "category": "execution",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    "tool_data_sample": {
-        "description": "Sample data.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string"},
-                "n_rows": {"type": "number"},
-                "strategy": {"type": "string"},
-            },
-            "required": ["filepath", "n_rows", "strategy"],
-        },
-    },
-    "tool_data_convert": {
-        "description": "Convert data between common formats (CSV, RDS, Feather, Parquet).",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "filepath": {"type": "string", "description": "Input file path"},
-                "output_format": {"type": "string", "description": "Desired output format (e.g. csv, rds, feather, parquet)"}
-            },
-            "required": ["filepath", "output_format"],
-        },
-    },
-    "tool_log_decision": {
-        "description": "Log a key reasoning step.",
+    "mem_decision_log": {
+        "description": "Append a structured decision (context, selected, rationale) to workspace/analysis.md.",
         "category": "memory",
         "inputSchema": {
             "type": "object",
@@ -754,66 +498,290 @@ TOOL_DEFINITIONS = {
             "required": ["context", "selected", "rationale"],
         },
     },
-    "tool_synthesize": {
-        "description": "Compile workspace findings into synthesis/paper.md. For complex papers, call section-by-section: section='methods', section='results', section='discussion', then call without section for final assembly.",
+
+    # ── Search & literature ───────────────────────────────────────────
+    "tool_search_semantic_scholar": {
+        "description": "Search Semantic Scholar for relevant academic papers.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_search_pubmed": {
+        "description": "Search PubMed (biomedical literature).",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_search_crossref": {
+        "description": "Search Crossref for DOI-linked academic literature.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_search_arxiv": {
+        "description": "Search arXiv for preprints (physics, math, CS, statistics, quantitative biology, etc.).",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_search_web": {
+        "description": "Search the web (Firecrawl primary, SerpAPI fallback). Use to ground methodology, find tools, or check current best practices.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_web_scrape": {
+        "description": "Scrape a webpage and return markdown content.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"url": {"type": "string"}},
+            "required": ["url"],
+        },
+    },
+    "tool_literature_download": {
+        "description": "Download a paper PDF into inputs/literature/.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "filename": {"type": "string"},
+            },
+            "required": ["url", "filename"],
+        },
+    },
+
+    # ── Execution ─────────────────────────────────────────────────────
+    "tool_python_exec": {
+        "description": "Execute a Python script located in the workspace. Runs with host permissions — do NOT execute untrusted code.",
         "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number"},
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool_r_exec": {
+        "description": "Execute an R script located in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number"},
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool_julia_exec": {
+        "description": "Execute a Julia script located in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number"},
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool_bash_exec": {
+        "description": "Execute a Bash script located in the workspace.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "script_path": {"type": "string"},
+                "timeout": {"type": "number"},
+            },
+            "required": ["script_path"],
+        },
+    },
+    "tool_package_install": {
+        "description": "Install Python packages and append them to environment/requirements.txt.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "packages": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["packages"],
+        },
+    },
+
+    # ── Data ──────────────────────────────────────────────────────────
+    "tool_data_sample": {
+        "description": "Sample N rows from a dataset (CSV, Parquet, Feather, JSON, Excel).",
+        "category": "data",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "n_rows": {"type": "number"},
+                "strategy": {
+                    "type": "string",
+                    "description": "head | random | tail (default: head)",
+                },
+            },
+            "required": ["filepath", "n_rows"],
+        },
+    },
+    "tool_data_profile": {
+        "description": "Profile a tabular dataset: schema, dtypes, missingness, descriptive stats, plus suggested next steps.",
+        "category": "data",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"filepath": {"type": "string"}},
+            "required": ["filepath"],
+        },
+    },
+    "tool_data_convert": {
+        "description": "Convert a dataset between CSV / Parquet / Feather / RDS.",
+        "category": "data",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "output_format": {"type": "string"},
+            },
+            "required": ["filepath", "output_format"],
+        },
+    },
+
+    # ── Audit ─────────────────────────────────────────────────────────
+    "tool_audit_synthesis": {
+        "description": "Audit a generated manuscript for completeness, claim grounding, and citation coverage.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"paper_path": {"type": "string"}},
+            "required": ["paper_path"],
+        },
+    },
+    "tool_audit_power": {
+        "description": "Compute post-hoc statistical power. Warns if power < 0.8. Writes a report to the current experiment's outputs/reports/.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filepath": {"type": "string"},
+                "effect_size": {"type": "number"},
+                "alpha": {"type": "number"},
+                "n": {"type": "number"},
+            },
+            "required": ["filepath", "alpha", "n"],
+        },
+    },
+    "tool_audit_assumptions": {
+        "description": "Re-run assumption checks (normality, homoscedasticity, independence) on residuals or model output.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"filepath": {"type": "string"}},
+            "required": ["filepath"],
+        },
+    },
+    "tool_audit_figure": {
+        "description": "Check figure quality: DPI, colorblind-friendly palette, axis labels, error bars.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"filepath": {"type": "string"}},
+            "required": ["filepath"],
+        },
+    },
+    "tool_audit_citations": {
+        "description": "Verify every citation in workspace/citations.md against an online lookup (Crossref / Semantic Scholar). Flags unverified entries.",
+        "category": "audit",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_audit_reproducibility": {
+        "description": "Re-run every experiment script in a clean environment and verify outputs match. Slow but the gold-standard reproducibility check.",
+        "category": "audit",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+
+    # ── Synthesis & output ────────────────────────────────────────────
+    "tool_synthesize_plan": {
+        "description": "Inspect available sources (methods.md, conclusions per step, citations) and return the recommended section ordering. Call BEFORE tool_synthesize.",
+        "category": "synthesis",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_synthesize": {
+        "description": "Compile workspace findings into synthesis/paper.md (or specific section). Section parameter generates one section at a time: abstract | introduction | methods | results | discussion | conclusion.",
+        "category": "synthesis",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "output_format": {
                     "type": "string",
-                    "enum": ["markdown", "latex", "both"],
-                    "description": "Output format for the compiled paper (default: markdown)",
+                    "description": "markdown | latex | both (default: markdown)",
                 },
-                "section": {
-                    "type": "string",
-                    "description": "Specific section to generate (e.g. abstract, methods, results, discussion). If omitted, generates the full paper.",
-                },
+                "section": {"type": "string"},
             },
-            "required": [],
         },
     },
-    "tool_synthesize_plan": {
-        "description": "Show synthesis plan: available source sections and recommended ordering. Always call this first before using tool.synthesize so the AI can decide the sequence of section generation.",
-        "category": "execution",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
+    "tool_latex_compile": {
+        "description": "Compile synthesis/paper.tex to PDF (pdflatex + bibtex).",
+        "category": "synthesis",
+        "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_protocol_log": {
-        "description": "Log a protocol execution to the protocol execution log (.os_state/protocol_execution_log.jsonl).",
-        "category": "system",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "protocol_name": {"type": "string", "description": "Name of the protocol"},
-                "status": {"type": "string", "description": "Execution status: started | completed | failed | skipped"},
-                "details": {"type": "string", "description": "Optional details about the execution"},
-            },
-            "required": ["protocol_name", "status"],
-        },
+    "tool_poster_create": {
+        "description": "Generate a LaTeX poster (tikzposter) from the workspace.",
+        "category": "synthesis",
+        "inputSchema": {"type": "object", "properties": {}},
     },
-    "sys_protocol_history": {
-        "description": "Read recent protocol execution history.",
-        "category": "system",
+    "tool_dashboard_create": {
+        "description": "Generate a standalone HTML dashboard summarising the project (key figures, tables, conclusions). Written to synthesis/dashboard.html.",
+        "category": "synthesis",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "limit": {"type": "number", "description": "Number of recent entries to return (default: 20)"},
-            },
-            "required": [],
+            "properties": {"title": {"type": "string"}},
         },
     },
 }
+
 
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
 
 
-def _log_search(root: Path, tool_name: str, query: str, count: int):
+def _log_search(root: Path, tool_name: str, query: str, count: int) -> None:
     log_path = root / "workspace" / "logs" / "searches.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "a") as f:
@@ -830,193 +798,105 @@ def _log_search(root: Path, tool_name: str, query: str, count: int):
         )
 
 
-def _handle_sys_guidance_list(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        try:
-            protocols = list_protocols()
-            # Rename summary to description to keep backward compatibility with clients if needed
-            summaries = [{"name": p["name"], "description": p["summary"]} for p in protocols]
-            return _text(_success_envelope({"protocols": summaries}))
-        except Exception as e:
-            return _text(_error_envelope(str(e)))
+def _read_profile(root: Path) -> dict:
+    """Return autonomy_level, expertise_level, model_profile in <100 tokens."""
+    cfg = get_config(root)
+    if cfg.get("status") != "success":
+        return {
+            "autonomy_level": "supervised",
+            "expertise_level": "intermediate",
+            "model_profile": "medium",
+        }
+    config = cfg.get("config", {})
+    return {
+        "autonomy_level": config.get("interaction", {}).get(
+            "autonomy_level", "supervised"
+        ),
+        "expertise_level": config.get("researcher", {}).get(
+            "expertise_level", "intermediate"
+        ),
+        "model_profile": config.get("model_profile", "medium"),
+    }
 
 
-def _handle_sys_guidance_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p_name = arguments.get("protocol_name")
-        config_res = get_config(root)
-        profile = "large"
-        if config_res.get("status") == "success":
-            profile = config_res.get("config", {}).get("model_profile", "large")
-
-        try:
-            import yaml
-            light = (profile == "small")
-            data = load_protocol(p_name, light=light)
-            # Inject model adaptations if they exist for the current profile
-            if "model_adaptations" in data and profile in data["model_adaptations"]:
-                adaptations = data["model_adaptations"][profile]
-                for step_id, overrides in adaptations.items():
-                    for step in data.get("steps", []):
-                        if step.get("id") == step_id:
-                            step.update(overrides)
-                del data["model_adaptations"]
-            res = {"content": yaml.dump(data)}
-            if profile == "small":
-                res["note"] = "Loaded in step-by-step mode due to 'small' model profile."
-            if p_name != "guidance/session_boot":
-                res["_reminder"] = "Check your session_boot profile before executing these steps if you haven't already."
-            return _text(_success_envelope(res))
-        except Exception as e:
-            return _text(_error_envelope(str(e)))
+def _handle_sys_protocol_list(name, arguments, root):
+    try:
+        protocols = list_protocols()
+        return _text(_success({"protocols": protocols}))
+    except Exception as e:
+        return _text(_error(str(e)))
 
 
-def _handle_sys_guidance_validate(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p_name = arguments.get("protocol_name")
-        res = validate_protocol(p_name, root)
-        if "error" in res:
-            return _text(_error_envelope(res["error"]))
-        return _text(_success_envelope(res))
+def _handle_sys_protocol_get(name, arguments, root):
+    p_name = arguments.get("protocol_name")
+    profile = _read_profile(root)
+    model_profile = profile.get("model_profile", "medium")
+    try:
+        import yaml as _yaml
 
-
-def _handle_sys_protocol_next(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = get_next_protocol(root)
-        return _text(_success_envelope(res))
-
-
-def _handle_sys_protocol_log(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.protocol import log_protocol_execution
-        res = log_protocol_execution(
-            root,
-            arguments["protocol_name"],
-            arguments["status"],
-            arguments.get("details", ""),
-        )
-        return _text(_success_envelope(res))
-
-
-def _handle_sys_protocol_history(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.protocol import get_protocol_history
-        res = get_protocol_history(root, arguments.get("limit", 20))
-        return _text(_success_envelope(res))
-
-
-def _handle_sys_tool_info(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        t_name = arguments.get("tool_name")
-        if t_name in TOOL_DEFINITIONS:
-            return _text(_success_envelope(TOOL_DEFINITIONS[t_name]))
-        return _text(_error_envelope(f"Tool {t_name} not found."))
-
-
-def _handle_sys_tool_search(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        q = arguments.get("query", "").lower()
-        matches = []
-        for t_name, t_schema in TOOL_DEFINITIONS.items():
-            if q in t_name.lower() or q in t_schema.get("description", "").lower():
-                matches.append(
-                    {"name": t_name, "description": t_schema.get("description", "")}
-                )
-        return _text(_success_envelope({"tools": matches}))
-
-
-def _handle_tool_r_exec(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.execution import execute_r_script
-        res = execute_r_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
-        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
-
-
-def _handle_tool_julia_exec(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.execution import execute_julia_script
-        res = execute_julia_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
-        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
-
-
-def _handle_tool_bash_exec(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.execution import execute_bash_script
-        res = execute_bash_script(arguments["script_path"], root, timeout=arguments.get("timeout", 300))
-        return _text(_success_envelope(res)) if "error" not in res else _text(_error_envelope(res["error"]))
-
-
-def _handle_sys_workspace_scaffold(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        ide_str = arguments.get("ide", "all")
-        valid_ides = ["cursor", "claude", "opencode", "vscode", "antigravity"]
-        ide_flags = valid_ides if ide_str == "all" else [i.strip() for i in ide_str.split(",") if i.strip() in valid_ides]
-        scaffold_minimal_workspace(
-            root,
-            arguments.get("project_name", "Research Project"),
-            git_init=arguments.get("git_init", False),
-            ide_flags=ide_flags,
-            copy_agents=True,
-        )
-        if (root / ".os_state").exists() and (root / "workspace").exists():
-            _profile_inputs(root)
-        return _text(_success_envelope({"scaffolded": True, "ide_flags": ide_flags}))
-
-
-def _handle_sys_file_read(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p = root / arguments["filepath"]
-        if not p.exists() or not p.is_file():
-            return _text(_error_envelope("File not found"))
-        # Add a size limit of 50MB
-        if p.stat().st_size > 50 * 1024 * 1024:
-            return _text(
-                _error_envelope("File too large (>50MB). Use tool.data.sample instead.")
+        data = load_protocol(p_name, model_profile=model_profile)
+        response = {"content": _yaml.dump(data, sort_keys=False)}
+        if model_profile == "small":
+            response["note"] = "Loaded in light mode (small model profile)."
+        if p_name != "guidance/session_boot":
+            response["_reminder"] = (
+                "Confirm session_boot has run this session; if not, load it first."
             )
-        return _text(_success_envelope({"content": p.read_text()}))
+        return _text(_success(response))
+    except Exception as e:
+        return _text(_error(str(e)))
 
 
-def _handle_sys_file_write(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p = root / arguments["filepath"]
-        force = arguments.get("force", False)
-        # Immutability enforcement
-        if "inputs/raw_data" in str(p) or "inputs/literature" in str(p):
-            if "inputs/literature_index.yaml" not in str(p):
-                return _text(
-                    _error_envelope("WriteProtectedError: Cannot modify raw inputs.")
-                )
-        if "synthesis/" in str(p) and p.exists() and not force:
-            return _text(
-                _error_envelope(
-                    "WriteProtectedError: Cannot overwrite files in synthesis/ without force=true."
-                )
-            )
-
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(arguments["content"])
-        # Sync manifest when writing to workspace/
-        if "workspace/" in arguments["filepath"]:
-            _update_manifest(root)
-        return _text(
-            _success_envelope({"written": True, "checksum": compute_file_hash(p)})
-        )
+def _handle_sys_protocol_validate(name, arguments, root):
+    res = validate_protocol(arguments.get("protocol_name"), root)
+    if "error" in res:
+        return _text(_error(res["error"]))
+    return _text(_success(res))
 
 
-def _handle_sys_file_list(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p = root / arguments["directory"]
-        if not p.exists() or not p.is_dir():
-            return _text(_error_envelope("Directory not found"))
-        files = [str(f.relative_to(root)) for f in p.rglob("*") if f.is_file()]
-        return _text(_success_envelope({"files": files}))
+def _handle_sys_protocol_next(name, arguments, root):
+    return _text(_success(get_next_protocol(root)))
 
 
-def _handle_sys_file_delete(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p = root / arguments["filepath"]
-        if p.exists():
-            if p.is_file():
-                p.unlink()
-                return _text(_success_envelope({"deleted": True}))
-            elif p.is_dir():
-                try:
-                    p.rmdir()
-                    return _text(_success_envelope({"deleted": True, "type": "directory"}))
-                except OSError as e:
-                    return _text(_error_envelope(f"Cannot delete directory: {e}"))
-        return _text(_error_envelope("File or directory not found"))
+def _handle_sys_protocol_log(name, arguments, root):
+    from research_os.tools.actions.protocol import log_protocol_execution
+
+    res = log_protocol_execution(
+        root,
+        arguments["protocol_name"],
+        arguments["status"],
+        arguments.get("details", ""),
+    )
+    return _text(_success(res))
 
 
-def _handle_sys_workspace_tree(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        depth = arguments.get("depth", 3)
-        include_files = arguments.get("include_files", True)
-        tree = _build_tree(root / "workspace", depth, include_files)
-        return _text(_success_envelope({"tree": tree}))
+def _handle_sys_protocol_history(name, arguments, root):
+    from research_os.tools.actions.protocol import get_protocol_history
+
+    res = get_protocol_history(root, arguments.get("limit", 20))
+    return _text(_success(res))
+
+
+def _handle_sys_workspace_scaffold(name, arguments, root):
+    ide = arguments.get("ide", "all")
+    valid = ["cursor", "claude", "antigravity", "opencode", "vscode"]
+    ide_flags = valid if ide == "all" else [i.strip() for i in ide.split(",") if i.strip() in valid]
+    scaffold_minimal_workspace(
+        root,
+        arguments.get("project_name", "Research Project"),
+        ide_flags=ide_flags,
+        copy_agents=True,
+    )
+    if (root / ".os_state").exists() and (root / "workspace").exists():
+        _profile_inputs(root)
+    return _text(_success({"scaffolded": True, "ide_flags": ide_flags}))
+
+
+def _handle_sys_workspace_tree(name, arguments, root):
+    depth = arguments.get("depth", 3)
+    include_files = arguments.get("include_files", True)
+    tree = _build_tree(root / "workspace", depth, include_files)
+    return _text(_success({"tree": tree}))
 
 
 def _build_tree(path: Path, depth: int, include_files: bool) -> dict:
@@ -1031,656 +911,631 @@ def _build_tree(path: Path, depth: int, include_files: bool) -> dict:
                 result[f"{item.name}/"] = _build_tree(item, depth - 1, include_files)
             elif include_files:
                 result[item.name] = item.stat().st_size
-    except PermissionError:
+    except (PermissionError, FileNotFoundError):
         pass
     return result
 
 
-def _handle_sys_state_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        full_state = load_state(root)
-        
-        # Strip heavy objects to reduce token waste
-        lean_state = {
-            "project": full_state.get("project", ""),
-            "pipeline_stage": full_state.get("pipeline_stage", full_state.get("phase", "init")),
-            "step": full_state.get("step", 0),
-            "current_path": full_state.get("current_path", "main"),
-            "resumable_from": full_state.get("resumable_from"),
-        }
-        
-        # Only include active or recently completed paths
-        paths = full_state.get("paths", {})
-        lean_state["paths_summary"] = {
-            k: v.get("status") for k, v in paths.items()
-        }
-        
-        # Add hypotheses if they exist
-        hyp = full_state.get("active_hypotheses", [])
-        if hyp:
-            lean_state["active_hypotheses"] = hyp
-            
-        return _text(_success_envelope(lean_state))
-
-
-def _handle_sys_state_summary(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        state = load_state(root)
-        paths = list(state.get("paths", {}).keys())
-        return _text(
-            _success_envelope(
-                {
-                    "current_path": state.get("current_path"),
-                    "paths": paths,
-                }
-            )
-        )
-
-
-def _handle_sys_state_summary_md(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        summary_path = root / ".os_state" / "os_state.md"
-        if not summary_path.exists():
-            return _text(_error_envelope("os_state.md not found. Run save_state first to generate it."))
-        return _text(_success_envelope({"content": summary_path.read_text()}))
-
-
-def _handle_sys_state_minimal_context(name: str, arguments: dict, root: Path) -> list[TextContent]:
+def _handle_sys_state_get(name, arguments, root):
+    fmt = (arguments.get("format") or "full").lower()
+    state = load_state(root)
+    if fmt == "minimal":
         from research_os.state.state_ledger import ResearchLedger
 
         ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
-        summary = ledger.get_project_summary(max_tokens=450)
-        return _text(_success_envelope({"minimal_context": summary}))
-
-
-def _handle_sys_state_health(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.state.state_ledger import ResearchLedger
-        import json
-        ledger = ResearchLedger(root / ".os_state" / "state_ledger.json")
-        result = ledger.health(root=root)
-        result["workspace_tree"] = _build_tree(root / "workspace", 2, True)
-        # Check manifest/state ledger sync
-        manifest_file = root / ".os_state" / "manifest.json"
-        if manifest_file.exists():
-            try:
-                manifest = json.loads(manifest_file.read_text())
-                manifest_paths = set(manifest.get("paths", {}).keys())
-                state = load_state(root)
-                state_paths = set(state.get("paths", {}).keys())
-                if manifest_paths != state_paths:
-                    result["manifest_valid"] = False
-                    result["manifest_warning"] = f"Manifest has {len(manifest_paths)} paths, state has {len(state_paths)} paths"
-                else:
-                    result["manifest_valid"] = True
-            except Exception:
-                result["manifest_valid"] = False
-        return _text(_success_envelope(result))
-
-
-def _handle_sys_session_handoff(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = session_handoff(root)
-        if res["status"] == "success":
-            return _text(res["content"])
-        return _text(_error_envelope(res["message"]))
-
-
-def _handle_tool_task_create(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.task import create_task
-
-        res = create_task(arguments.get("task_description", ""), root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_tool_synthesize_plan(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.synthesize import synthesize_plan
-        res = synthesize_plan(root)
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_audit_synthesis(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.audit import audit_synthesis
-
-        res = audit_synthesis(arguments["paper_path"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] != "error"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_tool_audit_statistical_power(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.audit import audit_power
-
-        effect_size = arguments.get("effect_size", 0.5)
-        res = audit_power(arguments["filepath"], effect_size, arguments["alpha"], arguments["n"], root)
-        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
-
-
-def _handle_tool_audit_assumptions(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.audit import audit_assumptions
-
-        res = audit_assumptions(arguments["filepath"], root)
-        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
-
-
-def _handle_tool_audit_figure_quality(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.audit import audit_figure
-
-        res = audit_figure(arguments["filepath"], root)
-        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
-
-
-def _handle_tool_audit_reproducibility_full(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.audit import audit_reproducibility_full
-
-        res = audit_reproducibility_full(root)
-        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
-
-
-def _handle_sys_checkpoint_create(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = create_checkpoint(arguments.get("description", "manual"), root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_checkpoint_rollback(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = rollback_checkpoint(arguments["checkpoint_id"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_checkpoint_list(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = list_checkpoints(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_checkpoint_pending(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = checkpoint_pending(
-            arguments["description"], arguments["requires_approval"], root
-        )
-        return (
-            _text(_success_envelope(res))
-            if res["status"] != "error"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_checkpoint_approve(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = checkpoint_approve(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_path_create(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = create_path(arguments["name"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_path_abandon(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = abandon_path(arguments["path_name"], arguments["rationale"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_path_list(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = list_paths(root)
-        return _text(_success_envelope(res))
-
-
-def _handle_sys_config_init(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = init_config(root)
-        return _text(_success_envelope(res))
-
-
-def _handle_sys_config_get(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = get_config(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_config_set(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = set_config(arguments["key"], arguments["value"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_config_validate(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = validate_config(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_sys_config_profile(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = get_config(root)
-        if res["status"] == "success":
-            config = res.get("config", {})
-            profile = {
-                "autonomy_level": config.get("interaction", {}).get("autonomy_level", "supervised"),
-                "expertise_level": config.get("researcher", {}).get("expertise_level", "intermediate"),
-                "model_profile": config.get("model_profile", "medium"),
+        return _text(_success({"minimal_context": ledger.get_project_summary(max_tokens=450)}))
+    if fmt == "markdown":
+        md_path = root / ".os_state" / "os_state.md"
+        if not md_path.exists():
+            return _text(_error("os_state.md missing — run a tool that mutates state first."))
+        return _text(_success({"markdown": md_path.read_text()}))
+    # full (lean projection — strip very large fields)
+    paths = state.get("paths", {})
+    return _text(
+        _success(
+            {
+                "project_name": state.get("project_name") or state.get("project", ""),
+                "pipeline_stage": state.get("pipeline_stage", state.get("phase", "init")),
+                "step": state.get("step", 0),
+                "current_path": state.get("current_path", "main"),
+                "paths_summary": {k: v.get("status") for k, v in paths.items()},
+                "active_hypotheses": state.get("active_hypotheses", []),
+                "resumable_from": state.get("resumable_from"),
             }
-            return _text(_success_envelope(profile))
-        return _text(_success_envelope({"autonomy_level": "supervised", "expertise_level": "intermediate", "model_profile": "medium"}))
-
-
-def _handle_sys_config_explain(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.config import explain_config as _explain
-        res = _explain(root, arguments.get("key", ""))
-        return _text(_success_envelope(res)) if res["status"] == "success" else _text(_error_envelope(res["message"]))
-
-
-def _handle_sys_notify(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = notify_researcher(arguments["message"], arguments["level"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
         )
+    )
 
 
-def _handle_sys_external_mcp_discover(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = discover_mcp(root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
+def _handle_sys_file_read(name, arguments, root):
+    p = root / arguments["filepath"]
+    if not p.exists() or not p.is_file():
+        return _text(_error(f"File not found: {arguments['filepath']}"))
+    if p.stat().st_size > 50 * 1024 * 1024:
+        return _text(_error("File too large (>50 MB). Use tool_data_sample for tabular data."))
+    return _text(_success({"content": p.read_text(errors="replace")}))
 
 
-def _handle_sys_task_monitor(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = task_monitor(arguments["task_id"], root)
-        return _text(_success_envelope(res))
+def _handle_sys_file_write(name, arguments, root):
+    p = root / arguments["filepath"]
+    force = arguments.get("force", False)
+    rel = str(p.relative_to(root)) if str(p).startswith(str(root)) else str(p)
+
+    if rel.startswith("inputs/raw_data") or rel.startswith("inputs/literature"):
+        if not rel.endswith("literature_index.yaml"):
+            return _text(_error("WriteProtectedError: inputs/raw_data and inputs/literature are immutable."))
+    if rel.startswith("synthesis/") and p.exists() and not force:
+        return _text(_error("synthesis/ files exist — pass force=true to overwrite."))
+
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(arguments["content"])
+    if rel.startswith("workspace/"):
+        _update_manifest(root)
+    return _text(_success({"written": True, "checksum": compute_file_hash(p)}))
 
 
-def _handle_sys_task_kill(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = task_kill(arguments["task_id"], root)
-        return _text(_success_envelope(res))
+def _handle_sys_file_list(name, arguments, root):
+    p = root / arguments["directory"]
+    if not p.exists() or not p.is_dir():
+        return _text(_error("Directory not found"))
+    files = [str(f.relative_to(root)) for f in p.rglob("*") if f.is_file()]
+    return _text(_success({"files": files}))
 
 
-def _handle_mem_analysis_log(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        log_path = root / "workspace" / "analysis.md"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_path, "a") as f:
-            f.write(f"[{now_iso()}] {arguments['entry']}\n")
-        _update_workflow_mermaid(root)
-        return _text(_success_envelope({"logged": True}))
+def _handle_sys_file_delete(name, arguments, root):
+    p = root / arguments["filepath"]
+    if not p.exists():
+        return _text(_error("File or directory not found"))
+    if p.is_file():
+        p.unlink()
+        return _text(_success({"deleted": True}))
+    try:
+        p.rmdir()
+        return _text(_success({"deleted": True, "type": "directory"}))
+    except OSError as e:
+        return _text(_error(f"Cannot delete directory: {e}"))
 
 
-def _handle_mem_citations_generate(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.project_ops import generate_citations_md
-        path = generate_citations_md(root)
-        return _text(_success_envelope({"citations_path": path}))
-
-
-def _handle_mem_intake_regenerate(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.project_ops import regenerate_intake
-        path = regenerate_intake(root)
-        return _text(_success_envelope({"intake_path": path}))
-
-
-def _handle_view_workspace_tree(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        return _handle_sys_workspace_tree(name, arguments, root)
-
-
-def _handle_mem_methods_append(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        m_path = root / "workspace" / "methods.md"
-        m_path.parent.mkdir(parents=True, exist_ok=True)
-        ts = now_iso()
-        method = arguments["method"]
-        # If only method is provided (bare string), write old format with deprecation note
-        if len(arguments) == 1:
-            line = f"- {method}\n"
-        else:
-            step_name = arguments.get("step_name", "Step")
-            step_number = arguments.get("step_number", "")
-            heading = f"{step_number} — {step_name}" if step_number else step_name
-            lines = [f"\n## {ts} — {heading}"]
-            lines.append(f"  - **Method**: {method}")
-            if arguments.get("dataset_name"):
-                h = arguments.get("dataset_hash", "N/A")
-                lines.append(f"  - **Dataset**: {arguments['dataset_name']} (sha256: {h})")
-            if arguments.get("implementation"):
-                lines.append(f"  - **Implementation**: {arguments['implementation']}")
-            if arguments.get("parameters"):
-                lines.append(f"  - **Parameters**: {arguments['parameters']}")
-            if arguments.get("justification"):
-                lines.append(f"  - **Justification**: {arguments['justification']}")
-            if arguments.get("assumptions"):
-                for a in arguments["assumptions"]:
-                    lines.append(f"  - **Assumption**: {a}")
-            line = "\n".join(lines) + "\n"
-        with open(m_path, "a") as f:
-            f.write(line)
-        return _text(_success_envelope({"logged": True}))
-
-
-def _handle_tool_search_semantic_scholar(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        q = arguments["query"]
-        limit = arguments.get("limit", 5)
-        _log_search(root, name, q, 0)
-        res = search_semantic_scholar(q, limit)
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_search_pubmed(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        q = arguments["query"]
-        limit = arguments.get("limit", 5)
-        _log_search(root, name, q, 0)
-        res = search_pubmed(q, limit)
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_search_crossref(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        q = arguments["query"]
-        limit = arguments.get("limit", 5)
-        _log_search(root, name, q, 0)
-        res = search_crossref(q, limit)
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_search_web(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        q = arguments["query"]
-        limit = arguments.get("limit", 5)
-        _log_search(root, name, q, 0)
-        res = search_web(q, limit)
-        if "warning" in res:
-            return _text(_success_envelope(res))
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_web_scrape(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = scrape_web(arguments["url"])
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_literature_download(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = download_literature(arguments["url"], arguments["filename"], root)
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(_error_envelope(res["message"]))
-        )
-
-
-def _handle_tool_python_exec(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        p = root / arguments["script_path"]
-        if not p.exists() or not p.is_file():
-            return _text(_error_envelope("Script not found"))
-
-        # Determine step for logging
-        step_name = p.stem
-        log_dir = root / "workspace" / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        exec_log_path = log_dir / f"{step_name}_exec.log"
-
-        cmd = [sys.executable, str(p)]
-        res = subprocess.run(cmd, cwd=str(p.parent), capture_output=True, text=True)
-
-        with open(exec_log_path, "a") as f:
-            f.write(
-                f"--- Executed at {now_iso()} ---\nCommand: {' '.join(cmd)}\nReturn Code: {res.returncode}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}\n\n"
-            )
-
-        return _text(
-            _success_envelope(
-                {"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode}
-            )
-        )
-
-
-def _handle_tool_r_exec_group(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.execution import execute_r_script, execute_julia_script, execute_bash_script
-
-        timeout = arguments.get("timeout", 300)
-        script_path = arguments["script_path"]
-
-        if name == "tool_r_exec":
-            res = execute_r_script(script_path, root, timeout)
-        elif name == "tool_julia_exec":
-            res = execute_julia_script(script_path, root, timeout)
-        else:
-            res = execute_bash_script(script_path, root, timeout)
-
-        return _text(_success_envelope(res)) if res["status"] != "error" else _text(_error_envelope(res["message"]))
-
-
-def _handle_tool_package_install(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        packages = arguments["packages"]
-        # Verify in a sub-process
-        res = package_install(packages)
-        if res.get("status") == "success":
-            req_path = root / "environment" / "requirements.txt"
-            req_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(req_path, "a") as f:
-                for pkg in packages:
-                    f.write(f"{pkg}\n")
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_env_freeze_group(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.environment import env_snapshot
-        res = env_snapshot(root)
-        return _text(_success_envelope(res)) if res.get("status") == "success" else _text(_error_envelope(res.get("message", "Error")))
-
-
-def _handle_tool_env_restore(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.environment import env_restore
-        res = env_restore(arguments.get("requirements", ""), root)
-        return _text(_success_envelope(res)) if res.get("status") != "error" and res.get("code", 0) == 0 else _text(_error_envelope(res.get("error", "Error")))
-
-
-def _handle_sys_env_docker_generate(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.environment import env_docker_generate
-        res = env_docker_generate(root)
-        return _text(_success_envelope(res)) if res.get("status") == "success" else _text(_error_envelope(res.get("message", "Error")))
-
-
-def _handle_tool_latex_compile(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.latex import latex_compile
-        return _text(_success_envelope(latex_compile(root)))
-
-
-def _handle_tool_poster_create(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.latex import create_poster
-        return _text(_success_envelope(create_poster(root)))
-
-
-def _handle_tool_data_sample(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.data import data_sample
-        res = data_sample(
-            arguments["filepath"], arguments["n_rows"], arguments["strategy"], root
-        )
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(
-                _error_envelope(res.get("message", res.get("error", "Unknown error")))
-            )
-        )
-
-
-def _handle_tool_data_convert(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.data import data_convert
-        res = data_convert(
-            arguments["filepath"], arguments["output_format"], root
-        )
-        return (
-            _text(_success_envelope(res))
-            if res["status"] == "success"
-            else _text(
-                _error_envelope(res.get("message", res.get("error", "Unknown error")))
-            )
-        )
-
-
-def _handle_tool_log_decision(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        res = log_decision(
-            arguments["context"],
-            arguments["selected"],
-            arguments["rationale"],
-            root=root,
-        )
-        return _text(_success_envelope(res))
-
-
-def _handle_tool_synthesize(name: str, arguments: dict, root: Path) -> list[TextContent]:
-        from research_os.tools.actions.synthesize import synthesize_workspace
-
-        fmt = arguments.get("output_format", "markdown")
-        sec = arguments.get("section")
-        res = synthesize_workspace(root, output_format=fmt, section=sec)
-        if "error" in res:
-            return _text(_error_envelope(res["error"]))
-        return _text(_success_envelope(res))
-
-
-
-def _handle_sys_md_validate(name: str, arguments: dict, root: Path) -> list[TextContent]:
+def _handle_sys_file_validate_md(name, arguments, root):
     from research_os.tools.actions.md_audit import validate_md_template
+
     res = validate_md_template(arguments["filepath"], arguments["protocol_name"], root)
-    if res["status"] == "success":
-        return _text(_success_envelope(res))
-    return _text(_error_envelope(res.get("message", "Validation failed") + str(res.get("errors", ""))))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "Validation failed")))
+
+
+def _handle_sys_path_create(name, arguments, root):
+    from research_os.project_ops import create_numbered_experiment
+
+    try:
+        res = create_numbered_experiment(
+            root,
+            arguments["name"],
+            hypothesis=arguments.get("hypothesis", ""),
+        )
+        return _text(_success(res))
+    except Exception as e:
+        return _text(_error(str(e)))
+
+
+def _handle_sys_path_abandon(name, arguments, root):
+    res = abandon_path(arguments["path_name"], arguments["rationale"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "abandon failed")))
+
+
+def _handle_sys_path_list(name, arguments, root):
+    return _text(_success(list_paths(root)))
+
+
+def _handle_sys_checkpoint_create(name, arguments, root):
+    res = create_checkpoint(arguments.get("description", "manual"), root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "checkpoint failed")))
+
+
+def _handle_sys_checkpoint_rollback(name, arguments, root):
+    res = rollback_checkpoint(arguments["checkpoint_id"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "rollback failed")))
+
+
+def _handle_sys_checkpoint_list(name, arguments, root):
+    res = list_checkpoints(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "checkpoint list failed")))
+
+
+def _handle_sys_config_get(name, arguments, root):
+    res = get_config(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "config not found")))
+
+
+def _handle_sys_config_set(name, arguments, root):
+    res = set_config(arguments["key"], arguments["value"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "set failed")))
+
+
+def _handle_sys_config_validate(name, arguments, root):
+    res = validate_config(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "validate failed")))
+
+
+def _handle_sys_notify(name, arguments, root):
+    res = notify_researcher(arguments["message"], arguments["level"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "notify failed")))
+
+
+def _handle_sys_session_handoff(name, arguments, root):
+    res = session_handoff(root)
+    if res.get("status") == "success":
+        return _text(res["content"])
+    return _text(_error(res.get("message", "handoff failed")))
+
+
+def _handle_sys_env_snapshot(name, arguments, root):
+    res = env_snapshot(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "snapshot failed")))
+
+
+def _handle_sys_env_docker_generate(name, arguments, root):
+    res = env_docker_generate(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "docker generate failed")))
+
+
+def _handle_mem_analysis_log(name, arguments, root):
+    log_path = root / "workspace" / "analysis.md"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a") as f:
+        f.write(f"[{now_iso()}] {arguments['entry']}\n")
+    _update_workflow_mermaid(root)
+    return _text(_success({"logged": True, "path": "workspace/analysis.md"}))
+
+
+def _handle_mem_methods_append(name, arguments, root):
+    m_path = root / "workspace" / "methods.md"
+    m_path.parent.mkdir(parents=True, exist_ok=True)
+    ts = now_iso()
+    method = arguments["method"]
+    if len(arguments) == 1:
+        line = f"- {method}\n"
+    else:
+        step_name = arguments.get("step_name", "Step")
+        step_number = arguments.get("step_number", "")
+        heading = f"{step_number} — {step_name}" if step_number else step_name
+        lines = [f"\n## {ts} — {heading}"]
+        lines.append(f"  - **Method**: {method}")
+        if arguments.get("dataset_name"):
+            h = arguments.get("dataset_hash", "N/A")
+            lines.append(f"  - **Dataset**: {arguments['dataset_name']} (sha256: {h})")
+        if arguments.get("implementation"):
+            lines.append(f"  - **Implementation**: {arguments['implementation']}")
+        if arguments.get("parameters"):
+            lines.append(f"  - **Parameters**: {arguments['parameters']}")
+        if arguments.get("justification"):
+            lines.append(f"  - **Justification**: {arguments['justification']}")
+        if arguments.get("assumptions"):
+            for a in arguments["assumptions"]:
+                lines.append(f"  - **Assumption checked**: {a}")
+        line = "\n".join(lines) + "\n"
+    with open(m_path, "a") as f:
+        f.write(line)
+    return _text(_success({"logged": True, "path": "workspace/methods.md"}))
+
+
+def _handle_mem_citations_generate(name, arguments, root):
+    from research_os.project_ops import generate_citations_md
+
+    return _text(_success({"citations_path": generate_citations_md(root)}))
+
+
+def _handle_mem_intake_regenerate(name, arguments, root):
+    from research_os.project_ops import regenerate_intake
+
+    return _text(_success({"intake_path": regenerate_intake(root)}))
+
+
+def _handle_mem_decision_log(name, arguments, root):
+    res = log_decision(
+        arguments["context"],
+        arguments["selected"],
+        arguments["rationale"],
+        root=root,
+    )
+    return _text(_success(res))
+
+
+def _handle_tool_search(name, arguments, root):
+    q = arguments["query"]
+    limit = arguments.get("limit", 5)
+    handler_map = {
+        "tool_search_semantic_scholar": search_semantic_scholar,
+        "tool_search_pubmed": search_pubmed,
+        "tool_search_crossref": search_crossref,
+        "tool_search_arxiv": search_arxiv,
+        "tool_search_web": search_web,
+    }
+    fn = handler_map[name]
+    _log_search(root, name, q, 0)
+    res = fn(q, limit)
+    return _text(_success(res))
+
+
+def _handle_tool_web_scrape(name, arguments, root):
+    return _text(_success(scrape_web(arguments["url"])))
+
+
+def _handle_tool_literature_download(name, arguments, root):
+    res = download_literature(arguments["url"], arguments["filename"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "download failed")))
+
+
+def _handle_tool_python_exec(name, arguments, root):
+    p = root / arguments["script_path"]
+    if not p.exists() or not p.is_file():
+        return _text(_error("Script not found"))
+
+    step_name = p.stem
+    log_dir = root / "workspace" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    exec_log_path = log_dir / f"{step_name}_exec.log"
+
+    cmd = [sys.executable, str(p)]
+    timeout = int(arguments.get("timeout", 600))
+    try:
+        res = subprocess.run(
+            cmd,
+            cwd=str(p.parent),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return _text(_error(f"Script timed out after {timeout}s"))
+
+    with open(exec_log_path, "a") as f:
+        f.write(
+            f"--- Executed at {now_iso()} ---\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Return Code: {res.returncode}\n"
+            f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}\n\n"
+        )
+
+    return _text(
+        _success({"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode})
+    )
+
+
+def _handle_tool_script_exec(name, arguments, root):
+    from research_os.tools.actions.execution import (
+        execute_bash_script,
+        execute_julia_script,
+        execute_r_script,
+    )
+
+    timeout = arguments.get("timeout", 600)
+    script_path = arguments["script_path"]
+    fn = {
+        "tool_r_exec": execute_r_script,
+        "tool_julia_exec": execute_julia_script,
+        "tool_bash_exec": execute_bash_script,
+    }[name]
+    res = fn(script_path, root, timeout)
+    if res.get("status") == "error":
+        return _text(_error(res.get("message", "execution failed")))
+    return _text(_success(res))
+
+
+def _handle_tool_package_install(name, arguments, root):
+    packages = arguments["packages"]
+    res = package_install(packages)
+    if res.get("status") == "success":
+        req_path = root / "environment" / "requirements.txt"
+        req_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = req_path.read_text().splitlines() if req_path.exists() else []
+        with open(req_path, "a") as f:
+            for pkg in packages:
+                if pkg not in existing:
+                    f.write(f"{pkg}\n")
+    return _text(_success(res))
+
+
+def _handle_tool_data_sample(name, arguments, root):
+    from research_os.tools.actions.data import data_sample
+
+    res = data_sample(
+        arguments["filepath"],
+        int(arguments.get("n_rows", 20)),
+        arguments.get("strategy", "head"),
+        root,
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", res.get("error", "sample failed"))))
+
+
+def _handle_tool_data_profile(name, arguments, root):
+    from research_os.tools.actions.data import data_profile
+
+    res = data_profile(arguments["filepath"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", res.get("error", "profile failed"))))
+
+
+def _handle_tool_data_convert(name, arguments, root):
+    from research_os.tools.actions.data import data_convert
+
+    res = data_convert(arguments["filepath"], arguments["output_format"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", res.get("error", "convert failed"))))
+
+
+def _handle_tool_audit_synthesis(name, arguments, root):
+    from research_os.tools.actions.audit import audit_synthesis
+
+    res = audit_synthesis(arguments["paper_path"], root)
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_audit_power(name, arguments, root):
+    from research_os.tools.actions.audit import audit_power
+
+    res = audit_power(
+        arguments["filepath"],
+        arguments.get("effect_size", 0.5),
+        arguments["alpha"],
+        arguments["n"],
+        root,
+    )
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_audit_assumptions(name, arguments, root):
+    from research_os.tools.actions.audit import audit_assumptions
+
+    res = audit_assumptions(arguments["filepath"], root)
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_audit_figure(name, arguments, root):
+    from research_os.tools.actions.audit import audit_figure
+
+    res = audit_figure(arguments["filepath"], root)
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_audit_citations(name, arguments, root):
+    from research_os.tools.actions.audit import audit_citations
+
+    res = audit_citations(root)
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_audit_reproducibility(name, arguments, root):
+    from research_os.tools.actions.audit import audit_reproducibility_full
+
+    res = audit_reproducibility_full(root)
+    if res.get("status") != "error":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "audit failed")))
+
+
+def _handle_tool_synthesize_plan(name, arguments, root):
+    from research_os.tools.actions.synthesize import synthesize_plan
+
+    return _text(_success(synthesize_plan(root)))
+
+
+def _handle_tool_synthesize(name, arguments, root):
+    from research_os.tools.actions.synthesize import synthesize_workspace
+
+    fmt = arguments.get("output_format", "markdown")
+    sec = arguments.get("section")
+    res = synthesize_workspace(root, output_format=fmt, section=sec)
+    if "error" in res:
+        return _text(_error(res["error"]))
+    return _text(_success(res))
+
+
+def _handle_tool_latex_compile(name, arguments, root):
+    from research_os.tools.actions.latex import latex_compile
+
+    return _text(_success(latex_compile(root)))
+
+
+def _handle_tool_poster_create(name, arguments, root):
+    from research_os.tools.actions.latex import create_poster
+
+    return _text(_success(create_poster(root)))
+
+
+def _handle_tool_dashboard_create(name, arguments, root):
+    from research_os.tools.actions.latex import create_dashboard
+
+    res = create_dashboard(root, title=arguments.get("title"))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "dashboard create failed")))
+
 
 _HANDLERS = {
-    "sys_md_validate": _handle_sys_md_validate,
-    "tool_audit_md_consistency": _handle_sys_md_validate,
-    "sys_guidance_list": _handle_sys_guidance_list,
-    "sys_guidance_get": _handle_sys_guidance_get,
-    "sys_guidance_validate": _handle_sys_guidance_validate,
-    "sys_tool_info": _handle_sys_tool_info,
-    "sys_tool_search": _handle_sys_tool_search,
-    "tool_r_exec": _handle_tool_r_exec_group,
-    "tool_julia_exec": _handle_tool_r_exec_group,
-    "tool_bash_exec": _handle_tool_r_exec_group,
+    # protocol
+    "sys_protocol_get": _handle_sys_protocol_get,
+    "sys_protocol_list": _handle_sys_protocol_list,
     "sys_protocol_next": _handle_sys_protocol_next,
+    "sys_protocol_validate": _handle_sys_protocol_validate,
     "sys_protocol_log": _handle_sys_protocol_log,
     "sys_protocol_history": _handle_sys_protocol_history,
+    # state / workspace
+    "sys_state_get": _handle_sys_state_get,
     "sys_workspace_scaffold": _handle_sys_workspace_scaffold,
     "sys_workspace_tree": _handle_sys_workspace_tree,
+    # files
     "sys_file_read": _handle_sys_file_read,
     "sys_file_write": _handle_sys_file_write,
     "sys_file_list": _handle_sys_file_list,
     "sys_file_delete": _handle_sys_file_delete,
-    "sys_state_get": _handle_sys_state_get,
-    "sys_state_summary": _handle_sys_state_summary,
-    "sys_state_summary_md": _handle_sys_state_summary_md,
-    "sys_state_minimal_context": _handle_sys_state_minimal_context,
-    "sys_state_health": _handle_sys_state_health,
-    "sys_session_handoff": _handle_sys_session_handoff,
-    "tool_task_create": _handle_tool_task_create,
-    "tool_synthesize": _handle_tool_synthesize,
-    "tool_synthesize_plan": _handle_tool_synthesize_plan,
-    "tool_audit_synthesis": _handle_tool_audit_synthesis,
-    "tool_audit_statistical_power": _handle_tool_audit_statistical_power,
-    "tool_audit_assumptions": _handle_tool_audit_assumptions,
-    "tool_audit_figure_quality": _handle_tool_audit_figure_quality,
-    "tool_audit_reproducibility_full": _handle_tool_audit_reproducibility_full,
-    "sys_checkpoint_create": _handle_sys_checkpoint_create,
-    "sys_checkpoint_rollback": _handle_sys_checkpoint_rollback,
-    "sys_checkpoint_list": _handle_sys_checkpoint_list,
-    "sys_checkpoint_pending": _handle_sys_checkpoint_pending,
-    "sys_checkpoint_approve": _handle_sys_checkpoint_approve,
+    "sys_file_validate_md": _handle_sys_file_validate_md,
+    # paths
     "sys_path_create": _handle_sys_path_create,
     "sys_path_abandon": _handle_sys_path_abandon,
     "sys_path_list": _handle_sys_path_list,
-    "sys_config_init": _handle_sys_config_init,
+    # checkpoints
+    "sys_checkpoint_create": _handle_sys_checkpoint_create,
+    "sys_checkpoint_rollback": _handle_sys_checkpoint_rollback,
+    "sys_checkpoint_list": _handle_sys_checkpoint_list,
+    # config
     "sys_config_get": _handle_sys_config_get,
     "sys_config_set": _handle_sys_config_set,
     "sys_config_validate": _handle_sys_config_validate,
-    "sys_config_profile": _handle_sys_config_profile,
-    "sys_config_explain": _handle_sys_config_explain,
+    # interaction
     "sys_notify": _handle_sys_notify,
-    "sys_external_mcp_discover": _handle_sys_external_mcp_discover,
-    "sys_task_monitor": _handle_sys_task_monitor,
-    "sys_task_kill": _handle_sys_task_kill,
+    "sys_session_handoff": _handle_sys_session_handoff,
+    # environment
+    "sys_env_snapshot": _handle_sys_env_snapshot,
+    "sys_env_docker_generate": _handle_sys_env_docker_generate,
+    # memory
     "mem_analysis_log": _handle_mem_analysis_log,
     "mem_methods_append": _handle_mem_methods_append,
     "mem_citations_generate": _handle_mem_citations_generate,
     "mem_intake_regenerate": _handle_mem_intake_regenerate,
-    "view_workspace_tree": _handle_view_workspace_tree,
-    "tool_search_semantic_scholar": _handle_tool_search_semantic_scholar,
-    "tool_search_pubmed": _handle_tool_search_pubmed,
-    "tool_search_crossref": _handle_tool_search_crossref,
-    "tool_search_web": _handle_tool_search_web,
+    "mem_decision_log": _handle_mem_decision_log,
+    # search
+    "tool_search_semantic_scholar": _handle_tool_search,
+    "tool_search_pubmed": _handle_tool_search,
+    "tool_search_crossref": _handle_tool_search,
+    "tool_search_arxiv": _handle_tool_search,
+    "tool_search_web": _handle_tool_search,
     "tool_web_scrape": _handle_tool_web_scrape,
     "tool_literature_download": _handle_tool_literature_download,
+    # execution
     "tool_python_exec": _handle_tool_python_exec,
+    "tool_r_exec": _handle_tool_script_exec,
+    "tool_julia_exec": _handle_tool_script_exec,
+    "tool_bash_exec": _handle_tool_script_exec,
     "tool_package_install": _handle_tool_package_install,
-    "tool_env_freeze": _handle_tool_env_freeze_group,
-    "sys_env_snapshot": _handle_tool_env_freeze_group,
-    "tool_env_restore": _handle_tool_env_restore,
-    "sys_env_docker_generate": _handle_sys_env_docker_generate,
+    # data
+    "tool_data_sample": _handle_tool_data_sample,
+    "tool_data_profile": _handle_tool_data_profile,
+    "tool_data_convert": _handle_tool_data_convert,
+    # audit
+    "tool_audit_synthesis": _handle_tool_audit_synthesis,
+    "tool_audit_power": _handle_tool_audit_power,
+    "tool_audit_assumptions": _handle_tool_audit_assumptions,
+    "tool_audit_figure": _handle_tool_audit_figure,
+    "tool_audit_citations": _handle_tool_audit_citations,
+    "tool_audit_reproducibility": _handle_tool_audit_reproducibility,
+    # synthesis
+    "tool_synthesize_plan": _handle_tool_synthesize_plan,
+    "tool_synthesize": _handle_tool_synthesize,
     "tool_latex_compile": _handle_tool_latex_compile,
     "tool_poster_create": _handle_tool_poster_create,
-    "tool_data_sample": _handle_tool_data_sample,
-    "tool_data_convert": _handle_tool_data_convert,
-    "tool_log_decision": _handle_tool_log_decision,
+    "tool_dashboard_create": _handle_tool_dashboard_create,
 }
+
+# Aliases — keep the AI's life easy when it forgets exact naming.
+_ALIASES = {
+    # Legacy: dot notation
+    # Handled generically by dot→underscore in dispatcher.
+    # Legacy: old tool names
+    "sys_guidance_get": "sys_protocol_get",
+    "sys_guidance_list": "sys_protocol_list",
+    "sys_guidance_validate": "sys_protocol_validate",
+    "sys_md_validate": "sys_file_validate_md",
+    "tool_audit_md_consistency": "sys_file_validate_md",
+    "view_workspace_tree": "sys_workspace_tree",
+    "tool_env_freeze": "sys_env_snapshot",
+    "tool_env_restore": "sys_env_snapshot",
+    "tool_log_decision": "mem_decision_log",
+    "tool_audit_statistical_power": "tool_audit_power",
+    "tool_audit_figure_quality": "tool_audit_figure",
+    "tool_audit_reproducibility_full": "tool_audit_reproducibility",
+    "sys_state_summary": "sys_state_get",
+    "sys_state_summary_md": "sys_state_get",
+    "sys_state_health": "sys_state_get",
+    "sys_state_minimal_context": "sys_state_get",
+    "sys_config_profile": "sys_config_get",
+    "sys_config_init": "sys_workspace_scaffold",
+    "sys_config_explain": "sys_config_get",
+    "sys_tool_info": "sys_protocol_get",
+    "sys_tool_search": "sys_protocol_list",
+}
+
+
+def _resolve_tool_name(name: str) -> str:
+    """Normalize incoming tool name: dots→underscores, then alias lookup."""
+    canonical = name.replace(".", "_")
+    return _ALIASES.get(canonical, canonical)
+
 
 def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextContent]:
     if not _rate_limiter.is_allowed():
-        return _text(_error_envelope("Rate limit exceeded."))
-    logger.info(f"Tool call: {name}")
-    handler = _HANDLERS.get(name)
+        return _text(_error("Rate limit exceeded — slow down."))
+    resolved = _resolve_tool_name(name)
+    logger.info(f"Tool call: {name} -> {resolved}")
+    handler = _HANDLERS.get(resolved)
     if handler is None:
-        if name.startswith("sys_") or name.startswith("tool_") or name.startswith("mem_"):
-            return _text(_error_envelope(f"Tool '{name}' is not yet implemented. Use sys.tool.search to find an alternative."))
-        return _text(_error_envelope(f"Unknown tool: {name}"))
+        return _text(
+            _error(
+                f"Unknown tool '{name}'. Call sys_protocol_list to see the tool surface "
+                "or check tool_search_web for the right capability."
+            )
+        )
     try:
-        return handler(name, arguments, root)
+        return handler(resolved, arguments, root)
     except Exception as e:
         logger.exception(f"Tool {name} failed")
-        return _text(_error_envelope(str(e)))
+        return _text(_error(str(e)))
+
+
+# ---------------------------------------------------------------------------
+# MCP wiring
+# ---------------------------------------------------------------------------
+
 
 if HAS_MCP:
     server = Server("research-os")
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        import os
-
         root = Path(os.getcwd())
-        config_res = get_config(root)
-        profile = "large"
-        if config_res.get("status") == "success":
-            profile = config_res.get("config", {}).get("model_profile", "large")
-
-        tools = []
+        profile = _read_profile(root)
+        tools: list[Tool] = []
         for name, schema in TOOL_DEFINITIONS.items():
             desc = schema["description"]
-            if profile == "small":
-                desc = desc.split(".")[0] + "."  # Bare essentials
+            if profile.get("model_profile") == "small":
+                # Keep only the first sentence to save context for small models.
+                desc = desc.split(".")[0] + "."
             tools.append(
                 Tool(name=name, description=desc, inputSchema=schema["inputSchema"])
             )
@@ -1688,8 +1543,6 @@ if HAS_MCP:
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-        import os
-
         root = Path(os.getcwd())
         return _handle_tool_call(name, arguments, root)
 
@@ -1698,6 +1551,39 @@ if HAS_MCP:
             await server.run(
                 read_stream, write_stream, server.create_initialization_options()
             )
+
+
+def _inject_api_keys(root: Path) -> None:
+    """Read inputs/researcher_config.yaml and export api_keys as env vars."""
+    try:
+        import yaml as _yaml
+
+        cfg_path = root / "inputs" / "researcher_config.yaml"
+        if not cfg_path.exists():
+            cfg_path = root / "researcher_config.yaml"
+            if not cfg_path.exists():
+                return
+        cfg = _yaml.safe_load(cfg_path.read_text()) or {}
+        api_keys = cfg.get("api_keys", {}) or {}
+        for key, value in api_keys.items():
+            if not value:
+                continue
+            env_name = key.upper()
+            os.environ[env_name] = str(value)
+            # Common alternative names (compat with multiple SDKs)
+            if key == "semantic_scholar":
+                os.environ["SEMANTIC_SCHOLAR_API_KEY"] = str(value)
+                os.environ["S2_API_KEY"] = str(value)
+            if key == "firecrawl":
+                os.environ["FIRECRAWL_API_KEY"] = str(value)
+            if key == "serpapi":
+                os.environ["SERPAPI_API_KEY"] = str(value)
+            if key == "openai":
+                os.environ["OPENAI_API_KEY"] = str(value)
+            if key == "anthropic":
+                os.environ["ANTHROPIC_API_KEY"] = str(value)
+    except Exception as e:  # pragma: no cover - non-fatal
+        logger.debug(f"API key injection skipped: {e}")
 
 
 def main() -> None:
@@ -1709,27 +1595,14 @@ def main() -> None:
     if args.workspace:
         os.chdir(args.workspace)
 
-    # Inject API keys from researcher_config.yaml into environment
-    try:
-        root = Path(os.getcwd())
-        import yaml
-        config_file = root / "researcher_config.yaml"
-        if config_file.exists():
-            with open(config_file) as f:
-                cfg = yaml.safe_load(f)
-            api_keys = cfg.get("api_keys", {}) if cfg else {}
-            for key, value in api_keys.items():
-                if value:
-                    os.environ[key.upper()] = value
-    except Exception:
-        pass  # Non-fatal — keys simply won't be injected
+    _inject_api_keys(Path(os.getcwd()))
 
     if HAS_MCP:
         import asyncio
 
         asyncio.run(run_stdio())
     else:
-        sys.exit("MCP package missing.")
+        sys.exit("MCP package missing. Install with: pip install 'research-os[all]'")
 
 
 if __name__ == "__main__":

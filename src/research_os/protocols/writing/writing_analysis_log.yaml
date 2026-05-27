@@ -1,40 +1,40 @@
-name: writing_analysis_log
-version: 1.0.0
-description: How to write structured entries to workspace/analysis.md via 
-  mem_analysis.log.
-always_include:
-- writing_core
-entry_template: '[{timestamp}] **{step_name} — {status}**
+id: writing_analysis_log
+name: Writing — Analysis Log
+version: '4.0.0'
+schema_version: '2.0'
+description: Format for structured entries appended to workspace/analysis.md via mem_analysis_log.
 
-  - **Tools used:** {tool_list}
+entry_template: |
+  [{timestamp}] **{step_id} — {status}**
+  - tools: {tool_list}
+  - key result: {quantitative summary with number}
+  - decision: {next action}
+  - routing: {continue|new_path|dead_end}
+  - warnings: {warnings or "none"}
 
-  - **Key result:** {quantitative_summary}
-
-  - **Decision:** {next_action}
-
-  - **Routing:** {continue_in_path_or_new_path}
-
-  - **Warnings:** {warnings}
-
-  '
-rules:
-- 'Status must be: STARTED, COMPLETED, ABANDONED, PAUSED.'
-- Key result must include a number or statistical finding.
-- After logging, update workspace/workflow.mermaid.
 steps:
-- id: log_entry
-  name: Log Analysis Entry
-  description: Write an entry to analysis.md using the template.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_analysis_log
-    completed'.\n5. Ask researcher: 'I've completed writing_analysis_log. Want me
-    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
-    new tools/libraries have been snapshotted to the step's environment file.\n  \
-    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: pick_status
+    name: Pick a Status
+    description: |
+      One of: STARTED · COMPLETED · ABANDONED · PAUSED · BLOCKED.
+
+  - id: log
+    name: Log the Entry
+    description: |
+      mem_analysis_log entry=<formatted entry from template>
+      The mem_analysis_log handler timestamps automatically; you only need to
+      provide the {step_id} {status} ... portion.
+
+  - id: refresh_workflow_diagram
+    name: Refresh Workflow Diagram
+    description: |
+      mem_analysis_log automatically regenerates workspace/workflow.mermaid.
+      Spot-check that your new step node appears with the right colour
+      (active=yellow, completed=green, dead_end=red).
+
+expected_outputs:
+  - workspace/analysis.md
+  - workspace/workflow.mermaid
+
+next_protocol: null
+on_failure: null

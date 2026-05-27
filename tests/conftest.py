@@ -1,6 +1,9 @@
-"""Global test fixtures — ensures tests never touch the real filesystem."""
-import pytest
+"""Global pytest fixtures — keep tests off the real filesystem."""
+
 from pathlib import Path
+
+import pytest
+
 
 @pytest.fixture(autouse=True)
 def _isolate_find_project_root(request, monkeypatch, tmp_path):
@@ -16,7 +19,8 @@ def _isolate_find_project_root(request, monkeypatch, tmp_path):
         return tmp_path
 
     monkeypatch.setattr(
-        asset_manager.AssetManager, "find_project_root",
+        asset_manager.AssetManager,
+        "find_project_root",
         staticmethod(_fake_find_project_root),
     )
     monkeypatch.setattr(
@@ -25,9 +29,5 @@ def _isolate_find_project_root(request, monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         "research_os.state.state_ledger.find_project_root",
-        _fake_find_project_root,
-    )
-    monkeypatch.setattr(
-        "research_os.state.checkpoint_manager.find_project_root",
         _fake_find_project_root,
     )

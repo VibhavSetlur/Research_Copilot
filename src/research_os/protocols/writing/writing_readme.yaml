@@ -1,93 +1,68 @@
-name: writing_readme
-version: 1.0.0
-description: How to update project and per‑step README.md files.
-always_include:
-- writing_core
-project_readme_template: '# {project_name}
+id: writing_readme
+name: Writing — README
+version: '4.0.0'
+schema_version: '2.0'
+description: Maintain the project-level README and per-step READMEs.
 
+project_readme_template: |
+  # {project_name}
 
   **Research Question:** {question}
-
   **Status:** {status}
-
   **Last Updated:** {date}
 
-
-  ## Workflow Summary
-
-  ![Workflow](synthesis/workflow_diagram.png)
-
+  ## Pipeline
+  ![Workflow](workspace/workflow.png)
 
   ## Key Findings
-
-  {top_3_findings}
-
+  - {top finding 1}
+  - {top finding 2}
+  - {top finding 3}
 
   ## Outputs
-
   - [Abstract](synthesis/abstract.md)
+  - [Paper](synthesis/paper.md) · [PDF](synthesis/paper.pdf)
+  - [Dashboard](synthesis/dashboard.html)
 
-  - [Paper](synthesis/paper.pdf)
+  ## Reproduce
+  1. Clone the repo.
+  2. `pip install -r environment/requirements.txt`
+  3. Run experiment scripts in order: see workspace/*/README.md.
 
-  {extra_outputs}
-
-
-  ## How to Reproduce
-
-  1. Clone repository
-
-  2. Restore environment: `pip install -r environment/requirements.txt`
-
-  3. Run scripts in order: {script_order}
-
-  '
-per_step_readme_template: '# {step_name}
-
-  **Created:** {date}
-
+per_step_readme_template: |
+  # {step_id}
+  Created: {date}
 
   ## Goal
+  {one-paragraph goal}
 
-  {goal}
-
-
-  ## Input Data
-
-  - {input_1} (sha256:{hash})
-
+  ## Input data
+  - {input file 1} (sha256:{hash})
 
   ## Methods
-
-  - {method_1}
-
+  - {method 1}
 
   ## Outputs
+  - {output 1}
 
-  - {output_1}
+  ## Decision
+  {proceed | branch | dead-end} — {one-line rationale}
 
-
-  ## Next‑Step Decision
-
-  {decision}
-
-  '
 steps:
-- id: update_project_readme
-  name: Update Project README
-  description: After final synthesis, update the project README.
-- id: update_step_readme
-  name: Update Step README
-  description: After completing a step, fill in the per‑step README.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_readme
-    completed'.\n5. Ask researcher: 'I've completed writing_readme. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: update_project
+    name: Update Project README
+    description: |
+      After synthesis completes, populate README.md at the project root using the
+      template above. sys_file_write filepath="README.md" force=true.
+
+  - id: update_step
+    name: Update Step README
+    description: |
+      After each experiment step's conclusions are written, refresh
+      workspace/<step>/README.md with the actual inputs/methods/outputs.
+
+expected_outputs:
+  - README.md
+
+next_protocol: null
+on_failure: null

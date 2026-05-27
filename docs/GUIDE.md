@@ -1,346 +1,290 @@
-# Research OS Guide
+# Research OS — Guide
 
-Research OS is an MCP server that gives AI coding IDEs (Cursor, Claude Desktop, etc.)
-73 tools to do reproducible, citation-verified research. The IDE is the brain (it plans,
-reasons, calls tools). Research OS is the body (it executes, records state, enforces
-immutability).
+Research OS is an MCP server that gives AI coding IDEs (Cursor, Claude,
+Antigravity, OpenCode, VS Code) the tools and protocols to do reproducible
+research. **The IDE is the brain; Research OS is the body.**
 
 ---
 
-## Quick Setup
+## 1. Install
 
 ```bash
-pip install "research-os[web,literature,viz,poster] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+pip install "research-os[all] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+```
 
+Optional extras: `web`, `literature`, `viz`, `execution`, `r`, `julia`, `audit`, `poster`, `ml`.
+
+## 2. Scaffold
+
+```bash
 mkdir my-project && cd my-project
-research-os init --name "My Study"
+research-os init                                # uses cwd name
+# or:
+research-os init my-project --name "PM2.5 Study" --domain clinical
+```
+
+`init` drops:
+
+* `AGENTS.md`                  — operating manual the AI reads first.
+* `inputs/researcher_config.yaml` — source of truth for AI behaviour.
+* `.os_state/` + state ledger  — initial pipeline state.
+* `.cursor/`, `.claude/`, `.antigravity/`, `.vscode/`, `opencode.json` —
+  pre-wired MCP configs.
+
+## 3. Start the server
+
+```bash
 research-os start --workspace .
 ```
 
-Connect your IDE to the MCP server (command: `research-os start --workspace .`).
-Put raw data in `inputs/raw_data/`, papers in `inputs/literature/`.
+Most IDEs auto-launch this via the MCP config dropped in step 2 — you typically
+don't run `start` manually.
+
+## 4. Add data, then talk to the AI
+
+* Drop datasets into `inputs/raw_data/`.
+* Drop PDFs into `inputs/literature/`.
+* Open your IDE pointed at the project. Say:
+
+  > "start the project"  · "analyse my data"  · "find related literature"  · "write the paper"
+
+The AI follows AGENTS.md, calls `sys_protocol_next`, loads the protocol, and
+walks through its steps using MCP tools.
 
 ---
 
-## Workspace Layout
+## 5. The 51 MCP tools
 
-```
-my-project/
-├── AGENTS.md                       # AI agent operating protocol
-├── README.md                       # Auto-generated project overview
-├── .os_state/                      # INTERNAL — OS state (DO NOT EDIT)
-│   ├── state_ledger.json           # Primary state (paths, stage, checkpoints)
-│   ├── manifest.json               # Auto-synced workspace file inventory
-│   ├── os_state.md                 # Human-readable status snapshot
-│   ├── protocol_execution_log.jsonl # Protocol execution history
-│   ├── checkpoints/                # Workspace snapshots
-│   └── cache/                      # API response cache
-├── docs/                           # Human-written research docs
-│   ├── research_question.md        # Main question + sub-questions
-│   └── glossary.md                 # Term definitions
-├── inputs/                         # IMMUTABLE — researcher provided
-│   ├── researcher_config.yaml      # Researcher preferences, autonomy, API keys
-│   ├── raw_data/                   # Source data (CSV, Parquet, JSON, etc.)
-│   ├── literature/                 # PDF papers
-│   ├── context/                    # Notes, past results, text files
-│   ├── intake.md                   # Auto-generated research brief (SHA-256 table)
-│   └── literature_index.yaml       # Filename → citation key mapping
-├── workspace/                      # ACTIVE — iterative experiments
-│   ├── methods.md                  # Append-only method log
-│   ├── analysis.md                 # Chronological log + Mermaid workflow
-│   ├── citations.md                # Running bibliography with verified flags
-│   ├── workflow.mermaid            # Auto-updated workflow diagram (colored nodes)
-│   ├── workflow.png                # Rendered diagram (via mmdc)
-│   ├── logs/
-│   │   ├── searches.log            # Every web search logged (JSON lines)
-│   │   ├── state_changes.log       # Before/after state diffs
-│   │   ├── notifications.log       # Researcher notifications
-│   │   ├── data_inventory.json     # Auto-profiled data inventory
-│   │   └── 01_baseline.log         # Per-step execution logs
-│   ├── 01_experiment_baseline/     # Numbered experiment steps
-│   │   ├── README.md               # Goal, hypotheses, outcomes
-│   │   ├── conclusions.md          # Key findings, routing decisions
-│   │   ├── data/                   # Derived data
-│   │   ├── scripts/                # Versioned scripts
-│   │   ├── outputs/
-│   │   │   ├── reports/
-│   │   │   ├── figures/
-│   │   │   ├── tables/
-│   │   │   └── dashboards/
-│   │   └── environment/            # Pinned dependencies
-│   ├── 02_data_preparation/
-│   │   └── ... (same structure)
-│   └── .os_state/                  # Symlink to root .os_state/
-├── synthesis/                      # FINAL — populated on completion
-│   ├── abstract.md
-│   ├── paper.tex / paper.pdf
-│   ├── references.bib
-│   ├── workflow_diagram.png
-│   └── supplementary/
-└── environment/                    # Global environment
-    ├── requirements.txt
-    └── Dockerfile
-```
+### System (`sys_*`)
 
-Key rules:
-- **`inputs/` is immutable** — tools reject writes there. Copy to `workspace/` to process.
-- **Experiments are chronological** — `sys.path.create` auto-numbers folders `01_`, `02_`, ...
-- **`methods.md` is append-only** — append via `mem.methods.append`.
-- **State is atomic** — updates use temp-file + rename on every tool call.
+| Tool | Description |
+|---|---|
+| `sys_protocol_get`     | Load a protocol YAML by name. |
+| `sys_protocol_list`    | List every protocol with summary. |
+| `sys_protocol_next`    | Recommend the next protocol from workspace state. |
+| `sys_protocol_validate`| Check whether a protocol's expected outputs exist. |
+| `sys_protocol_log`     | Record a protocol execution. |
+| `sys_protocol_history` | Show recent protocol log entries. |
+| `sys_state_get`        | Full state (or `format=minimal|markdown`). |
+| `sys_workspace_scaffold` | Re-create the workspace layout. |
+| `sys_workspace_tree`   | Structured view of `workspace/`. |
+| `sys_file_read`        | Read a workspace file (≤50 MB). |
+| `sys_file_write`       | Write a workspace file (respects immutability). |
+| `sys_file_list`        | Recursively list a directory. |
+| `sys_file_delete`      | Delete a file or empty directory. |
+| `sys_file_validate_md` | Validate a markdown file against a writing protocol. |
+| `sys_path_create`      | Create the next numbered experiment folder. |
+| `sys_path_abandon`     | Rename a step to `__DEAD_END`. |
+| `sys_path_list`        | List all numbered experiments + status. |
+| `sys_checkpoint_create`| Hardlinked workspace snapshot. |
+| `sys_checkpoint_rollback` | Restore a checkpoint (backs up current first). |
+| `sys_checkpoint_list`  | List checkpoints. |
+| `sys_config_get`       | Read `inputs/researcher_config.yaml` (API keys masked). |
+| `sys_config_set`       | Set a config key (dot notation). |
+| `sys_config_validate`  | Report missing required fields + which API keys are set. |
+| `sys_notify`           | Notify the researcher (logged). |
+| `sys_session_handoff`  | Generate a markdown handoff + resume prompt. |
+| `sys_env_snapshot`     | Snapshot Python/R/Julia environment to current step. |
+| `sys_env_docker_generate` | Build a Dockerfile from the environment snapshot. |
 
----
+### Tools (`tool_*`)
 
-## All 73 MCP Tools
+| Tool | Description |
+|---|---|
+| `tool_search_semantic_scholar` | Semantic Scholar Graph API. |
+| `tool_search_pubmed`     | PubMed via NCBI eutils. |
+| `tool_search_crossref`   | Crossref. |
+| `tool_search_arxiv`      | arXiv (no key required). |
+| `tool_search_web`        | Firecrawl primary, SerpAPI fallback. |
+| `tool_web_scrape`        | Scrape a webpage to markdown. |
+| `tool_literature_download` | Download a paper PDF to `inputs/literature/`. |
+| `tool_python_exec`       | Run a Python script in workspace. |
+| `tool_r_exec`            | Run an R script. |
+| `tool_julia_exec`        | Run a Julia script. |
+| `tool_bash_exec`         | Run a Bash script. |
+| `tool_package_install`   | `pip install` + append to requirements.txt. |
+| `tool_data_sample`       | Sample N rows from CSV/Parquet/Feather/JSON/Excel. |
+| `tool_data_profile`      | Schema + missingness + descriptive stats. |
+| `tool_data_convert`      | CSV ↔ Parquet ↔ Feather ↔ RDS. |
+| `tool_audit_synthesis`   | Section coverage, causal-language flags, citation density. |
+| `tool_audit_power`       | Post-hoc statistical power. |
+| `tool_audit_assumptions` | Re-run normality / homoscedasticity / etc. |
+| `tool_audit_figure`      | DPI / size / format checks. |
+| `tool_audit_citations`   | Verify each citation online. |
+| `tool_audit_reproducibility` | Re-run every script and compare output hashes. |
+| `tool_synthesize_plan`   | Show available sources + recommended ordering. |
+| `tool_synthesize`        | Build synthesis/paper.md (or one section). |
+| `tool_latex_compile`     | paper.tex → PDF. |
+| `tool_poster_create`     | tikzposter → PDF. |
+| `tool_dashboard_create`  | Single-file HTML dashboard. |
 
-### System (`sys.*`) — 39 tools
+### Memory (`mem_*`)
 
-| Tool | What it does |
-|------|-------------|
-| `sys.guidance.get` | Load a protocol YAML (tells AI what steps to run) |
-| `sys.guidance.list` | List all available protocols |
-| `sys.guidance.validate` | Check if protocol expected outputs exist |
-| `sys.protocol.next` | Recommend next protocol based on pipeline stage |
-| `sys.protocol.log` | Record a protocol execution to the log |
-| `sys.protocol.history` | Read recent protocol execution history |
-| `sys.workspace.scaffold` | Create full project directory structure |
-| `sys.workspace.tree` | Return structured tree of `workspace/` |
-| `sys.file.read` | Read a file |
-| `sys.file.write` | Write a file (cannot write to `inputs/` or overwrite `synthesis/` without force) |
-| `sys.file.list` | List files in a directory |
-| `sys.file.delete` | Delete a file |
-| `sys.state.get` | Full workspace state |
-| `sys.state.summary` | Brief state summary |
-| `sys.state.summary_md` | Read `.os_state/os_state.md` |
-| `sys.state.health` | Context estimate, paths, handoff recommendation |
-| `sys.state.minimal_context` | ≤500 token snapshot for small models |
-| `sys.session.handoff` | Generate structured markdown session summary |
-| `sys.checkpoint.create` | Snapshot workspace |
-| `sys.checkpoint.rollback` | Rollback to a checkpoint |
-| `sys.checkpoint.list` | List checkpoints |
-| `sys.checkpoint.pending` | Register a pending action for approval |
-| `sys.checkpoint.approve` | Approve pending action |
-| `sys.path.create` | Create next numbered experiment folder |
-| `sys.path.abandon` | Mark a path as dead end |
-| `sys.path.list` | List experiment paths |
-| `sys.config.init` | Initialize researcher config |
-| `sys.config.get` | Read config |
-| `sys.config.set` | Set a config value |
-| `sys.config.validate` | Validate config and API keys |
-| `sys.config.profile` | Return autonomy/expertise/model in <100 tokens |
-| `sys.config.explain` | Document any config key |
-| `sys.notify` | Notify researcher |
-| `sys.external_mcp.discover` | Discover external MCP servers |
-| `sys.task.monitor` | Check background task status |
-| `sys.task.kill` | Kill a background task |
-| `sys.tool.info` | Get full schema for a tool |
-| `sys.tool.search` | Search tools by name/description |
-| `sys.md.validate` | Validate a .md file against a writing protocol |
-| `sys.env.snapshot` | Snapshot Python/R/Julia environment |
-| `sys.env.docker.generate` | Generate Dockerfile from environment snapshot |
-
-### Tool (`tool.*`) — 25 tools
-
-| Tool | What it does |
-|------|-------------|
-| `tool.task.create` | Create a background task |
-| `tool.audit.synthesis` | Audit manuscript completeness and claims |
-| `tool.audit.statistical_power` | Compute post-hoc power (warns if < 0.8) |
-| `tool.audit.assumptions` | Re-run assumption checks on model outputs |
-| `tool.audit.figure_quality` | Validate DPI, colorblind-friendly, labels |
-| `tool.audit.reproducibility_full` | Full Docker-based reproducibility check |
-| `tool.search.semantic_scholar` | Search Semantic Scholar |
-| `tool.search.pubmed` | Search PubMed |
-| `tool.search.crossref` | Search Crossref |
-| `tool.search.web` | Web search |
-| `tool.web.scrape` | Scrape a webpage |
-| `tool.literature.download` | Download a paper PDF |
-| `tool.python.exec` | Execute a Python script |
-| `tool.r.exec` | Execute an R script |
-| `tool.julia.exec` | Execute a Julia script |
-| `tool.bash.exec` | Execute a Bash script |
-| `tool.package.install` | Install Python packages |
-| `tool.env.freeze` | (Deprecated, use sys.env.snapshot) |
-| `tool.env.restore` | Restore a frozen environment |
-| `tool.latex.compile` | Compile synthesis/paper.tex to PDF |
-| `tool.poster.create` | Generate LaTeX poster |
-| `tool.data.sample` | Sample rows from a dataset |
-| `tool.data.convert` | Convert between CSV/RDS/Feather/Parquet |
-| `tool.log.decision` | Log a reasoning decision |
-| `tool.synthesize` | Compile workspace findings into synthesis/paper.md |
-| `tool.synthesize.plan` | Show available sections and recommended ordering |
-
-### Memory (`mem.*`) — 4 tools
-
-| Tool | What it does |
-|------|-------------|
-| `mem.analysis.log` | Append to `workspace/analysis.md` |
-| `mem.methods.append` | Append structured method entry to `workspace/methods.md` |
-| `mem.citations.generate` | Generate `workspace/citations.md` from literature index |
-| `mem.intake.regenerate` | Regenerate `inputs/intake.md` with file hashes |
-
-### View (`view.*`) — 1 tool
-
-| Tool | What it does |
-|------|-------------|
-| `view.workspace.tree` | Alias for `sys.workspace.tree` |
+| Tool | Description |
+|---|---|
+| `mem_analysis_log`      | Append a line to `workspace/analysis.md`. |
+| `mem_methods_append`    | Append a structured method entry. |
+| `mem_citations_generate`| Refresh `workspace/citations.md` from the literature index. |
+| `mem_intake_regenerate` | Refresh `inputs/intake.md` (hashes). |
+| `mem_decision_log`      | Append a structured decision (context/selected/rationale). |
 
 ---
 
-## Pipeline (10 Stages)
+## 6. The pipeline (10 stages)
 
-The pipeline guides the research from start to finish:
+`sys_protocol_next` checks the workspace and returns the first stage whose
+output does NOT yet exist on disk. The default chain:
 
-| # | Protocol | Trigger | Completed when |
-|---|----------|---------|---------------|
-| 1 | `guidance/session_boot` | Every session start | Config read, autonomy set, model profile set |
-| 2 | `guidance/project_startup` | After session_boot | `workspace/01_baseline_eda/conclusions.md` exists |
-| 3 | `domain/domain_analysis` | After startup | `workspace/logs/domain_analysis.log` exists |
-| 4 | `domain/research_design` | After domain analysis | `docs/research_question.md` exists |
-| 5 | `methodology/methodology_selection` | After design | `workspace/methods.md` exists |
-| 6 | `literature/literature_search` | After method selection | `inputs/literature_index.yaml` exists |
-| 7 | `guidance/analysis_plan` | After literature | `workspace/02_data_preparation/README.md` exists |
-| 8 | `reproducibility/reproducibility` | After analysis | `workspace/*/environment/requirements.txt` exists |
-| 9 | `audit/audit_and_validation` | After reproducibility | `workspace/logs/audit.log` exists |
-| 10 | `synthesis/synthesis_paper` | After audit | `synthesis/paper.md` exists |
+| # | Protocol                              | Completed when ... |
+|---|---------------------------------------|---------------------|
+| 1 | `guidance/session_boot`               | protocol_execution_log.jsonl exists |
+| 2 | `guidance/project_startup`            | inputs/intake.md + docs/research_question.md exist |
+| 3 | `domain/domain_analysis`              | docs/domain_summary.md exists |
+| 4 | `domain/research_design`              | docs/research_design.md exists |
+| 5 | `methodology/methodology_selection`   | workspace/methods.md has substantive content |
+| 6 | `literature/literature_search`        | inputs/literature_index.yaml + workspace/citations.md exist |
+| 7 | `guidance/analysis_plan`              | at least one workspace/NN/conclusions.md is non-empty |
+| 8 | `reproducibility/reproducibility`     | workspace/*/environment/requirements.txt exists |
+| 9 | `audit/audit_and_validation`          | workspace/logs/audit_report.md exists |
+| 10| `synthesis/synthesis_paper`           | synthesis/paper.md exists |
 
-Call `sys.protocol.next` at any time to find out what should run next.
-Each protocol also comes in a **light** variant (loaded for small models).
+Side protocols (loaded on demand):
 
----
-
-## Natural Language Workflow
-
-Research OS is designed for you to talk to the AI in plain English. Here is
-exactly what happens when you give a prompt:
-
-### Example Session
-
-**You (in your IDE):**
-> "I put air pollution data in inputs. Analyze it and tell me what you find."
-
-**What the AI does (automatically, behind the scenes):**
-
-| # | AI Action | Tool Call |
-|---|-----------|-----------|
-| 1 | Read project status | `sys.state.summary_md` |
-| 2 | Read my profile | `sys.config.profile` |
-| 3 | Read full config | `sys.config.get` |
-| 4 | See workspace layout | `sys.workspace.tree` |
-| 5 | Read full state | `sys.state.get` |
-| 6 | Load session boot protocol | `sys.guidance.get` → `guidance/session_boot` |
-| 7 | Confirm next action | `sys.protocol.next` → `guidance/project_startup` |
-| 8 | Load project startup protocol | `sys.guidance.get` → `guidance/project_startup` |
-| 9 | Re-generate intake with checksums | `mem.intake.regenerate` |
-| 10 | Create experiment folder | `sys.path.create` → `workspace/01_baseline_eda/` |
-| 11 | Write and run analysis script | `tool.python.exec` |
-| 12 | Log findings | `mem.analysis.log` |
-| 13 | Register method used | `mem.methods.append` |
-| 14 | Mark protocol complete | `sys.protocol.log` → `project_startup completed` |
-| 15 | Check what to do next | `sys.protocol.next` → `domain/domain_analysis` |
-
-**AI says:** *"I analyzed your air pollution data. PM2.5 is strongly correlated
-with respiratory cases (r=0.985). I created 01_baseline_eda with the full
-analysis. Next step: domain_analysis. Should I continue?"*
-
-### More Prompts
-
-| You say | AI does |
-|---------|---------|
-| "Continue with domain analysis" | Loads `domain/domain_analysis` protocol, follows its steps |
-| "Search for related literature" | `tool.search.semantic_scholar` + `tool.search.pubmed` |
-| "This approach isn't working, abandon it" | `sys.path.abandon` with rationale |
-| "Run a statistical power check" | `tool.audit.statistical_power` on results |
-| "Write the methods section" | Loads `writing/writing_methods` protocol, calls `tool.synthesize` |
-| "Generate the paper" | Follows pipeline to `synthesis/synthesis_paper`, calls `tool.synthesize` |
-| "What should I do next?" | `sys.protocol.next` — returns current pipeline stage |
-| "What happened in the last session?" | `sys.protocol.history` — shows protocol execution log |
-| "Check if my methods are correct" | `sys.md.validate` against the writing protocol template |
-
-The AI never guesses — it always loads the protocol YAML and follows the
-numbered steps. You can inspect any protocol yourself by running
-`sys.guidance.list` to see available ones, then `sys.guidance.get` to read one.
+* `methodology/{clinical_trials,machine_learning,meta_analysis,causal_inference_deep,survey_psychometrics,research_methods,tool_discovery}`
+* `literature/{systematic_review,evidence_synthesis}`
+* `synthesis/{synthesis_abstract,synthesis_poster,synthesis_dashboard}`
+* `writing/{writing_core,writing_methods,writing_citations,writing_conclusions,writing_analysis_log,writing_readme}`
+* `guidance/{dead_end_routing,hypothesis_tracking,glossary_update,writing_standards}`
+* `visualization/figure_guidelines`
 
 ---
 
-## Key CLI Commands
+## 7. Natural-language workflow
 
-| Command | What it does |
-|---------|-------------|
-| `research-os init [--name "X"]` | Scaffold a new project |
-| `research-os start --workspace .` | Start MCP server |
-| `research-os doctor` | Check system health |
-| `research-os status [--json]` | Show workspace status and pipeline progress |
-| `research-os pull cursor\|claude\|opencode\|vscode\|antigravity\|all` | Add IDE MCP config to workspace |
-| `research-os env` | Show environment info |
+### What you say → what happens
+
+| You say                                  | The AI does                                       |
+|------------------------------------------|---------------------------------------------------|
+| "start the project"                      | session_boot → project_startup → suggests first experiment |
+| "look at my data"                        | tool_data_profile on every file in raw_data/      |
+| "plan the next experiment"               | analysis_plan: scope → ground → create step → execute |
+| "this isn't working, abandon"            | dead_end_routing: documents failure + chooses next direction |
+| "find related literature"                | literature_search: multi-source + dedup + citations.md |
+| "do a systematic review"                 | literature/systematic_review (PRISMA workflow)    |
+| "fit a model"                            | methodology_selection → machine_learning (or relevant) |
+| "write the methods"                      | writing_methods                                   |
+| "write the paper"                        | synthesis_paper: plan → methods → results → discussion → abstract → assemble |
+| "make a poster"                          | synthesis_poster (tikzposter PDF)                 |
+| "make a dashboard"                       | synthesis_dashboard (single-file HTML)            |
+| "check reproducibility"                  | reproducibility + (optional) tool_audit_reproducibility |
+| "audit everything"                       | audit_and_validation: citations + assumptions + figures + causal language + lint |
+| "what should I do next?"                 | sys_protocol_next                                 |
+| "wrap up the session"                    | sys_session_handoff (writes resume prompt)        |
 
 ---
 
-## Config & API Keys
+## 8. Configuration
 
-When you scaffold a project, `inputs/researcher_config.yaml` is created. The AI
-will ask you for values through a config interview:
+`inputs/researcher_config.yaml` (auto-created on `init`) is the source of truth:
 
 ```yaml
-# inputs/researcher_config.yaml
-project_id: "My Study"
-research_question: "What is the effect of PM2.5 on respiratory health?"
+project_name: "PM2.5 Study"
+research_question: "What is the effect of PM2.5 on respiratory ER visits?"
 domain: "environmental_health"
-default_depth: "academic"
-model_profile: "medium"          # small | medium | large
-interaction:
-  autonomy_level: "supervised"   # manual | supervised | autopilot
+
 researcher:
-  expertise_level: "intermediate"  # beginner | intermediate | advanced | pi
+  name: "Vibhav Setlur"
+  field: "environmental epidemiology"
+  expertise_level: "advanced"     # beginner | intermediate | advanced | pi
+
+interaction:
+  autonomy_level: "supervised"    # manual | supervised | autopilot
+
+model_profile: "medium"           # small | medium | large
+
+research_goal:
+  output_types: ["paper", "dashboard"]
+  target_venue: "journal"
+  reporting_standard: "STROBE"
+  
+writing_preferences:
+  citation_style: "vancouver"
+  language: "en-US"
+
 api_keys:
-  firecrawl: ""                  # Injected as FIRECRAWL env var at server start
-  semantic_scholar: ""           # Injected as SEMANTIC_SCHOLAR env var
+  firecrawl: ""                   # injected as FIRECRAWL_API_KEY at server start
+  semantic_scholar: ""            # injected as SEMANTIC_SCHOLAR_API_KEY / S2_API_KEY
+  pubmed: ""                      # injected as NCBI_API_KEY
+  crossref: ""
+  serpapi: ""
 ```
 
-API keys are injected as environment variables at server start, so search tools
-use them transparently.
+### Domain presets
 
-### Model Profiles
+Copy any of these into `inputs/researcher_config.yaml`:
 
-The `model_profile` field changes how protocols load:
+* `templates/configs/rct_config.yaml` — Randomised controlled trials (CONSORT).
+* `templates/configs/epidemiology_observational.yaml` — Observational health (STROBE).
+* `templates/configs/genomics.yaml` — Bioinformatics (MINSEQE / MIAME).
+* `templates/configs/nlp_benchmark.yaml` — NLP benchmarks (Model Cards).
+* `templates/configs/economic_panel.yaml` — Panel data econometrics (AEA).
 
-| Profile | Effect |
-|---------|--------|
-| **large** | Full protocol YAML, full tool descriptions |
-| **medium** | Standard protocols, standard descriptions |
-| **small** | Light protocol variants (shorter steps, step-by-step), truncated tool descriptions |
+### Model profiles
 
-Light protocols are auto-selected when profile is `small`. If a protocol has no
-light variant, the full version is used as fallback.
+| Profile  | Effect on protocols                            | Effect on tool descriptions |
+|----------|------------------------------------------------|------------------------------|
+| `small`  | Drops `model_adaptations`, `examples`, templates | Trimmed to first sentence    |
+| `medium` | Standard.                                      | Full.                        |
+| `large`  | Full + multi-step planning recommended.        | Full.                        |
 
 ---
 
-## Troubleshooting
+## 9. Migrating an existing project into Research OS
 
-| Problem | Fix |
-|---------|-----|
-| `research-os: command not found` | Add `~/.local/bin` to PATH |
-| `WriteProtectedError` | Can't write to `inputs/` — copy data to `workspace/` |
-| `Protocol not found` | Run `sys.guidance.list` to see valid names |
-| Tools not appearing in IDE | Restart IDE, check MCP panel for errors |
-| Mermaid not rendering | `npm install -g @mermaid-js/mermaid-cli` |
+```bash
+cd my-existing-project
+research-os init . --force
+# inspect what was added (.os_state/, AGENTS.md, inputs/, etc.)
+mv my_data*.csv inputs/raw_data/
+mv references/*.pdf inputs/literature/
+research-os start --workspace .
+```
+
+Then in your IDE:
+
+> "I have an existing project — read inputs and current docs/, then propose how to continue."
+
+The AI will run session_boot, project_startup, and figure out the right pipeline
+stage based on which files already exist.
 
 ---
 
-## Architecture (Brief)
+## 10. Troubleshooting
 
-```
-AI IDE (Cursor/Claude) ←→ MCP stdio → Research OS server.py
-                                              │
-                                   ┌──────────┼──────────┐
-                                   │          │          │
-                              sys.*      tool.*     mem.*
-                              (39)       (25)       (4)
-                                   │          │          │
-                                   └──────────┼──────────┘
-                                              │
-                                       Workspace files
-                                    (state, data, logs)
-```
+| Problem                                | Fix                                                  |
+|----------------------------------------|------------------------------------------------------|
+| `research-os: command not found`       | Add `~/.local/bin` to `PATH`.                        |
+| `Not a Research OS workspace`          | `research-os init .` or pass `--workspace`.          |
+| `WriteProtectedError`                  | Cannot write to `inputs/raw_data/` or `inputs/literature/`. Copy to `workspace/`. |
+| `Protocol not found`                   | `sys_protocol_list` to see valid names.              |
+| Tools missing in IDE                   | Restart IDE; check the IDE's MCP panel for stderr.   |
+| `Firecrawl API key not set`            | Add `firecrawl: <key>` under `api_keys` in researcher_config. |
+| Mermaid PNG not rendering              | `npm install -g @mermaid-js/mermaid-cli`.            |
+| `pdflatex not found`                   | Install TeX Live for PDF compile.                    |
+| `tool_audit_reproducibility` slow      | It re-runs every script. Skip in autopilot unless asked. |
 
-The IDE plans and decides. Research OS executes, records, and enforces rules.
-No autonomous decisions happen in Research OS — the AI model is always in control.
+---
+
+## 11. File index
+
+| File                                       | Role                                          |
+|--------------------------------------------|-----------------------------------------------|
+| `src/research_os/server.py`                | MCP server + dispatcher + 51 tool defs.       |
+| `src/research_os/cli.py`                   | `init` and `start` commands.                  |
+| `src/research_os/project_ops.py`           | Workspace scaffold, state, manifest, mermaid. |
+| `src/research_os/state/state_ledger.py`    | Single source of truth for state.             |
+| `src/research_os/tools/actions/*.py`       | One file per logical tool group.              |
+| `src/research_os/protocols/**/*.yaml`      | 33 YAML protocols.                            |
+| `templates/AGENTS.md`                      | AI operating rules dropped into every project.|
+| `templates/configs/*.yaml`                 | Domain presets.                               |
+| `templates/.{cursor,claude,antigravity}/`  | Per-IDE MCP + rule files.                     |

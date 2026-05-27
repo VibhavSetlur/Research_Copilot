@@ -1,23 +1,38 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+"""Central Pydantic settings — read from env and from .env."""
+
+from __future__ import annotations
+
 from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Central configuration for Research OS."""
+    """Environment-derived configuration for Research OS internals.
 
-    # LLM Provider Keys
+    Researcher-facing config lives in ``inputs/researcher_config.yaml``; this
+    class only handles credentials and runtime knobs picked up from env vars.
+    """
+
+    # LLM provider keys (not used by Research OS itself, but exposed for tools
+    # that integrate with these SDKs).
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
 
-    # Research Tool API Keys
+    # Literature & search APIs
     SEMANTIC_SCHOLAR_API_KEY: Optional[str] = None
+    S2_API_KEY: Optional[str] = None  # alias frequently used by other SDKs
     CROSSREF_API_KEY: Optional[str] = None
     NCBI_API_KEY: Optional[str] = None
+    FIRECRAWL_API_KEY: Optional[str] = None
+    FIRECRAWL: Optional[str] = None  # alias
+    SERPAPI_API_KEY: Optional[str] = None
+    SERPAPI: Optional[str] = None  # alias
 
-    # Optional DB / Redis
+    # Optional storage
     DATABASE_URL: Optional[str] = None
 
-    # Environment config
+    # Runtime knobs
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
 

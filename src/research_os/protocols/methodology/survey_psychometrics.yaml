@@ -1,49 +1,55 @@
-name: survey_psychometrics
-version: 2.0.0
-description: Scale validation and survey analysis.
-schema_version: '1.0'
-expected_outputs:
-- workspace/{step_number}_{descriptive_name}/outputs/reports/reliability_metrics.json
-- workspace/{step_number}_{descriptive_name}/outputs/figures/confirmatory_factor_analysis.png
-- workspace/{step_number}_{descriptive_name}/outputs/reports/missingness_report.md
-_output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
-  Example names: 02_scale_validation, 03_cfa_model_path_1.'
-prerequisites:
-- Survey responses data.
-- R with lavaan package or Python equivalent.
+id: survey_psychometrics
+name: Survey & Psychometrics
+version: '4.0.0'
+schema_version: '2.0'
+description: Scale reliability / validity, sampling weights, non-response analysis for survey data.
+trigger: Data is survey responses with multi-item scales OR complex sample design.
+
 steps:
-- id: create_experiment_path
-  name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and 
-    outputs.
-- id: scale_validation
-  name: Scale Validation
-  description: Calculate Cronbach's alpha, McDonald's omega, and perform 
-    Confirmatory Factor Analysis (CFA).
-- id: sampling_weights
-  name: Apply Sampling Weights
-  description: Calculate and apply weights to adjust for complex survey designs.
-- id: non_response_bias
-  name: Non-Response Bias Analysis
-  description: Compare early vs late responders or responders vs known 
-    population margins.
-- id: reporting
-  name: Reporting Standards
-  description: Format outputs to comply with STROBE guidelines for 
-    cross-sectional studies.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='survey_psychometrics
-    completed'.\n5. Ask researcher: 'I've completed survey_psychometrics. Want me
-    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
-    new tools/libraries have been snapshotted to the step's environment file.\n  \
-    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-checkpoints:
-- Verify model fit indices (CFI, TLI, RMSEA) for CFA.
-- Ensure weights sum to population size or sample size appropriately.
-next_protocol: methodology/methodology_selection
+  - id: create_step
+    name: Create Survey-Analysis Step
+    description: sys_path_create name="survey_<scale>"
+
+  - id: scale_reliability
+    name: Reliability — Cronbach's α + McDonald's ω
+    description: |
+      For each multi-item scale: compute α and ω, interpret:
+        > 0.9 excellent · 0.8-0.9 good · 0.7-0.8 acceptable · 0.6-0.7 questionable · <0.6 poor.
+      Inter-item correlations: flag items with low item-rest correlation (<0.3).
+      Save to outputs/reports/reliability.md.
+
+  - id: factor_structure
+    name: EFA / CFA
+    description: |
+      Exploratory factor analysis (EFA) for new scales, confirmatory (CFA) when
+      a published structure exists. Report:
+        EFA → KMO, Bartlett's, scree plot, parallel analysis, factor loadings.
+        CFA → CFI, TLI (≥0.95), RMSEA (≤0.06), SRMR (≤0.08).
+      Save to outputs/reports/factor_structure.md and outputs/figures/cfa_diagram.png.
+
+  - id: sampling_weights
+    name: Apply Sampling Weights
+    description: |
+      If complex design (stratified / clustered / oversampled), apply survey weights
+      using statsmodels or the survey package in R via tool_r_exec. Document the
+      weighting scheme.
+
+  - id: nonresponse_analysis
+    name: Non-response Bias
+    description: |
+      Compare early vs late responders OR responders vs known population margins
+      (post-stratification). Report differences in key variables to
+      outputs/reports/nonresponse.md.
+
+  - id: missing_data_strategy
+    name: Item-level Missingness
+    description: |
+      If item-level missingness exceeds 5% on any scale, use full-information ML
+      (FIML) or MICE imputation; document in outputs/reports/missing_data.md.
+
+expected_outputs:
+  - workspace/*/outputs/reports/reliability.md
+  - workspace/*/outputs/reports/factor_structure.md
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

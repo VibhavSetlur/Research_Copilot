@@ -1,46 +1,70 @@
-# Research OS Project Configuration
-# This file governs the behavior of AI agents operating in this workspace.
+# Research OS — Researcher Configuration
+#
+# This file is the SOURCE OF TRUTH for how the AI behaves in this workspace.
+# Fill in (or have the AI fill in during session_boot) and edit any time.
+# Research OS injects nothing autonomously — your AI client owns the LLM.
 
+# ─── Who you are ─────────────────────────────────────────────────────────
 researcher:
-  name: ""
-  expertise_level: "intermediate"
-  field: ""
+  name: ""                          # Appears in paper authorship.
+  field: ""                         # e.g., "clinical epidemiology", "NLP".
+  expertise_level: "intermediate"   # beginner | intermediate | advanced | pi
   institution: ""
-  orcid: ""
+  orcid: ""                         # Optional. Used in synthesis metadata.
 
+# ─── What this project is about ─────────────────────────────────────────
+project_name: ""                    # Short title.
+research_question: ""               # One sentence. AI will ask if blank.
+domain: ""                          # e.g. clinical, finance, geospatial, ml.
+
+# ─── How the AI should behave ───────────────────────────────────────────
 interaction:
-  autonomy_level: "supervised"
-  checkpoint_frequency: "after_each_step"
-  notification_preferences:
-    on_step_complete: true
-    on_error: true
-    on_decision_required: true
-    on_long_running_task: true
-    long_running_threshold_seconds: 300
+  autonomy_level: "supervised"      # manual | supervised | autopilot
+  # manual     → AI asks before every tool call (1 step / turn).
+  # supervised → AI asks before path creation / synthesis / writes (2 / turn).
+  # autopilot  → AI runs everything; asks before synthesis (5 / turn).
 
+# ─── Model profile (controls protocol verbosity) ────────────────────────
+model_profile: "medium"             # small | medium | large
+# small  → light protocols, terse tool descriptions, batch tool calls.
+# medium → standard.
+# large  → full protocol detail and multi-step planning.
+
+# ─── What you want to produce ────────────────────────────────────────────
 research_goal:
-  output_types:
-    - "paper"
-    - "poster"
-    - "dashboard"
-  target_venue: "conference"
-  poster_dimensions: "36x48"
+  output_types:                     # any combination
+    - "paper"                       # full IMRAD manuscript
+    # - "abstract"                  # 250-word structured abstract
+    # - "poster"                    # tikzposter PDF
+    # - "dashboard"                 # single-file HTML
+    # - "report"                    # internal write-up
+    # - "exploratory"               # EDA-only, no manuscript
+  target_venue: "journal"           # journal | conference | preprint | dissertation | report
+  reporting_standard: ""            # auto-filled by domain_analysis (CONSORT, STROBE, PRISMA, TRIPOD-AI, etc.)
+  poster_dimensions: "36x48"        # only if "poster" in output_types
 
-model_profile: "medium"
-
+# ─── Writing preferences ─────────────────────────────────────────────────
 writing_preferences:
-  citation_style: "apa"
-  default_reporting_standard: "strobe"
-  auto_apply_writing_core: true
+  citation_style: "apa"             # apa | vancouver | acm | ieee | nature
+  language: "en-US"
 
+# ─── API keys (optional — increase rate limits) ─────────────────────────
+# Leave blank for public/free endpoints. Keys are injected as env vars
+# (FIRECRAWL_API_KEY, SEMANTIC_SCHOLAR_API_KEY, NCBI_API_KEY, etc.) at
+# server start.
 api_keys:
-  firecrawl: ""
-  semantic_scholar: ""
-  pubmed: ""
-  crossref: ""
-  serpapi: ""
+  firecrawl: ""                     # https://firecrawl.io  — web search & scrape
+  semantic_scholar: ""              # https://www.semanticscholar.org/product/api
+  pubmed: ""                        # https://www.ncbi.nlm.nih.gov/account/  (NCBI_API_KEY)
+  crossref: ""                      # https://www.crossref.org (rarely needed)
+  serpapi: ""                       # https://serpapi.com  — fallback web search
+  # openai: ""                      # ONLY if your IDE doesn't manage its own LLM keys
+  # anthropic: ""                   # ditto
 
-external_mcp_servers: []
-
-reporting_standard: ""
-suggested_protocols: []
+# ─── Notification preferences ───────────────────────────────────────────
+notifications:
+  on_step_complete: true
+  on_error: true
+  on_decision_required: true
+  on_long_running_task: true
+  long_running_threshold_seconds: 300

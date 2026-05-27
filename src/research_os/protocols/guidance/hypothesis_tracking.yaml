@@ -1,40 +1,38 @@
-name: hypothesis_tracking
-version: 1.0.0
-description: Track, update, and validate research hypotheses throughout 
-  analysis.
+id: hypothesis_tracking
+name: Hypothesis Tracking
+version: '4.0.0'
+schema_version: '2.0'
+description: Maintain a clear ledger of active, supported, and refuted hypotheses across the project.
+trigger: Whenever a step generates evidence that confirms / disconfirms / refines a hypothesis.
+
 steps:
-- id: read_hypotheses
-  description: Read docs/hypotheses.md (create if not exists from 
-    docs/research_question.md).
-  name: Read Hypothesis File
-- id: update_status
-  description: 'For each hypothesis, assess its current status:
+  - id: record_hypothesis
+    name: Record / Update Hypothesis
+    description: |
+      State the hypothesis as a single declarative sentence with predicted direction
+      and effect (e.g. "PM2.5 exposure is positively associated with ER visits,
+      effect size r > 0.3"). Append or update via:
+        mem_analysis_log entry="HYPOTHESIS <id>: <statement> | status=<testing|supported|refuted|inconclusive> | evidence=<step:finding>"
+      One hypothesis per line — easy to grep.
 
-    - TESTING: actively being analyzed in current path
+  - id: assess_evidence
+    name: Tag with Current Status
+    description: |
+      For every hypothesis update, pick one status and justify it in one line:
+        testing      — being investigated, not enough evidence
+        supported    — primary evidence points toward it
+        refuted      — primary evidence rules it out
+        inconclusive — evidence is mixed; need more data / power
+      Cite the specific experiment step(s) that drove the change.
 
-    - SUPPORTED: evidence favors it (note effect size + p-value)
+  - id: propagate_to_writing
+    name: Propagate to Methods + Conclusions
+    description: |
+      Make sure workspace/methods.md and the current experiment's conclusions.md
+      reference the hypothesis ID. This makes the paper's "What we tested" and
+      "What we found" sections trivially auditable.
 
-    - REJECTED: evidence contradicts it
+expected_outputs: []
 
-    - INCONCLUSIVE: insufficient data
-
-    Update the status in docs/hypotheses.md.
-
-    '
-  name: Update Hypothesis Status
-- id: log_update
-  description: Call mem_analysis.log with hypothesis status summary.
-  name: Log Hypothesis Update
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='hypothesis_tracking
-    completed'.\n5. Ask researcher: 'I've completed hypothesis_tracking. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+next_protocol: null
+on_failure: null

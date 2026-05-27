@@ -1,57 +1,72 @@
-name: causal_inference_deep
-version: 2.0.0
-description: DoWhy-based causal analysis and DAG creation.
-schema_version: '1.0'
-expected_outputs:
-- workspace/{step_number}_{descriptive_name}/outputs/figures/causal_dag.png
-- workspace/{step_number}_{descriptive_name}/outputs/reports/refutation_results.md
-- workspace/{step_number}_{descriptive_name}/outputs/reports/causal_estimates.json
-_output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
-  Example names: 02_dag_identification, 03_causal_estimation_path_1.'
+id: causal_inference_deep
+name: Causal Inference (Deep)
+version: '4.0.0'
+schema_version: '2.0'
+description: DAG-based causal analysis for observational data — identification, estimation, and refutation.
+trigger: Researcher needs a causal estimate from observational data (e.g. DoWhy / EconML workflow).
 prerequisites:
-- Observational dataset.
-- 'Python libraries: dowhy, econml.'
-decision_tree:
-- Are there unobserved confounders? -> Use instrumental variables if available, 
-  or compute E-values.
+  - methodology_selection has been run and observational design chosen
+  - workspace/methods.md mentions a causal target
+
 steps:
-- id: create_experiment_path
-  name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and 
-    outputs.
-- id: dag_creation
-  name: DAG Creation
-  description: Define causal graph and identify backdoor/frontdoor paths. 
-    (Integration with DAGitty)
-- id: identification
-  name: Identification
-  description: Identify the causal estimand using backdoor or instrumental 
-    variable criteria.
-- id: estimation
-  name: Estimation
-  description: Estimate the causal effect using methods like IPW, Double Machine
-    Learning (DML), or matching.
-- id: refutation
-  name: Refutation Tests
-  description: 'Perform robustness checks: placebo treatment, random common cause,
-    subset data.'
-- id: evalue
-  name: E-value Calculation
-  description: Calculate E-value to quantify robustness to unmeasured 
-    confounding.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='causal_inference_deep
-    completed'.\n5. Ask researcher: 'I've completed causal_inference_deep. Want me
-    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
-    new tools/libraries have been snapshotted to the step's environment file.\n  \
-    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-checkpoints:
-- Verify covariate balance after matching or weighting.
-- Ensure refutation tests do not significantly alter the estimate.
-next_protocol: methodology/methodology_selection
+  - id: create_step
+    name: Create Experiment Step
+    description: |
+      sys_path_create name="causal_<treatment>_<outcome>"
+      hypothesis="Treatment X has a non-zero average effect on outcome Y in population P."
+
+  - id: dag_construction
+    name: Build the Causal DAG
+    description: |
+      Write a DAG description as a dot file at workspace/<step>/outputs/figures/causal_dag.dot
+      AND render to PNG via a matplotlib/graphviz script. Nodes: treatment, outcome,
+      observed confounders, mediators, instruments (if any), unobserved confounders
+      (dashed). Justify every edge with a 1-line comment.
+
+  - id: identification
+    name: Identification Strategy
+    description: |
+      Choose ONE based on the DAG:
+        Backdoor (control for all open backdoor paths) — most common.
+        Frontdoor (mediator unconfounded by treatment).
+        Instrumental variable (valid instrument exists).
+        Difference-in-differences (panel + parallel trends).
+        Regression discontinuity (sharp cutoff exists).
+      Document the choice + assumptions in workspace/<step>/outputs/reports/identification.md.
+
+  - id: estimation
+    name: Estimate the Causal Effect
+    description: |
+      Implement via dowhy / econml / statsmodels:
+        Backdoor → IPW, OLS adjustment, matching, Double ML.
+        IV       → 2SLS or LIML.
+        DiD      → fixed-effects with treatment×post.
+        RDD      → local linear regression at the cutoff.
+      Report ATE / ATT / LATE with bootstrap or robust CIs.
+      Save numerical results to workspace/<step>/outputs/reports/causal_estimates.json.
+
+  - id: refutation
+    name: Refutation Tests
+    description: |
+      Run ALL applicable:
+        - Placebo treatment (random treatment shouldn't show effect).
+        - Random common cause (adding noise covariate shouldn't change estimate).
+        - Subset robustness (estimate stable across population subsets).
+        - Negative control outcome (effect should be near zero on unrelated outcome).
+      Log results to workspace/<step>/outputs/reports/refutation_results.md.
+
+  - id: sensitivity_evalue
+    name: Sensitivity (E-value)
+    description: |
+      Compute the E-value (VanderWeele & Ding 2017) for the point estimate and
+      the lower CI bound. Report what magnitude of unmeasured confounding could
+      explain away the effect. Add to causal_estimates.json.
+
+expected_outputs:
+  - workspace/*/outputs/figures/causal_dag.png
+  - workspace/*/outputs/reports/identification.md
+  - workspace/*/outputs/reports/causal_estimates.json
+  - workspace/*/outputs/reports/refutation_results.md
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

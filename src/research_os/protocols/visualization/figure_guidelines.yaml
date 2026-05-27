@@ -1,72 +1,67 @@
-name: figure_guidelines
-version: 2.0.0
-description: Guidelines for selecting and formatting publication-ready figures.
-schema_version: '1.0'
-expected_outputs:
-- 'synthesis/figures/: Publication-ready figures compiled by tool_synthesize'
+id: figure_guidelines
+name: Figure Guidelines
+version: '4.0.0'
+schema_version: '2.0'
+description: Rules for picking the right chart type and styling figures for publication.
+
 chart_chooser:
   comparison:
-    over_time: Line Chart
-    categories: Bar Chart (Horizontal if many categories)
+    over_time: line chart
+    categories_few: vertical bar
+    categories_many: horizontal bar
   relationship:
-    two_continuous: Scatter Plot
-    three_continuous: Bubble Chart
+    two_continuous: scatter (+ optional regression line w/ CI band)
+    three_continuous: bubble OR small multiples
+    matrix: heatmap (clustered if appropriate)
   distribution:
-    single_variable: Histogram / Density Plot
-    multiple_variables: Box Plot / Violin Plot
+    single_variable: histogram + KDE
+    multiple_variables: violin OR box+strip
+    paired: ridgeline OR small multiples
   meta_analysis:
-    effect_sizes: Forest Plot
-    publication_bias: Funnel Plot
+    effect_sizes: forest plot (CI bars)
+    publication_bias: funnel plot
+
 formatting:
-  color_blind_palettes:
-    viridis:
-    - '#440154'
-    - '#31688E'
-    - '#35B779'
-    - '#FDE725'
-    okabe_ito:
-    - '#E69F00'
-    - '#56B4E9'
-    - '#009E73'
-    - '#F0E442'
-    - '#0072B2'
-    - '#D55E00'
-    - '#CC79A7'
+  palettes:
+    sequential: viridis
+    diverging: PuOr / RdBu_r
+    qualitative: Okabe-Ito (colorblind safe)
   typography:
-    min_font_size: 8pt (for publication)
-    title_font_size: 10pt
-  layouts:
-    forest_plot: Ensure lines for 95% CI are distinct, align study names left, 
-      align OR/RR values right.
-    funnel_plot: Symmetrical pseudo-95% confidence limits must be drawn as 
-      dashed lines.
+    axis_label_size: ≥10pt
+    tick_label_size: ≥8pt
+    title_size: ≥12pt
   technical:
-    dpi_requirements: Minimum 300 DPI for print publication, 600 DPI for line 
-      art.
-    axis_labeling: Always include units in parentheses, e.g., 'Blood Pressure 
-      (mmHg)'. Do not use variable names like 'bp_sys'.
-    error_bars_vs_confidence_bands:
-      error_bars: Use standard error (SE) or 95% CI for point estimates (e.g., 
-        bar charts of means). Explicitly state which one in the caption.
-      confidence_bands: Use shaded 95% confidence bands for continuous trends 
-        (e.g., regression lines or survival curves).
+    dpi: ≥300 (print); ≥150 (screen only)
+    figure_format: PNG primary; SVG for editable vectors; PDF for LaTeX inclusion
+    axis_units: always include units in parentheses (e.g. "Blood pressure (mmHg)")
+    error_indicator:
+      bar_chart: 95% CI or SE — declare in caption
+      regression: shaded 95% CI band
+      forest_plot: lines for 95% CI
+
 steps:
-- id: select_chart
-  name: Select Chart Type
-  description: Use the chart chooser decision tree.
-- id: apply_formatting
-  name: Apply Formatting
-  description: Ensure color-blind friendly palettes and minimum font sizes are 
-    used.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='figure_guidelines
-    completed'.\n5. Ask researcher: 'I've completed figure_guidelines. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
+  - id: pick_chart
+    name: Pick the Chart Type
+    description: |
+      Use the chart_chooser above. Default to the simplest chart that conveys
+      the comparison. Avoid 3-D charts, dual-y-axes, and pie charts (>4 slices).
+
+  - id: style_chart
+    name: Apply Standard Styling
+    description: |
+      In the analysis script: set DPI, choose a palette from formatting.palettes,
+      label axes with units, include CI / error bars, save as PNG to
+      workspace/<step>/outputs/figures/. Filename pattern:
+        <step_number>_<short_descriptor>.png  e.g.  02_age_distribution.png
+
+  - id: audit
+    name: Audit the Figure
+    description: |
+      tool_audit_figure filepath="workspace/<step>/outputs/figures/<name>.png"
+      Fix DPI/size warnings before finalising.
+
+expected_outputs:
+  - workspace/*/outputs/figures
+
+next_protocol: null
+on_failure: null

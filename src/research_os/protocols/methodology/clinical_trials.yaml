@@ -1,51 +1,62 @@
-name: clinical_trials
-version: 2.0.0
-description: CONSORT guidelines for clinical trials.
-schema_version: '1.0'
-expected_outputs:
-- workspace/{step_number}_{descriptive_name}/outputs/reports/randomisation_check.md
-- workspace/{step_number}_{descriptive_name}/outputs/figures/participant_flow.png
-- workspace/{step_number}_{descriptive_name}/outputs/tables/adverse_events.csv
-_output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
-  Example names: 02_randomisation_checks, 03_efficacy_analysis_path_1.'
+id: clinical_trials
+name: Clinical Trial Analysis (CONSORT)
+version: '4.0.0'
+schema_version: '2.0'
+description: CONSORT-compliant analysis of randomised clinical trial data.
+trigger: Trial registry + raw trial data provided; design is RCT (with or without blinding).
 prerequisites:
-- Trial registry number and protocol.
-- Raw clinical trial data.
+  - Trial protocol & registry number are in docs/research_design.md
+  - Raw randomisation table + outcomes data in inputs/raw_data/
+
 steps:
-- id: create_experiment_path
-  name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and 
-    outputs.
-- id: randomisation_checks
-  name: Randomisation Checks
-  description: Verify baseline characteristics are balanced between arms.
-- id: blinding_assessment
-  name: Blinding Assessment
-  description: Assess success of blinding if applicable.
-- id: participant_flow
-  name: Participant Flow Diagram
-  description: Generate CONSORT flow diagram detailing enrollment, allocation, 
-    follow-up, and analysis.
-- id: missing_data
-  name: Handle Missing Data
-  description: Apply multiple imputation (MICE) and perform sensitivity 
-    analysis.
-- id: adverse_events
-  name: Adverse Events Reporting
-  description: Tabulate adverse events by arm and severity.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='clinical_trials
-    completed'.\n5. Ask researcher: 'I've completed clinical_trials. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-checkpoints:
-- Ensure intent-to-treat (ITT) analysis is primary.
-- Check that all protocol-specified outcomes are reported.
-next_protocol: methodology/methodology_selection
+  - id: create_step
+    name: Create Trial Analysis Step
+    description: sys_path_create name="trial_<primary_outcome>" hypothesis="<H1 from protocol>"
+
+  - id: randomisation_check
+    name: Randomisation & Baseline Balance Check
+    description: |
+      Tabulate baseline characteristics by arm. Report standardised mean differences
+      (SMD); flag |SMD|>0.10 as imbalance. Save to outputs/tables/baseline.csv and
+      outputs/reports/randomisation_check.md.
+
+  - id: itt_vs_pp_definition
+    name: Define Analysis Populations
+    description: |
+      Make ITT (intention-to-treat) primary. Define per-protocol secondary. Document
+      both populations and number of participants in each.
+
+  - id: missing_data_handling
+    name: Missing Data Plan
+    description: |
+      Quantify missingness per outcome and per arm. Apply multiple imputation (MICE)
+      if MAR is reasonable. Also run sensitivity analyses: complete-case, tipping-point.
+      Save imputed datasets to data/output/ and a summary to outputs/reports/missing_data.md.
+
+  - id: primary_analysis
+    name: Primary Outcome Analysis
+    description: |
+      Use the pre-specified test from research_design.md. Report the effect estimate,
+      95% CI, and exact p-value. Save to outputs/reports/primary_analysis.md.
+
+  - id: safety_analysis
+    name: Adverse Events Reporting
+    description: |
+      Tabulate AEs by arm and severity (CTCAE if oncology). Include SAEs separately.
+      Save to outputs/tables/adverse_events.csv and outputs/reports/safety.md.
+
+  - id: participant_flow
+    name: CONSORT Flow Diagram
+    description: |
+      Generate the standard CONSORT 2010 flow diagram: enrolled → randomised →
+      allocated → received → followed up → analysed. Save to
+      outputs/figures/consort_flow.png.
+
+expected_outputs:
+  - workspace/*/outputs/tables/baseline.csv
+  - workspace/*/outputs/tables/adverse_events.csv
+  - workspace/*/outputs/reports/primary_analysis.md
+  - workspace/*/outputs/figures/consort_flow.png
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

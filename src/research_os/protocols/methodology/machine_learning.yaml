@@ -1,55 +1,79 @@
-name: machine_learning
-version: 2.0.0
-description: TRIPOD-compliant workflow for predictive modelling.
-schema_version: '1.0'
-expected_outputs:
-- workspace/{step_number}_{descriptive_name}/outputs/reports/model_performance.json
-- workspace/{step_number}_{descriptive_name}/outputs/figures/roc_curve.png
-- workspace/{step_number}_{descriptive_name}/outputs/figures/shap_summary.png
-_output_path_note: '{step_number}_{descriptive_name} is created by sys_path.create.
-  Example names: 02_feature_engineering, 03_model_training_path_1.'
-prerequisites:
-- Cleaned dataset.
-- 'Python libraries: scikit-learn, xgboost, shap.'
-decision_tree:
-- Is the dataset imbalanced? -> Use stratified splitting and consider SMOTE or 
-  class weights.
-- Are there non-linear relationships? -> Prefer tree-based models over linear 
-  models.
+id: machine_learning
+name: Machine Learning (TRIPOD-AI)
+version: '4.0.0'
+schema_version: '2.0'
+description: Standard ML / predictive modelling workflow with calibration, interpretation, and TRIPOD-style reporting.
+trigger: Goal is prediction or classification; ML approach selected during methodology_selection.
+
 steps:
-- id: create_experiment_path
-  name: Create Experiment Path
-  description: Create a new path via sys_path.create to store scripts and 
-    outputs.
-- id: data_splitting
-  name: Data Splitting
-  description: Perform stratified train/validation/test splits.
-- id: feature_engineering
-  name: Feature Engineering
-  description: Impute missing values, scale features, and encode categoricals.
-- id: model_selection
-  name: Model Selection & Tuning
-  description: Select algorithms and perform hyperparameter tuning using 
-    cross-validation.
-- id: performance_metrics
-  name: Calculate Performance Metrics
-  description: Evaluate AUROC, AUPRC, Brier score, and calibration.
-- id: model_interpretation
-  name: Model Interpretation
-  description: Generate SHAP or LIME explanations for feature importance.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='machine_learning
-    completed'.\n5. Ask researcher: 'I've completed machine_learning. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-checkpoints:
-- Ensure no data leakage between train and test sets.
-- Verify calibration of probabilities.
-next_protocol: methodology/methodology_selection
+  - id: create_step
+    name: Create ML Experiment Step
+    description: sys_path_create name="ml_<task>" hypothesis="<model> outperforms baseline on <metric>"
+
+  - id: data_split
+    name: Train / Validation / Test Split
+    description: |
+      Stratified split (preserves class proportions). Default 70/15/15 unless
+      sample size dictates otherwise. Set random_state explicitly. Hold the test
+      set OUT until the very end. Document split sizes per class to outputs/reports/data_split.md.
+
+  - id: preprocessing
+    name: Feature Engineering & Preprocessing
+    description: |
+      Fit imputers, scalers, encoders ONLY on the training fold (wrap in a
+      sklearn Pipeline or equivalent). Document every transformation.
+      Watch for data leakage: target encoding without proper CV, time-aware
+      features in cross-sectional data, etc.
+
+  - id: baseline_then_main
+    name: Baseline → Main Model
+    description: |
+      ALWAYS fit a trivial baseline first (DummyClassifier most-frequent, naive
+      mean, etc.). Then the candidate main model. Report both metrics — never
+      report only the main model.
+
+  - id: hyperparameter_tuning
+    name: CV-based Hyperparameter Tuning
+    description: |
+      Use stratified K-fold CV on the TRAINING set only. Use a search strategy
+      proportional to the search space (grid for small, Bayesian/Hyperopt for large).
+      Log the chosen hyperparameters to outputs/reports/hyperparameters.json.
+
+  - id: metrics
+    name: Compute Held-out Metrics
+    description: |
+      Evaluate ONLY on the held-out test set. Report:
+        Classification → AUROC, AUPRC, Brier score, calibration slope/intercept,
+          confusion matrix, F1 per class.
+        Regression → RMSE, MAE, R^2, residual plot.
+      Save to outputs/reports/test_metrics.json AND outputs/figures/roc_curve.png
+      (or relevant figure) at ≥300 DPI.
+
+  - id: interpretation
+    name: Model Interpretation
+    description: |
+      Generate SHAP (global + per-instance) or permutation importance for the
+      top features. Save outputs/figures/shap_summary.png and
+      outputs/reports/feature_importance.md.
+
+  - id: error_analysis
+    name: Error Analysis
+    description: |
+      Slice errors by demographics or other meaningful subgroups. Flag any
+      subgroup where performance drops >10% relative to overall. Save to
+      outputs/reports/error_analysis.md.
+
+  - id: tripod_card
+    name: Model Card / TRIPOD-AI Reporting
+    description: |
+      Write a model card at outputs/reports/model_card.md covering: intended use,
+      training data, evaluation data, metrics, ethical considerations, limitations,
+      caveats. Follow TRIPOD-AI checklist when the domain is clinical.
+
+expected_outputs:
+  - workspace/*/outputs/reports/test_metrics.json
+  - workspace/*/outputs/reports/model_card.md
+  - workspace/*/outputs/figures
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

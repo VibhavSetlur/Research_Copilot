@@ -1,16 +1,46 @@
+"""Protocol loader, pipeline ordering, and execution log.
+
+A protocol is a YAML file under ``src/research_os/protocols/`` describing a
+sequence of steps the AI should take. Each protocol has:
+
+* ``id``, ``name``, ``description``     — metadata
+* ``trigger``                            — when the AI should run it
+* ``prerequisites``                      — what must be true before running
+* ``steps``                              — ordered list of {id, name, description}
+* ``expected_outputs``                   — file paths the protocol should produce
+* ``next_protocol``                      — what runs after (or null for terminal)
+* ``on_failure``                         — fallback protocol when expected outputs missing
+
+Light mode (``model_profile=small``) auto-trims verbose blocks
+(``examples``, ``rationale``, ``model_adaptations``) inside the loader so that
+small models don't drown in tokens. There is no separate ``light/`` folder —
+all protocols are single source of truth.
+"""
+
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
 import yaml
-from typing import Dict, Any
 
-logger = logging.getLogger("research.tools.protocol")
+logger = logging.getLogger("research_os.tools.protocol")
 
+PROTOCOLS_DIR = Path(__file__).parent.parent.parent / "protocols"
 PROTOCOL_LOG_FILE = "protocol_execution_log.jsonl"
 
 
-def log_protocol_execution(root: Path, protocol_name: str, status: str, details: str = "") -> dict:
+# ---------------------------------------------------------------------------
+# Execution log
+# ---------------------------------------------------------------------------
+
+
+def log_protocol_execution(
+    root: Path, protocol_name: str, status: str, details: str = ""
+) -> dict:
     """Append a structured entry to the protocol execution log."""
     log_path = root / ".os_state" / PROTOCOL_LOG_FILE
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,164 +58,358 @@ def log_protocol_execution(root: Path, protocol_name: str, status: str, details:
 def get_protocol_history(root: Path, limit: int = 20) -> dict:
     """Return the last N protocol execution log entries."""
     log_path = root / ".os_state" / PROTOCOL_LOG_FILE
-    entries = []
+    entries: list[dict] = []
     if log_path.exists():
         with open(log_path) as f:
             for line in f:
                 line = line.strip()
-                if line:
-                    try:
-                        entries.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
     return {"entries": entries[-limit:], "total": len(entries)}
 
-PROTOCOLS_DIR = Path(__file__).parent.parent.parent / "protocols"
-LIGHT_DIR = PROTOCOLS_DIR / "light"
 
-def _find_protocol_file(name: str, light: bool = False) -> Path | None:
-    base = LIGHT_DIR if light else PROTOCOLS_DIR
+# ---------------------------------------------------------------------------
+# Loader
+# ---------------------------------------------------------------------------
+
+
+_LIGHT_DROP_KEYS = {
+    "model_adaptations",
+    "examples",
+    "rationale",
+    "rationale_examples",
+    "templates",
+    "code_templates",
+    "long_description",
+}
+
+
+def _find_protocol_file(name: str) -> Path | None:
+    """Locate ``<protocols>/<category>/<name>.yaml``.
+
+    Accepts ``"guidance/session_boot"`` or bare ``"session_boot"``.
+    """
     if "/" in name:
-        rel_path = name + ".yaml"
-        candidate = base / rel_path
+        candidate = PROTOCOLS_DIR / f"{name}.yaml"
         return candidate if candidate.exists() else None
-    else:
-        # search recursively for name.yaml
-        for yaml_file in base.rglob("*.yaml"):
-            if yaml_file.stem == name:
-                return yaml_file
-        return None
 
-def load_protocol(name: str, light: bool = False) -> dict:
-    file = _find_protocol_file(name, light)
-    if not file and light:
-        file = _find_protocol_file(name, False)
-    if not file:
-        raise FileNotFoundError(f"Protocol {name} not found")
-    with open(file) as f:
-        return yaml.safe_load(f)
-
-def list_protocols(light: bool = False) -> list[dict]:
-    base = LIGHT_DIR if light else PROTOCOLS_DIR
-    protocols = []
-    for yaml_file in base.rglob("*.yaml"):
-        # We need to correctly relative the file to base
-        # But if we use light=False, base=PROTOCOLS_DIR. It will also iterate over PROTOCOLS_DIR / "light"!
-        # We should skip the light directory if light=False
-        if not light and "light" in yaml_file.parts:
+    for yaml_file in PROTOCOLS_DIR.rglob("*.yaml"):
+        # Skip any legacy light/ folder that might still be on disk.
+        if "light" in yaml_file.parts:
             continue
-            
-        rel = yaml_file.relative_to(base).with_suffix("")
+        if yaml_file.stem == name:
+            return yaml_file
+    return None
+
+
+def _trim_for_light(data: dict) -> dict:
+    """Drop verbose keys at the top level and within each step."""
+    out: dict = {}
+    for key, value in data.items():
+        if key in _LIGHT_DROP_KEYS:
+            continue
+        if key == "steps" and isinstance(value, list):
+            out["steps"] = []
+            for step in value:
+                if not isinstance(step, dict):
+                    out["steps"].append(step)
+                    continue
+                out["steps"].append(
+                    {k: v for k, v in step.items() if k not in _LIGHT_DROP_KEYS}
+                )
+        else:
+            out[key] = value
+    return out
+
+
+_PROTOCOL_COMPLETION_BLOCK = {
+    "id": "protocol_completion",
+    "name": "Complete & Log Protocol",
+    "description": (
+        "Final mandatory step.\n"
+        "1. Call sys_protocol_log with status='completed' and a one-line details summary.\n"
+        "2. Call sys_checkpoint_create with description='<protocol> completed'.\n"
+        "3. Call sys_protocol_next to find the next protocol — load and run it.\n"
+        "4. Briefly summarise to the researcher: what changed, what's next.\n"
+        "\n"
+        "Grounding check: if this protocol involved methodology or claims, confirm at\n"
+        "least one tool_search_* call was made and logged to workspace/logs/searches.log."
+    ),
+}
+
+
+def _inject_completion_step(data: dict) -> dict:
+    """Append the standard completion step if not already present."""
+    steps = data.get("steps", []) or []
+    has_completion = any(
+        isinstance(s, dict) and s.get("id") == "protocol_completion" for s in steps
+    )
+    if not has_completion:
+        steps = list(steps) + [_PROTOCOL_COMPLETION_BLOCK]
+        data["steps"] = steps
+    return data
+
+
+def load_protocol(name: str, model_profile: str = "medium") -> dict:
+    """Load a protocol YAML and post-process it.
+
+    Args:
+        name: ``"guidance/project_startup"`` or bare ``"project_startup"``.
+        model_profile: ``small`` | ``medium`` | ``large``. ``small`` trims verbose
+                       keys (model_adaptations, examples, etc.) to save tokens.
+    """
+    file = _find_protocol_file(name)
+    if not file:
+        raise FileNotFoundError(f"Protocol '{name}' not found in {PROTOCOLS_DIR}")
+    with open(file) as f:
+        data = yaml.safe_load(f) or {}
+
+    # Inject any per-profile step overrides explicitly attached as
+    # ``model_adaptations: {small: {step_id: {key: value}}}``.
+    adaptations = data.get("model_adaptations", {})
+    if isinstance(adaptations, dict) and model_profile in adaptations:
+        overrides = adaptations.get(model_profile) or {}
+        if isinstance(overrides, dict):
+            for step_id, patch in overrides.items():
+                if not isinstance(patch, dict):
+                    continue
+                for step in data.get("steps", []):
+                    if isinstance(step, dict) and step.get("id") == step_id:
+                        step.update(patch)
+
+    if model_profile == "small":
+        data = _trim_for_light(data)
+
+    data = _inject_completion_step(data)
+    data.setdefault("name", name.split("/")[-1])
+    data.setdefault("_path", str(file.relative_to(PROTOCOLS_DIR)))
+    return data
+
+
+def list_protocols() -> list[dict]:
+    """Return every protocol with name and one-line description."""
+    out: list[dict] = []
+    for yaml_file in sorted(PROTOCOLS_DIR.rglob("*.yaml")):
+        if "light" in yaml_file.parts:
+            continue
+        rel = yaml_file.relative_to(PROTOCOLS_DIR).with_suffix("")
         name = str(rel).replace("\\", "/")
+        summary = ""
         try:
             with open(yaml_file) as f:
-                data = yaml.safe_load(f)
-            summary = data.get("description", "")
+                data = yaml.safe_load(f) or {}
+            summary = (data.get("description") or "").split("\n")[0]
         except Exception:
-            summary = ""
-        protocols.append({"name": name, "summary": summary})
-    return protocols
+            pass
+        out.append({"name": name, "summary": summary})
+    return out
 
-PIPELINE_ORDER = [
-    ("guidance/session_boot", []),
-    ("guidance/project_startup", ["workspace/01_baseline_eda/conclusions.md"]),
-    ("domain/domain_analysis", ["workspace/logs/domain_analysis.log"]),
-    ("domain/research_design", ["docs/research_question.md"]),
-    ("methodology/methodology_selection", ["workspace/methods.md"]),
-    ("literature/literature_search", ["inputs/literature_index.yaml"]),
-    ("guidance/analysis_plan", ["workspace/02_data_preparation/README.md"]),
-    ("reproducibility/reproducibility", ["workspace/*/environment/requirements.txt"]),
-    ("audit/audit_and_validation", ["workspace/logs/audit.log"]),
-    ("synthesis/synthesis_paper", ["synthesis/paper.md"]),
+
+# ---------------------------------------------------------------------------
+# Pipeline ordering
+# ---------------------------------------------------------------------------
+
+# Each entry: (protocol_name, predicate(root) -> bool) — "done" means the AI
+# can move on. Predicates check both the execution log AND key output files,
+# so the pipeline survives a workspace migrated from outside Research OS.
+
+
+def _has(root: Path, *paths: str) -> bool:
+    return all((root / p).exists() for p in paths)
+
+
+def _has_any(root: Path, glob_pattern: str) -> bool:
+    return bool(list(root.glob(glob_pattern)))
+
+
+def _has_experiment(root: Path, marker: str = "conclusions.md") -> bool:
+    workspace = root / "workspace"
+    if not workspace.exists():
+        return False
+    for child in workspace.iterdir():
+        if child.is_dir() and child.name[:2].isdigit() and "__DEAD_END" not in child.name:
+            mfile = child / marker
+            if mfile.exists() and len(mfile.read_text()) > 200:
+                return True
+    return False
+
+
+def _protocol_completed(root: Path, name: str) -> bool:
+    """True if the protocol has logged a 'completed' status."""
+    log = root / ".os_state" / PROTOCOL_LOG_FILE
+    if not log.exists():
+        return False
+    try:
+        for line in log.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("protocol") == name and entry.get("status") == "completed":
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _any_protocol_logged(root: Path) -> bool:
+    log = root / ".os_state" / PROTOCOL_LOG_FILE
+    if not log.exists():
+        return False
+    try:
+        return any(line.strip() for line in log.read_text().splitlines())
+    except Exception:
+        return False
+
+
+def _has_real_research_question(root: Path) -> bool:
+    """True if docs/research_question.md has been filled in (placeholder gone)."""
+    p = root / "docs" / "research_question.md"
+    if not p.exists():
+        return False
+    text = p.read_text()
+    if "(to be" in text.lower() or "(to be confirmed)" in text:
+        return False
+    return len(text.strip()) > 80
+
+
+# Each step is considered done when EITHER the protocol logged completion OR
+# its hallmark on-disk artifact exists with real content.
+
+PIPELINE: list[tuple[str, Any]] = [
+    (
+        "guidance/session_boot",
+        lambda r: _any_protocol_logged(r) or _protocol_completed(r, "guidance/session_boot"),
+    ),
+    (
+        "guidance/project_startup",
+        lambda r: _protocol_completed(r, "guidance/project_startup")
+        or _has_real_research_question(r),
+    ),
+    (
+        "domain/domain_analysis",
+        lambda r: _protocol_completed(r, "domain/domain_analysis")
+        or _has(r, "docs/domain_summary.md"),
+    ),
+    (
+        "domain/research_design",
+        lambda r: _protocol_completed(r, "domain/research_design")
+        or _has(r, "docs/research_design.md"),
+    ),
+    (
+        "methodology/methodology_selection",
+        lambda r: _protocol_completed(r, "methodology/methodology_selection")
+        or (
+            _has(r, "workspace/methods.md")
+            and (r / "workspace" / "methods.md").stat().st_size > 400
+        ),
+    ),
+    (
+        "literature/literature_search",
+        lambda r: _protocol_completed(r, "literature/literature_search")
+        or (_has(r, "inputs/literature_index.yaml") and _has(r, "workspace/citations.md") and (r / "workspace" / "citations.md").stat().st_size > 200),
+    ),
+    (
+        "guidance/analysis_plan",
+        lambda r: _has_experiment(r, "conclusions.md"),
+    ),
+    (
+        "reproducibility/reproducibility",
+        lambda r: _protocol_completed(r, "reproducibility/reproducibility")
+        or _has_any(r, "workspace/*/environment/requirements.txt"),
+    ),
+    (
+        "audit/audit_and_validation",
+        lambda r: _protocol_completed(r, "audit/audit_and_validation")
+        or _has(r, "workspace/logs/audit_report.md"),
+    ),
+    (
+        "synthesis/synthesis_paper",
+        lambda r: _has(r, "synthesis/paper.md")
+        and (r / "synthesis" / "paper.md").stat().st_size > 1000,
+    ),
 ]
 
 
 def get_next_protocol(root: Path) -> dict:
-    """Read current workspace state and return the recommended next protocol."""
-    for protocol_name, expected_outputs in PIPELINE_ORDER:
-        all_present = True
-        for output in expected_outputs:
-            if "*" in output:
-                matches = list(root.glob(output))
-                if not matches:
-                    all_present = False
-                    break
-            else:
-                if not (root / output).exists():
-                    all_present = False
-                    break
-        if not all_present:
-            reason = f"Expected output '{expected_outputs[0] if expected_outputs else 'none'}' not found"
-            return {"next_protocol": protocol_name, "reason": reason}
-    return {"next_protocol": None, "reason": "All pipeline phases complete — ready for synthesis"}
+    """Return the recommended next protocol based on workspace state."""
+    for protocol_name, predicate in PIPELINE:
+        try:
+            done = predicate(root)
+        except Exception:
+            done = False
+        if not done:
+            return {
+                "next_protocol": protocol_name,
+                "reason": f"Outputs of '{protocol_name}' not yet present.",
+                "pipeline_position": [name for name, _ in PIPELINE].index(protocol_name) + 1,
+                "pipeline_total": len(PIPELINE),
+            }
+    return {
+        "next_protocol": None,
+        "reason": "Pipeline complete — paper, audit, and reproducibility outputs all present.",
+        "pipeline_position": len(PIPELINE),
+        "pipeline_total": len(PIPELINE),
+    }
 
 
-def validate_protocol(name: str, root: Path = None) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+
+def validate_protocol(name: str, root: Path | None = None) -> dict:
+    """Check each declared expected_output against the filesystem."""
     try:
         data = load_protocol(name)
-        expected_outputs = data.get("expected_outputs", [])
+        expected_outputs = data.get("expected_outputs", []) or []
 
-        checklist = []
+        checklist: list[dict] = []
         all_passed = True
 
         if root:
             for item in expected_outputs:
-                if ":" in item:
+                if isinstance(item, dict):
+                    path_str = item.get("path", "")
+                elif ":" in item:
                     path_str = item.split(":")[0].strip()
                 else:
                     path_str = item.strip()
-                
-                # Simple wildcard matching for workspace/*/
-                if "workspace/*/" in path_str:
-                    workspace_dir = root / "workspace"
-                    if not workspace_dir.exists():
-                        checklist.append({"item": path_str, "status": "fail"})
-                        all_passed = False
-                        continue
-                    
-                    found = False
-                    for child in workspace_dir.iterdir():
-                        if child.is_dir() and child.name[:2].isdigit():
-                            candidate = child / path_str.split("workspace/*/")[1]
-                            if candidate.exists():
-                                found = True
-                                break
-                    if found:
-                        checklist.append({"item": path_str, "status": "pass"})
-                    else:
-                        checklist.append({"item": path_str, "status": "fail"})
-                        all_passed = False
-                else:
-                    p = root / path_str
-                    if p.exists():
-                        checklist.append({"item": path_str, "status": "pass"})
-                    else:
-                        checklist.append({"item": path_str, "status": "fail"})
-                        all_passed = False
 
-        # Also check required section headers in key files
-        if root:
-            for fpath, headers in [
-                ("workspace/methods.md", ["##", "Method"]),
-                ("workspace/analysis.md", ["##", "mermaid"]),
-            ]:
-                full = root / fpath
-                if full.exists():
-                    text = full.read_text()
-                    for h in headers:
-                        if h not in text:
-                            checklist.append({"item": f"{fpath} missing header '{h}'", "status": "fail"})
-                            all_passed = False
-                            break
+                if not path_str:
+                    continue
+
+                if "*" in path_str or "{" in path_str:
+                    # Use glob — drop curly placeholders ({step_name}) since we
+                    # only know step folders by pattern.
+                    expanded = path_str.replace("{step_number}", "??").replace(
+                        "{step_name}", "*"
+                    )
+                    matches = list(root.glob(expanded.lstrip("/")))
+                    status = "pass" if matches else "fail"
+                else:
+                    status = "pass" if (root / path_str).exists() else "fail"
+
+                checklist.append({"item": path_str, "status": status})
+                if status == "fail":
+                    all_passed = False
 
         return {
             "protocol": name,
             "checklist": checklist,
             "all_passed": all_passed,
             "expected_count": len(expected_outputs),
+            "next_protocol": data.get("next_protocol"),
         }
-    except FileNotFoundError:
-        return {"error": "Protocol not found"}
+    except FileNotFoundError as e:
+        return {"error": str(e)}
     except Exception as e:
-        logger.error(f"Validate protocol failed: {e}")
+        logger.error(f"validate_protocol failed: {e}")
         return {"error": str(e)}

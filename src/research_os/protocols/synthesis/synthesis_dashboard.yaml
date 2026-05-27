@@ -1,30 +1,33 @@
-name: synthesis_dashboard
-version: 1.0.0
-description: Generate an interactive dashboard from experiment outputs.
-always_include: []
-trigger: When output_types includes 'dashboard'.
-tool: tool_dashboard.create
-sources:
-- workspace/*/outputs/figures/
-- workspace/*/outputs/tables/
+id: synthesis_dashboard
+name: Synthesis — Dashboard
+version: '4.0.0'
+schema_version: '2.0'
+description: Generate a standalone HTML dashboard summarising all experiments, figures, conclusions, and citations.
+trigger: output_types includes "dashboard", or the researcher asks for an interactive overview.
+
 steps:
-- id: gather_data
-  name: Gather Data
-  description: Collect figures and tables from all completed experiment steps.
-- id: create_dashboard
-  name: Create Dashboard
-  description: Call tool_dashboard.create to generate an interactive HTML 
-    dashboard.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='synthesis_dashboard
-    completed'.\n5. Ask researcher: 'I've completed synthesis_dashboard. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: gather
+    name: Confirm Sources Exist
+    description: |
+      sys_path_list — verify at least one experiment has outputs/figures/ or
+      outputs/reports/. If nothing exists yet, dashboard will be largely empty
+      (warn the researcher).
+
+  - id: build
+    name: Build Dashboard
+    description: |
+      tool_dashboard_create title="<short title>"
+      Produces synthesis/dashboard.html plus a synthesis/figures/<step>/ tree
+      of copied figures. Single file — opens directly in any browser.
+
+  - id: share
+    name: Tell the Researcher Where to Find It
+    description: |
+      Report the absolute path so the researcher can open it. If running in a
+      remote workspace (SSH / container), advise download or port forward.
+
+expected_outputs:
+  - synthesis/dashboard.html
+
+next_protocol: null
+on_failure: null

@@ -1,38 +1,38 @@
-name: glossary_update
-version: 1.0.0
-description: Update docs/glossary.md with new domain-specific terms introduced 
-  during analysis.
-trigger: After domain_analysis, after literature_search, after any step that 
-  introduces new technical terms
+id: glossary_update
+name: Glossary Update
+version: '4.0.0'
+schema_version: '2.0'
+description: Add or refine a definition in docs/glossary.md. Run this protocol the first time any non-trivial term appears in the project.
+trigger: A jargon term, acronym, or domain-specific concept appears in methods/analysis/conclusions for the first time.
+
 steps:
-- id: collect_terms
-  description: Identify 3-10 domain-specific or project-specific terms 
-    introduced in this step.
-  name: Collect New Terms
-- id: update_glossary
-  description: 'Read docs/glossary.md via sys_file.read.
+  - id: identify_terms
+    name: Identify Undefined Terms
+    description: |
+      Scan workspace/methods.md, workspace/analysis.md, and the latest conclusions.md
+      for acronyms (uppercase >= 2 chars), domain-specific terms, statistical or
+      computational terms with a non-obvious meaning. List those not already in
+      docs/glossary.md.
 
-    For each new term not already in the glossary, add a row to the markdown table:
+  - id: write_definitions
+    name: Write Definitions
+    description: |
+      For each undefined term:
+        - 1-2 sentence plain-English definition.
+        - Where used in the project (which step or method).
+        - 1 citation if the term was sourced from literature.
+      Append rows to docs/glossary.md table. Keep entries alphabetised.
 
-    | Term | Definition | Source |
+  - id: ground_unclear
+    name: Ground Definitions in Literature
+    description: |
+      For any term you are not 100% confident about:
+        tool_search_web query="<term> definition"
+        OR tool_search_semantic_scholar query="<term> review"
+      Cite the source in the glossary entry.
 
-    Write back via sys_file.write.
+expected_outputs:
+  - docs/glossary.md
 
-    '
-  name: Update Glossary File
-- id: confirm
-  description: 'Confirm: ''Glossary updated with N new terms.'''
-  name: Confirm Update
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='glossary_update
-    completed'.\n5. Ask researcher: 'I've completed glossary_update. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+next_protocol: null
+on_failure: null

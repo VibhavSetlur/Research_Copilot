@@ -1,34 +1,33 @@
-# RCT Research Configuration
-# Copy to: inputs/researcher_config.yaml
+# Randomised Controlled Trial — preset researcher_config.yaml
+# Copy to inputs/researcher_config.yaml of your project, then customise.
+
+project_name: "Randomised Controlled Trial"
+research_question: ""
+domain: "clinical"
 
 researcher:
   name: ""
-  expertise_level: intermediate
   field: "clinical trials"
+  expertise_level: "intermediate"
   institution: ""
   orcid: ""
 
 interaction:
-  autonomy_level: supervised
-  checkpoint_frequency: after_each_step
-  notification_preferences:
-    on_step_complete: true
-    on_error: true
-    on_decision_required: true
-    on_long_running_task: true
-    long_running_threshold_seconds: 300
+  autonomy_level: "supervised"
+
+model_profile: "medium"
 
 research_goal:
-  output_types: ["paper", "poster"]
-  target_venue: journal
-  poster_dimensions: "36x48"
-
-model_profile: medium
+  output_types: ["paper"]
+  target_venue: "journal"
+  reporting_standard: "CONSORT 2010"
+  suggested_methodology: "clinical_trials"
+  suggested_protocols:
+    - "methodology/clinical_trials"
 
 writing_preferences:
-  citation_style: "apa"
-  default_reporting_standard: "strobe"
-  auto_apply_writing_core: true
+  citation_style: "vancouver"
+  language: "en-US"
 
 api_keys:
   firecrawl: ""
@@ -37,7 +36,16 @@ api_keys:
   crossref: ""
   serpapi: ""
 
-external_mcp_servers: []
+notifications:
+  on_step_complete: true
+  on_error: true
+  on_decision_required: true
 
-reporting_standard: consort
-suggested_protocols: ["clinical_trials"]
+domain_hints:
+  expected_columns: [patient_id, arm, baseline_outcome, follow_up_outcome, ae_grade, withdrawn]
+  expected_file_extensions: [.csv, .sas7bdat, .sav, .dta, .parquet]
+  biases_to_monitor:
+    - protocol deviations / per-protocol vs ITT analysis
+    - missing outcome data (handle via multiple imputation + sensitivity)
+    - selective outcome reporting
+    - performance bias when blinding broken

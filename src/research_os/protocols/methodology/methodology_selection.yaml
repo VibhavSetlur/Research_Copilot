@@ -1,178 +1,78 @@
-name: methodology_selection
-version: 2.0.0
-description: Three-layer decision matrix to select the best methodology and 
-  tools.
-schema_version: '1.0'
-expected_outputs:
-- 'workspace/methods.md: Appended methodological choices, libraries, and assumption
-  checks'
-- workspace/logs/methodology.log
-decision_matrix:
-  layers:
-    1_outcome_type:
-    - continuous
-    - binary
-    - count
-    - time-to-event
-    2_data_structure:
-    - independent
-    - repeated
-    - nested
-    - spatial
-    3_number_of_variables:
-    - univariate
-    - multivariate
-    - high-dimensional
-  mappings:
-    continuous_independent_multivariate:
-      method: Multiple Linear Regression
-      library: statsmodels (Python) / lm (R)
-      template: 'import statsmodels.api as sm
+id: methodology_selection
+name: Methodology Selection
+version: '4.0.0'
+schema_version: '2.0'
+description: Pick the statistical / computational method to test the planned hypotheses. Document the implementation, parameters, and assumptions.
+trigger: After research_design. Re-run if the outcome class changes.
 
-        X = sm.add_constant(df[[''var1'', ''var2'']])
-
-        model = sm.OLS(df[''outcome''], X).fit()
-
-        print(model.summary())
-
-        '
-      assumptions:
-      - Linearity
-      - Independence of errors
-      - Homoscedasticity
-      - Normality of residuals
-      - No multicollinearity
-    binary_independent_multivariate:
-      method: Logistic Regression
-      library: scikit-learn (Python) / glm (R)
-      template: 'from sklearn.linear_model import LogisticRegression
-
-        clf = LogisticRegression()
-
-        clf.fit(X, y)
-
-        '
-      assumptions:
-      - Linearity of independent variables and log-odds
-      - Absence of multicollinearity
-    time-to-event_independent_multivariate:
-      method: Cox Proportional Hazards
-      library: lifelines (Python) / survival (R)
-      template: 'from lifelines import CoxPHFitter
-
-        cph = CoxPHFitter()
-
-        cph.fit(df, duration_col=''T'', event_col=''E'')
-
-        cph.print_summary()
-
-        '
-      assumptions:
-      - Proportional hazards
-      - Non-informative censoring
-    fallback:
-      method: Random Forest / Gradient Boosting (Non-parametric)
-      library: scikit-learn / xgboost
-      template: 'from sklearn.ensemble import RandomForestRegressor
-
-        rf = RandomForestRegressor().fit(X, y)
-
-        '
-      assumptions:
-      - Representative sampling
-      - Stationarity (if time series)
-    count_independent_multivariate:
-      method: Poisson / Negative Binomial Regression
-      library: statsmodels (Python) / MASS (R)
-      template: 'import statsmodels.api as sm
-
-        model = sm.GLM(y, X, family=sm.families.Poisson()).fit()
-
-        '
-      assumptions:
-      - Events are independent
-      - Mean equals variance (Poisson) or variance > mean (NB)
-    continuous_repeated_multivariate:
-      method: Mixed Effects / GEE
-      library: statsmodels (Python) / lme4 (R)
-      template: 'import statsmodels.formula.api as smf
-
-        model = smf.mixedlm("outcome ~ var1", df, groups=df["subject_id"]).fit()
-
-        '
-      assumptions:
-      - Random effects are normally distributed
-      - Independence between subjects
-    continuous_nested_multivariate:
-      method: Multilevel Models (Hierarchical)
-      library: statsmodels (Python) / lme4 (R)
-      template: 'import statsmodels.formula.api as smf
-
-        model = smf.mixedlm("outcome ~ var1", df, groups=df["school_id"]).fit()
-
-        '
-      assumptions:
-      - Linearity
-      - Normality at each level
-      - Homoscedasticity
-    continuous_spatial_multivariate:
-      method: Spatial Regression / Kriging
-      library: PySAL / sklearn.gaussian_process (Python) / spdep (R)
-      template: 'from sklearn.gaussian_process import GaussianProcessRegressor
-
-        gpr = GaussianProcessRegressor().fit(X_spatial, y)
-
-        '
-      assumptions:
-      - Spatial autocorrelation
-      - Stationarity
-    continuous_independent_high-dimensional:
-      method: LASSO / Elastic Net / PCA+Regression
-      library: scikit-learn (Python) / glmnet (R)
-      template: 'from sklearn.linear_model import ElasticNet
-
-        model = ElasticNet(alpha=1.0, l1_ratio=0.5).fit(X, y)
-
-        '
-      assumptions:
-      - Sparsity (LASSO)
-      - Linearity
-    time-to-event_independent_competing_risks:
-      method: Fine-Gray Competing Risks
-      library: lifelines (Python) / cmprsk (R)
-      template: 'from lifelines import AalenJohansenFitter
-
-        ajf = AalenJohansenFitter()
-
-        ajf.fit(T, E, event_of_interest=1)
-
-        '
-      assumptions:
-      - Proportional subdistribution hazards
-      - Independent censoring
 steps:
-- id: identify_layers
-  name: Identify Matrix Layers
-  description: Determine outcome type, data structure, and number of variables.
-- id: select_methodology
-  name: Select Methodology
-  description: "Use the decision matrix mapping to pick the method, library, and template.\n\
-    \nCRITICAL: You MUST use search tools (search_semantic_scholar, search_web, etc.)
-    to ground your methodological choices. DO NOT hallucinate methods based on pre-trained
-    knowledge."
-- id: document_assumptions
-  name: Document Assumptions
-  description: List the assumptions that must be tested during the analysis.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='methodology_selection
-    completed'.\n5. Ask researcher: 'I've completed methodology_selection. Want me
-    to proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any
-    new tools/libraries have been snapshotted to the step's environment file.\n  \
-    \  - GROUNDING CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
+  - id: classify_problem
+    name: Classify the Problem on 3 Axes
+    description: |
+      Decide:
+        1. Outcome type:  continuous | binary | count | time-to-event | text | image | network
+        2. Data structure: independent | repeated | nested | spatial | temporal | sequential
+        3. Dimensionality: univariate | low-D | high-D (p >> n)
+      Write the triple to workspace/methods.md.
+
+  - id: enumerate_candidates
+    name: Enumerate Candidate Methods
+    description: |
+      Examples (NOT exhaustive — verify with literature):
+        Continuous · independent · low-D  → OLS / Ridge / LASSO; MLR for multi-IV
+        Continuous · repeated             → Mixed-effects (lme4 / statsmodels)
+        Continuous · nested               → Multilevel / hierarchical Bayes
+        Continuous · spatial              → Kriging / spatial regression
+        Continuous · high-D               → LASSO / Elastic Net / PCA + reg
+        Binary · independent              → Logistic / GLM
+        Binary · time-varying covariates  → Time-varying logistic
+        Count                             → Poisson / Negative Binomial / zero-inflated
+        Time-to-event                     → Cox PH; Fine-Gray for competing risks
+        Causal observational              → Propensity scoring, DiD, IV, RDD
+        ML benchmark                      → Cross-validated baseline + main + ablations
+        Text                              → Pretrained transformer fine-tune + calibration
+        Image                             → CNN baseline + domain-appropriate transfer
+      List 2-3 candidates with pros/cons.
+
+  - id: ground_with_literature
+    name: Ground Method Choice in Literature
+    description: |
+      MANDATORY: do NOT decide from training knowledge alone.
+        tool_search_semantic_scholar query="<problem> <leading candidate method> review"
+        tool_search_web query="<candidate method> best practices <year>"
+      Cite at least 2 sources supporting the chosen method.
+
+  - id: record_choice_and_assumptions
+    name: Record Choice, Implementation & Assumptions
+    description: |
+      For the WINNING method, call mem_methods_append with:
+        method=<name>
+        step_number=<NN>           # the experiment this method will be used in
+        step_name=<slug>
+        dataset_name=<from intake>
+        dataset_hash=<sha256 from intake>
+        implementation=<lib+version, e.g. statsmodels 0.14>
+        parameters=<key hyperparams>
+        justification=<1-2 sentences citing references>
+        assumptions=[list of assumptions you will TEST during execute_step]
+      Also call mem_decision_log to record the decision in analysis.md.
+
+  - id: list_assumption_tests
+    name: Plan Assumption Tests
+    description: |
+      For every assumption, name the diagnostic test that will be run during
+      analysis_plan's execute step. Examples:
+        Normality           → Shapiro-Wilk, Q-Q plot
+        Homoscedasticity    → Levene, Breusch-Pagan
+        Multicollinearity   → VIF (>10 = problem)
+        Independence        → Durbin-Watson (residuals)
+        Proportional hazards → Schoenfeld residuals
+        Calibration (binary)→ Hosmer-Lemeshow / calibration plot
+      Write the test plan as a numbered list inside workspace/methods.md under
+      "Assumption tests planned".
+
+expected_outputs:
+  - workspace/methods.md
+
 next_protocol: literature/literature_search
+on_failure: guidance/dead_end_routing

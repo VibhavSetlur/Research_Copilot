@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "research-os": {
-      "command": "python",
-      "args": ["-m", "research_os.server", "--workspace", "/path/to/your/project"]
+      "command": "research-os",
+      "args": ["start"],
+      "env": {
+        "RESEARCH_OS_WORKSPACE": "${workspaceFolder}"
+      }
     }
   }
 }

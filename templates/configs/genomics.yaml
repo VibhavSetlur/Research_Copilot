@@ -1,34 +1,34 @@
-# Genomics Research Configuration
-# Copy to: inputs/researcher_config.yaml
+# Genomics — preset researcher_config.yaml
+# Copy to inputs/researcher_config.yaml of your project, then customise.
+
+project_name: "Genomics Analysis"
+research_question: ""
+domain: "bioinformatics"
 
 researcher:
   name: ""
-  expertise_level: intermediate
   field: "bioinformatics"
+  expertise_level: "intermediate"
   institution: ""
   orcid: ""
 
 interaction:
-  autonomy_level: supervised
-  checkpoint_frequency: after_each_step
-  notification_preferences:
-    on_step_complete: true
-    on_error: true
-    on_decision_required: true
-    on_long_running_task: true
-    long_running_threshold_seconds: 300
+  autonomy_level: "supervised"
+
+model_profile: "medium"
 
 research_goal:
-  output_types: ["paper", "poster"]
-  target_venue: journal
-  poster_dimensions: "36x48"
-
-model_profile: medium
+  output_types: ["paper"]
+  target_venue: "journal"
+  reporting_standard: "MINSEQE (sequencing) / MIAME (microarray)"
+  suggested_methodology: "machine_learning"
+  suggested_protocols:
+    - "methodology/methodology_selection"
+    - "methodology/machine_learning"
 
 writing_preferences:
-  citation_style: "apa"
-  default_reporting_standard: "strobe"
-  auto_apply_writing_core: true
+  citation_style: "vancouver"
+  language: "en-US"
 
 api_keys:
   firecrawl: ""
@@ -37,7 +37,16 @@ api_keys:
   crossref: ""
   serpapi: ""
 
-external_mcp_servers: []
+notifications:
+  on_step_complete: true
+  on_error: true
+  on_decision_required: true
 
-reporting_standard: MIAME/MINSEQE
-suggested_protocols: ["machine_learning"]
+domain_hints:
+  expected_columns: [gene_id, expression, log2fc, pvalue, padj, chromosome, position]
+  expected_file_extensions: [.fasta, .fastq, .bam, .vcf, .gtf, .gff, .h5, .csv, .tsv]
+  biases_to_monitor:
+    - batch effects (sequencing run / lane / library prep)
+    - GC content bias
+    - read mapping / multi-mapper bias
+    - multiple testing without proper FDR control

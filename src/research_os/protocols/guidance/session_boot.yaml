@@ -1,47 +1,58 @@
-name: session_boot
-version: 1.1.0
-description: 'MANDATORY: Run before any other protocol. Read researcher config and set behavioral mode. Consolidates all session-start reads into a single turn.'
+id: session_boot
+name: Session Boot
+version: '4.0.0'
+schema_version: '2.0'
+description: Mandatory first protocol every session. Loads researcher config, current state, and chooses the right next protocol — all in ONE turn.
+trigger: First message of every chat / IDE session.
+prerequisites: []
+inputs:
+  - inputs/researcher_config.yaml
+  - .os_state/state_ledger.json
+
 steps:
-- id: load_context
-  name: Load Session Context (Single Turn)
-  description: |
-    Make EXACTLY these two calls, in order — no more, no less:
-    1. sys_config_get — get researcher profile (autonomy, expertise, model_profile, goals)
-    2. sys_state_get — get current pipeline_stage, active path, protocol history
+  - id: load_context
+    name: Load Researcher Config + Project State
+    description: |
+      Make exactly these two calls in parallel and merge them into your working memory:
+        1. sys_config_get
+        2. sys_state_get
+      Do NOT call sys_workspace_tree, sys_file_list, sys_protocol_history,
+      or any other tool during boot — those belong inside the chosen protocol.
 
-    DO NOT call sys_workspace_tree, sys_file_list, sys_protocol_history, or any other
-    tool during boot. Those are called during the active protocol steps.
-    Combine all information from these two calls into your internal session state.
+  - id: set_behavior
+    name: Set Behaviour from Config
+    description: |
+      From sys_config_get apply:
+        interaction.autonomy_level:
+          manual     → steps_per_turn=1, ask before every tool call.
+          supervised → steps_per_turn=2, ask before sys_path_create / tool_synthesize / writes.
+          autopilot  → steps_per_turn=5, ask only before synthesis or large external calls.
+        researcher.expertise_level:
+          beginner     → plain language, explain every term.
+          intermediate → standard depth; define jargon once.
+          advanced     → skip basics; focus on decisions.
+          pi           → minimal explanation; present options + outcomes.
+        model_profile:
+          small  → keep responses terse, batch tool calls, prefer 1-2 steps per turn.
+          medium → standard.
+          large  → can plan multi-step work in one shot.
 
-- id: set_behavior
-  name: Set Behavioral Mode
-  description: |
-    Based on interaction.autonomy_level from config:
-    - manual: Ask before every tool call. steps_per_turn=1.
-    - supervised: Ask before path creation, synthesis, writing. steps_per_turn=2.
-    - autopilot: Run all steps autonomously. steps_per_turn=5.
+  - id: choose_next
+    name: Choose Next Action
+    description: |
+      Call sys_protocol_next. The dispatcher returns the recommended protocol
+      based on what outputs already exist on disk. Acknowledge in ONE short
+      message:
+        - "Project: <name>. Stage: <pipeline_stage>. Autonomy: <mode> /
+           expertise: <level> / model: <profile>. Next: <protocol>. Proceed?"
+      Then load that protocol via sys_protocol_get and run its first step.
 
-    Based on researcher.expertise_level:
-    - beginner: Plain language, explain every concept.
-    - intermediate: Standard depth. Define jargon once.
-    - advanced: Skip basics. Focus on decisions and results.
-    - pi: Minimal explanation. Present options and outcomes only.
+      If the researcher's message contains a SPECIFIC request (e.g. "write the
+      methods section"), prefer THAT protocol over the pipeline default, and
+      tell the researcher you're deviating from the recommended next step.
 
-    Note model_profile for protocol variant selection.
-
-- id: confirm_ready
-  name: Confirm Ready
-  description: |
-    In ONE message, state:
-    - Current pipeline stage and what has been done (from state)
-    - Autonomy mode and expertise level loaded
-    - What the next recommended action is (from pipeline_stage)
-
-    Example: "Profile loaded (autopilot / intermediate). Project is at stage 'init'
-    — ready to begin project_startup. Shall I proceed?"
-
-    If pipeline_stage is NOT 'init', summarize what has been completed and ask
-    what the researcher wants to do next.
+expected_outputs:
+  - .os_state/protocol_execution_log.jsonl
 
 next_protocol: guidance/project_startup
-schema_version: '1.0'
+on_failure: null

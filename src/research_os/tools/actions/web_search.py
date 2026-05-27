@@ -1,20 +1,22 @@
-import logging
+"""Web search & scraping — Firecrawl (preferred), SerpAPI (fallback)."""
+
+from __future__ import annotations
+
 import json
-from typing import Dict, Any
-from tenacity import (
-    retry,
-    wait_exponential,
-    stop_after_attempt,
-)
-from research_os.config import settings
-from research_os.project_ops import now_iso
+import logging
+import os
+import urllib.parse
+import urllib.request
+from typing import Any
 
-logger = logging.getLogger("research.tools.web_search")
+logger = logging.getLogger("research_os.tools.web_search")
 
 
-def _log_error(message: str):
-    from research_os.utils.common import find_project_root
+def _log_error(message: str) -> None:
     try:
+        from research_os.project_ops import now_iso
+        from research_os.utils.common import find_project_root
+
         root = find_project_root()
         if not (root / ".os_state").exists():
             return
@@ -26,110 +28,110 @@ def _log_error(message: str):
         pass
 
 
-@retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
-def _firecrawl_search(query: str, limit: int):
-    from firecrawl import FirecrawlApp
-
-    app = FirecrawlApp(api_key=settings.FIRECRAWL_API_KEY)
-    return app.search(query)
+def _firecrawl_key() -> str | None:
+    return os.environ.get("FIRECRAWL_API_KEY") or os.environ.get("FIRECRAWL")
 
 
-def search_web(query: str, limit: int = 5) -> Dict[str, Any]:
-    try:
-        if not settings.FIRECRAWL_API_KEY:
-            logger.warning("Firecrawl API key not set, falling back to stub.")
-            return {
-                "query": query,
-                "source": "web (stub)",
-                "count": 0,
-                "results": [],
-                "warning": "Firecrawl API key not set",
-            }
+def _serpapi_key() -> str | None:
+    return os.environ.get("SERPAPI_API_KEY") or os.environ.get("SERPAPI")
 
+
+def search_web(query: str, limit: int = 5) -> dict[str, Any]:
+    """Search the web. Firecrawl first; SerpAPI fallback; clear warning when neither is configured."""
+    fc = _firecrawl_key()
+    serpapi = _serpapi_key()
+
+    if fc:
         try:
-            response = _firecrawl_search(query, limit)
-        except Exception as e:
-            _log_error(f"Firecrawl search failed: {e}. Falling back to SerpAPI.")
-            # Fallback to SerpAPI if Firecrawl fails
-            if getattr(settings, "SERPAPI_API_KEY", None):
-                import urllib.request
+            from firecrawl import FirecrawlApp  # type: ignore
 
-                url = f"https://serpapi.com/search?engine=google&q={urllib.parse.quote(query)}&api_key={settings.SERPAPI_API_KEY}"
-                req = urllib.request.urlopen(url)
-                data = json.loads(req.read())
-                results = data.get("organic_results", [])[:limit]
-                formatted = [
-                    {
-                        "title": r.get("title", ""),
-                        "url": r.get("link", ""),
-                        "description": r.get("snippet", ""),
-                    }
-                    for r in results
-                ]
-                return {
-                    "query": query,
-                    "source": "web (serpapi fallback)",
-                    "count": len(formatted),
-                    "results": formatted,
-                }
-            else:
-                raise e
-
-        results = response.get("data", [])[:limit]
-        formatted = []
-        for r in results:
-            formatted.append(
+            app = FirecrawlApp(api_key=fc)
+            response = app.search(query)
+            raw = response.get("data", []) if isinstance(response, dict) else []
+            results = [
                 {
                     "title": r.get("title", ""),
                     "url": r.get("url", ""),
-                    "description": r.get("description", ""),
+                    "description": r.get("description", "") or r.get("snippet", ""),
                 }
-            )
-        return {
-            "query": query,
-            "source": "web",
-            "count": len(formatted),
-            "results": formatted,
-        }
-    except Exception as e:
-        logger.error(f"Web search failed: {e}")
-        _log_error(f"Web search failed: {e}")
-        return {
-            "query": query,
-            "source": "web",
-            "count": 0,
-            "results": [],
-            "warning": str(e),
-        }
+                for r in raw[:limit]
+            ]
+            return {
+                "query": query,
+                "source": "firecrawl",
+                "count": len(results),
+                "results": results,
+            }
+        except Exception as e:
+            _log_error(f"Firecrawl search failed, trying SerpAPI: {e}")
 
-
-def scrape_web(url: str) -> Dict[str, Any]:
-    try:
+    if serpapi:
         try:
-            import trafilatura
-        except ImportError:
-            trafilatura = None
+            url = (
+                "https://serpapi.com/search?engine=google"
+                f"&q={urllib.parse.quote(query)}&api_key={serpapi}"
+            )
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                data = json.loads(resp.read())
+            organic = data.get("organic_results", [])[:limit]
+            results = [
+                {
+                    "title": r.get("title", ""),
+                    "url": r.get("link", ""),
+                    "description": r.get("snippet", ""),
+                }
+                for r in organic
+            ]
+            return {
+                "query": query,
+                "source": "serpapi",
+                "count": len(results),
+                "results": results,
+            }
+        except Exception as e:
+            _log_error(f"SerpAPI search failed: {e}")
 
-        from firecrawl import FirecrawlApp
+    return {
+        "query": query,
+        "source": "web",
+        "count": 0,
+        "results": [],
+        "warning": (
+            "No web-search provider configured. Add 'firecrawl' or 'serpapi' to "
+            "inputs/researcher_config.yaml api_keys."
+        ),
+    }
 
-        if settings.FIRECRAWL_API_KEY:
-            app = FirecrawlApp(api_key=settings.FIRECRAWL_API_KEY)
-            scrape_result = app.scrape_url(url, params={"formats": ["markdown"]})
-            content = scrape_result.get("markdown", "")
-            return {"url": url, "content": content}
 
-        if trafilatura:
-            downloaded = trafilatura.fetch_url(url)
-            if downloaded:
-                content = trafilatura.extract(downloaded)
-                return {"url": url, "content": content}
+def scrape_web(url: str) -> dict[str, Any]:
+    """Scrape a webpage to markdown. Firecrawl preferred, trafilatura fallback."""
+    fc = _firecrawl_key()
+    if fc:
+        try:
+            from firecrawl import FirecrawlApp  # type: ignore
 
-        return {
-            "url": url,
-            "content": "",
-            "warning": "Firecrawl API key not set and trafilatura fallback failed",
-        }
+            app = FirecrawlApp(api_key=fc)
+            r = app.scrape_url(url, params={"formats": ["markdown"]})
+            content = r.get("markdown") if isinstance(r, dict) else None
+            if content:
+                return {"url": url, "source": "firecrawl", "content": content}
+        except Exception as e:
+            _log_error(f"Firecrawl scrape failed: {e}")
+
+    try:
+        import trafilatura  # type: ignore
+
+        downloaded = trafilatura.fetch_url(url)
+        if downloaded:
+            content = trafilatura.extract(downloaded) or ""
+            return {"url": url, "source": "trafilatura", "content": content}
     except Exception as e:
-        logger.error(f"Web scrape failed: {e}")
-        _log_error(f"Web scrape failed: {e}")
-        return {"url": url, "content": "", "warning": str(e)}
+        _log_error(f"trafilatura scrape failed: {e}")
+
+    return {
+        "url": url,
+        "content": "",
+        "warning": (
+            "No scraper available — install trafilatura or set firecrawl api key."
+        ),
+    }

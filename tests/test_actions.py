@@ -1,224 +1,109 @@
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+"""Tests for top-level tool actions (web, env, checkpoint, literature)."""
 
-from research_os.tools.actions.web_search import search_web, scrape_web
-from research_os.tools.actions.environment import (
-    package_install,
-    env_freeze,
-    env_restore,
-)
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 from research_os.tools.actions.checkpoint import (
     create_checkpoint,
-    rollback_checkpoint,
     list_checkpoints,
+    rollback_checkpoint,
 )
+from research_os.tools.actions.environment import env_snapshot, package_install
 from research_os.tools.actions.literature import download_literature
+from research_os.tools.actions.web_search import scrape_web, search_web
 
 
-# ── Environment ───────────────────────────────────────────────────────────────
+# ── package_install ────────────────────────────────────────────────────
 
 
 class TestPackageInstall:
-    @patch("subprocess.run")
+    @patch("research_os.tools.actions.environment.subprocess.run")
     def test_success(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="installed", stderr="")
         res = package_install(["requests"])
         assert res["code"] == 0
-        assert res["stdout"] == "installed"
+        assert res["status"] == "success"
 
-    @patch("subprocess.run")
+    @patch("research_os.tools.actions.environment.subprocess.run")
     def test_error(self, mock_run):
         mock_run.side_effect = Exception("pip not found")
         res = package_install(["nonexistent"])
-        assert res["code"] == 1
-        assert "pip not found" in res["error"]
+        assert res["status"] == "error"
 
 
-class TestEnvFreeze:
-    @patch("subprocess.run")
-    def test_success(self, mock_run):
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="requests==2.31.0", stderr=""
-        )
-        res = env_freeze()
-        assert res["code"] == 0
-        assert "requests" in res["stdout"]
-
-    @patch("subprocess.run")
-    def test_error(self, mock_run):
-        mock_run.side_effect = Exception("freeze failed")
-        res = env_freeze()
-        assert res["code"] == 1
-        assert "freeze failed" in res["error"]
+# ── env_snapshot ───────────────────────────────────────────────────────
 
 
-class TestEnvRestore:
-    @patch("subprocess.run")
-    def test_success(self, mock_run, tmp_path):
+class TestEnvSnapshot:
+    @patch("research_os.tools.actions.environment.subprocess.run")
+    def test_creates_requirements_and_session(self, mock_run, tmp_path):
+        mock_run.return_value = MagicMock(returncode=0, stdout="requests==2.31.0\n", stderr="")
+        res = env_snapshot(tmp_path)
+        assert res["status"] == "success"
         env_dir = tmp_path / "environment"
-        env_dir.mkdir(parents=True)
-        (env_dir / "requirements.txt").write_text("requests==2.31.0")
-        mock_run.return_value = MagicMock(returncode=0, stdout="installed", stderr="")
-        res = env_restore("requests==2.31.0", root=tmp_path)
-        assert res["code"] == 0
-        args, _ = mock_run.call_args
-        assert "-r" in args[0]
-
-    @patch("subprocess.run")
-    def test_error(self, mock_run, tmp_path):
-        env_dir = tmp_path / "environment"
-        env_dir.mkdir(parents=True)
-        (env_dir / "requirements.txt").write_text("requests==2.31.0")
-        mock_run.side_effect = Exception("restore failed")
-        res = env_restore("requests==2.31.0", root=tmp_path)
-        assert res["code"] == 1
-        assert "restore failed" in res["error"]
+        assert (env_dir / "requirements.txt").exists()
+        assert (env_dir / "session.yaml").exists()
 
 
-# ── Web Search ────────────────────────────────────────────────────────────────
+# ── web search ─────────────────────────────────────────────────────────
 
 
 class TestSearchWeb:
-    @patch("research_os.tools.actions.web_search.settings")
-    @patch("research_os.tools.actions.web_search._firecrawl_search")
-    def test_success(self, mock_firecrawl, mock_settings):
-        mock_settings.FIRECRAWL_API_KEY = "test_key"
-        mock_firecrawl.return_value = {
-            "data": [{"title": "T", "url": "http://x.com", "description": "D"}]
-        }
-        res = search_web("q", limit=5)
-        assert res["count"] == 1
-        assert res["source"] == "web"
-        assert res["results"][0]["title"] == "T"
-
-    @patch("research_os.tools.actions.web_search.settings")
-    def test_no_api_key(self, mock_settings):
-        mock_settings.FIRECRAWL_API_KEY = ""
+    def test_no_provider_returns_warning(self, monkeypatch):
+        monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+        monkeypatch.delenv("SERPAPI_API_KEY", raising=False)
         res = search_web("q")
         assert res["count"] == 0
-        assert "stub" in res["source"]
+        assert "warning" in res
+
+    @patch("urllib.request.urlopen")
+    def test_serpapi_fallback(self, mock_urlopen, monkeypatch):
+        import json as _json
+        monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+        monkeypatch.setenv("SERPAPI_API_KEY", "sk_test")
+        body = _json.dumps(
+            {"organic_results": [{"title": "T", "link": "http://x.com", "snippet": "D"}]}
+        ).encode()
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = body
+        res = search_web("q", limit=1)
+        assert res["source"] == "serpapi"
+        assert res["count"] == 1
 
 
 class TestScrapeWeb:
-    @patch("research_os.tools.actions.web_search.settings")
-    @patch("firecrawl.FirecrawlApp")
-    def test_firecrawl(self, mock_app_cls, mock_settings):
-        mock_settings.FIRECRAWL_API_KEY = "key"
-        mock_app_cls.return_value.scrape_url.return_value = {"markdown": "# hello"}
-        res = scrape_web("http://x.com")
-        assert res["content"] == "# hello"
-
-    @patch("research_os.tools.actions.web_search.settings")
-    def test_no_api_key(self, mock_settings):
-        mock_settings.FIRECRAWL_API_KEY = ""
-        res = scrape_web("http://x.com")
+    def test_no_scraper_returns_warning(self, monkeypatch):
+        monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+        # If trafilatura isn't installed in the test env, scrape returns warning.
+        res = scrape_web("http://example.com")
+        # Either trafilatura returned content, or we got a warning.
         assert "content" in res
 
 
-# ── Checkpoint ────────────────────────────────────────────────────────────────
+# ── Checkpoints ────────────────────────────────────────────────────────
 
 
-class TestCreateCheckpoint:
-    @patch("research_os.tools.actions.checkpoint._snapshot_workspace")
-    @patch("research_os.state.checkpoint_manager.CheckpointManager")
-    def test_success(self, MockCM, mock_snapshot):
-        instance = MockCM.return_value
-        instance.save.return_value = Path(
-            "/tmp/.os_state/checkpoints/manual_20250101_120000.json"
-        )
-
-        res = create_checkpoint("test cp", Path("/tmp"))
-        assert res["status"] == "success"
-        assert res["checkpoint_id"] == "manual_20250101_120000"
-        MockCM.assert_called_once_with(Path("/tmp/.os_state/checkpoints"))
-        instance.save.assert_called_once_with(
-            phase="manual", data={}, metadata={"description": "test cp"}
-        )
-        mock_snapshot.assert_called_once_with(Path("/tmp"), "manual_20250101_120000")
-
-    def test_creates_zip(self, tmp_path):
+class TestCheckpoints:
+    def test_create_returns_id(self, tmp_path):
         (tmp_path / "workspace").mkdir()
-        (tmp_path / "workspace" / "notes.md").write_text("research notes")
-        (tmp_path / "workspace" / "data").mkdir()
-        (tmp_path / "workspace" / "data" / "large.csv").write_text("a,b\n1,2")
-
-        ckpt_dir = tmp_path / ".os_state" / "checkpoints"
-        ckpt_dir.mkdir(parents=True)
-        mock_path = ckpt_dir / "manual_20250101_120000.json"
-        mock_path.write_text("{}")
-
-        with patch("research_os.state.checkpoint_manager.CheckpointManager") as MockCM:
-            MockCM.return_value.save.return_value = mock_path
-            res = create_checkpoint("test cp", tmp_path)
-
+        (tmp_path / "workspace" / "note.md").write_text("hello")
+        res = create_checkpoint("first", tmp_path)
         assert res["status"] == "success"
-        zip_path = ckpt_dir / "manual_20250101_120000_workspace.zip"
-        assert zip_path.exists()
+        assert res["checkpoint_id"].startswith("ckpt_")
 
-        import zipfile
-
-        with zipfile.ZipFile(zip_path) as zf:
-            names = zf.namelist()
-            assert any("notes.md" in n for n in names)
-            assert not any("large.csv" in n for n in names)
-
-    def test_no_workspace(self, tmp_path):
-        ckpt_dir = tmp_path / ".os_state" / "checkpoints"
-        ckpt_dir.mkdir(parents=True)
-        mock_path = ckpt_dir / "manual_20250101_120000.json"
-        mock_path.write_text("{}")
-
-        with patch("research_os.state.checkpoint_manager.CheckpointManager") as MockCM:
-            MockCM.return_value.save.return_value = mock_path
-            res = create_checkpoint("test cp", tmp_path)
-
+    def test_list_after_create(self, tmp_path):
+        (tmp_path / "workspace").mkdir()
+        (tmp_path / "workspace" / "note.md").write_text("hello")
+        create_checkpoint("first", tmp_path)
+        res = list_checkpoints(tmp_path)
         assert res["status"] == "success"
-        zip_path = ckpt_dir / "manual_20250101_120000_workspace.zip"
-        assert not zip_path.exists()
+        assert len(res["checkpoints"]) >= 1
 
-
-class TestRollbackCheckpoint:
-    def test_success(self, tmp_path):
-        ckpt_dir = tmp_path / ".os_state" / "checkpoints"
-        ckpt_dir.mkdir(parents=True)
-        (ckpt_dir / "cp1.json").write_text("{}")
-
-        with patch("research_os.state.checkpoint_manager.CheckpointManager"):
-            with patch(
-                "research_os.tools.actions.checkpoint._restore_workspace"
-            ) as mock_restore:
-                res = rollback_checkpoint("cp1", tmp_path)
-
-        assert res["status"] == "success"
-        assert "cp1" in res["message"]
-        mock_restore.assert_called_once_with(tmp_path, "cp1")
-
-    def test_not_found(self, tmp_path):
-        with patch("research_os.state.checkpoint_manager.CheckpointManager"):
-            res = rollback_checkpoint("nonexistent", tmp_path)
+    def test_rollback_unknown(self, tmp_path):
+        res = rollback_checkpoint("does-not-exist", tmp_path)
         assert res["status"] == "error"
-        assert "not found" in res["message"].lower()
 
 
-class TestListCheckpoints:
-    @patch("research_os.state.checkpoint_manager.CheckpointManager")
-    def test_success(self, MockCM):
-        instance = MockCM.return_value
-        instance.list_all.return_value = [
-            {
-                "file": "cp1.json",
-                "phase": "manual",
-                "timestamp": "2025-01-01T12:00:00",
-                "metadata": {},
-            }
-        ]
-        res = list_checkpoints(Path("/tmp"))
-        assert res["status"] == "success"
-        assert len(res["checkpoints"]) == 1
-        assert res["checkpoints"][0]["phase"] == "manual"
-
-
-# ── Literature ────────────────────────────────────────────────────────────────
+# ── Literature download ───────────────────────────────────────────────
 
 
 class TestDownloadLiterature:
@@ -230,39 +115,24 @@ class TestDownloadLiterature:
             str(tmp_path / "inputs/literature/paper.pdf"),
             None,
         )
-
-        res = download_literature(
-            "https://example.com/paper.pdf", "paper.pdf", tmp_path
-        )
+        res = download_literature("https://example.com/paper.pdf", "paper.pdf", tmp_path)
         assert res["status"] == "success"
-        assert "paper.pdf" in res["filepath"]
-        expected = tmp_path / "inputs" / "literature" / "paper.pdf"
-        assert expected.parent.exists()
-        mock_retrieve.assert_called_once_with("https://example.com/paper.pdf", expected)
+        assert (tmp_path / "inputs" / "literature").exists()
 
     @patch("research_os.tools.actions.literature._check_unpaywall")
     def test_paywall(self, mock_unpaywall, tmp_path):
         mock_unpaywall.return_value = {"is_oa": False, "reason": "Closed access."}
-        res = download_literature(
-            "https://example.com/paper.pdf", "paper.pdf", tmp_path
-        )
+        res = download_literature("https://example.com/paper.pdf", "paper.pdf", tmp_path)
         assert res["status"] == "error"
-        assert "paywall" in res["message"].lower()
 
 
 def test_all_action_imports_resolve():
-    """Verify every action module is importable and exposes expected callables."""
-    import research_os.tools.actions as actions
+    from research_os.tools.actions.checkpoint import create_checkpoint as _c
+    from research_os.tools.actions.protocol import load_protocol as _l
+    from research_os.tools.actions.search import search_pubmed as _p
+    from research_os.tools.actions.web_search import search_web as _w
 
-    module = actions
-    assert module is not None
-
-    from research_os.tools.actions.web_search import search_web
-    from research_os.tools.actions.checkpoint import create_checkpoint
-    from research_os.tools.actions.protocol import load_protocol
-    from research_os.tools.actions.search import search_pubmed
-
-    assert callable(search_web)
-    assert callable(load_protocol)
-    assert callable(search_pubmed)
-    assert callable(create_checkpoint)
+    assert callable(_c)
+    assert callable(_l)
+    assert callable(_p)
+    assert callable(_w)

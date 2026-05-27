@@ -1,87 +1,234 @@
-import logging
-from typing import Dict, Any
-from pathlib import Path
-import pandas as pd
+"""Tabular data tools: sample, profile, convert."""
 
-logger = logging.getLogger("research.tools.data")
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger("research_os.tools.data")
+
+
+def _read(path: Path):
+    """Read a tabular file into a pandas DataFrame, raising on unknown format."""
+    import pandas as pd
+
+    ext = path.suffix.lower()
+    if ext == ".csv":
+        return pd.read_csv(path)
+    if ext == ".tsv":
+        return pd.read_csv(path, sep="\t")
+    if ext == ".parquet":
+        return pd.read_parquet(path)
+    if ext == ".feather":
+        return pd.read_feather(path)
+    if ext in (".xlsx", ".xls"):
+        return pd.read_excel(path)
+    if ext == ".json":
+        return pd.read_json(path)
+    if ext == ".jsonl":
+        return pd.read_json(path, lines=True)
+    if ext == ".rds":
+        try:
+            import pyreadr  # type: ignore
+
+            result = pyreadr.read_r(str(path))
+            return next(iter(result.values()))
+        except ImportError as exc:
+            raise RuntimeError(
+                "pyreadr is required for .rds files (pip install pyreadr)"
+            ) from exc
+    raise RuntimeError(f"Unsupported file format: {ext}")
+
+
+def _current_path(root: Path) -> str:
+    try:
+        from research_os.project_ops import load_state
+
+        state = load_state(root)
+        current = state.get("current_path")
+        if current and current != "main":
+            return current
+    except Exception:
+        pass
+    workspace = root / "workspace"
+    if workspace.exists():
+        dirs = [
+            d.name
+            for d in workspace.iterdir()
+            if d.is_dir() and d.name[:2].isdigit() and not d.name.endswith("__DEAD_END")
+        ]
+        if dirs:
+            return sorted(dirs)[-1]
+    return ""
 
 
 def data_sample(
-    filepath: str, n_rows: int, strategy: str, root: Path
-) -> Dict[str, Any]:
+    filepath: str, n_rows: int, strategy: str = "head", root: Path = Path(".")
+) -> dict[str, Any]:
+    """Sample N rows from a tabular dataset and write the sample to the current step."""
     try:
         data_path = root / filepath
         if not data_path.exists():
-            return {"error": f"File not found: {filepath}"}
+            return {"status": "error", "message": f"File not found: {filepath}"}
 
-        ext = data_path.suffix.lower()
-        if ext == ".csv":
-            df = pd.read_csv(data_path)
-        elif ext == ".parquet":
-            df = pd.read_parquet(data_path)
-        else:
-            return {"error": f"Unsupported file format: {ext}"}
-
+        df = _read(data_path)
         if strategy == "head":
             sampled = df.head(n_rows)
+        elif strategy == "tail":
+            sampled = df.tail(n_rows)
         elif strategy == "random":
             sampled = df.sample(n=min(n_rows, len(df)), random_state=42)
         else:
-            return {"error": f"Unknown strategy: {strategy}"}
+            return {"status": "error", "message": f"Unknown strategy: {strategy}"}
 
-        from research_os.tools.actions.audit import get_current_path
-        current_path = get_current_path(root)
-        if current_path:
-            out_path = root / "workspace" / current_path / "data" / f"sampled_{data_path.name}"
+        current = _current_path(root)
+        if current:
+            out_path = (
+                root / "workspace" / current / "data" / f"sampled_{data_path.name}"
+            )
         else:
             out_path = root / "workspace" / "logs" / f"sampled_{data_path.name}"
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if ext == ".csv":
-            sampled.to_csv(out_path, index=False)
-        else:
+        ext = data_path.suffix.lower()
+        if ext == ".parquet":
             sampled.to_parquet(out_path, index=False)
+        elif ext == ".feather":
+            sampled.to_feather(out_path)
+        else:
+            sampled.to_csv(out_path.with_suffix(".csv"), index=False)
+            out_path = out_path.with_suffix(".csv")
+
+        preview_rows = sampled.head(min(10, len(sampled))).to_dict(orient="records")
 
         return {
             "status": "success",
-            "filepath": str(out_path.absolute()),
+            "filepath": str(out_path.relative_to(root)),
             "rows": len(sampled),
+            "columns": list(sampled.columns),
+            "preview": preview_rows,
         }
     except Exception as e:
-        logger.error(f"Data sample failed: {e}")
+        logger.error(f"data_sample failed: {e}")
         return {"status": "error", "message": str(e)}
 
-def data_convert(filepath: str, output_format: str, root: Path) -> Dict[str, Any]:
+
+def data_profile(filepath: str, root: Path = Path(".")) -> dict[str, Any]:
+    """Profile a tabular dataset: schema, missingness, dtypes, descriptive stats."""
+    try:
+        data_path = root / filepath
+        if not data_path.exists():
+            return {"status": "error", "message": f"File not found: {filepath}"}
+
+        df = _read(data_path)
+        n_rows, n_cols = df.shape
+
+        columns = []
+        for col in df.columns:
+            series = df[col]
+            null_pct = float(series.isna().mean()) * 100.0
+            dtype = str(series.dtype)
+            entry = {
+                "name": str(col),
+                "dtype": dtype,
+                "null_pct": round(null_pct, 2),
+                "n_unique": int(series.nunique(dropna=True)),
+            }
+            if dtype.startswith(("int", "float")):
+                try:
+                    desc = series.describe()
+                    entry.update(
+                        {
+                            "min": float(desc["min"]),
+                            "max": float(desc["max"]),
+                            "mean": float(desc["mean"]),
+                            "std": float(desc["std"]),
+                        }
+                    )
+                except Exception:
+                    pass
+            elif dtype == "object" or "category" in dtype:
+                top_values = series.value_counts().head(5).to_dict()
+                entry["top_values"] = {str(k): int(v) for k, v in top_values.items()}
+            columns.append(entry)
+
+        suggestions: list[str] = []
+        high_missing = [c for c in columns if c["null_pct"] > 20]
+        if high_missing:
+            names = ", ".join(c["name"] for c in high_missing[:5])
+            suggestions.append(
+                f"{len(high_missing)} column(s) have >20% missing values "
+                f"(e.g., {names}). Decide on imputation or exclusion."
+            )
+        if n_rows < 30:
+            suggestions.append(
+                f"Sample size n={n_rows} is small — consider whether this is "
+                "enough for the planned statistical test."
+            )
+        suggestions.append(
+            "Next step: create an experiment (sys_path_create) for baseline EDA."
+        )
+
+        # Persist
+        current = _current_path(root)
+        if current:
+            out_path = (
+                root
+                / "workspace"
+                / current
+                / "outputs"
+                / "reports"
+                / f"profile_{data_path.stem}.md"
+            )
+        else:
+            out_path = (
+                root / "workspace" / "logs" / f"profile_{data_path.stem}.md"
+            )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        lines = [
+            f"# Data Profile — {data_path.name}",
+            "",
+            f"- Rows: {n_rows:,}",
+            f"- Columns: {n_cols}",
+            "",
+            "## Column summary",
+            "",
+            "| Column | dtype | % missing | unique |",
+            "|---|---|---:|---:|",
+        ]
+        for c in columns:
+            lines.append(
+                f"| {c['name']} | {c['dtype']} | {c['null_pct']:.1f} | {c['n_unique']} |"
+            )
+        lines.extend(["", "## Suggested next steps", ""])
+        for s in suggestions:
+            lines.append(f"- {s}")
+        out_path.write_text("\n".join(lines) + "\n")
+
+        return {
+            "status": "success",
+            "rows": n_rows,
+            "columns": columns,
+            "suggestions": suggestions,
+            "report_path": str(out_path.relative_to(root)),
+        }
+    except Exception as e:
+        logger.error(f"data_profile failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+def data_convert(filepath: str, output_format: str, root: Path) -> dict[str, Any]:
     try:
         p = root / filepath
         if not p.exists() or not p.is_file():
             return {"status": "error", "message": f"File not found: {filepath}"}
-            
-        ext = p.suffix.lower()
-        output_format = output_format.lower()
-        if output_format.startswith("."):
-            output_format = output_format[1:]
-            
+
+        df = _read(p)
+        output_format = output_format.lower().lstrip(".")
         out_path = p.with_suffix(f".{output_format}")
-        
-        # Load data
-        if ext == ".csv":
-            df = pd.read_csv(p)
-        elif ext == ".parquet":
-            df = pd.read_parquet(p)
-        elif ext == ".feather":
-            df = pd.read_feather(p)
-        elif ext == ".rds":
-            try:
-                import pyreadr
-                result = pyreadr.read_r(str(p))
-                df = next(iter(result.values())) # get first dataframe
-            except ImportError:
-                return {"status": "error", "message": "pyreadr package is required to read .rds files."}
-        else:
-            return {"status": "error", "message": f"Unsupported input format: {ext}"}
-            
-        # Save data
+
         if output_format == "csv":
             df.to_csv(out_path, index=False)
         elif output_format == "parquet":
@@ -90,18 +237,25 @@ def data_convert(filepath: str, output_format: str, root: Path) -> Dict[str, Any
             df.to_feather(out_path)
         elif output_format == "rds":
             try:
-                import pyreadr
+                import pyreadr  # type: ignore
+
                 pyreadr.write_rds(str(out_path), df)
             except ImportError:
-                return {"status": "error", "message": "pyreadr package is required to write .rds files."}
+                return {
+                    "status": "error",
+                    "message": "pyreadr required for .rds output",
+                }
         else:
-            return {"status": "error", "message": f"Unsupported output format: {output_format}"}
-            
+            return {
+                "status": "error",
+                "message": f"Unsupported output format: {output_format}",
+            }
+
         return {
             "status": "success",
             "message": f"Converted to {output_format}",
-            "filepath": str(out_path.relative_to(root))
+            "filepath": str(out_path.relative_to(root)),
         }
     except Exception as e:
-        logger.error(f"Data conversion failed: {e}")
+        logger.error(f"data_convert failed: {e}")
         return {"status": "error", "message": str(e)}

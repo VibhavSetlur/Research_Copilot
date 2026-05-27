@@ -1,57 +1,64 @@
-name: reproducibility
-version: 2.0.0
-description: Checklist and instructions to ensure full reproducibility.
-schema_version: '1.0'
-expected_outputs:
-- 'workspace/methods.md: Appended reproducibility verification'
-- 'workspace/{step_number}_{descriptive_name}/environment/requirements.txt: Frozen
-  environment per step'
-reproducibility_checklist:
-  1: Are all raw data files immutable and strictly read-only?
-  2: Are derived datasets saved separately in the experiment path's data/ 
-    directory?
-  3: Are all methodological choices logged in methods.md?
-  4: Is the random seed explicitly set for all stochastic operations?
-  5: Are all script paths relative to the workspace root?
-  6: Is the environment properly frozen (e.g., requirements.txt)?
-  7: Is code linted and free of obvious syntax errors?
-  8: Do scripts run from top to bottom without manual intervention?
-  9: Are third-party data access dates/versions recorded?
-  10: Are intermediate data files verified via MD5/SHA256 checksums?
-  11: Are figure generation scripts separate from heavy analysis scripts?
-  12: Are dependencies restricted to stable, version-pinned releases?
-instructions:
-  freeze_environment:
-    command: pip freeze > 
-      workspace/{step_number}_{descriptive_name}/environment/requirements.txt
-  relative_paths:
-    rule: Never use absolute paths like /home/user/... Always use paths starting
-      with inputs/ or workspace/.
-  random_seeds:
-    python: import numpy as np; np.random.seed(42); import random; 
-      random.seed(42)
-  verification:
-    clean_environment_run: To verify, create a new virtual environment (`python 
-      -m venv venv`), install requirements (`pip install -r 
-      workspace/*/environment/requirements.txt`), and execute the main pipeline 
-      scripts sequentially to ensure output matches exactly (compare checksums).
+id: reproducibility
+name: Reproducibility
+version: '4.0.0'
+schema_version: '2.0'
+description: Lock down environments, verify the pipeline runs end-to-end, and produce a Dockerfile for full portability.
+trigger: After all planned experiments are complete. Before audit_and_validation.
+
 steps:
-- id: verify_checklist
-  name: Verify Checklist
-  description: Ensure all 12 points of the reproducibility checklist are met.
-- id: freeze_env
-  name: Freeze Environment
-  description: Run pip freeze to lock down dependency versions.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='reproducibility
-    completed'.\n5. Ask researcher: 'I've completed reproducibility. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
+  - id: snapshot_each_step
+    name: Snapshot Each Step's Environment
+    description: |
+      For EACH active (non-dead-end) experiment in workspace/, ensure
+      workspace/<step>/environment/requirements.txt exists. If missing, switch
+      to that step (or just call) sys_env_snapshot. R packages → renv.lock,
+      Julia → Project.toml + Manifest.toml.
+
+  - id: verify_seeds
+    name: Verify Random Seeds Are Set
+    description: |
+      Grep every script in workspace/*/scripts/ for explicit seeding:
+        Python  → np.random.seed | random.seed | torch.manual_seed | rng = np.random.default_rng(seed=…)
+        R       → set.seed(…)
+        Julia   → Random.seed!
+      Any script that uses randomness but does NOT seed gets flagged. Either
+      bump the script to a new version with seeding, or document why determinism
+      is not required.
+
+  - id: verify_relative_paths
+    name: Verify Relative Paths
+    description: |
+      Grep scripts for absolute paths (/home, /Users, C:\). Any hit is a bug —
+      rewrite to use paths relative to workspace/<step>/ or to env vars.
+
+  - id: hash_outputs
+    name: Hash Key Outputs
+    description: |
+      For every key output file (anything under workspace/*/outputs/ and
+      workspace/*/data/output/), compute sha256 and append to
+      workspace/logs/output_hashes.json. This becomes the baseline that the
+      reproducibility audit will compare future runs against.
+
+  - id: dockerise
+    name: Generate Dockerfile
+    description: |
+      sys_env_docker_generate — produces environment/Dockerfile from the
+      session snapshot. Verify it would build (read it, sanity check the
+      package list).
+
+  - id: optional_full_audit
+    name: Optional Full Reproducibility Audit
+    description: |
+      If the researcher wants a hard guarantee:
+        tool_audit_reproducibility
+      This re-runs every workspace script in a clean subprocess, then compares
+      output hashes. Report goes to workspace/logs/reproducibility_report.md.
+      Slow — skip in autopilot unless requested.
+
+expected_outputs:
+  - workspace/*/environment/requirements.txt
+  - environment/Dockerfile
+  - workspace/logs/output_hashes.json
+
 next_protocol: audit/audit_and_validation
+on_failure: guidance/dead_end_routing

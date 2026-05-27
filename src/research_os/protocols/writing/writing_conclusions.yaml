@@ -1,65 +1,51 @@
-name: writing_conclusions
-version: 1.0.0
-description: How to write per‑step conclusions.md.
-always_include:
-- writing_core
-template: '# {step_name} — Conclusions
+id: writing_conclusions
+name: Writing — Conclusions (per step)
+version: '4.0.0'
+schema_version: '2.0'
+description: How to write per-step conclusions.md. Called by analysis_plan's document_conclusions step.
 
+template: |
+  # {step_id} — Conclusions
 
-  ## Key Findings
+  ## Findings
+  - {quantitative finding 1 with number + unit}
+  - {quantitative finding 2}
 
-  1. {finding_1_with_number}
-
-  2. {finding_2_with_number}
-
-
-  ## Statistical Summary
-
+  ## Statistical summary
   | Metric | Value | 95% CI | p-value |
+  |---|---|---|---|
+  | {metric} | {value} | [{lo}, {hi}] | {p} |
 
-  |--------|-------|--------|---------|
+  ## Limitations
+  - {assumption checks performed + their result}
 
-  | {metric} | {value} | [{lower}, {upper}] | {p} |
+  ## Decision
+  - {one of: proceed | branch | dead-end}
 
+  ## Next steps
+  1. {candidate 1 with rationale}
+  2. {candidate 2}
 
-  ## Bugs / Issues Encountered
-
-  - {bug_or_none}
-
-
-  ## Routing Decision
-
-  - **Next Step:** {next_step}
-
-  - **Rationale:** {why}
-
-  - **Continue in Same Path:** {yes/no}
-
-  - **New Path Number (if applicable):** {path_number}
-
-
-  ## Data Changes
-
-  - {new_data_or_none}
-
-  '
-rules:
-- Every finding must include a quantitative result.
-- If no bugs, write 'None.'
 steps:
-- id: write_conclusions
-  name: Write Conclusions
-  description: Populate conclusions.md using the template.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_conclusions
-    completed'.\n5. Ask researcher: 'I've completed writing_conclusions. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: write
+    name: Write Conclusions
+    description: |
+      sys_file_write filepath="workspace/<step>/conclusions.md"
+      content=<template above filled in>
+
+  - id: log
+    name: Log to analysis.md
+    description: |
+      mem_analysis_log entry="<step_id> conclusions: <one-line summary, key number>"
+
+  - id: validate
+    name: Validate Against Writing Standards
+    description: |
+      sys_file_validate_md filepath="workspace/<step>/conclusions.md"
+        protocol_name="writing_core"
+
+expected_outputs:
+  - workspace/*/conclusions.md
+
+next_protocol: null
+on_failure: null

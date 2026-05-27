@@ -1,62 +1,60 @@
-name: research_design
-version: 2.0.0
-description: Select the appropriate research design and compute sample size 
-  justification.
-schema_version: '1.0'
-expected_outputs:
-- 'workspace/methods.md: Appended chosen research design and sample size justification'
-- workspace/logs/research_design.log
-decision_tree:
-  flowchart:
-    q1:
-      question: Is the treatment assigned randomly by the researcher?
-      true: Randomised Controlled Trial (RCT)
-      false: q2
-    q2:
-      question: Is there a control group?
-      true: q3
-      false: Case Series / Cross-sectional (No comparator)
-    q3:
-      question: Is the outcome rare?
-      true: Case-Control Study
-      false: q4
-    q4:
-      question: Is time a factor (before/after)?
-      true: Longitudinal / Difference-in-Differences (DiD)
-      false: Cohort Study
-sample_size_justification:
-  formulae:
-    continuous_outcome:
-      description: Using Cohen's d for comparing two means.
-      power: 0.8
-      alpha: 0.05
-      formula: n = 2 * ( (Z_{alpha/2} + Z_{beta}) / d )^2
-      example: For d=0.5, n ≈ 64 per group.
-    binary_outcome:
-      description: Comparing two proportions.
-      power: 0.8
-      alpha: 0.05
-      formula: n = (p1(1-p1) + p2(1-p2)) * ( (Z_{alpha/2} + Z_{beta}) / (p1 - 
-        p2) )^2
+id: research_design
+name: Research Design
+version: '4.0.0'
+schema_version: '2.0'
+description: Choose the right study design (RCT, cohort, case-control, etc.) and compute / justify the sample size.
+trigger: After domain_analysis. Re-run if the research question pivots.
+
 steps:
-- id: traverse_flowchart
-  name: Traverse Design Flowchart
-  description: Answer the flowchart questions to determine the correct research 
-    design.
-- id: calculate_sample_size
-  name: Calculate Sample Size
-  description: Use the provided formulae to compute and justify the required 
-    sample size, given power=0.8 and alpha=0.05.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='research_design
-    completed'.\n5. Ask researcher: 'I've completed research_design. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
+  - id: choose_design
+    name: Choose the Study Design
+    description: |
+      Walk this decision flow with the researcher (or, in autopilot, decide and
+      justify):
+        Is treatment randomly assigned by the researcher?     → RCT (CONSORT)
+        Else, is there an active comparator group?
+            Outcome rare?                                     → Case-control
+            Time-ordered observations?                        → Cohort / DiD / ITS
+            Cross-sectional snapshot?                         → Cross-sectional
+        Pre-existing data without primary collection?         → Secondary analysis
+        No comparison group?                                  → Case series / descriptive
+        Computational only?                                   → Simulation / benchmark
+      Write the chosen design + a 2-sentence justification to docs/research_design.md.
+
+  - id: sample_size_justification
+    name: Sample Size or Power Justification
+    description: |
+      Pick the appropriate formula:
+        - Two-means (continuous outcome): n = 2 * ((Z_a/2 + Z_b) / d)^2 per group.
+            For d=0.5 (medium), alpha=0.05, power=0.8 → n ≈ 64/group.
+        - Two-proportions:
+            n = (p1*(1-p1) + p2*(1-p2)) * ((Z_a/2 + Z_b) / (p1-p2))^2 per group.
+        - Time-to-event: Schoenfeld formula on expected hazard ratio.
+        - ML benchmarks: dataset size justified by complexity of model
+          (rule of thumb: ≥10x parameters for vanilla deep models).
+      If the researcher's n is fixed (secondary data), instead compute the
+      MINIMUM detectable effect at power=0.8 and report it as a constraint.
+      Save the computation as a short script in workspace/<step>/scripts/ or
+      inline in docs/research_design.md.
+
+  - id: bias_mitigation_plan
+    name: Bias Mitigation Plan
+    description: |
+      For each bias listed in docs/domain_summary.md, write the design-level
+      mitigation (randomisation, matching, instrumental variable, sensitivity
+      analysis, hold-out test set, etc.) into docs/research_design.md.
+
+  - id: ground_design_choice
+    name: Ground the Design in Literature
+    description: |
+      tool_search_semantic_scholar query="<design> in <domain>"
+      tool_search_pubmed query="<design> <topic>"
+      Cite 1-3 prior papers that used the same design for similar questions.
+      Add them to workspace/citations.md via mem_citations_generate after updating
+      inputs/literature_index.yaml.
+
+expected_outputs:
+  - docs/research_design.md
+
 next_protocol: methodology/methodology_selection
+on_failure: guidance/dead_end_routing

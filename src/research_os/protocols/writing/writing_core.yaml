@@ -1,59 +1,58 @@
-name: writing_core
-version: 1.0.0
-description: Universal writing rules for all Research OS outputs. MUST be loaded
-  before any task-specific writing protocol.
-schema_version: '1.0'
-trigger: Always include this protocol when performing any writing task.
+id: writing_core
+name: Writing — Core Rules
+version: '4.0.0'
+schema_version: '2.0'
+description: Universal writing rules. Loaded implicitly by every writing/ and synthesis/ protocol.
+trigger: Loaded as a prerequisite — invoke directly only when auditing an arbitrary markdown file.
+
 rules:
   banned_phrases:
-  - It is important to note that
-  - Interestingly,
-  - Surprising as it may seem
-  - Delve into
-  - In this tapestry of
-  - As a language model
-  - Needless to say
-  - It goes without saying
-  - As shown above
-  - Due to the fact that
-  - In order to
+    - "it is important to note that"
+    - "interestingly,"
+    - "it is well known"
+    - "obviously"
+    - "naively"
+    - "trivially"
+    - "intuitively"
+    - "as a language model"
+    - "needless to say"
+    - "in order to"
+    - "due to the fact that"
+    - "novel approach"
   causal_language:
-  - Do not use 'causes', 'proof', or 'proves' unless referring to a randomized 
-    controlled trial or mathematical proof.
-  - Use 'associated with', 'correlated with', 'suggests', or 'indicates' for 
-    observational data.
-  - Avoid definitive claims without explicit statistical backing (e.g., 
-    p-values, confidence intervals).
+    - Do NOT use "causes", "leads to", "results in", "impacts", "proves" unless
+      the study is an RCT, instrumented variable, regression discontinuity, or
+      mathematical proof.
+    - For observational data, use "is associated with", "is correlated with",
+      "suggests", "is consistent with".
   number_formatting:
-  - Always report p-values with exactly three decimal places (e.g., p = 0.042, 
-    not p < 0.05). If p < 0.001, write p < 0.001.
-  - Report 95% confidence intervals for all point estimates.
-  - Use scientific notation for very large or very small numbers (e.g., 3.2e-5).
-  - Include units for all numerical values.
-  tense_rules:
-  - Use past tense for methods and results (e.g., 'We analyzed the data').
-  - Use present tense for established facts and conclusions (e.g., 'This 
-    indicates a significant association').
+    - p-values: exactly 3 decimals (p = 0.042). If p < 0.001, write "p < 0.001".
+    - Always report 95% CIs alongside point estimates.
+    - Use scientific notation for |x| < 1e-3 or > 1e5 (e.g. 3.2e-5).
+    - Always include units (e.g. "1.2 mg/dL", "12.5 °C", "0.85 (AUROC)").
+  tense:
+    - Methods + Results → past tense ("We fit", "Models were fit").
+    - Established facts / implications → present tense.
+    - Future work → future tense.
+
 steps:
-- id: verify_core_rules
-  name: Verify Core Rules
-  description: 'Before finalizing any output, verify that no banned phrases were used,
-    causal language is appropriate, numbers are formatted correctly, and verb tenses
-    are consistent.
+  - id: apply_rules
+    name: Apply Writing Rules
+    description: |
+      Self-check any draft you are about to commit:
+        - No banned phrases.
+        - No causal over-reach unless design warrants.
+        - p-values, CIs, units present and correctly formatted.
+        - Tense consistent across sections.
 
-    Call tool_md.validate if applicable.
+  - id: optional_validation
+    name: Optional Programmatic Validation
+    description: |
+      For substantial drafts:
+        sys_file_validate_md filepath="<path>" protocol_name="writing_core"
+      The validator flags banned phrases and missing structural headers.
 
-    '
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_core
-    completed'.\n5. Ask researcher: 'I've completed writing_core. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-next_protocol: synthesis/synthesis_paper
+expected_outputs: []
+
+next_protocol: null
+on_failure: null

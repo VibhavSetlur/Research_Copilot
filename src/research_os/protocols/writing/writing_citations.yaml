@@ -1,35 +1,36 @@
-name: writing_citations
-version: 1.0.0
-description: How to format and manage citations in workspace/citations.md.
-always_include:
-- writing_core
-citation_entry_template:
-  format: "### [{citation_key}]\n- **Authors:** {authors_et_al}\n- **Year:** {year}\n\
-    - **Title:** {title}\n- **Venue:** {journal_or_conference}\n- **DOI:** [{doi}]({doi_url})\n\
-    - **Verified:** {status} — {verification_date}\n- **Claims Used:** {list_of_claims}\n\
-    - **BibTeX:**\n  ```bibtex\n  {bibtex_entry}\n  ```\n"
-  rules:
-  - 'citation_key format: FirstAuthorLastNameYear'
-  - 'Verified status: VERIFIED | CONDITIONAL | FAILED | PENDING'
-  - Always run citation verification before marking VERIFIED.
+id: writing_citations
+name: Writing — Citations
+version: '4.0.0'
+schema_version: '2.0'
+description: Maintain workspace/citations.md so every claim is grounded and every citation is verified online.
+
 steps:
-- id: add_entry
-  name: Add Citation Entry
-  description: Insert a new citation in citations.md using the template above.
-- id: verify
-  name: Verify Citation
-  description: Call tool_audit.citations on the entry and update verification 
-    status.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='writing_citations
-    completed'.\n5. Ask researcher: 'I've completed writing_citations. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: regenerate_from_index
+    name: Regenerate citations.md from literature_index
+    description: |
+      mem_citations_generate — rebuilds workspace/citations.md from
+      inputs/literature_index.yaml. The literature_index gets entries when:
+        - Papers are dropped into inputs/literature/.
+        - tool_literature_download is called.
+
+  - id: verify_each_citation
+    name: Verify Each Citation Online
+    description: |
+      tool_audit_citations — queries Crossref / Semantic Scholar for each
+      citation_key, marks entries verified/unverified. Update
+      inputs/literature_index.yaml entries.verified=true accordingly (sys_file_write
+      with the relevant edit).
+
+  - id: format_for_paper
+    name: Format for the Paper
+    description: |
+      The synthesis pipeline will reference citations by key (e.g. [@smith2024]).
+      Make sure each citation_key in workspace/citations.md matches what the
+      paper drafts use. Keys are auto-generated from the filename stem and are
+      lowercase with underscores.
+
+expected_outputs:
+  - workspace/citations.md
+
+next_protocol: null
+on_failure: null

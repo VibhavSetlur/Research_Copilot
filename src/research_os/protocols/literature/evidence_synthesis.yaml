@@ -1,54 +1,44 @@
-name: evidence_synthesis
-version: 2.0.0
-description: Synthesise findings, build evidence tables, and detect 
-  contradictions.
-schema_version: '1.0'
-expected_outputs:
-- synthesis/evidence_table.md
-- synthesis/contradictions.md
-templates:
-  evidence_table_apa: '| Author(s) & Year | Study Design | Sample Size | Key Findings
-    | GRADE Strength |
+id: evidence_synthesis
+name: Evidence Synthesis
+version: '4.0.0'
+schema_version: '2.0'
+description: Build an evidence table from the literature corpus, grade each entry, and flag contradictions.
+trigger: After literature_search. Useful as the foundation for the paper's Introduction and Discussion.
 
-    |------------------|--------------|-------------|--------------|----------------|
-
-    | Doe et al., 2023 | RCT          | N=250       | ...          | High           |
-
-    '
-grade_system:
-  high: RCTs without serious limitations, or overwhelming evidence from 
-    observational studies.
-  moderate: RCTs with limitations, or strong observational studies.
-  low: Observational studies with limitations.
-  very_low: Case series, expert opinion, or studies with severe flaws.
-automated_contradiction_detector:
-  rule: Extract the primary outcome direction (positive, negative, null) for 
-    each paper. If Paper A asserts positive and Paper B asserts negative/null 
-    for the same relationship, flag as a contradiction.
-  action: Log all flagged contradictions in synthesis/contradictions.md and 
-    prompt for potential reasons (e.g., different populations, dosages, or 
-    timeframes).
 steps:
-- id: build_evidence_table
-  name: Build Evidence Table
-  description: Extract data from included papers and fill the APA-style 
-    template.
-- id: grade_evidence
-  name: Grade Evidence
-  description: Assign a GRADE strength to each paper.
-- id: detect_contradictions
-  name: Detect Contradictions
-  description: Run the automated contradiction detector and log conflicts.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='evidence_synthesis
-    completed'.\n5. Ask researcher: 'I've completed evidence_synthesis. Want me to
-    proceed to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new
-    tools/libraries have been snapshotted to the step's environment file.\n    - GROUNDING
-    CHECK: Ensure you have ACTUALLY called search tools (search_semantic_scholar,
-    search_web, etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-next_protocol: methodology/methodology_selection
+  - id: build_evidence_table
+    name: Build Evidence Table
+    description: |
+      From the entries in inputs/literature_index.yaml (and any PDFs in inputs/literature/),
+      build a table at synthesis/evidence_table.md with columns:
+        | citation_key | year | design | n | population | primary outcome | direction | GRADE |
+      Use sys_file_write to create the file. Fill each row by reading the abstract
+      from the literature_index entry; for missing fields, mark "n/r" (not reported).
+
+  - id: grade_quality
+    name: Apply GRADE Rating
+    description: |
+      Use the GRADE framework — pick one of {high, moderate, low, very_low} per entry:
+        high       — RCT without serious limitations; or overwhelming observational evidence.
+        moderate   — RCT with limitations or strong observational study.
+        low        — Observational study with limitations.
+        very_low   — Case series, single-arm, or studies with severe flaws.
+      Justify each rating in a short note column.
+
+  - id: detect_contradictions
+    name: Detect Contradictions
+    description: |
+      For each (population, exposure, outcome) triple represented in the evidence
+      table, group entries by direction (positive / negative / null). Any group
+      that contains BOTH positive and (negative or null) directions for the same
+      triple is a contradiction. Log to synthesis/contradictions.md with:
+        - Triple
+        - Conflicting citation_keys
+        - Hypothesised reason (different population? dose? era? definition?)
+
+expected_outputs:
+  - synthesis/evidence_table.md
+  - synthesis/contradictions.md
+
+next_protocol: guidance/analysis_plan
+on_failure: null

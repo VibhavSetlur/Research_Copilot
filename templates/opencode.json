@@ -1,9 +1,9 @@
 {
   "mcp": {
     "research-os": {
-      "command": "python",
-      "args": ["-m", "research_os.server", "--transport", "stdio"]
+      "command": "research-os",
+      "args": ["start"]
     }
   },
-  "system_prompt": "Read AGENTS.md in the project root before responding."
+  "system_prompt": "Read AGENTS.md at the project root before responding to any research request."
 }

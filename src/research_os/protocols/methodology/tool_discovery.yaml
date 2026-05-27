@@ -1,67 +1,59 @@
-name: tool_discovery
-version: 1.0.0
-description: Guide to discovering and evaluating Python/R/Julia packages for a 
-  specific task.
-always_include: []
-schema_version: '1.0'
-trigger: When the AI needs a library for a task but doesn't know which one to 
-  use.
+id: tool_discovery
+name: Tool / Library Discovery
+version: '4.0.0'
+schema_version: '2.0'
+description: Find the right Python / R / Julia library for a specific task and verify it can be installed.
+trigger: AI needs a library for a task but is uncertain which one to use.
+
 steps:
-- id: formulate_query
-  name: Formulate Search Query
-  description: 'Build a specific query: "<task> Python library", e.g., "survival analysis
-    Python library".
+  - id: formulate_query
+    name: Formulate the Search Query
+    description: |
+      Compose 2-3 candidate queries that combine task + language:
+        - "<task> Python library"   e.g. "Bayesian hierarchical models Python"
+        - "<task> R package"        e.g. "spatial point process R"
+        - "<task> Julia package"
+      Use the researcher's preferred language first (from researcher_config or
+      what's already installed).
 
-    If the researcher''s environment includes R, also search for "<task> R package".
+  - id: search_and_collect
+    name: Search & Collect Candidates
+    description: |
+      tool_search_web query=<query>   limit=8
+      For each promising hit, capture:
+        - Library name
+        - Official documentation URL
+        - GitHub repo URL
+        - Last commit date (≤ 12 months = active; >24 months = avoid)
+        - Star count (rough community signal; >500 = mature, >2000 = standard)
 
-    '
-- id: search_web
-  name: Search the Web
-  description: 'Use tool_search.web with the query. Gather top 5 results.
+  - id: short_list
+    name: Pick 1-3 Candidates
+    description: |
+      Filter on: maintenance status, documentation quality (has tutorial / API ref),
+      license compatibility, and dependency footprint.
 
-    For each, extract: library name, official documentation URL, GitHub repository
-    URL.
+  - id: test_install
+    name: Test Installation
+    description: |
+      tool_package_install packages=["<top-candidate>"]
+      If it fails, log the error and try the next candidate. Successful packages
+      are appended to environment/requirements.txt automatically.
 
-    '
-- id: evaluate_library
-  name: Evaluate Library Quality
-  description: 'For each candidate, check (via tool_search.web or direct GitHub API):
+  - id: log_decision
+    name: Log the Library Choice
+    description: |
+      mem_methods_append
+        method=<the task>
+        implementation=<library>==<version>
+        justification=<why this library over alternatives>
+      mem_decision_log
+        context="Library selection for <task>"
+        selected=<library>
+        rationale=<criteria + alternatives rejected>
 
-    - Last commit date (should be within 12 months)
-
-    - Number of GitHub stars (indicates community trust)
-
-    - Documentation quality (does it have a user guide? examples?)
-
-    - Compatibility with the current language environment
-
-    '
-- id: test_installation
-  name: Test Installation Feasibility
-  description: 'Call tool_package.install with the library name.
-
-    If installation fails, note the error and consider the next candidate.
-
-    '
-- id: log_decision
-  name: Log Decision
-  description: 'Record the selected library, its version, documentation URL, and justification
-    in methods_research.md.
-
-    '
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='tool_discovery
-    completed'.\n5. Ask researcher: 'I've completed tool_discovery. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
 expected_outputs:
-- workspace/{step_number}_.../methods_research.md updated with tool/library 
-  decision
+  - environment/requirements.txt
+
 next_protocol: methodology/research_methods
+on_failure: null

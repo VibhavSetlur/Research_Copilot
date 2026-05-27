@@ -1,34 +1,35 @@
-name: synthesis_poster
-version: 1.0.0
-description: Generate a professional research poster.
-always_include:
-- writing_core
-trigger: When output_types includes 'poster'.
-tool: tool_poster.create
-sections:
-- Title & Authors
-- Background
-- Methods
-- Results (2‑4 key figures)
-- Conclusions
-- References (compact)
+id: synthesis_poster
+name: Synthesis — Poster
+version: '4.0.0'
+schema_version: '2.0'
+description: Generate a conference-style poster (LaTeX → PDF) summarising the project.
+trigger: output_types includes "poster", or researcher asks for a poster.
+
 steps:
-- id: collect_content
-  name: Collect Content
-  description: Gather key findings, figures, and conclusions from workspace.
-- id: call_poster_tool
-  name: Generate Poster
-  description: Call tool_poster.create with the collected content.
-- id: protocol_completion
-  name: Complete Protocol & Update Workspace
-  description: "After all steps above are done:\n1. Call mem_analysis.log with completion
-    summary.\n2. Call mem_methods.append with any new methods or tools used.\n3. Read
-    workspace/workflow.mermaid via sys_file.read, add a node for this completed step
-    (green fill), write back.\n4. Call sys_checkpoint.create with description='synthesis_poster
-    completed'.\n5. Ask researcher: 'I've completed synthesis_poster. Want me to proceed
-    to the next protocol?'\n\n    - ENVIRONMENT CHECK: Validate that any new tools/libraries
-    have been snapshotted to the step's environment file.\n    - GROUNDING CHECK:
-    Ensure you have ACTUALLY called search tools (search_semantic_scholar, search_web,
-    etc.) to ground your decisions, and updated workspace/logs/methods_research.log.
-    Do not rely solely on pre-trained knowledge!"
-schema_version: '1.0'
+  - id: ensure_figures
+    name: Ensure 2-4 Headline Figures Exist
+    description: |
+      sys_file_list directory="workspace" looking for outputs/figures/*.png.
+      The poster will pick the first few — make sure they are the BEST ones
+      (highest DPI, clearest message). If the headline figure isn't ready, run
+      tool_audit_figure on candidates and pick winners.
+
+  - id: generate
+    name: Generate Poster
+    description: |
+      tool_poster_create — produces synthesis/poster.tex and synthesis/poster.pdf
+      (if pdflatex is available). The poster contains: title, background, methods,
+      headline figures, conclusions.
+
+  - id: refine
+    name: Refine in-place if Needed
+    description: |
+      Open synthesis/poster.tex via sys_file_read. Adjust block contents (title,
+      bullet text) using sys_file_write force=true. If LaTeX is rebuilt manually,
+      re-run tool_latex_compile via the synthesis path is not required for poster.
+
+expected_outputs:
+  - synthesis/poster.tex
+
+next_protocol: null
+on_failure: null
