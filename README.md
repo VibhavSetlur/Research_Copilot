@@ -1,179 +1,131 @@
 # Research OS
 
-**From raw data to publication-ready manuscript — an MCP-native research operating system.**
+**From raw data to publication-ready manuscript — an MCP-native research
+operating system. Works with any AI IDE (Claude Code, OpenCode, Antigravity,
+Cursor, VS Code) without managing any LLM provider keys.**
 
-Research OS is a [Model Context Protocol](https://modelcontextprotocol.io) server
-that gives any AI coding IDE (Cursor, Claude, Antigravity, OpenCode, VS Code) a
-focused set of tools and a set of YAML protocols for doing reproducible academic
-research. The IDE plans and reasons; Research OS records state, enforces
-immutability, and routes the AI through the right protocol for the current
+Research OS is a [Model Context Protocol](https://modelcontextprotocol.io)
+server that exposes ~75 research tools and 34 YAML protocols. The AI in your
+IDE plans and reasons; Research OS executes, records state, enforces
+immutability, and walks the AI through the right protocol for the current
 pipeline stage.
 
 ---
 
-## Quick start
+## Quick start (≤60 seconds)
 
 ```bash
 pip install "research-os[all] @ git+https://github.com/VibhavSetlur/Research-OS.git"
 
 mkdir my-project && cd my-project
-research-os init
-# (an MCP config + AGENTS.md are dropped in for every supported IDE)
-
-# Open your IDE here, then say:  "start the project"
+research-os init                     # scaffolds + drops an MCP config for every IDE
 ```
 
-Two CLI commands — that's the entire CLI surface:
+Open your AI IDE on the project. Drop your data into `inputs/raw_data/`,
+papers into `inputs/literature/`, notes into `inputs/context/`. Then say:
 
-| Command                          | What it does                                  |
-|----------------------------------|-----------------------------------------------|
-| `research-os init [dir]`         | Scaffold a workspace.                         |
-| `research-os start [--workspace .]` | Start the MCP server (your IDE talks to it).  |
+> "fill out the intake"   *(reads everything, proposes a research question, hypotheses, domain)*
 
-Everything else (data exploration, literature search, experiment creation,
-writing, synthesis) happens by **talking to the AI** in your IDE.
+> "what should I do next?"   *(iterative-planning protocol: literature, tools, options, recommendation)*
+
+> "run a baseline EDA"   *(creates `workspace/01_baseline_eda/`, atomic versioned scripts, conclusions)*
+
+> "write the paper"   *(IMRAD synthesis with **verified, real** citations only — no hallucinations)*
+
+The CLI is two commands by design:
+
+| Command                              | What it does                              |
+|--------------------------------------|-------------------------------------------|
+| `research-os init [dir]`             | Scaffold a workspace.                     |
+| `research-os start [--workspace .]`  | Run the MCP server (your IDE talks to it). |
 
 ---
 
-## Workspace layout
+## Why use it
+
+| Pain | What Research OS does about it |
+|---|---|
+| AI hallucinates citations | `tool_synthesize` pulls every citation from real providers (Crossref / Semantic Scholar / PubMed / arXiv), drops unverified entries, and caps per-section (3 for abstracts, 6 for posters, 40 for papers). |
+| AI guesses methodology from training memory | `tool_research_method` mandates literature grounding before any choice; `mem_decision_log` records the rationale + citations. |
+| AI writes 400-line one-shot scripts | `tool_plan_step` forces breakdown into atomic, versioned sub-tasks; protocol forbids mega-shots. |
+| Researcher just wants to dump files and talk | `tool_intake_autofill` reads `inputs/`, classifies the domain, extracts the research question + hypotheses, fills `intake.md`. Every config field is optional. |
+| Researcher mid-flow drops a new paper | `tool_context_intake` auto-routes the new file into the right `inputs/` subfolder and (optionally) re-runs intake autofill. |
+| AI gets stuck / workspace looks broken | `tool_workspace_repair` heals missing dirs, regenerates manifest + mermaid, backs up corrupted state — never deletes. |
+| Long jobs on shared HPC | `tool_task_run` (real `Popen`) backgrounds them, `tool_task_status` polls without blocking the conversation. |
+| Multi-language / notebook / Quarto workflows | First-class `.py`, `.R`, `.jl`, `.sh`, `.ipynb`, `.Rmd`, `.qmd`. |
+| Custom analyses (not just off-the-shelf libs) | Protocols explicitly support custom methodology — `mem_methods_append implementation="custom"`. Use `workspace/scratch/` to prototype. |
+| Iterating on direction (researcher wants AI to propose) | `guidance/iterative_planning` protocol reads state + searches literature + tools + proposes 2-3 options with rationale. |
+| Multiple hypotheses to track | `mem_hypothesis_add` / `_update` / `_list` maintains a ledger across experiment steps. |
+
+---
+
+## Workspace layout (created by `research-os init`)
 
 ```text
 my-project/
-├── AGENTS.md                  # AI operating rules — read first every session
-├── README.md                  # auto-generated project overview
-├── .os_state/                 # internal state (don't edit)
-│   ├── state_ledger.json      # single source of truth
-│   ├── manifest.json          # workspace tree snapshot
-│   ├── os_state.md            # human-readable status
-│   ├── protocol_execution_log.jsonl
-│   ├── checkpoints/           # hardlinked workspace snapshots
-│   ├── handoffs/              # session handoff notes
-│   └── cache/                 # API response cache
-├── inputs/                    # IMMUTABLE — researcher provides
-│   ├── researcher_config.yaml # config + API keys (gitignored)
-│   ├── raw_data/              # source files (CSV, Parquet, FASTQ, ...)
-│   ├── literature/            # PDFs
-│   ├── context/               # notes, prior reports
-│   ├── intake.md              # auto-generated SHA-256 inventory
-│   └── literature_index.yaml  # filename → citation_key mapping
-├── docs/                      # human-edited
-│   ├── research_overview.md
-│   ├── research_question.md
-│   ├── domain_summary.md
-│   ├── research_design.md
-│   └── glossary.md
-├── workspace/                 # ACTIVE — experiments live here
-│   ├── methods.md             # append-only methods log
-│   ├── analysis.md            # chronological log + mermaid diagram
-│   ├── citations.md           # bibliography
-│   ├── workflow.mermaid       # auto-updated diagram (PNG if mmdc installed)
-│   ├── logs/                  # searches, errors, audit reports
-│   └── 01_baseline_eda/       # numbered experiment steps
-│       ├── README.md
-│       ├── conclusions.md
-│       ├── scripts/
-│       ├── data/{input,output}/
+├── AGENTS.md                       # AI operating rules — read first every session
+├── inputs/                         # IMMUTABLE — researcher provides
+│   ├── researcher_config.yaml      # config + API keys (gitignored)  ← auto-created
+│   ├── raw_data/                   # source files
+│   ├── literature/                 # PDFs
+│   ├── context/                    # notes, prior reports
+│   ├── intake.md                   # auto-filled by tool_intake_autofill
+│   └── literature_index.yaml       # filename → citation_key
+├── docs/                           # human-readable: research question, glossary
+├── workspace/                      # ACTIVE — experiments live here
+│   ├── methods.md / analysis.md / citations.md / workflow.mermaid
+│   ├── logs/                       # search + error + audit logs
+│   ├── scratch/                    # AI sandbox (gitignored)
+│   └── 01_baseline_eda/            # numbered experiment steps
+│       ├── README.md / conclusions.md
+│       ├── scripts/                # versioned: 01_baseline_eda_v1.py …
+│       ├── data/{input,output}/    # input symlinked to previous step
 │       ├── outputs/{reports,figures,tables,dashboards}/
-│       └── environment/
-├── synthesis/                 # FINAL — generated by tool_synthesize
+│       └── environment/            # requirements.txt / renv.lock / Project.toml
+├── synthesis/                      # FINAL outputs (only when explicitly built)
 │   ├── paper.md / paper.tex / paper.pdf
-│   ├── abstract.md
-│   ├── dashboard.html
-│   ├── poster.pdf
-│   └── references.bib
-└── environment/               # global env (Dockerfile, requirements.txt)
+│   ├── abstract.md / poster.tex / dashboard.html / references.bib
+└── environment/                    # global env baseline
 ```
+
+`.os_state/` (state, manifest, checkpoints, handoffs, cache) is internal and
+gitignored beyond the state ledger.
 
 ---
 
-## Architecture
+## Architecture (45 seconds)
 
 ```
-AI IDE (Cursor / Claude / Antigravity / OpenCode / VS Code)
+AI IDE (Claude Code / OpenCode / Antigravity / Cursor / Claude / VS Code)
         │ MCP stdio
         ▼
 research-os MCP server
         │
-        ├── sys.*    workspace state, paths, checkpoints, config, files
-        ├── tool.*   search, exec, audit, synthesise, dashboard, poster
-        └── mem.*    append-only methods/analysis/citations/decisions
+        ├── sys.*    workspace, state, paths, checkpoints, config, files, repair
+        ├── tool.*   search, exec, audit, synthesis, scratch, tasks, research, intake
+        └── mem.*    append-only methods/analysis/citations/decisions/hypotheses
         │
         ▼
     Workspace files  (immutable inputs · iterative workspace · final synthesis)
 ```
 
-* The IDE plans and decides. Research OS executes and records.
-* No autonomous decisions in Research OS — the model is always in control.
-* Every protocol the AI loads tells it which tools to call, in what order,
-  and how to log the result.
-
----
-
-## What's in the box
-
-* **~65 MCP tools** under `sys_*`, `tool_*`, `mem_*` namespaces.
-  Names use underscores; dot notation + legacy names auto-rewritten.
-* **33 YAML protocols** covering the full pipeline: session boot → project
-  startup → domain analysis → research design → methodology selection →
-  literature search → analysis (looped) → reproducibility → audit → synthesis.
-* **5 domain presets** for `researcher_config.yaml`: RCTs, observational
-  epidemiology, genomics, NLP benchmarks, economic panels.
-* **Intake autofill** — drop your data + PDFs + notes into `inputs/`, say
-  "fill out the intake" — the AI reads everything, classifies the domain,
-  extracts your research question + hypotheses, and writes the metadata
-  for you. Every config field is optional.
-* **Reasoning / grounding tools** — `tool_research_method` (deep-dive a
-  method with 5-10 academic + web sources), `tool_research_tool` (find +
-  evaluate libraries, including external tools the AI can't run),
-  `tool_plan_step` (force complex steps to be broken into atomic
-  sub-tasks before coding), `tool_external_tool_instructions` (worksheet
-  the researcher fills when the chosen tool is a website / paid app).
-* **Multi-language scripts** — `.py` / `.R` / `.jl` / `.sh` / `.ipynb` /
-  `.Rmd` / `.qmd` all first-class.
-* **Real background tasks** for shared servers + HPC — `tool_task_run`
-  (Popen, returns task_id immediately), `tool_task_status`,
-  `tool_task_list`, `tool_task_kill`.
-* **Multi-hypothesis tracking** — `mem_hypothesis_add` /
-  `_update` / `_list` keep a ledger across experiment steps.
-* **Output generators** — `tool_synthesize` (IMRAD paper),
-  `tool_dashboard_create` (HTML), `tool_poster_create` (tikzposter PDF),
-  `tool_latex_compile` (.tex → PDF).
-* **Audit tools** with real checks — citation verification, statistical
-  power, model assumptions, figure quality, full reproducibility re-run.
-* **Live literature search** — Crossref, Semantic Scholar, PubMed, arXiv,
-  Firecrawl, SerpAPI. All free providers work without keys.
-
-**No LLM provider keys.** Research OS does not call any model itself.
-Your IDE (Claude Code / OpenCode / Antigravity / Cursor / Claude / VS Code)
-owns model access.
-
----
-
-## Value proposition
-
-* **Immutability** — `inputs/raw_data/` and `inputs/literature/` are
-  enforced read-only by the server.
-* **Provenance** — every method, decision, and search is logged to disk
-  (`methods.md`, `analysis.md`, `searches.log`, `protocol_execution_log.jsonl`).
-* **Pipeline guidance** — `sys_protocol_next` always knows the next step based
-  on which outputs already exist on disk.
-* **Chronological history** — experiments are numbered (`01_`, `02_`, ...);
-  abandoned paths are renamed `__DEAD_END` (never deleted).
-* **Model-size adaptability** — `model_profile` (`small`/`medium`/`large`)
-  controls protocol verbosity and tool description length on the fly.
-* **One source of truth** — `inputs/researcher_config.yaml` drives every
-  behavioural choice the AI makes (autonomy, depth, output types, citation style).
+The IDE plans and decides; Research OS executes and records. No autonomous
+decisions in Research OS — your model is always in control.
 
 ---
 
 ## Documentation
 
-* [`docs/GUIDE.md`](docs/GUIDE.md) — full reference: tools, pipeline, troubleshooting.
-* [`templates/AGENTS.md`](templates/AGENTS.md) — the AI operating manual that
-  gets dropped into every workspace.
+* **[docs/GUIDE.md](docs/GUIDE.md)** — Full reference: every tool, every
+  protocol, the pipeline, FAQ for power users (custom tools, branching,
+  scratch, mid-flow context, repair).
+* **[templates/AGENTS.md](templates/AGENTS.md)** — The AI operating manual
+  dropped into every workspace. Read this to understand how the AI is
+  expected to behave.
+* **[CHANGELOG.md](CHANGELOG.md)** — Release history.
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues + PRs welcome.

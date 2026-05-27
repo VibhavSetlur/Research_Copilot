@@ -52,6 +52,7 @@ TOP_LEVEL_DIRS = (
     "inputs/context",
     "workspace",
     "workspace/logs",
+    "workspace/scratch",
     "synthesis",
     "environment",
 )

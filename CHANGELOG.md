@@ -4,6 +4,94 @@ All notable changes to Research OS are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) ·
 versioning: [SemVer](https://semver.org).
 
+## [1.2.0] - 2026-05-27
+
+### Removed
+- `.env.example`, `Dockerfile`, `docker-compose.yml`. `research-os init`
+  drops a fully-functioning MCP config for every supported IDE; nothing else
+  is needed to start the server. researcher_config holds any optional keys.
+
+### Added — reasoning + iteration
+- `tool_plan_next_step` — surveys state + paths + hypotheses, pulls fresh
+  literature on the open question, searches the web for relevant tools,
+  proposes 2-3 prioritised next-step options, writes the plan markdown.
+- `tool_branch_recommendation` — branch into a parallel experiment vs
+  extend the current one; returns a guidance string.
+- `guidance/iterative_planning` — new protocol for the "what's next?"
+  workflow. Walks the AI through assess → propose → recommend → run.
+
+### Added — scratch sandbox
+- `workspace/scratch/` is auto-scaffolded and gitignored.
+- `tool_scratch_write/_run/_list/_clear` — AI playground for syntax checks,
+  smoke tests, parameter sweeps. Anything important moves OUT into a proper
+  numbered experiment.
+
+### Added — workspace healing
+- `tool_workspace_repair` — detects missing dirs, corrupted state ledgers,
+  stale path entries, broken symlinks; heals them and regenerates manifest +
+  workflow.mermaid. NEVER deletes — corrupted ledgers are backed up before
+  being reseeded.
+
+### Added — mid-flow context injection
+- `tool_context_intake` — researcher drops a new paper / dataset / note
+  anywhere in the project; auto-routes each to the right `inputs/` subfolder
+  (PDFs → literature, tabular → raw_data, prose → context), logs every move
+  to `.os_state/context_intake_log.jsonl` + `analysis.md`, optionally re-runs
+  `tool_intake_autofill` so the AI's view stays current. Never overwrites
+  (conflicts get `_imported_N` suffix).
+
+### Added — verified citations + condensed synthesis
+- `src/research_os/tools/actions/synthesis/citations.py`:
+  `collect_for_section` (pull k verified hits per section, dedupe by DOI),
+  `verify_all_in_workspace` / `verify_citation_key` (re-verify online),
+  `format_bib/_apa/_vancouver`, `write_references_bib`, `cap_for`.
+- `tool_synthesize` rewritten: every output (`paper`, `poster`, `abstract`,
+  `dashboard`, `report`) gets a citation cap (3 for abstracts, 6 posters,
+  12 dashboards, 25 reports, 40 papers). Citations are pulled from real
+  providers and dropped if unverified — no hallucinations leak through.
+  Writes `synthesis/references.bib` alongside `paper.md`.
+- `tool_citations_verify` exposes the verifier as a standalone audit.
+
+### Changed — tools/actions/ layout
+Reorganised into eight domain subfolders. Back-compat shim modules at the
+old flat paths keep every existing import working.
+
+```
+tools/actions/
+├── protocol.py                    # top-level — the loader
+├── state/                         # config, path, checkpoint, interaction, scratch, repair
+├── data/                          # data, profiling, intake, context_intake
+├── exec/                          # scripts, notebook, tasks, environment
+├── search/                        # search, literature
+├── research/                      # research_*, planning
+├── audit/                         # audit, md_audit
+├── synthesis/                     # synthesize, latex, citations
+└── memory/                        # hypotheses, decision/methods/citations logs
+```
+
+### Changed — tests layout
+Three subfolders: `tests/unit/`, `tests/integration/`, `tests/tools/`. Added
+`test_planning.py`, `test_scratch.py`, `test_repair.py`,
+`test_context_intake.py`, `test_citations.py`, `test_reorganized_imports.py`.
+
+### Changed — scaffold
+`workspace/scratch/` is now part of `TOP_LEVEL_DIRS` and created on init
+with its own `.gitignore` (contents ignored; folder + README tracked).
+
+### Changed — AGENTS.md
+Expanded to 18 rules including:
+- explicit custom/novel methodology support (Rule 6),
+- iterative planning (Rule 7),
+- scratch sandbox (Rule 11),
+- mid-flow context injection (Rule 12),
+- workspace repair (Rule 13),
+- verified citations + per-output_type caps (Rule 16).
+
+### Changed — docs
+README + GUIDE rewritten end-to-end. New "FAQ for power users" covers custom
+analyses, branching, scratch, context injection, repair, iterative planning,
+and hallucination-proof citations.
+
 ## [1.1.0] - 2026-05-27
 
 ### Removed

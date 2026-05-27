@@ -947,6 +947,96 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "category": "memory",
         "inputSchema": {"type": "object", "properties": {}},
     },
+
+    # ── Iterative planning ───────────────────────────────────────────
+    "tool_plan_next_step": {
+        "description": "Survey current state, pull fresh literature + tool candidates, propose the BEST next step. Use for iterative workflows where the researcher wants the AI to decide what's worth doing next.",
+        "category": "research",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "goal": {"type": "string"},
+                "search_literature": {"type": "boolean"},
+                "search_tools": {"type": "boolean"},
+            },
+        },
+    },
+    "tool_branch_recommendation": {
+        "description": "Decide whether to branch into a new parallel experiment or continue extending the current one.",
+        "category": "research",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"reason": {"type": "string"}},
+            "required": ["reason"],
+        },
+    },
+
+    # ── Scratch sandbox ───────────────────────────────────────────────
+    "tool_scratch_write": {
+        "description": "Write a quick-test file to workspace/scratch/. Gitignored, no provenance — use for syntax checks, smoke tests, parameter sweeps. Anything important must be moved out into a proper experiment.",
+        "category": "scratch",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string"},
+                "content": {"type": "string"},
+            },
+            "required": ["filename", "content"],
+        },
+    },
+    "tool_scratch_run": {
+        "description": "Execute a script in workspace/scratch/. Language inferred from extension (.py | .R | .jl | .sh).",
+        "category": "scratch",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string"},
+                "timeout": {"type": "number"},
+            },
+            "required": ["filename"],
+        },
+    },
+    "tool_scratch_list": {
+        "description": "List files currently in workspace/scratch/.",
+        "category": "scratch",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_scratch_clear": {
+        "description": "Wipe workspace/scratch/ contents (keeps .gitignore and README).",
+        "category": "scratch",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+
+    # ── Workspace repair (heal, never delete) ────────────────────────
+    "tool_workspace_repair": {
+        "description": "Detect missing directories / corrupted state / stale paths and (optionally) heal them. NEVER deletes files.",
+        "category": "state",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"dry_run": {"type": "boolean"}},
+        },
+    },
+
+    # ── Mid-flow context injection ───────────────────────────────────
+    "tool_context_intake": {
+        "description": "Detect new files dropped anywhere in the project and route each into the right inputs/ subfolder (literature / raw_data / context). Logs every move; never overwrites.",
+        "category": "intake",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source_dir": {"type": "string"},
+                "dry_run": {"type": "boolean"},
+                "also_autofill": {"type": "boolean"},
+            },
+        },
+    },
+
+    # ── Verified citations ────────────────────────────────────────────
+    "tool_citations_verify": {
+        "description": "Verify every citation_key in workspace/citations.md by hitting Crossref. Reports verified vs unverified (possibly hallucinated) entries.",
+        "category": "synthesis",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 }
 
 
@@ -1742,6 +1832,112 @@ def _handle_mem_hypothesis_list(name, arguments, root):
     return _text(_error(res.get("message", "hypothesis_list failed")))
 
 
+# ── Iterative planning ───────────────────────────────────────────────
+
+
+def _handle_tool_plan_next_step(name, arguments, root):
+    from research_os.tools.actions.research.planning import plan_next_step
+
+    res = plan_next_step(
+        root,
+        goal=arguments.get("goal"),
+        search_literature=bool(arguments.get("search_literature", True)),
+        search_tools=bool(arguments.get("search_tools", True)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "plan_next_step failed")))
+
+
+def _handle_tool_branch_recommendation(name, arguments, root):
+    from research_os.tools.actions.research.planning import branch_recommendation
+
+    res = branch_recommendation(root, reason=arguments["reason"])
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "branch_recommendation failed")))
+
+
+# ── Scratch ───────────────────────────────────────────────────────────
+
+
+def _handle_tool_scratch_write(name, arguments, root):
+    from research_os.tools.actions.state.scratch import scratch_write
+
+    res = scratch_write(arguments["filename"], arguments["content"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "scratch_write failed")))
+
+
+def _handle_tool_scratch_run(name, arguments, root):
+    from research_os.tools.actions.state.scratch import scratch_run
+
+    res = scratch_run(arguments["filename"], root, timeout=int(arguments.get("timeout", 60)))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "scratch_run failed")))
+
+
+def _handle_tool_scratch_list(name, arguments, root):
+    from research_os.tools.actions.state.scratch import scratch_list
+
+    res = scratch_list(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "scratch_list failed")))
+
+
+def _handle_tool_scratch_clear(name, arguments, root):
+    from research_os.tools.actions.state.scratch import scratch_clear
+
+    res = scratch_clear(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "scratch_clear failed")))
+
+
+# ── Workspace repair ──────────────────────────────────────────────────
+
+
+def _handle_tool_workspace_repair(name, arguments, root):
+    from research_os.tools.actions.state.repair import workspace_repair
+
+    res = workspace_repair(root, dry_run=bool(arguments.get("dry_run", False)))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "workspace_repair failed")))
+
+
+# ── Mid-flow context intake ───────────────────────────────────────────
+
+
+def _handle_tool_context_intake(name, arguments, root):
+    from research_os.tools.actions.data.context_intake import context_intake
+
+    res = context_intake(
+        root,
+        source_dir=arguments.get("source_dir"),
+        dry_run=bool(arguments.get("dry_run", False)),
+        also_autofill=bool(arguments.get("also_autofill", False)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "context_intake failed")))
+
+
+# ── Verified citations ────────────────────────────────────────────────
+
+
+def _handle_tool_citations_verify(name, arguments, root):
+    from research_os.tools.actions.synthesis.citations import verify_all_in_workspace
+
+    res = verify_all_in_workspace(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "citations_verify failed")))
+
+
 _HANDLERS = {
     # protocol
     "sys_protocol_get": _handle_sys_protocol_get,
@@ -1834,6 +2030,20 @@ _HANDLERS = {
     "mem_hypothesis_add": _handle_mem_hypothesis_add,
     "mem_hypothesis_update": _handle_mem_hypothesis_update,
     "mem_hypothesis_list": _handle_mem_hypothesis_list,
+    # iterative planning
+    "tool_plan_next_step": _handle_tool_plan_next_step,
+    "tool_branch_recommendation": _handle_tool_branch_recommendation,
+    # scratch
+    "tool_scratch_write": _handle_tool_scratch_write,
+    "tool_scratch_run": _handle_tool_scratch_run,
+    "tool_scratch_list": _handle_tool_scratch_list,
+    "tool_scratch_clear": _handle_tool_scratch_clear,
+    # workspace repair
+    "tool_workspace_repair": _handle_tool_workspace_repair,
+    # mid-flow context intake
+    "tool_context_intake": _handle_tool_context_intake,
+    # verified citations
+    "tool_citations_verify": _handle_tool_citations_verify,
 }
 
 # Aliases — keep the AI's life easy when it forgets exact naming.
