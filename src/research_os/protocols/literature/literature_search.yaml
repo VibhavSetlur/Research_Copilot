@@ -50,11 +50,12 @@ steps:
 
       B) **Step literature** (papers grounding a SPECIFIC experiment step):
          tool_literature_download url=<pdf-url> filename=<author_year_kw.pdf>
-                                  step_id="03_logistic_baseline"
+                                  step_id="<NN>_<slug>"   # whatever this step is called
                                   metadata={title, authors, year, doi}
          Saves under workspace/<step>/literature/. Use this when a paper is
-         the canonical reference for the method this step uses (e.g. the
-         original Cox PH paper for a survival-analysis step).
+         the canonical reference for the method this step uses.
+         (Don't hardcode `step_id` — pull the current step ID from
+         sys_path_list or the active state.)
 
       Faster bulk approach — combined search + download in one call:
          tool_literature_search_and_save

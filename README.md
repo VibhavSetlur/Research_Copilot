@@ -73,7 +73,12 @@ the install + IDE wiring without needing one.
 ## Workspace layout example
 
 `research-os init` creates a clean skeleton. The AI fills the rest as you
-work. **Real projects look like this after a few sessions:**
+work. **Real projects look like this after a few sessions** (the step
+names below — `01_baseline_eda`, `02_data_preparation`,
+`03_logistic_baseline`, `04_random_forest` — are **illustrative only**;
+the AI derives each slug from the actual goal of the step it's creating,
+following the naming rules in the `guidance/analysis_plan` protocol
+(loaded contextually, not in `AGENTS.md`):
 
 ```text
 my-project/
@@ -211,27 +216,59 @@ my-project/
     └── tasks/                        # background subprocess registry
 ```
 
+### Step naming — AI-derived, not hardcoded
+
+**Nothing about the slug `baseline_eda` (or any other name) is special to
+Research OS.** The AI picks every slug based on the goal of the step it's
+about to create. The full rules live in the `guidance/analysis_plan`
+protocol (the `create_step_folder` step) — short version:
+
+* lowercase + underscores, ≤ 40 chars, descriptive
+* mention the method when one is selected (`cox_ph_treatment_effect`, not generic `survival`)
+* mention the sub-population if restricted (`logistic_under_65`)
+* `NN_` prefix is auto-assigned by `sys_path_create` — don't pass it
+* same goal, different parameters → bump `_v<n>` on the script
+* different goal → new numbered step (different slug)
+
+Plausible slugs the AI might pick (purely illustrative — different
+projects look totally different):
+
+```
+01_baseline_eda           02_imputation_mice         03_cox_ph_full_cohort
+01_distribution_scan      02_outlier_winsorise       03_ipw_treatment_effect
+01_corpus_profile         02_bert_finetune_sentiment 03_attention_ablation
+01_rna_seq_qc             02_deseq2_de               03_gsea_pathway
+```
+
 ### How numbered steps grow over a session
 
-1. **AI creates `workspace/01_baseline_eda/`** via `sys_path_create name="baseline_eda"`.
-   Step `01` is the first; `data/input/` is symlinked to `inputs/raw_data/`.
-2. **AI writes `scripts/01_baseline_eda_v1.py`** — atomic, single-purpose, sets RNG seeds.
-3. **Researcher says "group by quarter instead of month".** AI writes
-   `01_baseline_eda_v2.py` (new version, not overwrite), re-runs, updates conclusions.
-4. **AI creates `02_data_preparation/`** whose `data/input/` symlinks to
-   `01_baseline_eda/data/output/`. Chain continues.
-5. **`03_logistic_baseline` fails** (e.g. assumptions violated). AI calls
-   `sys_path_abandon path_name="03_logistic_baseline" rationale="…"`. The
-   folder is renamed `03_logistic_baseline__DEAD_END`. Files preserved.
-   The `conclusions.md` gets a `## Why this path failed` section.
-6. **AI creates `04_random_forest`** as a fresh alternative. Its
-   `data/input/` symlinks to `02_data_preparation/data/output/` (skipping
-   the dead-end step). `tool_branch_recommendation` advised this.
-7. **Per-step literature** — AI downloads `breiman2001rf.pdf` into
-   `04_random_forest/literature/` with metadata sidecar (instead of polluting
+*(Slugs below are made up to illustrate — your AI picks names from your
+project's actual goals.)*
+
+1. **AI creates the first step folder** via `sys_path_create name="<slug>"`,
+   e.g. `name="baseline_eda"`. The server auto-prefixes `01_`. `data/input/`
+   is symlinked to `inputs/raw_data/`.
+2. **AI writes the main script** as `<NN>_<slug>_v1.<ext>` (atomic,
+   single-purpose, RNG seeds set, library versions printed to stderr).
+3. **Researcher pivots** ("group by quarter instead of month"). AI bumps
+   to `<NN>_<slug>_v2.<ext>` (new version, not overwrite), re-runs,
+   updates `conclusions.md`.
+4. **AI creates the next step** with a slug describing its NEW goal. The
+   server picks `02_`. Its `data/input/` symlinks to step 01's
+   `data/output/`. Chain continues.
+5. **A step fails** (e.g. assumption violated). AI calls
+   `sys_path_abandon path_name="<NN>_<slug>" rationale="…"`. The folder
+   is renamed `<NN>_<slug>__DEAD_END`. Files preserved. The
+   `conclusions.md` gets a `## Why this path failed` section.
+6. **AI creates an alternative step** — fresh slug describing the new
+   approach. The server picks the next number. Its `data/input/` symlinks
+   past the dead-end (to whichever earlier step produced its input).
+   `tool_branch_recommendation` advises whether to branch or extend.
+7. **Per-step literature** — AI downloads a canonical reference into the
+   step's `literature/` with a `.meta.yaml` sidecar (instead of polluting
    project-wide `inputs/literature/`). Synthesis cites it correctly later.
-8. **Scratch** — quick syntax checks live in `workspace/scratch/` (gitignored).
-   Real work moves into a numbered step or gets deleted.
+8. **Scratch** — quick syntax checks live in `workspace/scratch/`
+   (gitignored). Real work moves into a numbered step or gets deleted.
 
 ### Final outputs (synthesis is project-wide, not per-step)
 

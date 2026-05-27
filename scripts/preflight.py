@@ -206,7 +206,10 @@ def check_protocols_referenced_tools_resolve():
         "tool_list",        # word appearing in prose ("tool list")
     }
     refs: dict[str, set[str]] = {}
-    pattern = re.compile(r"\b((?:sys|tool|mem)_[a-z_]+)\b")
+    # Match a tool name, but reject the match if the very next char is `*`
+    # (those are wildcard mentions in prose like `tool_search_*`, not real
+    # tool calls).
+    pattern = re.compile(r"\b((?:sys|tool|mem)_[a-z_]+)\b(?!\*)")
     for f in PROTOCOLS_DIR.rglob("*.yaml"):
         if "light" in f.parts:
             continue
@@ -214,6 +217,10 @@ def check_protocols_referenced_tools_resolve():
         for m in pattern.finditer(text):
             name = m.group(1)
             if name in false_positive_strings:
+                continue
+            # Reject bare prefixes like `tool_search_` that end in `_`
+            # (always a truncation/wildcard mention in prose).
+            if name.endswith("_"):
                 continue
             refs.setdefault(name, set()).add(f.name)
 

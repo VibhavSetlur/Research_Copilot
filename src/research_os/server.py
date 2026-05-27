@@ -347,7 +347,20 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "Short slug, e.g. baseline_eda"},
+                "name": {
+                    "type": "string",
+                    "description": (
+                        "Short descriptive slug DERIVED FROM THE STEP'S GOAL "
+                        "(lowercase, words joined by underscores, ≤40 chars). "
+                        "The AI picks this based on what the step actually does "
+                        "for THIS project — there are no fixed canonical names. "
+                        "Examples by domain (not requirements): "
+                        "EDA → 'baseline_eda' / 'distribution_scan'; "
+                        "cleaning → 'imputation' / 'outlier_handling'; "
+                        "modelling → 'cox_ph' / 'random_forest' / 'cnn_baseline'; "
+                        "audit → 'sensitivity' / 'calibration_check'."
+                    ),
+                },
                 "hypothesis": {"type": "string"},
             },
             "required": ["name"],

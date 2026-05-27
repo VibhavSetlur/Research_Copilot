@@ -63,8 +63,8 @@ can override at any time:
 
 ### My AI keeps writing 400-line mega-scripts. How do I stop that?
 
-Research OS forbids this in `guidance/analysis_plan` and AGENTS.md (Rule 8).
-The protocol mandates `tool_plan_step` for any non-trivial scope (>3
+The `guidance/analysis_plan` protocol (loaded on every analysis step)
+forbids this. It mandates `tool_plan_step` for any non-trivial scope (>3
 methods OR multiple subgroups OR custom pipelines), which forces a
 breakdown into atomic versioned sub-tasks BEFORE any code is written.
 

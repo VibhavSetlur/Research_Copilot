@@ -73,8 +73,40 @@ steps:
     name: Create the Numbered Experiment Folder
     description: |
       sys_path_create name="<slug>" hypothesis="<H<id>: <text>>"
+
+      NAMING — the AI picks the slug based on what THIS step actually does.
+      There are NO canonical names. Derive the slug from the step's goal,
+      the chosen method, and the domain context. Rules:
+
+        - lowercase, words joined by underscores (no spaces / dashes / dots)
+        - ≤ 40 chars, descriptive but compact
+        - mention the METHOD when one was selected
+          (e.g. `cox_ph_treatment_effect`, not `survival_analysis`)
+        - mention the SUB-POPULATION if the step is restricted
+          (e.g. `logistic_under_65` vs `logistic_all`)
+        - re-use the same slug + version-bump scripts (_v1, _v2) when
+          iterating on the SAME goal; create a NEW step (different slug)
+          only when the goal changes
+
+      Examples ACROSS domains (illustrative — do not copy verbatim):
+        EDA              :  baseline_eda  /  distribution_scan  /  missingness_map
+        Cleaning         :  imputation_mice  /  outlier_winsorise  /  schema_harmonise
+        Feature work     :  pca_demographics  /  one_hot_encode_diagnoses
+        Stats modelling  :  logistic_baseline  /  cox_ph  /  mixed_effects_school
+        Causal           :  ipw_treatment  /  did_policy_change  /  rdd_age_threshold
+        ML               :  rf_baseline  /  xgb_tuned  /  cnn_transfer
+        NLP              :  bert_finetune_sentiment  /  ner_clinical_notes
+        Genomics         :  deseq2_de  /  gsea_pathway  /  variant_call_strelka
+        Audit            :  power_recheck  /  calibration_curve  /  sensitivity_unmeasured
+
       Creates workspace/NN_<slug>/{scripts,literature,data/{input,output},outputs/{reports,figures,tables},environment}
-      and sets it as current_path.
+      and sets it as current_path. NN is auto-assigned (next free number).
+
+      For script filenames inside the step, the convention is
+      `<NN>_<slug>_v<n>.<ext>` for the main script, and
+      `<NN>_<slug>_<subtask>_v<n>.<ext>` for atomic sub-tasks. Sub-task
+      names follow the SAME naming rules (descriptive, lowercase,
+      underscore-joined).
 
   - id: write_atomic_scripts
     name: Write Atomic Versioned Scripts
