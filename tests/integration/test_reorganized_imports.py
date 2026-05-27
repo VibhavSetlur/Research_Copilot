@@ -1,47 +1,141 @@
-"""Verify both the new subfolder layout and the back-compat shims work."""
+"""Verify the action-module subfolder layout exposes everything cleanly.
+
+After the v1.0.0 cleanup, the back-compat shims at the flat ``tools/actions/``
+level were removed. Every import now goes through the proper package paths.
+"""
 
 
-def test_new_layout_imports():
-    """The new subfolder layout exposes everything cleanly."""
-    from research_os.tools.actions.state import config, path, checkpoint
-    from research_os.tools.actions.data import data, intake, profiling
-    from research_os.tools.actions.exec import scripts, notebook, tasks, environment
-    from research_os.tools.actions.search import search, literature
-    from research_os.tools.actions.research import research, planning
-    from research_os.tools.actions.audit import audit, md_audit
-    from research_os.tools.actions.synthesis import synthesize, latex, citations
-    from research_os.tools.actions.memory import memory
-
-    assert callable(config.get_config)
-    assert callable(planning.plan_next_step)
-    assert callable(citations.collect_for_section)
-    assert callable(scripts.execute_r_script)
-    assert callable(notebook.execute_notebook)
-    assert callable(tasks.task_run)
-    assert callable(intake.intake_autofill)
-
-
-def test_backcompat_shims_resolve():
-    """Old imports keep working after the reorganization."""
-    from research_os.tools.actions.config import get_config            # noqa: F401
-    from research_os.tools.actions.checkpoint import create_checkpoint  # noqa: F401
-    from research_os.tools.actions.path import create_path              # noqa: F401
-    from research_os.tools.actions.interaction import session_handoff   # noqa: F401
-    from research_os.tools.actions.data import data_profile              # noqa: F401
-    from research_os.tools.actions.intake import intake_autofill         # noqa: F401
-    from research_os.tools.actions.profiling import _profile_inputs       # noqa: F401
-    from research_os.tools.actions.web_search import search_web          # noqa: F401
-    from research_os.tools.actions.literature_retrieval import (         # noqa: F401
-        search_semantic_scholar,
+def test_subpackage_imports():
+    """The eight subpackages expose every public function via their __init__."""
+    # state/
+    from research_os.tools.actions.state import (  # noqa: F401
+        abandon_path,
+        create_checkpoint,
+        create_path,
+        get_config,
+        init_config,
+        list_checkpoints,
+        list_paths,
+        notify_researcher,
+        rollback_checkpoint,
+        scratch_clear,
+        scratch_list,
+        scratch_run,
+        scratch_write,
+        session_handoff,
+        set_config,
+        validate_config,
+        workspace_repair,
     )
-    from research_os.tools.actions.search import search_arxiv             # noqa: F401
-    from research_os.tools.actions.research import research_method        # noqa: F401
-    from research_os.tools.actions.audit import audit_synthesis           # noqa: F401
-    from research_os.tools.actions.md_audit import validate_md_template   # noqa: F401
-    from research_os.tools.actions.environment import env_snapshot        # noqa: F401
-    from research_os.tools.actions.execution import execute_r_script      # noqa: F401
-    from research_os.tools.actions.notebook import execute_notebook       # noqa: F401
-    from research_os.tools.actions.tasks import task_run                  # noqa: F401
-    from research_os.tools.actions.synthesize import synthesize_workspace  # noqa: F401
-    from research_os.tools.actions.latex import latex_compile             # noqa: F401
-    from research_os.tools.actions.memory import hypothesis_add           # noqa: F401
+
+    # data/
+    from research_os.tools.actions.data import (  # noqa: F401
+        _profile_inputs,
+        context_intake,
+        data_convert,
+        data_profile,
+        data_sample,
+        intake_autofill,
+    )
+
+    # exec/
+    from research_os.tools.actions.exec import (  # noqa: F401
+        env_docker_generate,
+        env_snapshot,
+        execute_bash_script,
+        execute_julia_script,
+        execute_notebook,
+        execute_r_script,
+        package_install,
+        render_rmarkdown,
+        task_kill,
+        task_list,
+        task_run,
+        task_status,
+    )
+
+    # search/
+    from research_os.tools.actions.search import (  # noqa: F401
+        download_literature,
+        retrieve_literature,
+        scrape_web,
+        search_arxiv,
+        search_crossref,
+        search_pubmed,
+        search_semantic_scholar,
+        search_web,
+    )
+
+    # research/
+    from research_os.tools.actions.research import (  # noqa: F401
+        branch_recommendation,
+        external_tool_instructions,
+        plan_next_step,
+        plan_step,
+        research_method,
+        research_tool,
+    )
+
+    # audit/
+    from research_os.tools.actions.audit import (  # noqa: F401
+        audit_assumptions,
+        audit_citations,
+        audit_figure,
+        audit_power,
+        audit_reproducibility_full,
+        audit_synthesis,
+        get_current_path,
+        validate_md_template,
+    )
+
+    # synthesis/
+    from research_os.tools.actions.synthesis import (  # noqa: F401
+        cap_for,
+        collect_for_section,
+        create_dashboard,
+        create_poster,
+        format_apa,
+        format_bib,
+        format_vancouver,
+        latex_compile,
+        synthesize_plan,
+        synthesize_workspace,
+        verify_all_in_workspace,
+        verify_citation_key,
+        write_references_bib,
+    )
+
+    # memory/
+    from research_os.tools.actions.memory import (  # noqa: F401
+        hypothesis_add,
+        hypothesis_list,
+        hypothesis_update,
+    )
+
+    # protocol.py stays at top level (it's the loader — fundamental).
+    from research_os.tools.actions.protocol import (  # noqa: F401
+        get_next_protocol,
+        get_protocol_history,
+        list_protocols,
+        load_protocol,
+        log_protocol_execution,
+        validate_protocol,
+    )
+
+
+def test_top_level_actions_namespace_is_minimal():
+    """Only protocol.py + __init__.py + the eight subpackages live at the top."""
+    from pathlib import Path
+
+    actions_dir = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src" / "research_os" / "tools" / "actions"
+    )
+    flat_py_files = sorted(
+        f.name for f in actions_dir.iterdir()
+        if f.is_file() and f.suffix == ".py"
+    )
+    assert flat_py_files == ["__init__.py", "protocol.py"], (
+        f"Unexpected flat .py files in tools/actions/: {flat_py_files}. "
+        "Move them into the right subpackage."
+    )

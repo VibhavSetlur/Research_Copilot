@@ -1,7 +1,7 @@
 """Tests for the mem_hypothesis_* tools."""
 
 from research_os.project_ops import scaffold_minimal_workspace
-from research_os.tools.actions.memory import (
+from research_os.tools.actions.memory.memory import (
     hypothesis_add,
     hypothesis_list,
     hypothesis_update,

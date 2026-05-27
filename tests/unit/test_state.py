@@ -10,7 +10,7 @@ from research_os.project_ops import (
     scaffold_minimal_workspace,
 )
 from research_os.state.state_ledger import ResearchLedger
-from research_os.tools.actions.checkpoint import (
+from research_os.tools.actions.state.checkpoint import (
     create_checkpoint,
     list_checkpoints,
     rollback_checkpoint,

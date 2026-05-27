@@ -8,6 +8,43 @@ versioning: [SemVer](https://semver.org).
 
 Research OS 1.0.0 is the first stable release. Headline features:
 
+### Final readiness pass
+
+* **Removed all 22 back-compat shim files** at the flat `tools/actions/`
+  level. The package now exposes everything through eight focused
+  subpackages (`state/`, `data/`, `exec/`, `search/`, `research/`,
+  `audit/`, `synthesis/`, `memory/`) plus the top-level `protocol.py`
+  loader. Updated server.py, project_ops.py, state/interaction.py,
+  audit/audit.py, research/research.py, and every test file.
+* **Per-step literature management** — added a `literature/` subfolder
+  to every experiment directory. `tool_literature_download` now accepts
+  `step_id` to scope downloads. New `tool_literature_search_and_save`
+  (search → download in one shot) + `tool_step_literature_list`.
+  Every downloaded PDF gets a `.meta.yaml` sidecar with full citation
+  metadata so synthesis renders real verified citations.
+  `mem_citations_generate` now walks BOTH `inputs/literature/` and
+  every `workspace/<step>/literature/` for the unified bibliography.
+* **Publication-quality paper synthesis** — `synthesize_workspace`
+  rewritten to produce a real IMRAD paper with numbered figures
+  (copied into `synthesis/figures/`, referenced as Figure 1, 2…),
+  numbered tables with captions (copied into `synthesis/tables/`,
+  CSVs auto-rendered as inline markdown), inline citation rewriting
+  (`[@key]` → `[N]`), per-output_type citation caps (3 abstract /
+  6 poster / 12 dashboard / 25 report / 40 paper) applied to the
+  unified pool from project literature + per-step literature + live
+  Crossref/Semantic Scholar lookups, a hypothesis-status table in
+  Discussion, and a proper LaTeX renderer using natbib + bibtex.
+  `tool_synthesize` exposes `output_type` and `citation_style` args.
+
+### Bug fixes during the audit
+
+* `_handle_tool_synthesize` was ignoring `output_type` and
+  `citation_style` (would always default). Now passes them through.
+* `_handle_sys_workspace_scaffold` IDE allow-list was stale (missing
+  windsurf / continue / aider). Now matches `cli.VALID_IDES`.
+* `scratch_list` was using `sorted({…dict…}, key=…)` — a set of dicts
+  which is unhashable; would raise at runtime. Fixed to build a list.
+
 ### Surface
 
 * Two-command CLI: `research-os init` (scaffold a workspace) and

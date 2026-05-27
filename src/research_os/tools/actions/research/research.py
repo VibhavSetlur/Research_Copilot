@@ -19,7 +19,7 @@ logger = logging.getLogger("research_os.tools.research")
 
 def _write_report(root: Path, kind: str, slug: str, body: str) -> str:
     """Write a research report into the current step (or workspace/logs)."""
-    from research_os.tools.actions.audit import get_current_path
+    from research_os.tools.actions.audit.audit import get_current_path
 
     current = get_current_path(root)
     if current:
@@ -51,12 +51,12 @@ def research_method(query: str, root: Path, limit: int = 5) -> dict[str, Any]:
     parsed evidence so the AI can choose.
     """
     try:
-        from research_os.tools.actions.literature_retrieval import (
+        from research_os.tools.actions.search.search import (
             search_crossref,
             search_pubmed,
             search_semantic_scholar,
+            search_web,
         )
-        from research_os.tools.actions.web_search import search_web
 
         sources: list[dict[str, Any]] = []
 
@@ -176,7 +176,7 @@ def research_tool(task: str, root: Path, language: str = "any") -> dict[str, Any
     WORKSHEET.md for the researcher (see tool_external_tool_instructions).
     """
     try:
-        from research_os.tools.actions.web_search import search_web
+        from research_os.tools.actions.search.search import search_web
 
         queries = [task]
         if language and language != "any":
@@ -289,7 +289,7 @@ def external_tool_instructions(
     drop the results back into the workspace.
     """
     try:
-        from research_os.tools.actions.audit import get_current_path
+        from research_os.tools.actions.audit.audit import get_current_path
 
         current = get_current_path(root)
         target_dir = (
@@ -350,7 +350,7 @@ def plan_step(goal: str, root: Path, max_substeps: int = 6) -> dict[str, Any]:
     """
     try:
         from research_os.project_ops import load_state
-        from research_os.tools.actions.audit import get_current_path
+        from research_os.tools.actions.audit.audit import get_current_path
 
         state = load_state(root)
         profile = state.get("model_profile") or "medium"

@@ -36,6 +36,7 @@ EXPERIMENT_SUBDIRS = (
     "data/input",
     "data/output",
     "scripts",
+    "literature",        # per-step PDFs; populated by tool_literature_download(step_id=…)
     "outputs/reports",
     "outputs/figures",
     "outputs/tables",
@@ -222,7 +223,7 @@ def _write_os_state_summary(root: Path) -> None:
         return
 
     try:
-        from research_os.tools.actions.path import list_paths
+        from research_os.tools.actions.state.path import list_paths
 
         paths = list_paths(root).get("paths", []) or []
     except Exception:
@@ -394,7 +395,7 @@ def scaffold_minimal_workspace(
         )
 
     # 6. researcher_config.yaml — source of truth for AI behaviour.
-    from research_os.tools.actions.config import init_config
+    from research_os.tools.actions.state.config import init_config
 
     init_config(root, overrides=config_overrides)
 
@@ -940,7 +941,7 @@ def _update_analysis_mermaid_block(root: Path, mermaid_content: str) -> None:
 def _update_workflow_mermaid(root: Path) -> None:
     """Regenerate workspace/workflow.mermaid + analysis.md block + (optional) PNG."""
     try:
-        from research_os.tools.actions.path import list_paths
+        from research_os.tools.actions.state.path import list_paths
 
         paths = list_paths(root).get("paths", []) or []
     except Exception:
@@ -980,33 +981,123 @@ def _update_workflow_mermaid(root: Path) -> None:
 
 
 def generate_citations_md(root: Path) -> str:
-    """Regenerate workspace/citations.md from inputs/literature_index.yaml."""
+    """Regenerate workspace/citations.md from project + per-step literature.
+
+    Pulls entries from:
+      - inputs/literature_index.yaml                 (project scope)
+      - workspace/<step>/literature/literature_index.yaml (each step scope)
+      - workspace/<step>/literature/*.meta.{yaml,json}    (sidecars)
+    """
     citations_path = root / "workspace" / "citations.md"
     citations_path.parent.mkdir(parents=True, exist_ok=True)
 
-    index_path = root / "inputs" / "literature_index.yaml"
-    entries: dict = {}
-    if index_path.exists() and yaml:
+    # citation_key → entry dict
+    entries: dict[str, dict] = {}
+
+    # 1. Project-level literature index.
+    proj_index = root / "inputs" / "literature_index.yaml"
+    if proj_index.exists() and yaml:
         try:
-            data = yaml.safe_load(index_path.read_text()) or {}
-            entries = data.get("entries", {})
+            data = yaml.safe_load(proj_index.read_text()) or {}
+            for filename, meta in (data.get("entries") or {}).items():
+                key = meta.get("citation_key") or filename
+                meta = dict(meta)
+                meta.setdefault("citation_key", key)
+                meta.setdefault("filename", filename)
+                meta.setdefault("scope", "project")
+                entries[key] = meta
         except Exception:
             pass
 
-    lines = ["# Running Bibliography", "", "*Auto-generated from inputs/literature_index.yaml*", ""]
+    # 2. Per-step literature indexes + sidecars.
+    workspace = root / "workspace"
+    if workspace.exists():
+        for step_dir in sorted(workspace.iterdir()):
+            if not (step_dir.is_dir() and re.match(r"^\d{2,3}_", step_dir.name)):
+                continue
+            lit_dir = step_dir / "literature"
+            if not lit_dir.exists():
+                continue
+            # First read the step's index (if present).
+            step_idx = lit_dir / "literature_index.yaml"
+            if step_idx.exists() and yaml:
+                try:
+                    data = yaml.safe_load(step_idx.read_text()) or {}
+                    for filename, meta in (data.get("entries") or {}).items():
+                        key = meta.get("citation_key") or filename
+                        meta = dict(meta)
+                        meta.setdefault("citation_key", key)
+                        meta.setdefault("filename", filename)
+                        meta.setdefault("scope", f"step:{step_dir.name}")
+                        # Don't clobber project entries; step entries are
+                        # secondary.
+                        entries.setdefault(key, meta)
+                except Exception:
+                    pass
+            # Then fall back to sidecar walk for PDFs that have no index entry.
+            for pdf in lit_dir.iterdir():
+                if not pdf.is_file() or pdf.suffix.lower() not in {".pdf", ".epub"}:
+                    continue
+                for ext in (".meta.yaml", ".meta.json"):
+                    side = pdf.with_suffix(pdf.suffix + ext)
+                    if side.exists():
+                        try:
+                            if ext == ".meta.yaml":
+                                meta = (yaml.safe_load(side.read_text()) or {}) if yaml else {}
+                            else:
+                                meta = json.loads(side.read_text())
+                        except Exception:
+                            meta = {}
+                        key = meta.get("citation_key") or re.sub(r"[\s-]+", "_", pdf.stem).lower()
+                        meta["citation_key"] = key
+                        meta["filename"] = pdf.name
+                        meta.setdefault("scope", f"step:{step_dir.name}")
+                        entries.setdefault(key, meta)
+                        break
+
+    lines = [
+        "# Running Bibliography",
+        "",
+        "*Auto-generated from project + per-step literature.*",
+        "",
+    ]
     if entries:
-        for filename, meta in sorted(entries.items()):
-            key = meta.get("citation_key", filename)
-            verified = meta.get("verified", False)
+        # Sort by scope (project first), then citation_key.
+        ordered = sorted(
+            entries.items(),
+            key=lambda kv: (0 if kv[1].get("scope") == "project" else 1, kv[0]),
+        )
+        for key, meta in ordered:
+            scope = meta.get("scope", "project")
+            verified = meta.get("verified", bool(meta.get("doi") or meta.get("url")))
             sha = (meta.get("sha256") or "")[:12]
             badge = "✅ verified" if verified else "⏳ pending verification"
             lines.append(f"### `{key}`")
-            lines.append(f"- File: {filename}")
-            lines.append(f"- SHA-256: `{sha}`")
+            lines.append(f"- Scope: `{scope}`")
+            if meta.get("filename"):
+                lines.append(f"- File: {meta['filename']}")
+            if meta.get("title"):
+                lines.append(f"- Title: {meta['title']}")
+            if meta.get("authors"):
+                authors = meta["authors"]
+                if isinstance(authors, list):
+                    authors = ", ".join(authors)
+                lines.append(f"- Authors: {authors}")
+            if meta.get("year"):
+                lines.append(f"- Year: {meta['year']}")
+            if meta.get("doi"):
+                lines.append(f"- DOI: `{meta['doi']}`")
+            if meta.get("url"):
+                lines.append(f"- URL: {meta['url']}")
+            if sha:
+                lines.append(f"- SHA-256: `{sha}`")
             lines.append(f"- Status: {badge}")
             lines.append("")
     else:
-        lines.append("*(No PDFs in `inputs/literature/` yet — drop some in or use `tool_literature_download`.)*")
+        lines.append(
+            "*(No literature yet — drop PDFs in `inputs/literature/` or call "
+            "`tool_literature_download` / `tool_literature_search_and_save`.)*"
+        )
         lines.append("")
 
     citations_path.write_text("\n".join(lines) + "\n")

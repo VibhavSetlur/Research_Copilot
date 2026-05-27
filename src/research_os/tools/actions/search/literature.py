@@ -1,55 +1,423 @@
-import logging
-from typing import Dict, Any
-from pathlib import Path
-import urllib.request
+"""Literature download + per-experiment-step literature management.
+
+Two scopes:
+
+* **Project literature** lives at ``inputs/literature/`` and is shared
+  across the whole project. PDFs the researcher dropped in by hand, plus
+  papers the AI downloaded that ground the overall research question, go
+  here.
+
+* **Step literature** lives at ``workspace/<step>/literature/`` and is
+  attached to a specific numbered experiment. Useful when a paper is
+  relevant ONLY to a specific analysis step (e.g. the canonical paper for
+  the method the step uses). The AI can reference these in the step's
+  conclusions.md and they bubble up into citations automatically.
+
+Public functions
+----------------
+* ``download_literature(url, filename, root, step_id=None)`` — download a
+  PDF to the chosen scope.
+* ``search_and_save(query, source, root, step_id=None, limit=5,
+  download_top=True)`` — run a literature search, optionally download the
+  top-N results into the chosen scope, return the search results.
+* ``step_literature_list(root, step_id=None)`` — list every PDF in a step's
+  (or all steps') literature folder.
+"""
+
+from __future__ import annotations
 
 import json
+import logging
+import re
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict
 
-logger = logging.getLogger("research.tools.literature")
+logger = logging.getLogger("research_os.tools.search.literature")
+
+
+# ---------------------------------------------------------------------------
+# Unpaywall (open-access pre-check)
+# ---------------------------------------------------------------------------
 
 
 def _check_unpaywall(url: str) -> Dict[str, Any]:
-    # Try to extract DOI if present in URL, otherwise we just try
-    import re
-    import urllib.request
-
+    """Best-effort: does the DOI look open-access via Unpaywall?"""
     match = re.search(r"(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", url, re.I)
     if not match:
-        return {"is_oa": True, "reason": "No DOI found in URL, assuming direct link."}
+        return {"is_oa": True, "reason": "No DOI in URL; assuming direct PDF link."}
     doi = match.group(1)
     try:
         req_url = f"https://api.unpaywall.org/v2/{doi}?email=research@os.local"
-        data = json.loads(urllib.request.urlopen(req_url).read())
-        is_oa = data.get("is_oa", False)
+        data = json.loads(urllib.request.urlopen(req_url, timeout=10).read())
+        is_oa = bool(data.get("is_oa"))
         return {
             "is_oa": is_oa,
-            "reason": "Unpaywall reported closed access."
-            if not is_oa
-            else "Unpaywall reported open access.",
+            "reason": (
+                "Unpaywall reports open access."
+                if is_oa
+                else "Unpaywall reports closed access."
+            ),
         }
     except Exception as e:
-        return {"is_oa": True, "reason": f"Unpaywall check failed: {e}, assuming open."}
+        # Fail-open with a noted warning. We don't want to block downloads
+        # because Unpaywall is down.
+        return {"is_oa": True, "reason": f"Unpaywall check failed ({e}); proceeding."}
 
 
-def download_literature(url: str, filename: str, root: Path) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _slugify(text: str, maxlen: int = 80) -> str:
+    s = re.sub(r"[^a-zA-Z0-9._-]+", "_", text.strip()).strip("_") or "paper"
+    return s[:maxlen]
+
+
+def _step_literature_dir(root: Path, step_id: str) -> Path:
+    """Resolve ``workspace/<step_id>/literature/``."""
+    workspace = root / "workspace"
+    if not workspace.exists():
+        raise FileNotFoundError("workspace/ not found — run scaffold first.")
+    candidate = workspace / step_id
+    if not candidate.exists() or not candidate.is_dir():
+        raise FileNotFoundError(
+            f"Step '{step_id}' not found under workspace/. "
+            f"Use sys_path_list to see valid step IDs."
+        )
+    if not re.match(r"^\d{2,3}_", step_id):
+        raise ValueError(
+            f"'{step_id}' is not a numbered experiment path (expected NN_<slug>)."
+        )
+    lit = candidate / "literature"
+    lit.mkdir(parents=True, exist_ok=True)
+    return lit
+
+
+def _write_sidecar(pdf_path: Path, meta: dict[str, Any]) -> Path:
+    """Drop a .meta.yaml alongside the PDF with citation metadata."""
+    side = pdf_path.with_suffix(pdf_path.suffix + ".meta.yaml")
     try:
-        oa_check = _check_unpaywall(url)
-        if not oa_check["is_oa"]:
-            logger.warning(f"Paywall warning for {url}: {oa_check['reason']}")
-            # Log the reason to a file
-            log_path = root / "workspace" / "logs" / "errors.log"
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(log_path, "a") as f:
-                f.write(f"Paywall warning for {url}: {oa_check['reason']}\n")
+        import yaml  # type: ignore
+
+        side.write_text(yaml.safe_dump(meta, sort_keys=False))
+    except Exception:
+        # Fall back to JSON if pyyaml unavailable.
+        side = pdf_path.with_suffix(pdf_path.suffix + ".meta.json")
+        side.write_text(json.dumps(meta, indent=2, default=str))
+    return side
+
+
+def _update_step_literature_index(step_lit_dir: Path) -> Path:
+    """Maintain ``literature_index.yaml`` inside the step's literature folder."""
+    index_path = step_lit_dir / "literature_index.yaml"
+    entries: dict[str, dict[str, Any]] = {}
+    for pdf in sorted(step_lit_dir.iterdir()):
+        if pdf.is_file() and pdf.suffix.lower() in {".pdf", ".epub", ".djvu", ".ps"}:
+            citation_key = re.sub(r"[\s-]+", "_", pdf.stem).lower()
+            entry = {"citation_key": citation_key, "filename": pdf.name}
+            sidecar_yaml = pdf.with_suffix(pdf.suffix + ".meta.yaml")
+            sidecar_json = pdf.with_suffix(pdf.suffix + ".meta.json")
+            for side in (sidecar_yaml, sidecar_json):
+                if side.exists():
+                    try:
+                        if side.suffix == ".yaml":
+                            import yaml  # type: ignore
+
+                            sidedata = yaml.safe_load(side.read_text()) or {}
+                        else:
+                            sidedata = json.loads(side.read_text())
+                        entry.update(
+                            {
+                                k: sidedata.get(k)
+                                for k in ("title", "year", "authors", "doi", "url",
+                                          "venue", "source")
+                                if sidedata.get(k)
+                            }
+                        )
+                    except Exception:
+                        pass
+                    break
+            entries[pdf.name] = entry
+
+    try:
+        import yaml  # type: ignore
+
+        body = yaml.safe_dump(
+            {
+                "schema_version": "1.0",
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "entries": entries,
+            },
+            sort_keys=False,
+        )
+    except Exception:
+        body = json.dumps({"entries": entries}, indent=2)
+    index_path.write_text(body)
+    return index_path
+
+
+# ---------------------------------------------------------------------------
+# Download
+# ---------------------------------------------------------------------------
+
+
+def download_literature(
+    url: str,
+    filename: str,
+    root: Path,
+    *,
+    step_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    skip_unpaywall: bool = False,
+) -> dict[str, Any]:
+    """Download a PDF into either the project or a specific experiment step.
+
+    Parameters
+    ----------
+    url : str
+        Direct PDF URL or DOI link.
+    filename : str
+        Saved filename (sanitised). Bare names only — no path separators.
+    root : Path
+        Project root.
+    step_id : str, optional
+        ``"NN_<slug>"`` to save under ``workspace/<step_id>/literature/``.
+        ``None`` saves under ``inputs/literature/``.
+    metadata : dict, optional
+        Citation metadata to write into the sidecar (.meta.yaml). Keys the
+        downstream tools look for: ``title``, ``year``, ``authors``, ``doi``,
+        ``url``, ``venue``, ``source``.
+    skip_unpaywall : bool
+        Skip the open-access pre-check (e.g. for direct preprint links).
+    """
+    try:
+        if "/" in filename or ".." in filename:
+            return {"status": "error",
+                    "message": "filename may not contain '/' or '..'"}
+        # Force a .pdf suffix if absent (most callers omit it).
+        safe_name = _slugify(Path(filename).name)
+        if not safe_name.lower().endswith((".pdf", ".epub", ".djvu", ".ps")):
+            safe_name += ".pdf"
+
+        if not skip_unpaywall:
+            oa = _check_unpaywall(url)
+            if not oa["is_oa"]:
+                log_path = root / "workspace" / "logs" / "errors.log"
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, "a") as f:
+                    f.write(f"Paywall warning for {url}: {oa['reason']}\n")
+                return {
+                    "status": "error",
+                    "message": f"Paywall: {oa['reason']}",
+                }
+
+        # Resolve target directory + scope.
+        if step_id:
+            target_dir = _step_literature_dir(root, step_id)
+            scope = f"workspace/{step_id}/literature"
+        else:
+            target_dir = root / "inputs" / "literature"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            scope = "inputs/literature"
+
+        out_path = target_dir / safe_name
+        # Never overwrite — rename if needed.
+        if out_path.exists():
+            stem = out_path.stem
+            i = 1
+            while (target_dir / f"{stem}_v{i}{out_path.suffix}").exists():
+                i += 1
+            out_path = target_dir / f"{stem}_v{i}{out_path.suffix}"
+
+        try:
+            urllib.request.urlretrieve(url, out_path)
+        except Exception as e:
+            return {"status": "error",
+                    "message": f"Download failed: {e}"}
+
+        # Write sidecar metadata.
+        meta = dict(metadata or {})
+        meta.setdefault("url", url)
+        meta.setdefault("downloaded_at", datetime.now(timezone.utc).isoformat())
+        meta.setdefault("scope", scope)
+        if step_id:
+            meta.setdefault("step_id", step_id)
+        sidecar = _write_sidecar(out_path, meta)
+
+        # Refresh the per-step index (or the project index if no step).
+        if step_id:
+            _update_step_literature_index(target_dir)
+        else:
+            try:
+                from research_os.project_ops import update_literature_index
+
+                update_literature_index(root)
+            except Exception:
+                pass
+
+        return {
+            "status": "success",
+            "filepath": str(out_path.relative_to(root)),
+            "sidecar": str(sidecar.relative_to(root)),
+            "scope": scope,
+            "step_id": step_id,
+        }
+    except (FileNotFoundError, ValueError) as e:
+        return {"status": "error", "message": str(e)}
+    except Exception as e:
+        logger.exception("download_literature failed")
+        return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Combined search + download
+# ---------------------------------------------------------------------------
+
+
+def search_and_save(
+    query: str,
+    root: Path,
+    *,
+    source: str = "semantic_scholar",
+    step_id: str | None = None,
+    limit: int = 5,
+    download_top: int = 3,
+) -> dict[str, Any]:
+    """Search a literature provider, then download the top-N PDF candidates
+    into the chosen scope.
+
+    Skips entries without a URL/DOI; never overwrites; preserves citation
+    metadata in a sidecar so downstream tools can render real citations.
+    """
+    try:
+        from research_os.tools.actions.search.search import (
+            search_arxiv,
+            search_crossref,
+            search_pubmed,
+            search_semantic_scholar,
+        )
+
+        provider = {
+            "semantic_scholar": search_semantic_scholar,
+            "crossref": search_crossref,
+            "pubmed": search_pubmed,
+            "arxiv": search_arxiv,
+        }.get(source.lower())
+        if not provider:
             return {
                 "status": "error",
-                "message": f"Article is behind a paywall: {oa_check['reason']}",
+                "message": f"Unknown source '{source}'. "
+                           f"Allowed: semantic_scholar | crossref | pubmed | arxiv",
             }
 
-        out_path = root / "inputs" / "literature" / filename
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        urllib.request.urlretrieve(url, out_path)
-        return {"status": "success", "filepath": str(out_path.absolute())}
+        hits = provider(query, limit=int(limit)) or []
+        downloads: list[dict[str, Any]] = []
+        for h in hits[: int(download_top)]:
+            link = h.get("url") or h.get("doi")
+            if not link:
+                continue
+            # Build a sensible filename: <firstAuthorLast><year>_<firstword>.pdf
+            authors = h.get("authors") or []
+            first = (authors[0] if authors else "anon").split()[-1].lower()
+            first = re.sub(r"[^a-z]", "", first) or "anon"
+            year = str(h.get("year") or "nd")
+            title_words = re.findall(r"[A-Za-z]{4,}", h.get("title") or "")
+            stem = (title_words[0] if title_words else "paper").lower()
+            fname = f"{first}{year}_{stem}.pdf"
+
+            meta = {
+                "title": h.get("title"),
+                "authors": authors,
+                "year": h.get("year"),
+                "doi": h.get("doi"),
+                "url": h.get("url"),
+                "source": source,
+            }
+            res = download_literature(
+                link, fname, root, step_id=step_id, metadata=meta, skip_unpaywall=False
+            )
+            downloads.append({"query_hit": h, "download": res})
+
+        return {
+            "status": "success",
+            "query": query,
+            "source": source,
+            "step_id": step_id,
+            "hits_found": len(hits),
+            "downloads_attempted": len(downloads),
+            "downloads_succeeded": sum(
+                1 for d in downloads if d["download"].get("status") == "success"
+            ),
+            "results": downloads,
+        }
     except Exception as e:
-        logger.error(f"Download literature failed: {e}")
+        logger.exception("search_and_save failed")
+        return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# List
+# ---------------------------------------------------------------------------
+
+
+def step_literature_list(root: Path, step_id: str | None = None) -> dict[str, Any]:
+    """List PDFs in a specific step (``step_id`` provided) or across all steps."""
+    try:
+        workspace = root / "workspace"
+        if not workspace.exists():
+            return {"status": "success", "by_step": {}, "total_count": 0}
+
+        out: dict[str, list[dict[str, Any]]] = {}
+
+        def _scan(step_dir: Path) -> list[dict[str, Any]]:
+            lit = step_dir / "literature"
+            if not lit.exists():
+                return []
+            files: list[dict[str, Any]] = []
+            for f in sorted(lit.iterdir()):
+                if not f.is_file():
+                    continue
+                if f.suffix.lower() not in {".pdf", ".epub", ".djvu", ".ps"}:
+                    continue
+                entry: dict[str, Any] = {
+                    "filename": f.name,
+                    "relative_path": str(f.relative_to(root)),
+                    "size_kb": round(f.stat().st_size / 1024, 1),
+                }
+                sidecar_yaml = f.with_suffix(f.suffix + ".meta.yaml")
+                sidecar_json = f.with_suffix(f.suffix + ".meta.json")
+                for side in (sidecar_yaml, sidecar_json):
+                    if side.exists():
+                        try:
+                            if side.suffix == ".yaml":
+                                import yaml  # type: ignore
+
+                                entry["metadata"] = yaml.safe_load(side.read_text()) or {}
+                            else:
+                                entry["metadata"] = json.loads(side.read_text())
+                        except Exception:
+                            pass
+                        break
+                files.append(entry)
+            return files
+
+        if step_id:
+            step_dir = workspace / step_id
+            if not step_dir.exists():
+                return {"status": "error", "message": f"Step '{step_id}' not found."}
+            out[step_id] = _scan(step_dir)
+        else:
+            for step_dir in sorted(workspace.iterdir()):
+                if step_dir.is_dir() and re.match(r"^\d{2,3}_", step_dir.name):
+                    files = _scan(step_dir)
+                    if files:
+                        out[step_dir.name] = files
+
+        total = sum(len(v) for v in out.values())
+        return {"status": "success", "by_step": out, "total_count": total}
+    except Exception as e:
+        logger.exception("step_literature_list failed")
         return {"status": "error", "message": str(e)}

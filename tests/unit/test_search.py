@@ -3,12 +3,12 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from research_os.tools.actions.literature_retrieval import (
+from research_os.tools.actions.search.search import (
     search_crossref,
     search_pubmed,
     search_semantic_scholar,
+    search_web,
 )
-from research_os.tools.actions.web_search import search_web
 
 
 @patch("urllib.request.urlopen")

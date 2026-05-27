@@ -27,7 +27,7 @@ def notify_researcher(message: str, level: str, root: Path) -> dict[str, Any]:
 def session_handoff(root: Path) -> dict[str, Any]:
     """Generate a structured markdown handoff and a resume prompt."""
     try:
-        from research_os.tools.actions.path import list_paths
+        from research_os.tools.actions.state.path import list_paths
 
         state = load_state(root)
         paths_data = list_paths(root)

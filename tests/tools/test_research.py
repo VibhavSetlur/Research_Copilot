@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from research_os.tools.actions.research import (
+from research_os.tools.actions.research.research import (
     external_tool_instructions,
     plan_step,
     research_method,

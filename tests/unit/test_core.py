@@ -40,8 +40,9 @@ def test_path_create_creates_full_subtree():
         assert res["path_id"].startswith("01_")
         exp = root / "workspace" / res["path_id"]
         assert exp.exists()
-        for sub in ("scripts", "data/input", "data/output", "outputs/reports",
-                    "outputs/figures", "outputs/tables", "environment"):
+        for sub in ("scripts", "literature", "data/input", "data/output",
+                    "outputs/reports", "outputs/figures", "outputs/tables",
+                    "outputs/dashboards", "environment"):
             assert (exp / sub).exists(), sub
         assert (exp / "README.md").exists()
         assert (exp / "conclusions.md").exists()

@@ -112,7 +112,7 @@ def scratch_list(root: Path) -> dict[str, Any]:
     """List files currently in scratch."""
     try:
         d = _scratch_dir(root)
-        files = sorted(
+        entries = [
             {
                 "name": f.name,
                 "size_bytes": f.stat().st_size,
@@ -122,7 +122,8 @@ def scratch_list(root: Path) -> dict[str, Any]:
             }
             for f in d.iterdir()
             if f.is_file() and f.name not in {".gitignore", "README.md"}
-        , key=lambda x: x["modified"]) if any(d.iterdir()) else []
+        ]
+        files = sorted(entries, key=lambda x: x["modified"])
         return {"status": "success", "count": len(files), "files": files}
     except Exception as e:
         logger.exception("scratch_list failed")

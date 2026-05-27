@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from research_os.tools.actions.execution import (
+from research_os.tools.actions.exec.scripts import (
     execute_bash_script,
     execute_julia_script,
     execute_r_script,

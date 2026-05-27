@@ -41,12 +41,32 @@ steps:
   - id: download_and_index
     name: Download Key Papers & Build Index
     description: |
-      For the top 5-10 papers most relevant to the methodology:
-        - tool_literature_download url=<pdf-url> filename=<author_year_kw.pdf>
-        - This saves into inputs/literature/.
-      Then call mem_citations_generate — this scans inputs/literature/ and
-      rewrites inputs/literature_index.yaml + workspace/citations.md with the
-      verified-citation format.
+      Two scopes are available:
+
+      A) **Project literature** (papers grounding the WHOLE research question):
+         tool_literature_download url=<pdf-url> filename=<author_year_kw.pdf>
+                                  metadata={title, authors, year, doi, venue}
+         (No step_id → saves under inputs/literature/.)
+
+      B) **Step literature** (papers grounding a SPECIFIC experiment step):
+         tool_literature_download url=<pdf-url> filename=<author_year_kw.pdf>
+                                  step_id="03_logistic_baseline"
+                                  metadata={title, authors, year, doi}
+         Saves under workspace/<step>/literature/. Use this when a paper is
+         the canonical reference for the method this step uses (e.g. the
+         original Cox PH paper for a survival-analysis step).
+
+      Faster bulk approach — combined search + download in one call:
+         tool_literature_search_and_save
+           query="<concept>"  source="semantic_scholar"
+           limit=8  download_top=3  step_id=<optional>
+
+      After downloading, call mem_citations_generate — scans both
+      inputs/literature/ and every workspace/<step>/literature/, rewrites
+      inputs/literature_index.yaml + workspace/citations.md.
+
+      List step literature any time with:
+         tool_step_literature_list step_id=<NN_slug>   # or omit for all steps
 
   - id: log_prisma_counts
     name: Log PRISMA-style counts

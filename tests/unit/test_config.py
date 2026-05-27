@@ -4,7 +4,7 @@ import os
 import yaml
 import pytest
 
-from research_os.tools.actions.config import (
+from research_os.tools.actions.state.config import (
     get_config,
     init_config,
     set_config,

@@ -2,7 +2,7 @@
 
 from unittest import mock
 
-from research_os.tools.actions.notebook import execute_notebook, render_rmarkdown
+from research_os.tools.actions.exec.notebook import execute_notebook, render_rmarkdown
 
 
 def test_notebook_not_found(tmp_path):

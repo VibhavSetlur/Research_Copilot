@@ -28,22 +28,33 @@ steps:
       plan markdown becomes part of the experiment record.
 
   - id: ground_methods
-    name: Ground Methodology in Literature (mandatory)
+    name: Ground Methodology in Literature (mandatory) — STEP-SCOPED
     description: |
-      You MUST search literature BEFORE choosing any method. Skip on training
-      memory alone is forbidden.
+      You MUST search literature BEFORE choosing any method. Selecting from
+      training memory alone is forbidden.
 
-      For each candidate method, call EITHER:
-        tool_research_method query="<method> for <data structure>"   (deep)
-        OR a single batch:
-        tool_search_semantic_scholar + tool_search_web              (light)
+      For each candidate method, do ONE of:
+        (a) DEEP: tool_research_method query="<method> for <data structure>"
+            — writes a structured report into outputs/reports/.
+        (b) LIGHT: tool_search_semantic_scholar + tool_search_web in parallel.
+
+      Save the 2-3 most important papers into THIS step's literature folder
+      (NOT inputs/literature, unless they ground the whole project):
+        tool_literature_search_and_save
+          query="<method canonical paper>"
+          source="semantic_scholar"
+          step_id="<this step's NN_slug>"
+          limit=5  download_top=2
+
+      Each PDF gets a .meta.yaml sidecar (title/authors/year/doi). Synthesis
+      later pulls these into the paper's references with proper numbering.
 
       For each method actually chosen:
         - mem_methods_append (full structured fields: method, dataset,
-          dataset_hash, implementation, parameters, justification with citation,
-          assumptions list).
+          dataset_hash, implementation, parameters, justification with
+          citation_key, assumptions list).
         - mem_decision_log (context / selected / rationale / options
-          considered / linked citations).
+          considered / linked citation_keys).
         - mem_hypothesis_update for each hypothesis touched, status='testing'.
 
   - id: pick_tools

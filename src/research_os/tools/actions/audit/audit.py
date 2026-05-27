@@ -333,7 +333,7 @@ def audit_figure(filepath: str, root: Path) -> dict[str, Any]:
 def audit_citations(root: Path) -> dict[str, Any]:
     """Verify every citation in workspace/citations.md against Crossref/Semantic Scholar."""
     try:
-        from research_os.tools.actions.literature_retrieval import retrieve_literature
+        from research_os.tools.actions.search.search import retrieve_literature
 
         citations_md = root / "workspace" / "citations.md"
         if not citations_md.exists():

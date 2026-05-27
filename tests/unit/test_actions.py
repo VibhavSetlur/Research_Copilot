@@ -1,30 +1,29 @@
 """Tests for top-level tool actions (web, env, checkpoint, literature)."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from research_os.tools.actions.checkpoint import (
+from research_os.tools.actions.search.literature import download_literature
+from research_os.tools.actions.search.search import scrape_web, search_web
+from research_os.tools.actions.state.checkpoint import (
     create_checkpoint,
     list_checkpoints,
     rollback_checkpoint,
 )
-from research_os.tools.actions.environment import env_snapshot, package_install
-from research_os.tools.actions.literature import download_literature
-from research_os.tools.actions.web_search import scrape_web, search_web
+from research_os.tools.actions.exec.environment import env_snapshot, package_install
 
 
 # ── package_install ────────────────────────────────────────────────────
 
 
 class TestPackageInstall:
-    @patch("research_os.tools.actions.environment.subprocess.run")
+    @patch("research_os.tools.actions.exec.environment.subprocess.run")
     def test_success(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="installed", stderr="")
         res = package_install(["requests"])
         assert res["code"] == 0
         assert res["status"] == "success"
 
-    @patch("research_os.tools.actions.environment.subprocess.run")
+    @patch("research_os.tools.actions.exec.environment.subprocess.run")
     def test_error(self, mock_run):
         mock_run.side_effect = Exception("pip not found")
         res = package_install(["nonexistent"])
@@ -35,7 +34,7 @@ class TestPackageInstall:
 
 
 class TestEnvSnapshot:
-    @patch("research_os.tools.actions.environment.subprocess.run")
+    @patch("research_os.tools.actions.exec.environment.subprocess.run")
     def test_creates_requirements_and_session(self, mock_run, tmp_path):
         mock_run.return_value = MagicMock(returncode=0, stdout="requests==2.31.0\n", stderr="")
         res = env_snapshot(tmp_path)
@@ -73,9 +72,7 @@ class TestSearchWeb:
 class TestScrapeWeb:
     def test_no_scraper_returns_warning(self, monkeypatch):
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
-        # If trafilatura isn't installed in the test env, scrape returns warning.
         res = scrape_web("http://example.com")
-        # Either trafilatura returned content, or we got a warning.
         assert "content" in res
 
 
@@ -107,7 +104,7 @@ class TestCheckpoints:
 
 
 class TestDownloadLiterature:
-    @patch("research_os.tools.actions.literature._check_unpaywall")
+    @patch("research_os.tools.actions.search.literature._check_unpaywall")
     @patch("urllib.request.urlretrieve")
     def test_success(self, mock_retrieve, mock_unpaywall, tmp_path):
         mock_unpaywall.return_value = {"is_oa": True, "reason": "OA"}
@@ -119,7 +116,7 @@ class TestDownloadLiterature:
         assert res["status"] == "success"
         assert (tmp_path / "inputs" / "literature").exists()
 
-    @patch("research_os.tools.actions.literature._check_unpaywall")
+    @patch("research_os.tools.actions.search.literature._check_unpaywall")
     def test_paywall(self, mock_unpaywall, tmp_path):
         mock_unpaywall.return_value = {"is_oa": False, "reason": "Closed access."}
         res = download_literature("https://example.com/paper.pdf", "paper.pdf", tmp_path)
@@ -127,10 +124,10 @@ class TestDownloadLiterature:
 
 
 def test_all_action_imports_resolve():
-    from research_os.tools.actions.checkpoint import create_checkpoint as _c
     from research_os.tools.actions.protocol import load_protocol as _l
     from research_os.tools.actions.search import search_pubmed as _p
-    from research_os.tools.actions.web_search import search_web as _w
+    from research_os.tools.actions.search import search_web as _w
+    from research_os.tools.actions.state import create_checkpoint as _c
 
     assert callable(_c)
     assert callable(_l)

@@ -66,28 +66,31 @@ def _lazy_import(module_name: str, names: list[str]):
 
 
 search_web, scrape_web = _lazy_import(
-    "research_os.tools.actions.web_search", ["search_web", "scrape_web"]
+    "research_os.tools.actions.search",
+    ["search_web", "scrape_web"],
 )
 package_install, env_snapshot, env_docker_generate = _lazy_import(
-    "research_os.tools.actions.environment",
+    "research_os.tools.actions.exec",
     ["package_install", "env_snapshot", "env_docker_generate"],
 )
 create_checkpoint, rollback_checkpoint, list_checkpoints = _lazy_import(
-    "research_os.tools.actions.checkpoint",
+    "research_os.tools.actions.state",
     ["create_checkpoint", "rollback_checkpoint", "list_checkpoints"],
 )
 create_path, abandon_path, list_paths = _lazy_import(
-    "research_os.tools.actions.path", ["create_path", "abandon_path", "list_paths"]
+    "research_os.tools.actions.state",
+    ["create_path", "abandon_path", "list_paths"],
 )
 download_literature, = _lazy_import(
-    "research_os.tools.actions.literature", ["download_literature"]
+    "research_os.tools.actions.search",
+    ["download_literature"],
 )
 get_config, set_config, init_config, validate_config = _lazy_import(
-    "research_os.tools.actions.config",
+    "research_os.tools.actions.state",
     ["get_config", "set_config", "init_config", "validate_config"],
 )
 notify_researcher, session_handoff = _lazy_import(
-    "research_os.tools.actions.interaction",
+    "research_os.tools.actions.state",
     ["notify_researcher", "session_handoff"],
 )
 search_semantic_scholar, search_pubmed, search_crossref, search_arxiv = _lazy_import(
@@ -104,7 +107,8 @@ load_protocol, list_protocols, validate_protocol, get_next_protocol = _lazy_impo
     ["load_protocol", "list_protocols", "validate_protocol", "get_next_protocol"],
 )
 _profile_inputs, = _lazy_import(
-    "research_os.tools.actions.profiling", ["_profile_inputs"]
+    "research_os.tools.actions.data",
+    ["_profile_inputs"],
 )
 
 try:
@@ -570,15 +574,52 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         },
     },
     "tool_literature_download": {
-        "description": "Download a paper PDF into inputs/literature/.",
+        "description": "Download a paper PDF. Default scope is inputs/literature/ (project-wide). Pass step_id='NN_<slug>' to save it under workspace/<step>/literature/ instead. Writes a .meta.yaml sidecar with title/authors/year/doi if provided so synthesis can cite it correctly.",
         "category": "search",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "url": {"type": "string"},
                 "filename": {"type": "string"},
+                "step_id": {
+                    "type": "string",
+                    "description": "Optional: NN_<slug> to scope the download to that experiment step's literature folder.",
+                },
+                "metadata": {
+                    "type": "object",
+                    "description": "Citation metadata to embed in the sidecar (title, authors, year, doi, venue, source).",
+                },
+                "skip_unpaywall": {"type": "boolean"},
             },
             "required": ["url", "filename"],
+        },
+    },
+    "tool_literature_search_and_save": {
+        "description": "Search a provider, download the top-N PDFs into the chosen scope (project or step), preserve citation metadata. One-shot 'find + save' for literature you want backing a specific analysis step.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "source": {
+                    "type": "string",
+                    "description": "semantic_scholar | crossref | pubmed | arxiv (default semantic_scholar)",
+                },
+                "step_id": {"type": "string"},
+                "limit": {"type": "number", "description": "Hits to consider (default 5)."},
+                "download_top": {"type": "number", "description": "Top-N to actually download (default 3)."},
+            },
+            "required": ["query"],
+        },
+    },
+    "tool_step_literature_list": {
+        "description": "List PDFs in a specific experiment step's literature/ folder, OR across every step when no step_id is given.",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+            },
         },
     },
 
@@ -742,7 +783,7 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "tool_synthesize": {
-        "description": "Compile workspace findings into synthesis/paper.md (or specific section). Section parameter generates one section at a time: abstract | introduction | methods | results | discussion | conclusion.",
+        "description": "Compile workspace findings into a publishable output. Without `section`, builds the full paper/poster/etc with numbered figures + tables + verified citations. With `section`, builds one section at a time (abstract | introduction | methods | results | discussion | conclusion | references). `output_type` drives the citation cap and section structure.",
         "category": "synthesis",
         "inputSchema": {
             "type": "object",
@@ -751,7 +792,18 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
                     "type": "string",
                     "description": "markdown | latex | both (default: markdown)",
                 },
-                "section": {"type": "string"},
+                "section": {
+                    "type": "string",
+                    "description": "Specific section to build, else full output.",
+                },
+                "output_type": {
+                    "type": "string",
+                    "description": "paper | abstract | poster | dashboard | report | grant (default: paper). Drives citation cap and section structure.",
+                },
+                "citation_style": {
+                    "type": "string",
+                    "description": "vancouver (default) | apa",
+                },
             },
         },
     },
@@ -1149,8 +1201,15 @@ def _handle_sys_protocol_history(name, arguments, root):
 
 def _handle_sys_workspace_scaffold(name, arguments, root):
     ide = arguments.get("ide", "all")
-    valid = ["cursor", "claude", "antigravity", "opencode", "vscode"]
-    ide_flags = valid if ide == "all" else [i.strip() for i in ide.split(",") if i.strip() in valid]
+    valid = [
+        "cursor", "claude", "antigravity", "opencode", "vscode",
+        "windsurf", "continue", "aider",
+    ]
+    ide_flags = (
+        valid
+        if ide == "all"
+        else [i.strip() for i in ide.split(",") if i.strip() in valid]
+    )
     scaffold_minimal_workspace(
         root,
         arguments.get("project_name", "Research Project"),
@@ -1266,7 +1325,7 @@ def _handle_sys_file_delete(name, arguments, root):
 
 
 def _handle_sys_file_validate_md(name, arguments, root):
-    from research_os.tools.actions.md_audit import validate_md_template
+    from research_os.tools.actions.audit.md_audit import validate_md_template
 
     res = validate_md_template(arguments["filepath"], arguments["protocol_name"], root)
     if res.get("status") == "success":
@@ -1452,10 +1511,42 @@ def _handle_tool_web_scrape(name, arguments, root):
 
 
 def _handle_tool_literature_download(name, arguments, root):
-    res = download_literature(arguments["url"], arguments["filename"], root)
+    res = download_literature(
+        arguments["url"],
+        arguments["filename"],
+        root,
+        step_id=arguments.get("step_id"),
+        metadata=arguments.get("metadata"),
+        skip_unpaywall=bool(arguments.get("skip_unpaywall", False)),
+    )
     if res.get("status") == "success":
         return _text(_success(res))
     return _text(_error(res.get("message", "download failed")))
+
+
+def _handle_tool_literature_search_and_save(name, arguments, root):
+    from research_os.tools.actions.search.literature import search_and_save
+
+    res = search_and_save(
+        arguments["query"],
+        root,
+        source=arguments.get("source", "semantic_scholar"),
+        step_id=arguments.get("step_id"),
+        limit=int(arguments.get("limit", 5)),
+        download_top=int(arguments.get("download_top", 3)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "search_and_save failed")))
+
+
+def _handle_tool_step_literature_list(name, arguments, root):
+    from research_os.tools.actions.search.literature import step_literature_list
+
+    res = step_literature_list(root, step_id=arguments.get("step_id"))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "step_literature_list failed")))
 
 
 def _handle_tool_python_exec(name, arguments, root):
@@ -1495,7 +1586,7 @@ def _handle_tool_python_exec(name, arguments, root):
 
 
 def _handle_tool_script_exec(name, arguments, root):
-    from research_os.tools.actions.execution import (
+    from research_os.tools.actions.exec.scripts import (
         execute_bash_script,
         execute_julia_script,
         execute_r_script,
@@ -1621,36 +1712,40 @@ def _handle_tool_audit_reproducibility(name, arguments, root):
 
 
 def _handle_tool_synthesize_plan(name, arguments, root):
-    from research_os.tools.actions.synthesize import synthesize_plan
+    from research_os.tools.actions.synthesis.synthesize import synthesize_plan
 
     return _text(_success(synthesize_plan(root)))
 
 
 def _handle_tool_synthesize(name, arguments, root):
-    from research_os.tools.actions.synthesize import synthesize_workspace
+    from research_os.tools.actions.synthesis.synthesize import synthesize_workspace
 
-    fmt = arguments.get("output_format", "markdown")
-    sec = arguments.get("section")
-    res = synthesize_workspace(root, output_format=fmt, section=sec)
+    res = synthesize_workspace(
+        root,
+        output_format=arguments.get("output_format", "markdown"),
+        section=arguments.get("section"),
+        output_type=arguments.get("output_type", "paper"),
+        citation_style=arguments.get("citation_style", "vancouver"),
+    )
     if "error" in res:
         return _text(_error(res["error"]))
     return _text(_success(res))
 
 
 def _handle_tool_latex_compile(name, arguments, root):
-    from research_os.tools.actions.latex import latex_compile
+    from research_os.tools.actions.synthesis.latex import latex_compile
 
     return _text(_success(latex_compile(root)))
 
 
 def _handle_tool_poster_create(name, arguments, root):
-    from research_os.tools.actions.latex import create_poster
+    from research_os.tools.actions.synthesis.latex import create_poster
 
     return _text(_success(create_poster(root)))
 
 
 def _handle_tool_dashboard_create(name, arguments, root):
-    from research_os.tools.actions.latex import create_dashboard
+    from research_os.tools.actions.synthesis.latex import create_dashboard
 
     res = create_dashboard(
         root,
@@ -1666,7 +1761,7 @@ def _handle_tool_dashboard_create(name, arguments, root):
 
 
 def _handle_tool_research_method(name, arguments, root):
-    from research_os.tools.actions.research import research_method
+    from research_os.tools.actions.research.research import research_method
 
     res = research_method(arguments["query"], root, limit=int(arguments.get("limit", 5)))
     if res.get("status") == "success":
@@ -1675,7 +1770,7 @@ def _handle_tool_research_method(name, arguments, root):
 
 
 def _handle_tool_research_tool(name, arguments, root):
-    from research_os.tools.actions.research import research_tool
+    from research_os.tools.actions.research.research import research_tool
 
     res = research_tool(arguments["task"], root, language=arguments.get("language", "any"))
     if res.get("status") == "success":
@@ -1684,7 +1779,7 @@ def _handle_tool_research_tool(name, arguments, root):
 
 
 def _handle_tool_external_tool_instructions(name, arguments, root):
-    from research_os.tools.actions.research import external_tool_instructions
+    from research_os.tools.actions.research.research import external_tool_instructions
 
     res = external_tool_instructions(
         arguments["tool_name"],
@@ -1699,7 +1794,7 @@ def _handle_tool_external_tool_instructions(name, arguments, root):
 
 
 def _handle_tool_plan_step(name, arguments, root):
-    from research_os.tools.actions.research import plan_step
+    from research_os.tools.actions.research.research import plan_step
 
     res = plan_step(
         arguments["goal"], root, max_substeps=int(arguments.get("max_substeps", 6))
@@ -1713,7 +1808,7 @@ def _handle_tool_plan_step(name, arguments, root):
 
 
 def _handle_tool_intake_autofill(name, arguments, root):
-    from research_os.tools.actions.intake import intake_autofill
+    from research_os.tools.actions.data.intake import intake_autofill
 
     res = intake_autofill(root, overwrite=bool(arguments.get("overwrite", False)))
     if res.get("status") == "success":
@@ -1725,7 +1820,7 @@ def _handle_tool_intake_autofill(name, arguments, root):
 
 
 def _handle_tool_task_run(name, arguments, root):
-    from research_os.tools.actions.tasks import task_run
+    from research_os.tools.actions.exec.tasks import task_run
 
     res = task_run(
         arguments["command"],
@@ -1739,7 +1834,7 @@ def _handle_tool_task_run(name, arguments, root):
 
 
 def _handle_tool_task_status(name, arguments, root):
-    from research_os.tools.actions.tasks import task_status
+    from research_os.tools.actions.exec.tasks import task_status
 
     res = task_status(
         arguments["task_id"], root, tail_lines=int(arguments.get("tail_lines", 50))
@@ -1750,7 +1845,7 @@ def _handle_tool_task_status(name, arguments, root):
 
 
 def _handle_tool_task_list(name, arguments, root):
-    from research_os.tools.actions.tasks import task_list
+    from research_os.tools.actions.exec.tasks import task_list
 
     res = task_list(root)
     if res.get("status") == "success":
@@ -1759,7 +1854,7 @@ def _handle_tool_task_list(name, arguments, root):
 
 
 def _handle_tool_task_kill(name, arguments, root):
-    from research_os.tools.actions.tasks import task_kill
+    from research_os.tools.actions.exec.tasks import task_kill
 
     res = task_kill(
         arguments["task_id"], root, signal_name=arguments.get("signal_name", "TERM")
@@ -1773,7 +1868,7 @@ def _handle_tool_task_kill(name, arguments, root):
 
 
 def _handle_tool_notebook_exec(name, arguments, root):
-    from research_os.tools.actions.notebook import execute_notebook
+    from research_os.tools.actions.exec.notebook import execute_notebook
 
     res = execute_notebook(
         arguments["notebook_path"],
@@ -1787,7 +1882,7 @@ def _handle_tool_notebook_exec(name, arguments, root):
 
 
 def _handle_tool_rmarkdown_render(name, arguments, root):
-    from research_os.tools.actions.notebook import render_rmarkdown
+    from research_os.tools.actions.exec.notebook import render_rmarkdown
 
     res = render_rmarkdown(
         arguments["doc_path"],
@@ -1804,7 +1899,7 @@ def _handle_tool_rmarkdown_render(name, arguments, root):
 
 
 def _handle_mem_hypothesis_add(name, arguments, root):
-    from research_os.tools.actions.memory import hypothesis_add
+    from research_os.tools.actions.memory.memory import hypothesis_add
 
     res = hypothesis_add(
         arguments["statement"],
@@ -1819,7 +1914,7 @@ def _handle_mem_hypothesis_add(name, arguments, root):
 
 
 def _handle_mem_hypothesis_update(name, arguments, root):
-    from research_os.tools.actions.memory import hypothesis_update
+    from research_os.tools.actions.memory.memory import hypothesis_update
 
     res = hypothesis_update(
         arguments["hypothesis_id"],
@@ -1834,7 +1929,7 @@ def _handle_mem_hypothesis_update(name, arguments, root):
 
 
 def _handle_mem_hypothesis_list(name, arguments, root):
-    from research_os.tools.actions.memory import hypothesis_list
+    from research_os.tools.actions.memory.memory import hypothesis_list
 
     res = hypothesis_list(root)
     if res.get("status") == "success":
@@ -1998,6 +2093,8 @@ _HANDLERS = {
     "tool_search_web": _handle_tool_search,
     "tool_web_scrape": _handle_tool_web_scrape,
     "tool_literature_download": _handle_tool_literature_download,
+    "tool_literature_search_and_save": _handle_tool_literature_search_and_save,
+    "tool_step_literature_list": _handle_tool_step_literature_list,
     # execution
     "tool_python_exec": _handle_tool_python_exec,
     "tool_r_exec": _handle_tool_script_exec,
