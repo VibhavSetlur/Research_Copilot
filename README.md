@@ -1,8 +1,13 @@
 # Research OS
 
+[![tests](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml/badge.svg)](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml)
+[![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://github.com/VibhavSetlur/Research-OS)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **From raw data to publication-ready manuscript — an MCP-native research
 operating system. Works with any AI IDE (Claude Code, OpenCode, Antigravity,
-Cursor, VS Code) without managing any LLM provider keys.**
+Cursor, VS Code, Windsurf, Continue, Aider) without managing any LLM
+provider keys.**
 
 Research OS is a [Model Context Protocol](https://modelcontextprotocol.io)
 server that exposes ~75 research tools and 34 YAML protocols. The AI in your
