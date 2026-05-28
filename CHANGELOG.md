@@ -4,7 +4,18 @@ All notable changes to Research OS are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) ·
 versioning: [SemVer](https://semver.org).
 
-## [Unreleased] — National-lab quality overhaul
+## [2.0.0] — National-lab quality overhaul
+
+Major release. 137 MCP tools (up from 98), 52 protocols (up from 47),
+new grounded-reasoning layer, sub-task pipelines, per-output provenance,
+Playwright dashboard self-tests, expanded visualisation library (25 chart
+kinds), comprehensive quality auditors, pre-registration / SAP workflow,
+HPC integration. State schema migrates automatically on first load.
+
+See the [migration guide](docs/MIGRATION_2_0.md) for the few API names
+that changed and the dropped legacy aliases.
+
+
 
 ### Sub-task pipelines (no more mega-scripts)
 * **`tool_step_pipeline_define / _run / _status / _diagram`** — every

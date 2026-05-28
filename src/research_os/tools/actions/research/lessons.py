@@ -147,22 +147,27 @@ def lessons_consult(
     """
     lessons = _read_lessons(root)
     if scope_filter:
-        lessons = [l for l in lessons if l.get("scope") in scope_filter]
+        lessons = [
+            lesson for lesson in lessons
+            if lesson.get("scope") in scope_filter
+        ]
     task_tags = {t.lower() for t in (tags or [])}
     # Cheap keyword extraction: lowercase word tokens >3 chars.
-    task_keywords = {w for w in re.findall(r"\b[a-z]{4,}\b", task.lower())}
+    task_keywords = set(re.findall(r"\b[a-z]{4,}\b", task.lower()))
     scored = [
-        (_score_lesson(l, task_tags, task_keywords), l) for l in lessons
+        (_score_lesson(lesson, task_tags, task_keywords), lesson)
+        for lesson in lessons
     ]
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = [l for s, l in scored[:top_k] if s > 0]
+    top = [lesson for s, lesson in scored[:top_k] if s > 0]
 
     if top:
         prompt_block = "## Prior lessons\n\n" + "\n".join(
-            f"- **[{l['ts'][:10]} · {l['outcome']}]** "
-            f"{l['reflection'][:200]}"
-            + (f" → {l['recommendation'][:120]}" if l.get('recommendation') else "")
-            for l in top
+            f"- **[{lesson['ts'][:10]} · {lesson['outcome']}]** "
+            f"{lesson['reflection'][:200]}"
+            + (f" → {lesson['recommendation'][:120]}"
+               if lesson.get("recommendation") else "")
+            for lesson in top
         )
     else:
         prompt_block = ""

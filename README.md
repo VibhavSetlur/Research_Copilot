@@ -4,25 +4,66 @@
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://github.com/VibhavSetlur/Research-OS)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**From raw data to publication-ready manuscript — an MCP-native research
-operating system. Works with any AI IDE (Claude Code, OpenCode, Antigravity,
-Cursor, VS Code, Windsurf, Continue, Aider) without managing any LLM
-provider keys.**
+**From raw data to publication-ready manuscript — a research operating 
+system that runs inside your AI IDE. Drop your data,
+ask in plain English, get back reproducible pipelines, publication-grade
+figures with provenance, plain-English captions, and a self-tested
+dashboard you can email.**
 
-Research OS is a [Model Context Protocol](https://modelcontextprotocol.io)
-server exposing 98 research tools and 47 YAML protocols. The AI in your
-IDE plans and reasons; Research OS executes, records state, enforces
-immutability, and walks the AI through the right protocol for the current
-pipeline stage. Every citation in every final output is verified online —
-no hallucinations leak through.
+Built for researchers of any experience level. The AI does the
+typing; Research OS makes sure the typing is rigorous — every figure
+carries its provenance sidecar, every paper number traces back to a
+workspace output, every methodological decision cites the evidence
+that informed it.
+
+Works with any MCP-capable IDE (Claude Code, OpenCode, Antigravity,
+Cursor, VS Code, Windsurf, Continue, Aider). Research OS doesn't
+manage LLM provider keys — your IDE owns that.
+
+---
+
+## What it does in one screen
+
+* **Sub-task pipelines, not mega-scripts.** Every analytical step
+  declares a `pipeline.yaml` of small, focused nodes (`ingest →
+  validate → clean → fit → diagnose → visualize → report`). Topologically
+  ordered, content-hash cached — edits re-run only the affected chain.
+* **Provenance on every output.** Each figure / table / model emits a
+  `<name>.prov.json` sidecar (PROV-O compatible) recording the script,
+  input hashes, parameters, RNG seed, library versions, wall time. The
+  audit gate blocks synthesis below 50% provenance coverage.
+* **25 publication-grade figure kinds via one tool call.** ROC, PR,
+  calibration, QQ, residual diagnostics (4-panel), partial dependence,
+  forest, dot-and-whisker, ridgeline, raincloud, posterior (HDI + ROPE),
+  variable importance, funnel, alluvial, hierarchical heatmap, CONSORT
+  flow — all colour-blind safe, ≥300 DPI, dual PNG + SVG, with technical
+  + plain-English captions.
+* **Grounded reasoning (ReAct + CoVe + PROV-O + Reflexion).** Every
+  decision binds to the evidence that informed it (papers / context
+  files / datasets / web). Chain-of-Verification per claim. Lessons
+  carry across sessions.
+* **Quality gates that block bad synthesis.** Code quality (ruff +
+  AST), prose quality (hedging + reporting-standard coverage), claim
+  grounding (paper numbers must trace to outputs — catches AI
+  hallucinations), pre-registration drift, per-step completeness.
+* **Self-tested dashboards.** Auto-generated Playwright suite covers
+  TOC scroll-spy, theme toggle, sortable tables, lightbox figures,
+  print stylesheet, ARIA snapshot, axe-core WCAG, visual regression.
+  The AI iterates until tests pass.
+* **HPC ready.** SLURM submit / status / fetch. Per-step Apptainer
+  recipes + reproducer `entrypoint.sh`.
+
+137 MCP tools, 52 YAML protocols, full hierarchical L1→L2→L3 routing
+keeps every session boot under ~1.2K tokens.
 
 ---
 
 ## Quick start (≤60 seconds)
 
 ```bash
-pip install "research-os[ci] @ git+https://github.com/VibhavSetlur/Research-OS.git"
-# (or [all] for shap / xgboost / jupyter and full search providers)
+pip install "research-os @ git+https://github.com/VibhavSetlur/Research-OS.git"
+# (extras: [viz] for matplotlib+plotly, [audit] for assumption diagnostics,
+#          [literature] for richer search providers, [all] for everything)
 
 mkdir my-project && cd my-project
 research-os init                     # scaffolds + drops MCP config for every IDE
@@ -33,11 +74,15 @@ papers into `inputs/literature/`, notes into `inputs/context/`. Then say:
 
 > *"fill out the intake"* — AI reads everything, proposes research question + hypotheses + domain.
 
-> *"what should I do next?"* — iterative planning: literature + tools + 2-3 options.
+> *"what should I do next?"* — iterative planning with grounded reasoning.
 
-> *"run a baseline EDA"* — creates `workspace/01_baseline_eda/`, atomic versioned scripts, conclusions.
+> *"run a baseline EDA as a sub-task pipeline"* — creates `workspace/01_baseline_eda/`, defines the pipeline.yaml, executes each node with provenance.
 
-> *"write the paper for a journal"* — IMRAD synthesis with numbered figures + verified citations only.
+> *"freeze the analysis plan before I touch the data"* — pre-registers the SAP; deviations diff at synthesis.
+
+> *"build the dashboard and run the playwright tests"* — assembles the dashboard, generates the test suite, runs it, iterates.
+
+> *"write the paper for a journal"* — IMRAD synthesis with verified citations + claim grounding (no hallucinated numbers).
 
 The CLI is two commands by design:
 
@@ -71,11 +116,24 @@ the install + IDE wiring without needing one.
 | AI burns tokens picking the wrong protocol | `tool_route` does a hierarchical L1→L2→L3 walk over `_router_index.yaml` and returns the answer in ~250 tokens. `sys_protocol_get format='summary'` loads a 300-token outline. A typical session boot costs ~1.2K tokens (vs ~5K under the old "load everything" pattern). |
 | AI one-shots complex prompts on smaller models | `tool_route` persists an `active_plan` for any complex prompt. `tool_plan_turn` slices it into batches sized to `model_profile` (1 / 3 / 6 steps per turn). When the plan won't fit one chat, it recommends a handoff + fresh chat. |
 | Same project, different AI tomorrow | `sys_session_handoff` snapshots a checkpoint + writes a "fresh AI can resume cold" doc. `tool_session_resume` reconstructs intent + status in one call. |
-| 98 tools is too many for the AI to triage every turn | `tool_route` returns an `active_tools` shortlist (~10-15 tools = essentials + the chosen protocol's decomposition). `sys_active_tools(protocol)` queries the same scope directly. AI focuses on the working set instead of every tool every turn. |
+| 137 tools is too many for the AI to triage every turn | `tool_route` returns an `active_tools` shortlist (~10-15 tools = essentials + the chosen protocol's decomposition). `sys_active_tools(protocol)` queries the same scope directly. AI focuses on the working set instead of every tool every turn. |
 | Need a visual of how steps depend on each other | `tool_workflow_dag` walks each numbered step's `data/input` symlink to derive cross-step edges, writes `docs/workflow_dag.mermaid` (+ PNG if `mmdc` is installed). Auto-refreshed on every `sys_path_create` / `sys_path_abandon`. |
 | Step results break years later when the global env drifts | `tool_step_env_lock` pins `requirements.txt` + `python_version.txt` (+ optional `conda.yaml` + per-step `Dockerfile`) inside `workspace/<NN>/environment/`. Each step is self-contained. |
 | AI runs runaway / unsafe shell commands on shared HPC | `tool_task_run` validates argv[0] against a configurable allowlist, refuses shell metacharacters by default, applies `setrlimit` for CPU / RSS / file-size, and audits every accepted task to `workspace/logs/task_audit.log`. |
 | API rate limits during heavy synthesis | Search providers cache results under `.os_state/cache/search/` with a 24h TTL (`runtime.cache_ttl_seconds`). 429s trigger exponential backoff honouring `Retry-After`. `tool_cache_clear` wipes per-provider or older-than-N-days. |
+| AI hallucinates a number in the paper | `tool_audit_claims` extracts every numeric claim from `synthesis/paper.md` and verifies each appears verbatim (or within 1% tolerance) in some workspace CSV / JSON / MD / TXT. BLOCKS `tool_synthesize` until cleared. |
+| AI commits a methodological choice without showing its work | `tool_grounding_register` binds each decision to PROV-O sources (papers, context files, datasets, web). `tool_grounding_verify` audits every decision in `analysis.md`; un-grounded decisions become a master-audit blocker. |
+| Step output appears six months later — where did it come from? | `tool_figure_create` / the pipeline runner / `tool_sensitivity_run` / Papermill `tool_notebook_exec` each drop a `<file>.prov.json` sidecar recording script + git SHA + input hashes + params + RNG seed + library versions + wall time. |
+| Dashboard CSS / JS regressions go unnoticed | `tool_dashboard_test_generate` writes a Playwright suite covering scroll-spy, theme toggle, sortable tables, lightbox, print stylesheet, ARIA snapshot, axe-core WCAG, visual regression. `tool_dashboard_test_run` returns structured failures + `trace.zip` paths for time-travel debugging. |
+| Same analysis under different reasonable choices flips the result | `tool_sensitivity_define` / `tool_sensitivity_run` enumerate a Cartesian grid of covariate sets / exclusion rules / model families and render a Steegen-style **specification curve**. Distinguishes ROBUST findings from FRAGILE ones. |
+| Null findings end up in the file drawer | `tool_null_findings_report` assembles `synthesis/null_findings.md` from refuted hypotheses, underpowered tests, and dead-end paths — a publishable companion document. Routes via the new `synthesis/synthesis_null_findings` protocol. |
+| Pre-registered analyses drift from the SAP | `tool_preregister_freeze` content-hashes the SAP before data. `tool_preregister_diff` lists every deviation at synthesis time so the Discussion can acknowledge them honestly. |
+| Need to hand off to a human collaborator | `guidance/collaboration_handoff` writes a `COLLABORATOR.md` in their vocabulary, packages a share-safe zip, and verifies reproduction first. |
+| Need to respond to peer review | `guidance/peer_review_response` parses the reviewer report, classifies each comment (accept / clarify / push back), routes new experiments via `analysis_plan`, drafts the rebuttal letter with line refs. |
+| Submitting to an HPC cluster | `tool_slurm_submit` generates an `sbatch` script from `researcher_config.runtime.cluster_defaults`, records the job id; `tool_slurm_status` polls; `tool_slurm_fetch` waits + pulls logs back into the step folder. |
+| Multi-script step gets reorganised across many files | `tool_step_pipeline_define` writes a 7-node `pipeline.yaml` (ingest → validate → clean → fit → diagnose → visualize → report). `tool_step_pipeline_run` walks the DAG, caches by content hash, drops a `.pipeline_run/run_<ts>.json` audit trail. |
+| Reviewer-style internal critique before submission | `tool_redteam_review` writes a hostile-reviewer scaffold (M1-M5 major, threats to validity, devil's-advocate questions) under three personas (methodological skeptic / statistical referee / sympathetic peer). |
+| Carry lessons across sessions | `tool_lessons_record` captures what worked / didn't; `tool_lessons_consult` retrieves the top-K relevant prior lessons + returns a prompt block ready to prepend to the next system prompt. |
 
 ---
 
@@ -348,7 +406,7 @@ protocols + tools exist on disk.
 * **98 MCP tools** across `sys_*`, `tool_*`, `mem_*` namespaces. Dot
   notation (`sys.state.get`) and legacy names auto-rewrite. Run
   `python scripts/preflight.py` after install to verify everything is wired.
-* **47 YAML protocols** — the AI loads the right one based on what you ask.
+* **52 YAML protocols** — the AI loads the right one based on what you ask.
   Each declares an explicit `quality_bar` so output stays publication-grade
   even on smaller models. Coverage spans methodology (RCTs, clinical
   trials, observational causal, ML, meta-analysis, survey psychometrics,

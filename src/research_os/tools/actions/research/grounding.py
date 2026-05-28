@@ -384,10 +384,9 @@ def grounding_verify(root: Path) -> dict[str, Any]:
         }
 
     grounding = _read_jsonl(_grounding_log(root))
-    # Index grounding records by both decision_id and by claim-prefix
-    # so the AI can ground a decision by either ID or by re-quoting
-    # the rationale.
-    by_id = {g.get("decision_id"): g for g in grounding}
+    # Index grounding records by claim-prefix so the AI can ground a
+    # decision by re-quoting the rationale (decision_id matching is
+    # done inline below).
     grounded_claims = {
         g.get("claim", "")[:60].lower() for g in grounding
     }

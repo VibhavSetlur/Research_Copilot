@@ -1,3 +1,8 @@
-"""Research OS — An MCP-native operating system for reproducible, citation-verified research."""
+"""Research OS — MCP server for reproducible, grounded, citation-verified research.
 
-__version__ = "1.0.0"
+Built for any-level researcher: drop your data, ask the AI in natural
+language, and get publication-grade analyses with provenance sidecars,
+plain-English captions, and a self-tested dashboard you can email.
+"""
+
+__version__ = "2.0.0"

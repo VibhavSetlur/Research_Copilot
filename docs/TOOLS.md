@@ -1,7 +1,10 @@
 # Tool Catalog
 
-**98 MCP tools** across three namespaces. Names use underscores; dot
-notation (`sys.state.get`) and legacy names (`sys_guidance_get`) auto-rewrite.
+**137 MCP tools** across three namespaces (`sys_*` / `tool_*` / `mem_*`).
+Names use underscores; dot notation (`sys.state.get`) and a small set
+of legacy aliases (e.g. `tool_audit_statistical_power` →
+`tool_audit_power`) auto-rewrite. `sys_tool_describe(name)` returns the
+long-form description of any tool without re-listing the whole catalog.
 
 For most users this is a quick lookup. For *when* to use a tool, see
 [PROTOCOLS.md](PROTOCOLS.md) — protocols string tools together to do
@@ -200,6 +203,61 @@ the router picks one for you.
 
 **Default `list_tools` payload is ~1K tokens** (down from ~3K) — each
 tool ships its `short` field, full description available on demand.
+
+---
+
+## What's new in 2.0 — quick reference
+
+**Sub-task pipelines** (replaces "one mega-script per step")
+* `tool_step_pipeline_define / _run / _status / _diagram` — declare a
+  multi-node `pipeline.yaml`; runner topologically orders + content-hash
+  caches; emits a per-output `.prov.json` sidecar.
+
+**Provenance + grounding**
+* `tool_thought_log` / `tool_thought_trace` — ReAct trace.
+* `tool_grounding_register` / `tool_ground_from_context` /
+  `tool_grounding_verify` — PROV-O decision-to-evidence binding +
+  audit gate.
+* `tool_claim_verify` — Chain-of-Verification per claim.
+* `tool_lessons_record` / `tool_lessons_consult` — Reflexion-style
+  lessons across sessions.
+
+**Visualisation (25 chart kinds)**
+* `tool_figure_create kind=<roc|pr|calibration|qq|residual_diagnostics|
+  partial_dependence|dot_whisker|ridgeline|raincloud|hexbin|slope|
+  posterior|var_importance|funnel|alluvial|hierarchical_heatmap|
+  consort_flow|...>` — auto colour-blind palette, ≥300 DPI, dual
+  PNG + SVG, four sidecars (caption, summary, prov, optional HTML).
+* `tool_figure_caption_synthesise` — plain-English `.summary.md`.
+* `tool_audit_figure_full` — strict figure audit (DPI, caption,
+  summary, SVG companion, aspect ratio).
+* `tool_figure_palette` — Okabe-Ito / viridis / PuOr palettes.
+
+**Quality auditors**
+* `tool_audit_quality_full` — runs every gate in one call.
+* `tool_audit_code_quality` — ruff + AST complexity + smells.
+* `tool_audit_prose` — hedging + vague quantifiers + reporting
+  standards.
+* `tool_audit_claims` — every paper number traces to outputs.
+* `tool_audit_evalue` — VanderWeele E-value sensitivity.
+* `tool_audit_step_completeness` — focal figure + sidecars +
+  conclusions per step.
+
+**Pre-registration, multi-verse, red-team, null findings**
+* `tool_preregister_freeze` / `tool_preregister_diff`
+* `tool_sensitivity_define` / `tool_sensitivity_run` (specification curve)
+* `tool_redteam_review` / `tool_response_to_reviewers`
+* `tool_null_findings_report`
+
+**HPC / SLURM**
+* `tool_slurm_submit / _status / _fetch / _list`
+
+**Self-tested dashboards (Playwright)**
+* `tool_dashboard_test_generate` / `tool_dashboard_test_run`
+
+**Plan creation**
+* `tool_plan_step_grounded` — every sub-task has explicit
+  Thought / Required-grounding / Action / Verification slots.
 
 ---
 

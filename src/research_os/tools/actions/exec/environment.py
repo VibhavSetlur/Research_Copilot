@@ -244,7 +244,7 @@ def step_env_lock(
         if write_dockerfile:
             lines = [
                 f"# Auto-generated per-step Dockerfile for {step_dir.name}",
-                f"# Reproduces every output via the per-step entrypoint.sh.",
+                "# Reproduces every output via the per-step entrypoint.sh.",
                 f"FROM python:{py_version.rsplit('.', 1)[0]}-slim",
                 "ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 \\",
                 "    PYTHONUNBUFFERED=1 LC_ALL=C.UTF-8 LANG=C.UTF-8",
@@ -282,7 +282,7 @@ def step_env_lock(
                 "    export LANG=C.UTF-8",
                 "",
                 "%runscript",
-                f"    cd /step && exec bash environment/entrypoint.sh \"$@\"",
+                "    cd /step && exec bash environment/entrypoint.sh \"$@\"",
                 "",
                 "%labels",
                 f"    StepID {step_dir.name}",

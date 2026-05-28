@@ -348,14 +348,13 @@ def _render_specification_curve(
         sharex=True,
     )
     ax_top, ax_bot = axes
-    xs = list(range(n))
     est = [t[1] for t in estimates]
     lo  = [t[2] for t in estimates]
     hi  = [t[3] for t in estimates]
     # Dots + CI.
-    for i, (e, l, h) in enumerate(zip(est, lo, hi, strict=False)):
-        if l is not None and h is not None:
-            ax_top.plot([i, i], [l, h], color="#cbd5e1", lw=0.7, zorder=1)
+    for i, (e, lo_v, hi_v) in enumerate(zip(est, lo, hi, strict=False)):
+        if lo_v is not None and hi_v is not None:
+            ax_top.plot([i, i], [lo_v, hi_v], color="#cbd5e1", lw=0.7, zorder=1)
         ax_top.scatter([i], [e],
                        color="#2C5282" if e >= 0 else "#9b2c2c",
                        s=15, zorder=2, alpha=0.85)

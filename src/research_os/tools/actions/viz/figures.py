@@ -1051,8 +1051,10 @@ def _render_alluvial(
     tgt_cursor = {t: tgt_pos[t][0] for t in targets}
     for i, ((s, t), v) in enumerate(sorted(flows.items())):
         h = v / total
-        y_s = src_cursor[s]; src_cursor[s] += h
-        y_t = tgt_cursor[t]; tgt_cursor[t] += h
+        y_s = src_cursor[s]
+        src_cursor[s] += h
+        y_t = tgt_cursor[t]
+        tgt_cursor[t] += h
         # Bezier-ish: 4 control points, fill the band between top + bottom curves.
         N = 50
         xs = np.linspace(0, 1, N)

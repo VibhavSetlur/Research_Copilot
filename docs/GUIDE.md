@@ -198,7 +198,7 @@ src/research_os/
 ├── cli.py                            # `init` + `start`
 ├── project_ops.py                    # scaffolding, state, mermaid, intake regen
 ├── config.py / errors.py / __init__.py
-├── protocols/                        # 47 YAML protocols + _router_index.yaml
+├── protocols/                        # 52 YAML protocols + _router_index.yaml
 ├── state/                            # ResearchLedger
 ├── utils/                            # asset manager, common helpers
 └── tools/

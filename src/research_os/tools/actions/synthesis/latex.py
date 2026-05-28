@@ -228,7 +228,7 @@ def create_poster(
     # Limitations
     limitations = spec.get("limitations") or []
     limitations_items = "\n".join(
-        f"        \\item {_poster_tex_escape(l)}" for l in limitations[:4]
+        f"        \\item {_poster_tex_escape(item)}" for item in limitations[:4]
     )
 
     # Figure blocks — half-width centered, captions truncated to one line

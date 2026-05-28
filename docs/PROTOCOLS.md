@@ -1,6 +1,6 @@
 # Protocol Reference
 
-Research OS ships **47 YAML protocols** organised into nine categories.
+Research OS ships **52 YAML protocols** organised into nine categories.
 Each protocol is a sequence of steps the AI should follow, with explicit
 `expected_outputs`, a `next_protocol` pointer, and a `quality_bar`. All
 are indexed in `src/research_os/protocols/_router_index.yaml` for
@@ -66,16 +66,18 @@ AND on-disk artifacts so migrated projects resume cleanly.
 | `guidance/session_boot` | session / boot | "start session", "hi", "begin" |
 | `guidance/session_resume` | session / resume | "pick up", "where were we", "another session" |
 | `guidance/chat_handoff` | session / handoff | "wrap up", "going to lunch", "switch chat" |
+| `guidance/collaboration_handoff` | session / collaborator | "send to a collaborator", "another lab is taking this" |
 | `guidance/autopilot` | session / autopilot | "autopilot", "you drive", "wake me up" |
 | `guidance/casual_exploration` | plan / casual | "just poke", "exploratory only", "sanity check" |
 | `guidance/quick_paper_review` | review / quick | "tear apart", "tough reviewer", "quick review" |
+| `guidance/code_review` | review / code | "review my code", "vet this script", "is this correct" |
+| `guidance/peer_review_response` | review / respond | "respond to reviewers", "draft a rebuttal", "revise and resubmit" |
 | `guidance/project_startup` | discover / intake | "fill the intake", "what do I have" |
 | `guidance/analysis_plan` | execute / new_experiment | "run a baseline", "next experiment", "fit a model" |
 | `guidance/iterative_planning` | plan / next_step | "what should I do next", "I'm stuck" |
 | `guidance/dead_end_routing` | execute / abandon | "dead end", "abandon", "not working" |
 | `guidance/hypothesis_tracking` | memory / hypothesis | "add hypothesis", "list hypotheses" |
 | `guidance/glossary_update` | memory / glossary | "add to glossary", "define term" |
-| `guidance/writing_standards` | synthesize / writing | "writing standard", "reporting standard" |
 
 ### Domain — classification + design
 
@@ -86,10 +88,12 @@ AND on-disk artifacts so migrated projects resume cleanly.
 
 | Protocol | When |
 |---|---|
-| `methodology/methodology_selection` | Top-level method picker |
-| `methodology/research_methods` | Generic survey when unsure |
+| `methodology/methodology_selection` | Top-level method picker (absorbs the lightweight "lookup mode") |
+| `methodology/preregistration` | Freeze the SAP + hypotheses BEFORE data analysis |
 | `methodology/causal_inference_deep` | DAG + dowhy / IPW / DiD / RDD |
 | `methodology/machine_learning` | TRIPOD-AI ML pipeline |
+| `methodology/bayesian_analysis` | Priors → posterior → diagnostics → checks → sensitivity |
+| `methodology/timeseries_analysis` | Time-aware analysis + forecasting (ARIMA/ETS/state-space/ML) |
 | `methodology/clinical_trials` | CONSORT-compliant RCT |
 | `methodology/meta_analysis` | Random/fixed effects + heterogeneity |
 | `methodology/survey_psychometrics` | EFA/CFA + reliability + IRT |
@@ -125,12 +129,16 @@ Each is venue/audience-tailored and enforces quality minimums:
   bands, figure DPI ≥300, citation cap 40, verified online.
 * `synthesis/synthesis_abstract` — structured (journal/preprint) vs
   unstructured (conference) vs grant style. Cap 3 citations.
-* `synthesis/synthesis_poster` — tikzposter, audience profiles
-  (academic_conference / symposium / industry / teaching). ≥2 figures
-  ≥300 DPI, ≤6 citations.
+* `synthesis/synthesis_poster` — tikzposter, billboard mode (Morrison
+  Better Poster) + classic IMRAD. Audience profiles (academic_conference
+  / symposium / industry / teaching). ≥2 figures ≥300 DPI, ≤6 citations.
 * `synthesis/synthesis_dashboard` — single-file HTML, audience profiles
   (academic / executive / technical / teaching). Sortable tables,
-  lightbox, light/dark, print stylesheet.
+  lightbox, light/dark, print stylesheet, evidence-traceability matrix,
+  outstanding-artefacts panel.
+* `synthesis/synthesis_null_findings` — publishable companion for
+  refuted / inconclusive / underpowered / abandoned findings — fights
+  the file-drawer problem.
 * `synthesis/synthesis_grant` — funder profiles
   (nih_r01 / nsf / wellcome / erc / doe / industry). Specific Aims first.
 * `synthesis/synthesis_report` — audience profiles
@@ -138,10 +146,14 @@ Each is venue/audience-tailored and enforces quality minimums:
 
 ### Audit + reproducibility
 
-* `audit/audit_and_validation` — citations, assumptions, figures, causal
-  language, code lint. Aggregates to `workspace/logs/audit_report.md`.
-* `reproducibility/reproducibility` — per-experiment env snapshot, seed
-  verification, output hashing, Dockerfile generation.
+* `audit/audit_and_validation` — master quality audit
+  (`tool_audit_quality_full`): step completeness, code quality, prose
+  quality, claim grounding, pre-registration diff, grounding
+  verification. Single call, every gate. Aggregates to
+  `workspace/logs/audit_master.md`.
+* `reproducibility/reproducibility` — per-step env snapshot, seed
+  verification, output hashing, Apptainer + Dockerfile + entrypoint
+  generation.
 
 ### Visualization
 

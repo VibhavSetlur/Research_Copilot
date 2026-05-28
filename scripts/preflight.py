@@ -178,12 +178,16 @@ def check_dispatcher_aliases():
     from research_os.server import _resolve_tool_name
 
     cases = {
+        # Dot-notation rewrite is generic.
         "sys.state.get": "sys_state_get",
-        "sys_guidance_get": "sys_protocol_get",  # legacy alias
+        # The five live aliases retained in the v2.0 alias table.
+        "tool_audit_figure_quality": "tool_audit_figure_full",
         "tool_audit_statistical_power": "tool_audit_power",
-        "sys_md_validate": "sys_file_validate_md",
+        "sys_state_summary": "sys_state_get",
         "tool_log_decision": "mem_decision_log",
-        "sys_state_get": "sys_state_get",  # passthrough
+        "view_workspace_tree": "sys_workspace_tree",
+        # Passthrough — name already canonical.
+        "sys_state_get": "sys_state_get",
     }
     bad: list[str] = []
     for given, expected in cases.items():
