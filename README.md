@@ -1,6 +1,6 @@
 # Research OS
 
-[![tests](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml/badge.svg)](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml)
+[![tests](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/VibhavSetlur/Research-OS/actions/workflows/test.yml)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://github.com/VibhavSetlur/Research-OS)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
