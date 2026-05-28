@@ -65,9 +65,9 @@ def test_save_state_writes_os_state_md(tmp_path):
 
 def test_ledger_update_persists(tmp_path):
     ledger = ResearchLedger(tmp_path / ".os_state" / "state_ledger.json")
-    ledger.update(phase="execution", step=2)
+    ledger.update(pipeline_stage="execution", step=2)
     s = ledger.get()
-    assert s["phase"] == "execution"
+    assert s["pipeline_stage"] == "execution"
     assert s["step"] == 2
 
 
@@ -79,6 +79,30 @@ def test_ledger_phase_lifecycle(tmp_path):
     s = ledger.get()
     assert s["checkpoints"]["analysis"] == "complete"
     assert s["resumable_from"] == "analysis"
+
+
+def test_ledger_migrates_legacy_state(tmp_path):
+    """Schema v4.0 migration: legacy fields normalised on load."""
+    import json
+
+    state_path = tmp_path / ".os_state" / "state_ledger.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps({
+        "project": "Legacy",
+        "phase": "analysis",
+        "run_id": "old-uuid",
+        "token_budget": {"used": 0},
+        "paths": {"main": {"input_data_hashes": {"x": "y"}, "status": "active"}},
+    }))
+    ledger = ResearchLedger(state_path)
+    s = ledger.get()
+    assert "phase" not in s
+    assert "project" not in s
+    assert "token_budget" not in s
+    assert s["project_name"] == "Legacy"
+    assert s["pipeline_stage"] == "analysis"
+    assert s["project_id"] == "old-uuid"
+    assert "input_data_hashes" not in s["paths"]["main"]
 
 
 def test_ledger_hypothesis_lifecycle(tmp_path):

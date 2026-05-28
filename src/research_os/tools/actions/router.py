@@ -107,11 +107,51 @@ def sys_boot(root: Path) -> dict[str, Any]:
         # Optional-dep inventory (imported lazily — server.py owns the list).
         dep_inv = _dep_inventory()
 
+        # Compact hypothesis view — short statements + status, never the
+        # full evidence list (that bloats sys_boot when steps are deep).
+        hyps_short = [
+            {
+                "id": h.get("id"),
+                "status": h.get("status", "testing"),
+                "statement": (h.get("statement") or "")[:120],
+            }
+            for h in (state.get("active_hypotheses") or [])
+        ]
+
+        # Paths summary — id + status + the per-step focal-figure flag
+        # so the AI can spot which steps still need a figure / caption
+        # before final synthesis.
+        try:
+            from research_os.tools.actions.state.path import list_paths
+            from research_os.tools.actions.viz import step_figure_inventory
+
+            paths_summary = []
+            for p in (list_paths(root).get("paths") or []):
+                pid = p.get("path_id")
+                missing_focal = False
+                missing_caps = 0
+                missing_sums = 0
+                try:
+                    inv = step_figure_inventory(pid, root)
+                    missing_focal = bool(inv.get("missing_focal_figure"))
+                    missing_caps = len(inv.get("missing_captions", []))
+                    missing_sums = len(inv.get("missing_summaries", []))
+                except Exception:
+                    pass
+                paths_summary.append({
+                    "id": pid,
+                    "status": p.get("status"),
+                    "missing_focal_figure": missing_focal,
+                    "missing_captions": missing_caps,
+                    "missing_summaries": missing_sums,
+                })
+        except Exception:
+            paths_summary = []
+
         return {
             "status": "success",
-            "project_name": state.get("project_name")
-            or state.get("project", "(unnamed)"),
-            "pipeline_stage": state.get("pipeline_stage", state.get("phase", "init")),
+            "project_name": state.get("project_name", "(unnamed)"),
+            "pipeline_stage": state.get("pipeline_stage", "init"),
             "current_path": state.get("current_path", "main"),
             "domain": cfg.get("domain", ""),
             "research_question_set": bool(
@@ -126,7 +166,8 @@ def sys_boot(root: Path) -> dict[str, Any]:
             "long_running_threshold": cfg.get("runtime", {}).get(
                 "long_running_threshold_seconds", 60
             ),
-            "active_hypotheses": state.get("active_hypotheses", []),
+            "active_hypotheses": hyps_short,
+            "paths_summary": paths_summary,
             "history_tail": entries[-3:],
             "last_protocol_entry": last_entry,
             "pause_classification": pause,
@@ -753,18 +794,36 @@ def _match_shortcut(prompt_norm: str, shortcuts: dict) -> dict | None:
 
 
 def _is_complex(prompt_norm: str) -> bool:
+    """Decide whether a researcher prompt warrants persisted multi-step plan.
+
+    Tightened in v4.0:
+      * Word-count threshold lowered from 25 → 18 (most "fit a model and
+        write up the results" prompts fall just below 25).
+      * Verb threshold lowered from ≥3 → ≥2 — anything with two distinct
+        verbs should be planned.
+      * Explicit deliverable-side phrases ("full project", "end to end",
+        "from scratch", "everything", "wake me when") always trigger.
+    """
     word_count = len(prompt_norm.split())
-    if word_count > 25:
+    if word_count > 18:
         return True
     if any(tok in prompt_norm for tok in _COMPLEXITY_TOKENS):
+        return True
+    deliverable_phrases = (
+        "full project", "end to end", "end-to-end", "from scratch",
+        "do everything", "do it all", "wake me when", "go autopilot",
+        "ship it", "the whole thing",
+    )
+    if any(p in prompt_norm for p in deliverable_phrases):
         return True
     # multiple verb-style asks
     verbs = re.findall(
         r"\b(run|write|fit|audit|check|build|draft|make|render|"
-        r"compile|verify|publish|generate|train|analyse|analyze)\b",
+        r"compile|verify|publish|generate|train|analyse|analyze|"
+        r"refactor|review|design|model|simulate)\b",
         prompt_norm,
     )
-    return len(verbs) >= 3
+    return len(verbs) >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -811,12 +870,20 @@ def _load_active_plan(root: Path) -> dict | None:
         return None
 
 
-def advance_plan(root: Path) -> dict[str, Any]:
+def advance_plan(root: Path, *, override_gate: bool = False) -> dict[str, Any]:
     """Mark the current step of the active plan complete + move to next.
 
     The AI calls this after finishing each decomposed step. When the plan
     runs out of steps the file is moved to ``.os_state/handoffs/`` so it's
     retrievable but stops blocking future routes.
+
+    Anti-one-shot gate: if the step we're about to advance INTO is a
+    final-deliverable tool (``tool_synthesize``, ``tool_dashboard_create``,
+    ``tool_poster_create``, ``tool_latex_compile``), the per-step
+    completeness audit runs first. If it returns BLOCKERS, advance_plan
+    refuses unless the caller passes ``override_gate=true`` (or sets the
+    plan's ``override_completeness_gate`` flag, useful when the researcher
+    explicitly says "just give me the partial dashboard").
     """
     plan = _load_active_plan(root)
     if not plan:
@@ -835,8 +902,43 @@ def advance_plan(root: Path) -> dict[str, Any]:
         except OSError:
             path.write_text(json.dumps(plan, indent=2, default=str))
         return {"status": "success", "message": "Plan completed and archived."}
-    _active_plan_path(root).write_text(json.dumps(plan, indent=2, default=str))
     next_step = decomposition[plan["current_step"] - 1]
+
+    # ---- Anti-one-shot deliverable gate ----
+    next_tool = (
+        next_step.get("tool", "") if isinstance(next_step, dict) else ""
+    )
+    DELIVERABLE_TOOLS = {
+        "tool_synthesize", "tool_dashboard_create",
+        "tool_poster_create", "tool_latex_compile",
+    }
+    if (next_tool in DELIVERABLE_TOOLS
+            and not override_gate
+            and not plan.get("override_completeness_gate")):
+        try:
+            from research_os.tools.actions.audit.audit import audit_step_completeness
+
+            gate = audit_step_completeness(root)
+            if gate.get("status") == "error":
+                return {
+                    "status": "blocked",
+                    "current_step": plan["current_step"] - 1,
+                    "next_step": next_step,
+                    "blockers": gate.get("blockers", []),
+                    "advice": (
+                        f"Cannot advance to `{next_tool}` — per-step "
+                        "completeness audit found "
+                        f"{len(gate.get('blockers', []))} blocker(s). "
+                        "Resolve them or call advance_plan with "
+                        "override_gate=true if the researcher "
+                        "explicitly authorised a partial deliverable. "
+                        f"Full report: {gate.get('report_path')}"
+                    ),
+                }
+        except Exception as e:
+            logger.warning("plan_advance gate check failed: %s", e)
+
+    _active_plan_path(root).write_text(json.dumps(plan, indent=2, default=str))
     return {
         "status": "success",
         "current_step": plan["current_step"],

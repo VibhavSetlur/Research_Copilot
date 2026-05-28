@@ -1,43 +1,112 @@
 id: figure_guidelines
 name: Figure Guidelines
-version: '4.0.0'
+version: '6.0.0'
 schema_version: '2.0'
-description: Rules for picking the right chart type and styling figures for publication.
+description: |
+  Rules for picking the right chart type, producing publication-quality
+  figures via the built-in viz toolkit, writing technical AND plain-
+  English captions, and ensuring every analysis step has at least one
+  focal figure with both caption sidecars. Server-enforced via
+  tool_audit_step_completeness.
+
+mandatory_per_step_figure:
+  rule: |
+    Every numbered analysis step MUST produce at least one focal figure
+    saved to workspace/<step>/outputs/figures/<step_number>_<descriptor>.png
+    even if the step's role is data plumbing or methodology selection.
+    A step with no visual representation is hard to follow, hard to
+    review, and gets skipped in dashboards. tool_audit_step_completeness
+    flags this as a BLOCKER that gates tool_synthesize.
+  rationale: |
+    Researchers follow analysis visually before they follow it
+    numerically. A focal figure makes each step legible at a glance and
+    gives the synthesis dashboard a canonical artefact to surface.
+  conventions:
+    naming: "<NN>_<short_descriptor>.png  e.g. 03_attitude_by_demographic.png"
+    dpi: 300 (auto via tool_figure_create)
+    background: white
+    formats: PNG (raster) + SVG (vector) — both auto-emitted by tool_figure_create
+    caption_sidecar: required — <name>.caption.md (technical)
+    summary_sidecar: required — <name>.summary.md (plain-English; auto-synthesised
+                     by tool_figure_caption_synthesise or tool_path_finalize)
+
+preferred_tool:
+  rule: |
+    Prefer tool_figure_create over hand-rolled matplotlib for any figure
+    that will appear in the dashboard, paper, or poster.
+  why: |
+    tool_figure_create automatically applies the SciencePlots stylesheet
+    (or built-in equivalent), the Okabe-Ito / viridis / PuOr palette,
+    axis units, n annotations, and 95% CI bands on regression overlays —
+    enforcing the publication bar in one call. It also writes the SVG
+    companion and both caption sidecars, so the figure clears
+    tool_audit_step_completeness on first try.
+  signature: |
+    tool_figure_create step_id="<NN_slug>" name="<descriptor>" kind=<chart_kind>
+      data="<path or list>" x="<col>" y="<col>"
+      caption="<technical>" plain_english="<accessible>"
+      [palette=qualitative|sequential|diverging|accent]
+      [style=default|nature|ieee|notebook]
+      [interactive=true]  # also writes <name>.html via plotly when installed
 
 chart_chooser:
   comparison:
-    over_time: line chart
-    categories_few: vertical bar
-    categories_many: horizontal bar
+    over_time: line       # tool_figure_create kind=line
+    categories_few: bar   # tool_figure_create kind=bar
+    categories_many: barh # tool_figure_create kind=barh
   relationship:
-    two_continuous: scatter (+ optional regression line w/ CI band)
-    three_continuous: bubble OR small multiples
-    matrix: heatmap (clustered if appropriate)
+    two_continuous: scatter        # kind=scatter; pass regression=true for OLS+CI
+    three_continuous: bubble OR small multiples (use plotnine backend)
+    matrix: heatmap                # kind=heatmap; needs x, y, z columns
   distribution:
-    single_variable: histogram + KDE
-    multiple_variables: violin OR box+strip
+    single_variable: hist          # kind=hist; KDE overlay automatic
+    multiple_variables: violin     # kind=violin (or box for compact)
     paired: ridgeline OR small multiples
   meta_analysis:
-    effect_sizes: forest plot (CI bars)
+    effect_sizes: forest           # kind=forest; pass label_col, effect_col, ci_lo_col, ci_hi_col via extra
     publication_bias: funnel plot
 
 formatting:
   palettes:
     sequential: viridis
     diverging: PuOr / RdBu_r
-    qualitative: Okabe-Ito (colorblind safe)
+    qualitative: Okabe-Ito (colorblind safe; auto-applied)
   typography:
-    axis_label_size: ≥10pt
-    tick_label_size: ≥8pt
-    title_size: ≥12pt
+    axis_label_size: ≥10pt (auto)
+    tick_label_size: ≥8pt (auto)
+    title_size: ≥12pt (auto)
   technical:
-    dpi: ≥300 (print); ≥150 (screen only)
+    dpi: ≥300 (print); ≥150 (screen only) — tool_figure_create always ≥300
     figure_format: PNG primary; SVG for editable vectors; PDF for LaTeX inclusion
     axis_units: always include units in parentheses (e.g. "Blood pressure (mmHg)")
     error_indicator:
-      bar_chart: 95% CI or SE — declare in caption
-      regression: shaded 95% CI band
-      forest_plot: lines for 95% CI
+      bar_chart: 95% CI or SE — pass `error=<col>` to tool_figure_create
+      regression: shaded 95% CI band — set regression=true
+      forest_plot: lines for 95% CI — auto from ci_lo_col, ci_hi_col
+
+caption_rules:
+  technical_caption:
+    file: <name>.caption.md (mandatory)
+    length: 3 sentences max, ~250 chars
+    voice:
+      - Lead with the substantive finding ("STATIC scores cluster at
+        the high end" — not "Histogram of STATIC scores").
+      - Name the unit on each axis if not self-evident.
+      - Call out one specific feature ("note the second mode near 3.5").
+  plain_english_summary:
+    file: <name>.summary.md (mandatory for synthesis-bound figures)
+    length: 2-3 short paragraphs
+    structure: |
+      - **What it shows.** Identify the chart family and the variables.
+      - **How to read it.** Spell out the axes / colour / trend the reader
+        should look at, in language an undergraduate could follow.
+      - **Why it matters.** Connect the figure to the step's headline finding.
+    generation: |
+      Either pass `plain_english="..."` to tool_figure_create directly,
+      OR run tool_figure_caption_synthesise figure_path=<rel> afterwards
+      (uses the step's conclusions.md Findings section to anchor the
+      summary), OR run tool_path_finalize which auto-synthesises missing
+      summaries for every figure in the step.
 
 steps:
   - id: pick_chart
@@ -46,22 +115,76 @@ steps:
       Use the chart_chooser above. Default to the simplest chart that conveys
       the comparison. Avoid 3-D charts, dual-y-axes, and pie charts (>4 slices).
 
-  - id: style_chart
-    name: Apply Standard Styling
+  - id: build_via_tool_figure_create
+    name: Build via tool_figure_create (preferred)
     description: |
-      In the analysis script: set DPI, choose a palette from formatting.palettes,
-      label axes with units, include CI / error bars, save as PNG to
-      workspace/<step>/outputs/figures/. Filename pattern:
-        <step_number>_<short_descriptor>.png  e.g.  02_age_distribution.png
+      Single MCP call — the wrapper handles style, palette, DPI, axis
+      labelling, SVG emission, and caption sidecars in one shot:
+
+        tool_figure_create
+          step_id="<NN_slug>"
+          name="<descriptor>"                # step number auto-prefixed
+          kind=bar|barh|line|scatter|hist|box|violin|heatmap|forest
+          data="<path to CSV>"  OR  data=[{...},...]
+          x="<col>" y="<col>"
+          caption="<one-sentence finding>"
+          plain_english="<2-sentence non-expert summary>"
+          regression=true                    # scatter: OLS + 95% CI band
+          palette=qualitative|sequential|diverging|accent
+          style=default|nature|ieee|notebook|no_latex
+          interactive=true                   # also writes <name>.html (plotly)
+
+      Returns the PNG + SVG + caption + summary paths. The step now
+      passes tool_audit_step_completeness without further work.
+
+  - id: build_manually_when_needed
+    name: Manual matplotlib / plotnine / plotly (fallback)
+    description: |
+      If you need a chart kind tool_figure_create doesn't support
+      (e.g. networkx layouts, geopandas maps), write the script
+      directly — but still:
+        - Save to workspace/<step>/outputs/figures/<step_number>_<short_descriptor>.png
+        - DPI ≥ 300, PNG + SVG dual export
+        - Use viridis / PuOr / Okabe-Ito (tool_figure_palette returns hex codes)
+        - Write the .caption.md technical sidecar yourself
+        - Run tool_figure_caption_synthesise to produce .summary.md
+
+  - id: write_caption
+    name: Write the Technical Caption
+    description: |
+      Mandatory sibling <name>.caption.md. 3 sentences max:
+        1. Lead with the substantive finding.
+        2. Name the unit on each axis if not self-evident.
+        3. Call out one specific feature.
+
+  - id: write_plain_english_summary
+    name: Write the Plain-English Summary (mandatory for synthesis figures)
+    description: |
+      Mandatory sibling <name>.summary.md. The dashboard's executive
+      and teaching audience profiles surface this verbatim. Structure:
+
+        **What it shows.** [chart family + variables]
+        **How to read it.** [axes / colour / trend cue in plain language]
+        **Why it matters.** [link to the step's headline finding]
+
+      Quickest path: tool_figure_caption_synthesise figure_path=<rel>
+      generates a competent draft from the existing caption + the step's
+      conclusions.md Findings. Polish the draft if needed.
 
   - id: audit
     name: Audit the Figure
     description: |
-      tool_audit_figure filepath="workspace/<step>/outputs/figures/<name>.png"
-      Fix DPI/size warnings before finalising.
+      tool_audit_figure_full filepath="workspace/<step>/outputs/figures/<name>.png"
+      Checks DPI, dimensions, caption + summary presence, SVG companion,
+      aspect ratio sanity for time series. Emits BLOCKERs and warnings
+      that tool_audit_step_completeness aggregates.
 
 expected_outputs:
   - workspace/*/outputs/figures
+  - workspace/*/outputs/figures/*.png
+  - workspace/*/outputs/figures/*.svg
+  - workspace/*/outputs/figures/*.caption.md
+  - workspace/*/outputs/figures/*.summary.md
 
 next_protocol: null
 on_failure: null

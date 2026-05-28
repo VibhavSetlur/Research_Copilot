@@ -29,7 +29,18 @@ def test_notebook_runs_with_mock_subprocess(tmp_path):
     p = tmp_path / "nb.ipynb"
     p.write_text("{}")
     (tmp_path / "workspace" / "logs").mkdir(parents=True)
-    with mock.patch("shutil.which", return_value="/usr/bin/jupyter"), \
+    # Force the legacy nbconvert path even if papermill is installed —
+    # the v6.0 wrapper prefers Papermill but falls back to nbconvert
+    # when neither papermill CLI nor module is available.
+    def _which(name):
+        # papermill not present; jupyter present.
+        if name == "papermill":
+            return None
+        return "/usr/bin/jupyter"
+    with mock.patch("shutil.which", side_effect=_which), \
+         mock.patch(
+             "research_os.tools.actions.exec.notebook._has_papermill_module",
+             return_value=False), \
          mock.patch("subprocess.run") as mock_run:
         mock_run.return_value = mock.MagicMock(returncode=0, stdout="ok", stderr="")
         res = execute_notebook("nb.ipynb", tmp_path)

@@ -403,3 +403,189 @@ def plan_step(goal: str, root: Path, max_substeps: int = 6) -> dict[str, Any]:
     except Exception as e:
         logger.exception("plan_step failed")
         return {"status": "error", "message": str(e)}
+
+
+def plan_step_grounded(
+    goal: str,
+    root: Path,
+    *,
+    inputs_to_consult: list[str] | None = None,
+    context_to_consult: list[str] | None = None,
+    literature_queries: list[str] | None = None,
+    max_substeps: int = 6,
+) -> dict[str, Any]:
+    """Plan a step where every sub-task carries a Thought / Required-Grounding
+    / Action / Verification structure (ReAct + CoVe schema).
+
+    Unlike ``plan_step`` (which writes a free-form checklist), this writer
+    surfaces the inputs / context / literature the AI is supposed to consult
+    and gives each sub-task a slot for the grounding source + the
+    verification question. The output is the canonical pre-coding artefact
+    for hardcore research: every action is preceded by stated evidence and
+    followed by a check.
+
+    Lists the project's available context up front (intake.md,
+    inputs/context/*, prior step conclusions) so the AI cannot claim
+    "nothing to consult".
+
+    Use this for substantive analyses; ``plan_step`` is fine for routine
+    sub-task chunking.
+    """
+    try:
+        from research_os.project_ops import load_state
+        from research_os.tools.actions.audit.audit import get_current_path
+
+        state = load_state(root)
+        profile = state.get("model_profile") or "medium"
+
+        # Auto-inventory potential evidence the AI should consult.
+        inputs_dir = root / "inputs"
+        ctx_dir = inputs_dir / "context"
+        lit_dir = inputs_dir / "literature"
+        intake = inputs_dir / "intake.md"
+        rq = root / "docs" / "research_question.md"
+
+        available_inputs: list[str] = []
+        if intake.exists():
+            available_inputs.append("inputs/intake.md (research question + input inventory)")
+        if rq.exists():
+            available_inputs.append("docs/research_question.md")
+        for sub in (inputs_dir / "raw_data",):
+            if sub.exists() and any(p for p in sub.iterdir() if p.name != ".gitkeep"):
+                available_inputs.append(f"{sub.relative_to(root)}/ (raw data)")
+        available_context: list[str] = []
+        if ctx_dir.exists():
+            for p in sorted(ctx_dir.iterdir()):
+                if p.is_file() and p.name not in {"README.md", ".gitkeep"}:
+                    available_context.append(str(p.relative_to(root)))
+        available_literature: list[str] = []
+        if lit_dir.exists():
+            for p in sorted(lit_dir.iterdir()):
+                if p.suffix.lower() == ".pdf":
+                    available_literature.append(str(p.relative_to(root)))
+        # Also surface the most recent active step's conclusions for chain.
+        prior_conclusions: list[str] = []
+        ws = root / "workspace"
+        if ws.exists():
+            import re as _re
+
+            for d in sorted(ws.iterdir()):
+                if d.is_dir() and _re.match(r"^\d{2,3}_", d.name) \
+                        and not d.name.endswith("__DEAD_END"):
+                    c = d / "conclusions.md"
+                    if c.exists() and c.stat().st_size > 200:
+                        prior_conclusions.append(str(c.relative_to(root)))
+        prior_conclusions = prior_conclusions[-3:]  # last 3
+
+        # Build the plan body.
+        def _fmt_list(items: list[str], default: str = "(none)") -> str:
+            return "\n".join(f"  - `{x}`" for x in items) if items else f"  - {default}"
+
+        body_parts: list[str] = []
+        body_parts.append(f"# Grounded plan — {goal}")
+        body_parts.append(f"*Generated: {datetime.now(timezone.utc).isoformat()}*  "
+                          f"·  Model profile: `{profile}`")
+        body_parts.append("")
+        body_parts.append("## Available evidence (consult BEFORE acting)")
+        body_parts.append("")
+        body_parts.append("### Project inputs")
+        body_parts.append(_fmt_list(available_inputs))
+        body_parts.append("")
+        body_parts.append("### Researcher context (prose notes)")
+        body_parts.append(_fmt_list(available_context, "(none — researcher provided no narrative context)"))
+        body_parts.append("")
+        body_parts.append("### Literature on hand")
+        body_parts.append(_fmt_list(available_literature, "(none — call tool_literature_search_and_save to add)"))
+        body_parts.append("")
+        body_parts.append("### Prior step conclusions")
+        body_parts.append(_fmt_list(prior_conclusions, "(this is the first step)"))
+        body_parts.append("")
+        if inputs_to_consult or context_to_consult or literature_queries:
+            body_parts.append("### Explicitly required for this step")
+            if inputs_to_consult:
+                body_parts.append("Inputs:")
+                body_parts.append(_fmt_list(inputs_to_consult))
+            if context_to_consult:
+                body_parts.append("Context files:")
+                body_parts.append(_fmt_list(context_to_consult))
+            if literature_queries:
+                body_parts.append("Literature queries to run:")
+                body_parts.append(
+                    "\n".join(f"  - `tool_literature_search_and_save query=\"{q}\"`"
+                               for q in literature_queries)
+                )
+            body_parts.append("")
+
+        body_parts.append("## Sub-tasks (ReAct + CoVe schema)")
+        body_parts.append("")
+        body_parts.append(
+            "Each sub-task carries the structure below. Fill every slot — "
+            "an unfilled grounding or verification means the sub-task is "
+            "**not** ready to execute."
+        )
+        body_parts.append("")
+        for i in range(1, max_substeps + 1):
+            body_parts.extend([
+                f"### {i}. _(sub-task title)_",
+                "",
+                "- **Thought**: _why this sub-task; what hypothesis it tests._",
+                "- **Required grounding**: _which inputs / context files / "
+                "literature entries the action will consult._",
+                "  - e.g. `inputs/context/protocol_v2.md` (researcher's spec)",
+                "  - e.g. `literature/smith2023.pdf` (canonical reference for the method)",
+                "- **Action**: _the tool call(s) — `tool_step_pipeline_run` / "
+                "`tool_figure_create` / etc._",
+                "- **Expected outputs**: _files this sub-task should produce."
+                " Provenance sidecars auto-emit._",
+                "- **Verification** (CoVe): _the question that would falsify "
+                "this sub-task's output; how it gets checked._",
+                "- **Lessons consulted**: _from `tool_lessons_consult task=\"<goal>\"` — list lesson_ids referenced._",
+                "",
+            ])
+
+        body_parts.extend([
+            "## Pre-commit checklist (before running ANY sub-task)",
+            "",
+            "- [ ] Researcher context (inputs/intake.md + inputs/context/) read end-to-end.",
+            "- [ ] Prior step conclusions skimmed.",
+            "- [ ] `tool_lessons_consult task=\"" + goal[:80] + "\"` called — "
+            "prior lessons noted.",
+            "- [ ] Every sub-task above has filled grounding + verification slots.",
+            "- [ ] `tool_thought_log kind='plan' content=<this plan summary>` recorded.",
+            "",
+            "## After execution",
+            "",
+            "- For each completed sub-task: `tool_grounding_register` with the "
+            "evidence consulted + `tool_claim_verify` with the CoVe question.",
+            "- `tool_lessons_record outcome=<...> reflection=<one paragraph>` "
+            "for the step as a whole.",
+            "- `tool_audit_quality_full` before synthesis.",
+        ])
+
+        current = get_current_path(root)
+        out_dir = (
+            root / "workspace" / current / "outputs" / "reports"
+            if current
+            else root / "workspace" / "logs"
+        )
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"plan_grounded_{_slug(goal)}.md"
+        out.write_text("\n".join(body_parts) + "\n")
+
+        return {
+            "status": "success",
+            "plan_path": str(out.relative_to(root)),
+            "available_inputs": available_inputs,
+            "available_context": available_context,
+            "available_literature": available_literature,
+            "prior_conclusions": prior_conclusions,
+            "advice": (
+                "Grounded plan written. Every sub-task has explicit "
+                "Thought / Required grounding / Action / Verification "
+                "slots — fill them ALL before executing the first action. "
+                "Call tool_lessons_consult and tool_thought_log first."
+            ),
+        }
+    except Exception as e:
+        logger.exception("plan_step_grounded failed")
+        return {"status": "error", "message": str(e)}

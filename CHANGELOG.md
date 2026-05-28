@@ -4,6 +4,181 @@ All notable changes to Research OS are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) ·
 versioning: [SemVer](https://semver.org).
 
+## [Unreleased] — National-lab quality overhaul
+
+### Sub-task pipelines (no more mega-scripts)
+* **`tool_step_pipeline_define / _run / _status / _diagram`** — every
+  numbered step can now declare a `pipeline.yaml` of small atomic
+  scripts (ingest → validate → clean → fit → diagnose → visualize →
+  report). The runner topologically orders nodes, content-hash
+  caches inputs+params+script (only changed downstream chains
+  re-run), and writes `.pipeline_run/run_<ts>.json` audit trails.
+* Multi-script steps without a `pipeline.yaml` are flagged by
+  `tool_audit_step_completeness`.
+
+### Per-file provenance sidecars (PROV-O / RO-Crate compatible)
+* **`write_output_provenance`** drops a `<file>.prov.json` next to
+  every figure, table, CSV, pickle. Records: script + git SHA,
+  input SHA-256s, params, RNG seed, library versions, wall time,
+  host. `tool_figure_create`, the sub-task runner, `tool_sensitivity_run`,
+  and Papermill-mode notebook exec all emit sidecars automatically.
+* `step_provenance_inventory` gates synthesis on coverage <50%.
+
+### 16 new publication-grade plot types
+* ROC, PR, calibration, QQ, residual diagnostics (4-panel),
+  partial dependence, dot-and-whisker (regression coefs),
+  ridgeline, raincloud, hexbin, slope, Bayesian posterior (with HDI
+  + ROPE), variable importance, funnel (publication bias),
+  alluvial / Sankey, hierarchical heatmap with clustering, CONSORT
+  flow diagram. `tool_figure_create` now supports 25 chart kinds.
+
+### Quality auditors (every gate BLOCKS at synthesis)
+* **`tool_audit_code_quality`** — ruff lint + AST-based cyclomatic
+  complexity + function length + smell detection (bare except,
+  `import *`, `eval`/`exec`, hardcoded absolute paths) per script.
+  Blockers: complexity >20, length >150, sloppy smells.
+* **`tool_audit_prose`** — flags 40+ hedge phrases, numbers-without-
+  precision regex, passive-voice ratio, Flesch-Kincaid grade,
+  causal language on observational designs, CONSORT / STROBE /
+  PRISMA / ARRIVE section coverage by domain.
+* **`tool_audit_claims`** — extracts every numeric claim from
+  `synthesis/paper.md` and verifies each appears in some workspace
+  output (CSV / JSON / MD / TXT) within 1% tolerance. Catches AI
+  hallucination.
+* **`tool_audit_evalue`** — VanderWeele & Ding 2017 E-value
+  sensitivity to unmeasured confounding for observational designs.
+* **`tool_audit_quality_full`** — runs every gate in one call,
+  aggregates blockers. `tool_synthesize` calls this as its first
+  step; if any blocker, synthesis is REFUSED.
+
+### Extended statistical diagnostics
+* `tool_audit_assumptions` now runs Breusch-Pagan,
+  Durbin-Watson, Variance Inflation Factor (VIF), Cook's distance,
+  Shapiro-Wilk, Levene — the full diagnostic battery a national-lab
+  reviewer expects.
+
+### Pre-registration / SAP
+* **`tool_preregister_freeze`** — snapshots methods + hypotheses
+  into a content-hashed, immutable SAP under
+  `workspace/.preregistration/`. Follows the FDA E9 + SPIRIT 2025 +
+  CONSORT 2010 field structure; suggests OSF upload.
+* **`tool_preregister_diff`** — at synthesis, lists every deviation
+  (added/removed hypotheses, methods drift, primary-outcome
+  swap) so the Discussion can acknowledge them honestly.
+* New protocol: `methodology/preregistration.yaml`.
+
+### Multi-verse / specification-curve sensitivity
+* **`tool_sensitivity_define / _run`** — author a Cartesian-product
+  grid of analytic choices (covariate sets, exclusion rules, outlier
+  handling, model families); the runner fans out the base script,
+  collects estimate + CI per spec, and renders a Steegen-style
+  specification curve. Distinguishes ROBUST from FRAGILE findings.
+
+### Red-team peer-reviewer workflow
+* **`tool_redteam_review`** — generates a hostile-reviewer scaffold
+  (summary, M1-M5 major comments, m1-m5 minor, threats-to-validity,
+  devil's-advocate questions) under three personas
+  (methodological_skeptic, statistical_referee, sympathetic_peer).
+* **`tool_response_to_reviewers`** — paired response template with
+  one heading per reviewer comment.
+
+### Null findings reporter
+* **`tool_null_findings_report`** — assembles `synthesis/null_findings.md`
+  from refuted hypotheses, underpowered tests (computed power <0.8),
+  and abandoned dead-end paths. Fights the file-drawer problem.
+
+### HPC / SLURM integration
+* **`tool_slurm_submit / _status / _fetch / _list`** — generate
+  sbatch scripts from `researcher_config.runtime.cluster_defaults`
+  (cpus, mem, time, partition, GPUs, array, dependency, modules,
+  conda env); record job_id; poll squeue/sacct; pull stdout/stderr
+  back into the step folder.
+
+### Apptainer / Docker / entrypoint per step
+* `tool_step_env_lock` gains `write_apptainer` (emits HPC-friendly
+  `step.def`) and `write_entrypoint` (default true — writes
+  `entrypoint.sh` that reproduces every output by walking the
+  sub-task DAG).
+
+### Papermill-aware notebook execution
+* `tool_notebook_exec` accepts a `parameters` dict (Papermill).
+  Each parameter set lands at `notebooks/runs/<stem>_<hash>.ipynb`
+  with a provenance sidecar. The executed notebook IS the provenance
+  record. Falls back to nbconvert when papermill isn't installed.
+
+### Visualisation toolkit (new module `tools/actions/viz/`)
+* **`tool_figure_create`** — publication-grade figure builder. SciencePlots
+  stylesheet (or built-in equivalent), Okabe-Ito / viridis / PuOr palettes,
+  enforced ≥300 DPI, mandatory axis-with-units, inline n annotation,
+  95% CI band on regression overlays, dual PNG + SVG emission, and both
+  caption sidecars written in one call. Optional plotnine backend (grammar
+  of graphics) and plotly companion (interactive HTML) when installed.
+* **`tool_figure_caption_synthesise`** — W3C-style accessible
+  `<name>.summary.md` next to every figure, drafted from the technical
+  caption + the step's Findings.
+* **`tool_figure_audit_quality`** — deeper figure audit (DPI + caption +
+  summary + SVG + aspect ratio).
+* **`tool_figure_palette`** — colour-blind-safe palettes by encoding.
+
+### Per-step accessibility + completeness gates
+* **New `context/` folder** in every step — narrative scratchpad with a
+  `notes.md` template; plain-language summary auto-propagates to the
+  step's README via `tool_path_finalize`.
+* **Dual-file README + conclusions** convention: README is a 60-second
+  overview for non-experts; conclusions is the full statistical record.
+  Every figure now MUST have `.caption.md` (technical) AND `.summary.md`
+  (plain-English) sidecars — auto-synthesised by `tool_path_finalize`
+  if the analyst doesn't supply them.
+* **`tool_audit_step_completeness`** — server-enforced gate validating
+  that every active step has a focal figure + both sidecars + non-stub
+  conclusions. BLOCKS `tool_synthesize` and `tool_plan_advance` to the
+  final deliverable until cleared (override available for partial
+  deliverables when explicitly authorised).
+* **Tightened `_is_complex` classifier** — word-count threshold 25 → 18,
+  verb threshold 3 → 2, explicit "do everything"-style phrases always
+  trigger an active plan.
+
+### Synthesis outputs
+* **Unified `synthesis_spec.yaml`** (legacy `dashboard_spec.yaml` still
+  read) — single editorial source consumed by paper + dashboard + poster.
+  Adds `methods_summary`, `poster_headline`, `paper_url` fields.
+* **Better paper LaTeX**: replaces line-by-line escape with a proper
+  AST-aware renderer (pandoc when available, full markdown→LaTeX
+  fallback with inline formatting, lists, tables, hyperlinks). Real
+  Background/Methods/Results/Conclusion abstract derived from
+  conclusions, not a stub.
+* **Better dashboard**: audience-driven section ordering (academic,
+  executive, technical, teaching), evidence-traceability matrix
+  (hypothesis → step → figure), per-step appendix surfacing plain-
+  language summaries + headline finding + figure with BOTH captions +
+  decision, "Outstanding artefacts" panel embedding the latest
+  completeness audit.
+* **`tool_poster_create`** gains `layout` parameter — `billboard`
+  (default, Mike Morrison Better Poster pattern: oversized plain-
+  English headline + ammo bar + QR code) or `classic` (IMRAD two-
+  column). `audience` profile (academic_conference, symposium, industry,
+  teaching) gates copy density and call-to-action.
+
+### Workflow diagram polish
+* Hypothesis badges per node (which H's the step touched).
+* Inline figure / table counts with ★ marker for a focal figure.
+* Headline finding annotation under each step box.
+* Chronological timeline bar at the top.
+* "⚠ no focal figure yet" inline warning for incomplete steps.
+
+### State schema v4.0 — streamlined for AI consumption
+* **One canonical default** (`ResearchLedger._default_state`); drops
+  the duplicate in `project_ops`.
+* **Legacy field migration** runs on load: `phase` → `pipeline_stage`,
+  `project` → `project_name`, `run_id` → `project_id`. Drops vestigial
+  `token_budget`, `knowledge_graph_path`, `data_scale_profile`,
+  `execution_dag_path`, and per-path `input_data_hashes` mirrors.
+* **CTMs externalised** — full blobs in `.os_state/context_transfer_memos/<id>.json`;
+  in-state list now stores 3-field stubs only.
+* **Slimmer `sys_boot`** — returns short hypothesis statements,
+  per-step focal-figure flags, and missing-caption counts so the AI
+  spots outstanding artefacts in one call.
+
 ## [1.0.0] — Stable release
 
 ### Operational safety + ergonomics (post-routing finalization)

@@ -59,8 +59,14 @@ def test_dot_notation_routes_to_underscore(tmp_path):
 def test_legacy_tool_name_alias(tmp_path):
     _handle_tool_call("sys_workspace_scaffold", {"project_name": "Alias Test"}, tmp_path)
 
-    # Old name should alias to sys_protocol_get
+    # `tool_audit_statistical_power` is one of the live aliases retained
+    # in the 2.0 alias table — it routes to `tool_audit_power`.
     res = _handle_tool_call(
-        "sys_guidance_get", {"protocol_name": "guidance/session_boot"}, tmp_path
+        "tool_audit_statistical_power",
+        {"filepath": "workspace/dummy.csv",
+         "effect_size": 0.5, "alpha": 0.05, "n": 100},
+        tmp_path,
     )
-    assert "success" in res[0].text
+    # Should route the alias and reach the handler (which may then error
+    # for missing file — that's fine; the alias resolved).
+    assert "Unknown tool" not in res[0].text

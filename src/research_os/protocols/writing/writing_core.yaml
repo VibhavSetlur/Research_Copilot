@@ -1,11 +1,43 @@
 id: writing_core
 name: Writing — Core Rules
-version: '4.0.0'
+version: '5.0.0'
 schema_version: '2.0'
-description: Universal writing rules. Loaded implicitly by every writing/ and synthesis/ protocol.
-trigger: Loaded as a prerequisite — invoke directly only when auditing an arbitrary markdown file.
+description: |
+  Universal writing rules. Loaded implicitly by every writing/* and
+  synthesis/* protocol. The single source of truth for voice, claim
+  grounding, banned phrases, number formatting, and tense. Invoke
+  directly only when auditing an arbitrary markdown file.
+
+editorial_voice:
+  default_tense: past for what was done, present for what the evidence supports
+  mode: prescription
+  rules:
+    - "Every quantitative claim must trace to a workspace artefact or a
+       verified citation. 'It is well known' is not grounding."
+    - "Use supportive, professional research voice in any deliverable
+       reviewing prior work — 'would benefit from', 'consider', 'the
+       alternative interpretation is'."
+    - "No first-person voice in deliverables. Methods + Results in
+       past tense; Discussion in present tense; Future Work in future."
 
 rules:
+  voice_and_tense:
+    methods: "past tense; either active ('We fit a model') or passive
+              ('Models were fit') — be consistent within a section."
+    results: "past tense; no causal language unless the design warrants
+              it (RCT / IV / RDD / DiD / mathematical proof)."
+    discussion: "present tense for what the evidence supports; past
+                 tense for what was done."
+    conclusion: "present + future ('These results suggest', 'Future work
+                 should')."
+  claim_grounding:
+    - "Every number, comparison, and method choice must be traceable
+       to a specific row in workspace/methods.md, an output in
+       workspace/<step>/outputs/, or a verified citation."
+    - "No vague-evidence phrasing ('many studies have shown', 'most
+       researchers agree'); cite explicitly."
+    - "tool_audit_claims and tool_grounding_verify enforce this at
+       synthesis time."
   banned_phrases:
     - "it is important to note that"
     - "interestingly,"
@@ -19,38 +51,65 @@ rules:
     - "in order to"
     - "due to the fact that"
     - "novel approach"
+    - "many studies have shown"
+    - "most researchers"
+    - "perfectly"
+    - "100% accurate"
   causal_language:
-    - Do NOT use "causes", "leads to", "results in", "impacts", "proves" unless
-      the study is an RCT, instrumented variable, regression discontinuity, or
-      mathematical proof.
-    - For observational data, use "is associated with", "is correlated with",
-      "suggests", "is consistent with".
+    permitted_when: ["RCT", "instrumental variable", "regression discontinuity",
+                     "difference-in-differences", "mathematical proof"]
+    permitted_terms_when_warranted:
+      ["causes", "leads to", "results in", "impacts", "proves"]
+    observational_alternatives:
+      ["is associated with", "is correlated with", "suggests",
+       "is consistent with", "would be expected under"]
   number_formatting:
-    - p-values: exactly 3 decimals (p = 0.042). If p < 0.001, write "p < 0.001".
-    - Always report 95% CIs alongside point estimates.
-    - Use scientific notation for |x| < 1e-3 or > 1e5 (e.g. 3.2e-5).
-    - Always include units (e.g. "1.2 mg/dL", "12.5 °C", "0.85 (AUROC)").
-  tense:
-    - Methods + Results → past tense ("We fit", "Models were fit").
-    - Established facts / implications → present tense.
-    - Future work → future tense.
+    p_values: "3 decimals (p = 0.042); 'p < 0.001' for very small."
+    confidence_intervals: "Always report a 95% CI alongside the point
+                           estimate (12.3, 95% CI 10.1–14.5)."
+    scientific_notation: "For |x| < 1e-3 or > 1e5 (e.g. 3.2e-5)."
+    units: "Always include where applicable ('1.2 mg/dL', '12.5 °C',
+            '0.85 AUROC', '423 patients')."
+    significant_figures: "Match the precision of the underlying
+                          measurement; do not over-report digits."
+  figure_referencing:
+    - "Every figure cited in prose must exist on disk."
+    - "Reference by its file name or by 'Figure N' once numbered."
+    - "Captions live in <name>.caption.md (technical) and
+       <name>.summary.md (plain-English) sidecars."
 
 steps:
-  - id: apply_rules
-    name: Apply Writing Rules
+  - id: voice_and_tense_check
+    name: Voice + tense check (during drafting)
     description: |
-      Self-check any draft you are about to commit:
-        - No banned phrases.
-        - No causal over-reach unless design warrants.
-        - p-values, CIs, units present and correctly formatted.
-        - Tense consistent across sections.
+      Before committing any paragraph, self-check the tense matches
+      the section it lives in. Methods/Results past, Discussion
+      present, Future Work future. Consistency within a section
+      matters more than the specific choice.
+
+  - id: claim_grounding_check
+    name: Every claim grounded
+    description: |
+      For each quantitative claim, identify the source. If it lives
+      in a workspace output, the claim is grounded; if it lives in a
+      citation, ensure the citation is verified
+      (`tool_citations_verify`). If it lives in neither, either
+      remove the claim or generate the supporting artefact first.
+
+  - id: banned_phrase_check
+    name: Banned phrases + causal over-reach
+    description: |
+      Self-scan for the banned phrase list above. Verify any causal
+      term is licensed by the study design. When in doubt, use the
+      observational alternative — over-claiming costs more than
+      under-claiming.
 
   - id: optional_validation
-    name: Optional Programmatic Validation
+    name: Programmatic validation (optional)
     description: |
       For substantial drafts:
         sys_file_validate_md filepath="<path>" protocol_name="writing_core"
-      The validator flags banned phrases and missing structural headers.
+      Flags banned phrases and missing structural headers.
 
 expected_outputs: []
 

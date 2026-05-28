@@ -31,23 +31,40 @@ steps:
     name: Mandatory Confirmation Gates
     description: |
       Autopilot DOES stop and ask before:
-        1. tool_synthesize for the final deliverable (paper / grant / report)
-        2. tool_audit_reproducibility (slow + expensive)
-        3. Any tool_research_tool candidate tagged paid_or_licensed
-        4. sys_path_abandon (dead-end declarations are reversible but loud)
-        5. Any sys_file_write to synthesis/ with force=true
-        6. tool_package_install for a package not already in
-           environment/requirements.txt
-        7. Any tool_task_run with an estimated cost > 1 GPU-hour OR > 10 GB
-           of memory OR > 50 GB of disk I/O
+        1. tool_synthesize for the final deliverable (paper / grant / report).
+           If tool_audit_step_completeness has BLOCKERS, autopilot HALTS
+           before even asking — the gate is server-enforced and refuses
+           the call until fixed.
+        2. tool_dashboard_create / tool_poster_create for the FINAL
+           deliverable (mid-flight progress dashboards bypass the ask,
+           but flag any open completeness blockers).
+        3. tool_audit_reproducibility (slow + expensive).
+        4. Any tool_research_tool candidate tagged paid_or_licensed.
+        5. sys_path_abandon (dead-end declarations are reversible but loud).
+        6. Any sys_file_write to synthesis/ with force=true.
+        7. tool_package_install for a package not already in
+           environment/requirements.txt.
+        8. Any tool_task_run with an estimated cost > 1 GPU-hour OR > 10 GB
+           of memory OR > 50 GB of disk I/O.
       For each gate, sys_notify level="action_required" and wait one turn.
+
+      NEVER one-shot the full research project. Autopilot may iterate
+      through experiment steps without checking in, but the gates above
+      are floors — they cannot be bypassed even by an explicit
+      "do everything" prompt. The researcher must consent to each final
+      deliverable separately so the synthesis is a deliberate act, not a
+      side effect.
 
   - id: scheduled_checkpoints
     name: Auto-Checkpoint Every Major Step
     description: |
-      After each completed numbered experiment step, call
-      sys_checkpoint_create description="autopilot after <step_id>". Keeps
-      a rollback target so a runaway autopilot can be undone in one call.
+      After each completed numbered experiment step, in this order:
+        1. tool_path_finalize — rewrites the step's READMEs from what was
+           produced (so empty environment/literature/data folders carry an
+           informative note, not blank space).
+        2. sys_checkpoint_create description="autopilot after <step_id>"
+           — keeps a rollback target so a runaway autopilot can be undone
+           in one call.
 
   - id: heartbeat
     name: Hourly Heartbeat (long runs)

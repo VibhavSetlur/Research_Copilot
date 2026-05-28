@@ -1,11 +1,18 @@
 id: synthesis_paper
 name: Synthesis — Paper (IMRAD, venue-tailored)
-version: '5.0.0'
+version: '6.0.0'
 schema_version: '2.0'
-description: Compile the final IMRAD paper into synthesis/paper.md (and synthesis/paper.tex → PDF when requested), tuned to the target venue.
+description: |
+  Compile the final IMRAD paper into synthesis/paper.md (and
+  synthesis/paper.tex → PDF when requested), tuned to the target venue.
+  Uses pandoc for the LaTeX render when available; otherwise our own
+  inline-formatting + table-aware fallback (no more raw-escaped text).
+  Server-side completeness gate blocks the assembly until every active
+  step has a focal figure + caption + summary + non-stub conclusions.
 trigger: After audit_and_validation passes. Final pipeline step. The researcher asks "write the paper" / "draft the manuscript".
 prerequisites:
   - workspace/logs/audit_report.md exists with no BLOCKER lines
+  - workspace/logs/step_completeness.md shows no per-step BLOCKERS
   - At least one experiment step has a substantive conclusions.md (>200 chars under "## Findings")
   - workspace/methods.md, workspace/citations.md exist with real content
   - inputs/literature_index.yaml has at least 3 entries
@@ -70,6 +77,21 @@ venue_profile:
       Internal / industry. Prefers "Executive summary" + "Recommendations". Lighter on citations.
 
 steps:
+  - id: gate_completeness
+    name: Run Completeness Gate (BLOCKING)
+    description: |
+      tool_audit_step_completeness
+      The first step. If any active step has BLOCKERS (missing focal
+      figure, missing caption sidecar, missing summary sidecar, stub
+      conclusions sections), tool_synthesize REFUSES to assemble and
+      this protocol cannot proceed. Fix the blockers in the listed
+      steps (use tool_figure_create for missing figures —
+      auto-generates both sidecars) and re-run.
+
+      Override only when the researcher explicitly asks for a partial
+      paper (e.g. "draft what we have so far, mark the gaps"). The
+      override is `override_completeness_gate=true` on tool_synthesize.
+
   - id: select_venue_profile
     name: Select Venue Profile
     description: |

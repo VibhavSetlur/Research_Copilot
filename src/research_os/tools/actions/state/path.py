@@ -211,37 +211,870 @@ def workflow_dag(
         mmd_path = out_dir / "workflow_dag.mermaid"
         mmd_path.write_text("\n".join(mermaid_lines) + "\n")
 
-        png_path = None
-        if render_png and _shutil.which("mmdc"):
+        png_path: str | None = None
+        png_renderer = None  # mmdc | matplotlib | None
+        if render_png:
             png_target = out_dir / "workflow_dag.png"
-            try:
-                res = _subprocess.run(
-                    ["mmdc", "-i", str(mmd_path), "-o", str(png_target),
-                     "-b", "transparent"],
-                    capture_output=True, text=True, timeout=30,
-                )
-                if res.returncode == 0:
+            # Prefer mmdc (faithful mermaid rendering); fall back to a
+            # matplotlib PNG so a PNG is ALWAYS available regardless of npm.
+            if _shutil.which("mmdc"):
+                try:
+                    res = _subprocess.run(
+                        ["mmdc", "-i", str(mmd_path), "-o", str(png_target),
+                         "-b", "transparent"],
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    if res.returncode == 0:
+                        png_path = str(png_target.relative_to(root))
+                        png_renderer = "mmdc"
+                except (OSError, _subprocess.TimeoutExpired):
+                    pass
+            if not png_path:
+                try:
+                    step_meta = _collect_step_metadata(workspace_dir, root)
+                    _render_workflow_png_matplotlib(
+                        nodes, edges, png_target, step_meta=step_meta,
+                    )
                     png_path = str(png_target.relative_to(root))
-            except (OSError, _subprocess.TimeoutExpired):
-                pass
+                    png_renderer = "matplotlib"
+                except Exception as e:
+                    logger.warning("matplotlib workflow render failed: %s", e)
+
+        # Also copy a publishable PNG into synthesis/figures so the dashboard
+        # picks it up as the workflow figure without extra wiring.
+        if png_path:
+            try:
+                syn_fig = root / "synthesis" / "figures"
+                syn_fig.mkdir(parents=True, exist_ok=True)
+                target = syn_fig / "fig00_workflow_diagram.png"
+                src = root / png_path
+                if not target.exists() or target.stat().st_mtime < src.stat().st_mtime:
+                    _shutil.copy2(src, target)
+                cap = target.with_suffix(".caption.md")
+                if not cap.exists():
+                    cap.write_text(
+                        "**Analytical workflow.** Each box is one numbered "
+                        "analysis step. The header bar summarises overall "
+                        "progress; arrows show data-dependency between "
+                        "steps. Each box surfaces the hypotheses the step "
+                        "touched (H-prefix), figure/table counts, and the "
+                        "step's headline finding so the diagram doubles as "
+                        "a project-at-a-glance summary. Colour encodes "
+                        "status (green = completed, amber = active, red = "
+                        "dead-end, preserved). Steps with no inbound arrows "
+                        "read from the project inputs directly. The ★ marker "
+                        "indicates a focal figure named after the step "
+                        "number; ⚠ flags an outstanding artefact.\n"
+                    )
+                # Also write a plain-English summary sibling for the dashboard.
+                sumf = target.with_suffix(".summary.md")
+                if not sumf.exists():
+                    sumf.write_text(
+                        "**What it shows.** The full path of the analysis: "
+                        "every numbered step, what depends on what, and how "
+                        "far along each one is.\n\n"
+                        "**How to read it.** Start at the top, follow the "
+                        "arrows. Green = done. Amber = in progress. Red = "
+                        "abandoned but kept on the record. Each box lists "
+                        "the hypotheses that step tested and its headline "
+                        "result.\n\n"
+                        "**Why it matters.** Lets a reader trust that the "
+                        "conclusion didn't appear out of nowhere — every "
+                        "step is traceable to its inputs and to the next "
+                        "step that consumed its output.\n"
+                    )
+            except Exception as e:
+                logger.debug("workflow figure copy to synthesis/figures failed: %s", e)
 
         return {
             "status": "success",
             "mermaid_path": str(mmd_path.relative_to(root)),
             "png_path": png_path,
+            "png_renderer": png_renderer,
             "nodes": len(nodes),
             "edges": len(edges),
             "has_mmdc": bool(_shutil.which("mmdc")),
             "advice": (
-                "Install mmdc (npm install -g @mermaid-js/mermaid-cli) and "
-                "re-run with render_png=true for a PNG."
-                if not _shutil.which("mmdc")
-                else "Re-run with render_png=true to refresh the PNG."
+                "PNG rendered via matplotlib. For a mermaid-faithful render, "
+                "install mmdc with `npm install -g @mermaid-js/mermaid-cli`."
+                if png_renderer == "matplotlib"
+                else "PNG rendered via mmdc."
+                if png_renderer == "mmdc"
+                else (
+                    "PNG not produced. Install either matplotlib "
+                    "(`pip install matplotlib`) for an in-Python render OR "
+                    "mmdc (`npm install -g @mermaid-js/mermaid-cli`) for the "
+                    "faithful mermaid render, then re-run with render_png=true."
+                )
             ),
         }
     except Exception as e:
         logger.exception("workflow_dag failed")
         return {"status": "error", "message": str(e)}
+
+
+def _collect_step_metadata(workspace: Path, root: Path) -> dict[str, dict[str, Any]]:
+    """For every numbered step, harvest the hypotheses it touched and a
+    one-line headline finding (so the diagram can show H-badges + the
+    actual result, not just a slug)."""
+    meta: dict[str, dict[str, Any]] = {}
+    try:
+        from research_os.project_ops import load_state
+
+        state = load_state(root)
+        hyps = state.get("active_hypotheses") or []
+        # step → set of H-IDs (from each hypothesis's evidence list)
+        step_to_hyps: dict[str, set[str]] = {}
+        for h in hyps:
+            hid = h.get("id", "?")
+            for ev in (h.get("evidence") or []):
+                sid = ev.get("step")
+                if sid:
+                    step_to_hyps.setdefault(sid, set()).add(hid)
+        # statement per hypothesis (for tooltips later)
+        h_statements = {h.get("id"): (h.get("statement") or "")[:80] for h in hyps}
+    except Exception:
+        step_to_hyps = {}
+        h_statements = {}
+
+    for p in workspace.iterdir():
+        if not (p.is_dir() and re.match(r"^\d{2,3}_", p.name)):
+            continue
+        info: dict[str, Any] = {
+            "hypotheses": sorted(step_to_hyps.get(p.name, set())),
+            "h_statements": h_statements,
+            "headline": "",
+            "has_focal_figure": False,
+            "n_figures": 0,
+            "n_tables": 0,
+        }
+        # Headline from conclusions.md Findings.
+        conc = p / "conclusions.md"
+        if conc.exists():
+            try:
+                txt = conc.read_text()
+                m = re.search(
+                    r"##\s*Findings\s*\n(.+?)(?:\n##|\Z)",
+                    txt, flags=re.DOTALL | re.IGNORECASE,
+                )
+                if m:
+                    for line in m.group(1).splitlines():
+                        line = line.strip()
+                        if line.startswith(("-", "*")):
+                            info["headline"] = line.lstrip("-* ").strip()[:100]
+                            break
+            except Exception:
+                pass
+        figs_dir = p / "outputs" / "figures"
+        if figs_dir.exists():
+            num = p.name.split("_", 1)[0]
+            figures = [
+                f for f in figs_dir.iterdir()
+                if f.suffix.lower() in {".png", ".svg", ".jpg", ".jpeg"}
+            ]
+            info["n_figures"] = len(figures)
+            info["has_focal_figure"] = any(
+                f.name.startswith(f"{num}_") for f in figures
+            )
+        tables_dir = p / "outputs" / "tables"
+        if tables_dir.exists():
+            info["n_tables"] = sum(
+                1 for f in tables_dir.iterdir() if f.is_file()
+                and f.suffix.lower() in {".csv", ".tsv", ".md"}
+            )
+        meta[p.name] = info
+    return meta
+
+
+def _render_workflow_png_matplotlib(
+    nodes: dict[str, dict[str, str]],
+    edges: list[tuple[str, str]],
+    target: Path,
+    *,
+    step_meta: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    """Render the workflow DAG as a polished PNG using matplotlib only.
+
+    Layout: numbered steps stack top-to-bottom along the chronological
+    axis; each step is a rounded box coloured by status. Edges are drawn
+    as arrows connecting boxes. Includes hypothesis badges per node, a
+    small "missing focal figure" annotation, a chronological timeline
+    bar at the top, and a legend.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+
+    step_meta = step_meta or {}
+    ordered_ids = sorted(nodes.keys())
+    n = len(ordered_ids)
+    if n == 0:
+        return
+
+    # Map node -> (col, row). Default everything in column 0; if two siblings
+    # share a parent we split them into columns to avoid line crossings.
+    parent_of: dict[str, str | None] = {p: None for p in ordered_ids}
+    children: dict[str, list[str]] = {p: [] for p in ordered_ids}
+    for src, dst in edges:
+        if src in parent_of and dst in parent_of:
+            parent_of[dst] = src
+            children[src].append(dst)
+
+    # Topological row assignment based on depth.
+    depth: dict[str, int] = {}
+    for pid in ordered_ids:
+        d = 0
+        cursor = pid
+        while parent_of.get(cursor):
+            cursor = parent_of[cursor]
+            d += 1
+            if d > 50:
+                break
+        depth[pid] = d
+    max_depth = max(depth.values()) if depth else 0
+
+    # Column assignment: siblings spread horizontally.
+    col: dict[str, int] = {pid: 0 for pid in ordered_ids}
+    for parent, kids in children.items():
+        if len(kids) <= 1:
+            continue
+        kids_sorted = sorted(kids)
+        for i, kid in enumerate(kids_sorted):
+            col[kid] = i - (len(kids_sorted) - 1) / 2
+        for kid in kids_sorted:
+            stack = list(children.get(kid, []))
+            base = col[kid]
+            while stack:
+                cur = stack.pop()
+                col[cur] = base
+                stack.extend(children.get(cur, []))
+
+    max_col = max(col.values(), default=0)
+    min_col = min(col.values(), default=0)
+    width_cols = max(2, (max_col - min_col) + 1)
+
+    # A taller box accommodates the H-badge + headline annotation.
+    box_w, box_h = 3.2, 1.10
+    fig_w = max(9.5, width_cols * 3.6)
+    fig_h = max(5.5, (max_depth + 1) * 1.9 + 2.5)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.set_xlim(-0.5, width_cols + 0.5)
+    ax.set_ylim(-1.3, max_depth + 2.3)
+    ax.invert_yaxis()
+    ax.axis("off")
+
+    status_colors = {
+        "completed": ("#d4edda", "#1a7f37"),
+        "active":    ("#fff3cd", "#856404"),
+        "dead_end":  ("#f8d7da", "#9b2c2c"),
+        "missing_on_disk": ("#edf2f7", "#718096"),
+    }
+
+    # ----- Timeline bar at the very top -----
+    n_steps_done = sum(
+        1 for pid in ordered_ids if nodes[pid]["status"] == "completed"
+    )
+    n_steps_active = sum(
+        1 for pid in ordered_ids if nodes[pid]["status"] == "active"
+    )
+    n_steps_dead = sum(
+        1 for pid in ordered_ids if nodes[pid]["status"] == "dead_end"
+    )
+    bar_y = -1.0
+    bar_w = width_cols
+    bar_h = 0.25
+    # Background track.
+    ax.add_patch(Rectangle((0, bar_y), bar_w, bar_h,
+                           facecolor="#edf2f7", edgecolor="#cbd5e1", lw=0.8))
+    # Completed slice.
+    if n > 0:
+        done_w = bar_w * (n_steps_done / n)
+        active_w = bar_w * (n_steps_active / n)
+        ax.add_patch(Rectangle((0, bar_y), done_w, bar_h,
+                               facecolor="#1a7f37", edgecolor="none"))
+        ax.add_patch(Rectangle((done_w, bar_y), active_w, bar_h,
+                               facecolor="#d29922", edgecolor="none"))
+    ax.text(
+        bar_w / 2, bar_y - 0.15,
+        f"Progress: {n_steps_done} completed · {n_steps_active} active · "
+        f"{n_steps_dead} dead-end · {n} total",
+        ha="center", va="bottom",
+        fontsize=9.5, color="#4a5568",
+    )
+
+    coords: dict[str, tuple[float, float]] = {}
+    for pid in ordered_ids:
+        x = col[pid] - min_col + (width_cols - 1 - (max_col - min_col)) / 2.0
+        y = depth[pid]
+        coords[pid] = (x, y)
+        fg = status_colors.get(nodes[pid]["status"], status_colors["completed"])
+        ax.add_patch(FancyBboxPatch(
+            (x - box_w / 2, y - box_h / 2), box_w, box_h,
+            boxstyle="round,pad=0.06,rounding_size=0.18",
+            facecolor=fg[0], edgecolor=fg[1], linewidth=1.4,
+        ))
+
+        # Step label (top line of the box).
+        label = nodes[pid]["label"]
+        ax.text(x, y - box_h / 2 + 0.22, label,
+                ha="center", va="center",
+                fontsize=10.5, fontweight="semibold", color="#1a202c")
+
+        # Hypothesis badges + figure/table counts (middle line).
+        meta = step_meta.get(pid, {})
+        badges: list[str] = []
+        for hid in meta.get("hypotheses", []):
+            badges.append(hid)
+        meta_line_parts = []
+        if badges:
+            meta_line_parts.append("H: " + ", ".join(badges))
+        if meta.get("n_figures"):
+            mark = "★" if meta.get("has_focal_figure") else "•"
+            meta_line_parts.append(f"{mark} {meta['n_figures']} fig")
+        if meta.get("n_tables"):
+            meta_line_parts.append(f"⊞ {meta['n_tables']} tab")
+        if meta_line_parts:
+            ax.text(x, y, " · ".join(meta_line_parts),
+                    ha="center", va="center",
+                    fontsize=8.5, color="#4a5568")
+
+        # Headline finding (bottom line, italic).
+        headline = meta.get("headline", "")
+        if headline:
+            # Truncate to fit the box width.
+            max_chars = 42
+            if len(headline) > max_chars:
+                headline = headline[:max_chars - 1] + "…"
+            ax.text(x, y + box_h / 2 - 0.22, headline,
+                    ha="center", va="center",
+                    fontsize=8.0, fontstyle="italic", color="#2d3748")
+        elif not meta.get("has_focal_figure") and nodes[pid]["status"] != "dead_end":
+            ax.text(x, y + box_h / 2 - 0.22,
+                    "⚠ no focal figure yet",
+                    ha="center", va="center",
+                    fontsize=8.0, fontstyle="italic", color="#9b2c2c")
+
+    for src, dst in edges:
+        if src not in coords or dst not in coords:
+            continue
+        x1, y1 = coords[src]
+        x2, y2 = coords[dst]
+        ax.annotate(
+            "", xy=(x2, y2 - box_h / 2), xytext=(x1, y1 + box_h / 2),
+            arrowprops=dict(arrowstyle="-|>", color="#3a4661",
+                            lw=1.6, shrinkA=2, shrinkB=2,
+                            connectionstyle="arc3,rad=0.05"),
+        )
+
+    # ----- Legend -----
+    legend_y = max_depth + 1.5
+    legend_items = [
+        ("completed", "Completed"),
+        ("active", "Active"),
+        ("dead_end", "Dead-end (preserved)"),
+    ]
+    for i, (key, label) in enumerate(legend_items):
+        bg, bd = status_colors[key]
+        lx = -0.2 + i * 2.5
+        ax.add_patch(FancyBboxPatch(
+            (lx, legend_y), 0.45, 0.32,
+            boxstyle="round,pad=0.02,rounding_size=0.06",
+            facecolor=bg, edgecolor=bd, linewidth=1.0,
+        ))
+        ax.text(lx + 0.55, legend_y + 0.16, label,
+                fontsize=9.0, va="center", color="#3a4661")
+    # Inline legend key for badges.
+    ax.text(0, legend_y + 0.7,
+            "★ focal figure · H: hypothesis touched · ⚠ outstanding artefact",
+            fontsize=8.5, color="#4a5568")
+
+    ax.set_title("Analytical workflow", fontsize=14,
+                 fontweight="bold", color="#1a202c", pad=18)
+    plt.tight_layout()
+    fig.savefig(target, dpi=220, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
+_DEC_HEADER_RE = re.compile(r"^###\s+Decision\s*[·-]", re.MULTILINE)
+
+
+def _extract_step_decisions(root: Path, branch_id: str) -> list[str]:
+    """Pull decision-log entries from workspace/analysis.md that reference
+    this step. A block matches if it mentions the full branch_id
+    (``03_replicate_attitude_demographics``) or the step number with a
+    word-ish boundary (``Step 03`` / ``step=03``)."""
+    analysis = root / "workspace" / "analysis.md"
+    if not analysis.exists():
+        return []
+    text = analysis.read_text()
+    blocks = _DEC_HEADER_RE.split(text)
+    step_num = branch_id.split("_", 1)[0]  # e.g. "03"
+    needle_re = re.compile(
+        rf"(?:{re.escape(branch_id)}|[Ss]tep[ =]{step_num}\b|`{step_num}_)",
+    )
+    hits: list[str] = []
+    for block in blocks[1:]:
+        if needle_re.search(block):
+            hits.append("### Decision ·" + block.strip())
+    return hits
+
+
+def _figure_table_inventory(exp_dir: Path) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {"figures": [], "tables": [], "reports": []}
+    for sub in ("figures", "tables", "reports"):
+        d = exp_dir / "outputs" / sub
+        if not d.exists():
+            continue
+        for f in sorted(d.iterdir()):
+            if f.name.startswith("."):
+                continue
+            if f.name == "README.md":
+                continue
+            out[sub].append(f.name)
+    return out
+
+
+def finalize_path(
+    path_name: str | None,
+    root: Path,
+) -> dict[str, Any]:
+    """Rewrite a step's README + subfolder READMEs from what actually got
+    produced. Idempotent — safe to call repeatedly.
+
+    Behaviour:
+      * Step `README.md`: fills the Methods / Outputs / Decision sections
+        from `conclusions.md` headings + the per-step decision-log entries
+        in `workspace/analysis.md` if those sections were left as stubs.
+      * `environment/README.md`: if folder is empty → notes that the
+        project-global environment was used. If snapshot exists → notes
+        bespoke env + lists tracked files.
+      * `literature/README.md`: if folder is empty → notes the project-
+        global corpus was used + extracts any literature-tagged decisions
+        from analysis.md as evidence chain. If sidecar PDFs/notes present
+        → lists them.
+      * `context/README.md`: if folder has only the seed template → notes
+        nothing prose-specific was needed. If `notes.md` was filled in,
+        surfaces the plain-language summary into the step README.
+      * `data/README.md` + `data/output/README.md`: lists every artefact
+        actually written + which downstream step (per workflow DAG) reads it.
+      * For every figure missing a `.summary.md` plain-language sidecar,
+        invokes the caption synthesiser so the dashboard / paper can
+        embed an accessible description alongside the technical caption.
+    """
+    from research_os.project_ops import load_state
+
+    workspace = root / "workspace"
+    if not workspace.exists():
+        return {"status": "error", "message": "workspace/ not found"}
+
+    if path_name is None:
+        state = load_state(root)
+        path_name = state.get("current_path")
+        if not path_name or not (workspace / path_name).is_dir():
+            return {
+                "status": "error",
+                "message": "No path_name given and current_path is unset.",
+            }
+
+    exp_dir = workspace / path_name
+    if not exp_dir.is_dir():
+        return {"status": "error", "message": f"Path '{path_name}' not found"}
+
+    changes: list[str] = []
+
+    # ---- 1. Per-folder normalisation ----
+    env_dir = exp_dir / "environment"
+    env_files = [
+        p for p in env_dir.iterdir()
+        if env_dir.exists() and p.name not in {"README.md", ".gitkeep"}
+    ] if env_dir.exists() else []
+    if not env_files:
+        (env_dir / "README.md").parent.mkdir(parents=True, exist_ok=True)
+        (env_dir / "README.md").write_text(
+            f"# `{path_name}` — environment\n\n"
+            "**Used the project-global environment** "
+            "(`environment/requirements.txt`). No step-specific snapshot "
+            "needed — analysis ran with the same package versions as every "
+            "other step. Reproduce by recreating the global env.\n\n"
+            "If you later add a step-specific requirement, run "
+            "`sys_env_snapshot` and re-run `tool_path_finalize` to refresh "
+            "this note.\n"
+        )
+        changes.append("environment/README.md → global-env note")
+    else:
+        lines = "\n".join(f"- `{p.name}`" for p in env_files)
+        (env_dir / "README.md").write_text(
+            f"# `{path_name}` — environment\n\n"
+            "**Step-specific environment** captured here (differs from "
+            "project global):\n\n"
+            f"{lines}\n\n"
+            "Recreate with `pip install -r requirements.txt` from this folder.\n"
+        )
+        changes.append("environment/README.md → bespoke-env listing")
+
+    lit_dir = exp_dir / "literature"
+    lit_files = [
+        p for p in lit_dir.iterdir()
+        if lit_dir.exists() and p.name not in {"README.md", ".gitkeep"}
+    ] if lit_dir.exists() else []
+    decisions = _extract_step_decisions(root, path_name)
+    if not lit_files:
+        body = (
+            f"# `{path_name}` — literature\n\n"
+            "No step-specific PDFs / notes — this step relied on the "
+            "**project-global literature corpus** (`inputs/literature/`) "
+            "and on transparent methodological reasoning rather than "
+            "citation-specific support.\n"
+        )
+        if decisions:
+            body += (
+                "\n## Methodological decisions made here (from analysis.md)\n\n"
+                + "\n\n".join(decisions[-5:])
+                + "\n"
+            )
+        else:
+            body += (
+                "\nNo methodological decisions captured for this step. "
+                "If a non-trivial choice was made, log it with "
+                "`mem_decision_log` so the reasoning is preserved.\n"
+            )
+        (lit_dir / "README.md").parent.mkdir(parents=True, exist_ok=True)
+        (lit_dir / "README.md").write_text(body)
+        changes.append("literature/README.md → global-corpus note + decisions")
+    else:
+        lines = "\n".join(f"- `{p.name}`" for p in lit_files)
+        body = (
+            f"# `{path_name}` — literature\n\n"
+            "**Step-specific literature** (used to justify methodological "
+            "choices below):\n\n"
+            f"{lines}\n"
+        )
+        if decisions:
+            body += (
+                "\n## Decisions these sources informed\n\n"
+                + "\n\n".join(decisions[-5:])
+                + "\n"
+            )
+        (lit_dir / "README.md").write_text(body)
+        changes.append("literature/README.md → sources + linked decisions")
+
+    # ---- 1c. Context folder (narrative scratchpad) ----
+    ctx_dir = exp_dir / "context"
+    ctx_files = [
+        p for p in ctx_dir.iterdir()
+        if ctx_dir.exists() and p.name not in {"README.md", ".gitkeep"}
+    ] if ctx_dir.exists() else []
+    plain_summary_from_context = ""
+    notes_path = ctx_dir / "notes.md"
+    if notes_path.exists():
+        try:
+            notes_text = notes_path.read_text()
+            m = re.search(
+                r"##\s*Plain-language summary\s*\n(.+?)(?=^##|\Z)",
+                notes_text,
+                flags=re.MULTILINE | re.DOTALL | re.IGNORECASE,
+            )
+            if m:
+                body = m.group(1).strip()
+                # Drop the seed italicised placeholder.
+                if body and not body.startswith("_If you"):
+                    plain_summary_from_context = body
+        except Exception:
+            pass
+    if not ctx_files or (
+        len(ctx_files) == 1 and ctx_files[0].name == "notes.md"
+        and not plain_summary_from_context
+    ):
+        (ctx_dir / "README.md").parent.mkdir(parents=True, exist_ok=True)
+        (ctx_dir / "README.md").write_text(
+            f"# `{path_name}` — context\n\n"
+            "No prose context was needed for this step — the README + "
+            "conclusions captured the relevant narrative. The "
+            "`notes.md` template is preserved if a later analyst wants to "
+            "add commentary.\n"
+        )
+        changes.append("context/README.md → no-context note")
+    else:
+        bullet_files = [f for f in ctx_files if f.name != "README.md"]
+        listing = "\n".join(f"- `{p.name}`" for p in bullet_files)
+        body = (
+            f"# `{path_name}` — context\n\n"
+            "Prose / narrative material accompanying this step:\n\n"
+            f"{listing}\n"
+        )
+        if plain_summary_from_context:
+            body += (
+                "\n## Plain-language summary (lifted from notes.md)\n\n"
+                f"{plain_summary_from_context}\n"
+            )
+        (ctx_dir / "README.md").write_text(body)
+        changes.append("context/README.md → narrative inventory + summary")
+
+    # ---- 2. Data folder + downstream consumer map ----
+    consumers = _downstream_consumers(workspace, path_name)
+    out_dir = exp_dir / "data" / "output"
+    out_files = []
+    if out_dir.exists():
+        for f in sorted(out_dir.iterdir()):
+            if f.name in {"README.md", ".gitkeep"}:
+                continue
+            if f.is_file():
+                out_files.append(f.name)
+    out_body = (
+        f"# `{path_name}/data/output` — artefacts\n\n"
+    )
+    if out_files:
+        out_body += "Persisted files:\n\n" + "\n".join(
+            f"- `{name}`" for name in out_files
+        ) + "\n"
+    else:
+        out_body += (
+            "No persisted artefacts yet. If this step intentionally "
+            "produces no downstream data (e.g. it's a pure synthesis or "
+            "audit step), that's fine — note it in `conclusions.md`.\n"
+        )
+    if consumers:
+        out_body += "\n## Downstream consumers\n\n" + "\n".join(
+            f"- `{c}` reads this folder via `data/input` symlink." for c in consumers
+        ) + "\n"
+    else:
+        out_body += (
+            "\nNo downstream step currently consumes these outputs.\n"
+        )
+    (out_dir / "README.md").parent.mkdir(parents=True, exist_ok=True)
+    (out_dir / "README.md").write_text(out_body)
+    changes.append("data/output/README.md → artefacts + consumer map")
+
+    # ---- 3. Outputs inventory + step README finalize ----
+    inv = _figure_table_inventory(exp_dir)
+    out_readme = exp_dir / "outputs" / "README.md"
+    out_readme.parent.mkdir(parents=True, exist_ok=True)
+    out_readme.write_text(
+        f"# `{path_name}` — outputs inventory\n\n"
+        f"- **Figures:** {len(inv['figures'])}"
+        + (": " + ", ".join(f"`{n}`" for n in inv['figures']) if inv['figures'] else "")
+        + "\n"
+        f"- **Tables:** {len(inv['tables'])}"
+        + (": " + ", ".join(f"`{n}`" for n in inv['tables']) if inv['tables'] else "")
+        + "\n"
+        f"- **Reports:** {len(inv['reports'])}"
+        + (": " + ", ".join(f"`{n}`" for n in inv['reports']) if inv['reports'] else "")
+        + "\n\n"
+        "Pair each figure / table with a sibling `<name>.caption.md` so the "
+        "synthesis dashboard can embed the explanation inline.\n"
+    )
+    changes.append("outputs/README.md → produced-artefact inventory")
+
+    # ---- 4. Step README: only fill stub sections; never overwrite real text ----
+    step_readme = exp_dir / "README.md"
+    conc_path = exp_dir / "conclusions.md"
+    if step_readme.exists() and conc_path.exists():
+        readme_text = step_readme.read_text()
+        conc_text = conc_path.read_text()
+        new_readme = _finalize_step_readme(
+            readme_text, conc_text, decisions, inv, path_name,
+            plain_summary=plain_summary_from_context,
+        )
+        if new_readme != readme_text:
+            step_readme.write_text(new_readme)
+            changes.append("README.md → stub sections populated")
+
+    # ---- 5. Auto-synthesise plain-English summaries for figures ----
+    summaries_written: list[str] = []
+    figs_dir = exp_dir / "outputs" / "figures"
+    if figs_dir.exists():
+        try:
+            from research_os.tools.actions.viz import caption_synthesise
+
+            for f in sorted(figs_dir.iterdir()):
+                if f.suffix.lower() not in {".png", ".svg", ".jpg", ".jpeg"}:
+                    continue
+                if f.with_suffix(".summary.md").exists():
+                    continue
+                rel = f.relative_to(root).as_posix()
+                res = caption_synthesise(figure_path=rel, root=root)
+                if res.get("status") == "success" and not res.get("already_exists"):
+                    summaries_written.append(f.name)
+        except Exception as e:
+            logger.debug("plain-English summary synthesis skipped: %s", e)
+        if summaries_written:
+            changes.append(
+                f"plain-English summaries → {len(summaries_written)} figure(s)"
+            )
+
+    return {
+        "status": "success",
+        "path_name": path_name,
+        "changes": changes,
+        "decisions_linked": len(decisions),
+        "output_files": len(out_files),
+        "figures": len(inv["figures"]),
+        "tables": len(inv["tables"]),
+        "reports": len(inv["reports"]),
+        "plain_english_summary_present": bool(plain_summary_from_context),
+        "figure_summaries_synthesised": summaries_written,
+    }
+
+
+def _downstream_consumers(workspace: Path, path_name: str) -> list[str]:
+    """Steps whose data/input symlink resolves under <path_name>/data/output."""
+    self_out = (workspace / path_name / "data" / "output").resolve()
+    consumers: list[str] = []
+    for p in sorted(workspace.iterdir()):
+        if not (p.is_dir() and re.match(r"^\d{2,3}_", p.name)) or p.name == path_name:
+            continue
+        inp = p / "data" / "input"
+        if not inp.exists():
+            continue
+        try:
+            if inp.is_symlink() and inp.resolve() == self_out:
+                consumers.append(p.name)
+            elif inp.is_dir():
+                for child in inp.iterdir():
+                    if child.is_symlink() and child.resolve() == self_out:
+                        consumers.append(p.name)
+                        break
+        except OSError:
+            continue
+    return consumers
+
+
+_STUB_MARKERS = (
+    "*(list inputs used)*",
+    "*(list methods/models)*",
+    "*(describe expected outputs)*",
+    "*(proceed | branch | dead-end)*",
+    "*(One paragraph. Imagine",
+    "*(the single most important result",
+    "*(name the method;",
+    "*(figures / tables / reports produced)*",
+)
+
+
+def _section(text: str, header: str) -> str:
+    """Extract a markdown section under ``## <header>`` until the next ## or EOF."""
+    pat = re.compile(
+        rf"^##\s+{re.escape(header)}\s*\n(.*?)(?=^##\s|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    m = pat.search(text)
+    return m.group(1).strip() if m else ""
+
+
+def _replace_section(text: str, header: str, new_body: str) -> str:
+    pat = re.compile(
+        rf"(^##\s+{re.escape(header)}\s*\n)(.*?)(?=^##\s|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    if not pat.search(text):
+        return text + f"\n## {header}\n{new_body}\n"
+    return pat.sub(lambda m: m.group(1) + new_body.rstrip() + "\n\n", text)
+
+
+def _is_stub_section(text: str, header: str) -> bool:
+    """A section counts as a stub if it's empty OR contains any stub marker."""
+    body = _section(text, header)
+    if not body:
+        return True
+    return any(marker in body for marker in _STUB_MARKERS)
+
+
+def _shorten(body: str, max_chars: int = 800) -> str:
+    body = body.strip()
+    if len(body) <= max_chars:
+        return body
+    cut = body[:max_chars].rsplit(". ", 1)[0]
+    return cut + ". …"
+
+
+def _headline_from_findings(conclusions: str) -> str:
+    """Pull the most quotable headline from the conclusions' Findings section.
+    Returns the first non-empty bullet, stripped of markdown markers."""
+    body = _section(conclusions, "Findings")
+    if not body:
+        return ""
+    for line in body.splitlines():
+        line = line.strip()
+        if line.startswith(("-", "*")):
+            return line.lstrip("-* ").strip()
+    return body.splitlines()[0].strip() if body.splitlines() else ""
+
+
+def _finalize_step_readme(
+    readme: str,
+    conclusions: str,
+    decisions: list[str],
+    inv: dict[str, list[str]],
+    path_name: str,
+    *,
+    plain_summary: str = "",
+) -> str:
+    """Backfill stub README sections from conclusions + decisions + outputs.
+
+    The README is the 60-second OVERVIEW; the per-section behaviour is:
+
+    * **In plain English** ← `context/notes.md` Plain-language summary OR
+      `conclusions.md`'s "Plain-language summary" section.
+    * **Methods (one line each)** ← `conclusions.md`'s Methods section,
+      truncated to ~800 chars.
+    * **Headline finding** ← first bullet of `conclusions.md` Findings.
+    * **Outputs** ← inventory of figures / tables / reports.
+    * **Decision** ← `conclusions.md`'s Decision section.
+    """
+    text = readme
+
+    # Plain-English overview: context > conclusions > skip.
+    if _is_stub_section(text, "In plain English"):
+        body = plain_summary or _section(
+            conclusions, "Plain-language summary"
+        )
+        if body:
+            text = _replace_section(text, "In plain English", _shorten(body, 700))
+
+    # Methods (one-line each).
+    if _is_stub_section(text, "Methods (one line each)") or _is_stub_section(text, "Methods"):
+        method_src = _section(conclusions, "Methods (full detail)") or _section(
+            conclusions, "Methods"
+        ) or _section(conclusions, "Method")
+        if not method_src and decisions:
+            method_src = "Decisions logged for this step:\n\n" + "\n\n".join(
+                d[:600] for d in decisions[-3:]
+            )
+        if method_src:
+            header = (
+                "Methods (one line each)"
+                if "Methods (one line each)" in text
+                else "Methods"
+            )
+            text = _replace_section(text, header, _shorten(method_src, 800))
+
+    # Headline finding.
+    if _is_stub_section(text, "Headline finding"):
+        headline = _headline_from_findings(conclusions)
+        if headline:
+            text = _replace_section(text, "Headline finding", headline)
+
+    # Outputs.
+    if _is_stub_section(text, "Outputs"):
+        lines = []
+        if inv["figures"]:
+            lines.append("**Figures**: " + ", ".join(f"`{n}`" for n in inv["figures"]))
+        if inv["tables"]:
+            lines.append("**Tables**: " + ", ".join(f"`{n}`" for n in inv["tables"]))
+        if inv["reports"]:
+            lines.append("**Reports**: " + ", ".join(f"`{n}`" for n in inv["reports"]))
+        if not lines:
+            lines.append("_(no figures, tables, or reports produced — pure routing / synthesis step)_")
+        text = _replace_section(text, "Outputs", "\n".join(lines))
+
+    # Decision.
+    if _is_stub_section(text, "Decision"):
+        dec_src = _section(conclusions, "Decision")
+        if dec_src:
+            text = _replace_section(text, "Decision", dec_src)
+
+    return text
 
 
 def list_paths(root: Path) -> dict[str, Any]:

@@ -63,6 +63,8 @@ _SCAFFOLD_NAMES = {
 # folders plus common conda/git/IDE noise.
 _EXCLUDED_DIRS = {
     "inputs", "workspace", "synthesis", "docs", "environment", ".os_state",
+    "scripts",  # project-owned share-archive + GitHub-init scripts
+    "tests",    # researcher's pytest suite, not "incoming context"
     "node_modules", "__pycache__", "venv", ".venv", "env",
     "dist", "build", ".pytest_cache", ".ruff_cache", ".mypy_cache",
 }

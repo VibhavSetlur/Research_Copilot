@@ -1,0 +1,130 @@
+id: preregistration
+name: Pre-registration & Statistical Analysis Plan
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  Freeze the Statistical Analysis Plan (SAP) BEFORE data analysis so
+  the project has a clean confirmatory-vs-exploratory split when the
+  paper is assembled. Diff the actual analysis against the frozen
+  SAP at synthesis time and surface every deviation honestly in the
+  paper's Discussion.
+
+  Optional but strongly recommended for any project that will be
+  submitted to a journal — Registered Reports (which require this
+  exact handshake) are now offered by 300+ journals including
+  Cortex, Nature, Royal Society Open Science, and PLOS Biology.
+
+trigger: |
+  After project_startup + methodology_selection have settled the
+  primary analysis plan, BEFORE the first data-touching analysis
+  script runs. Also re-runnable whenever a substantive amendment is
+  authorised (creates a NEW snapshot; the original remains immutable).
+
+prerequisites:
+  - workspace/methods.md exists with at least one substantive entry
+  - At least one hypothesis has been registered via mem_hypothesis_add
+  - inputs/researcher_config.yaml has the research question + design
+
+editorial_voice:
+  rules:
+    - "Confirmatory ≠ exploratory. Use mem_hypothesis_add kind='confirmatory'
+       for the pre-registered set; kind='exploratory' for anything added
+       after data inspection."
+    - "Every deviation from the SAP must appear in the Discussion under
+       'Deviations from pre-registration'. Hiding them is worse than
+       having them."
+    - "Null findings (refuted / inconclusive) are first-class. See
+       synthesis_null_findings."
+
+steps:
+  - id: freeze_sap
+    name: Freeze the Statistical Analysis Plan
+    description: |
+      tool_preregister_freeze
+        primary_outcomes="..."
+        secondary_outcomes="..."
+        target_n=<int>
+        power_assumption="..."
+        sensitivity=[...]
+        multiplicity="Benjamini-Hochberg over the primary endpoint family"
+        inclusion=[...]
+        exclusion=[...]
+        missing_data="MICE with m=20 imputations"
+
+      Snapshots workspace/methods.md + active hypotheses into
+      workspace/.preregistration/prereg_<iso>.{md,yaml}, content-hashed
+      and immutable. Suggests OSF submission via
+      https://osf.io/prereg/ "Standard Pre-Data Collection Registration".
+
+      Required SAP fields (FDA E9 + SPIRIT 2025 + CONSORT 2010):
+        - Trial / study design summary
+        - Primary + secondary outcome definitions
+        - Sample-size calculation with assumptions
+        - Statistical method for each endpoint
+        - Inclusion / exclusion criteria
+        - Missing-data handling rule
+        - Multiplicity correction
+        - Pre-specified sensitivity analyses
+        - Pre-specified subgroup analyses
+        - Stopping rules / interim analyses (if any)
+        - Anticipated deviations + contingencies
+
+  - id: register_externally
+    name: Register on OSF / AsPredicted (optional but recommended)
+    description: |
+      The frozen SAP markdown is OSF-compatible. Upload at
+      https://osf.io/prereg/ → "Standard Pre-Data Collection Registration"
+      → paste the SAP body. AsPredicted (https://aspredicted.org/)
+      offers a shorter 9-question form for simpler designs.
+
+      Record the issued OSF / AsPredicted URL in
+      synthesis/synthesis_spec.yaml under `preregistration_url` so the
+      paper, dashboard, and poster surface it prominently.
+
+  - id: run_analyses
+    name: Run the Pre-Specified Analyses
+    description: |
+      Run the primary + secondary analyses per the SAP. Tag any new
+      hypothesis added post-hoc explicitly:
+        mem_hypothesis_add id="H5" kind="exploratory" statement="..."
+
+      Confirmatory hypotheses count toward the family-wise multiplicity
+      correction; exploratory ones are reported as hypothesis-generating
+      and not subjected to the same correction.
+
+  - id: diff_at_synthesis
+    name: Diff Pre-Registration at Synthesis Time
+    description: |
+      tool_preregister_diff
+      Loads the most recent frozen SAP; compares to the current state +
+      methods + paper. Lists every deviation:
+        - hypotheses added since freeze (must be marked exploratory)
+        - hypotheses removed since freeze (requires justification)
+        - methods.md passages added (post-hoc additions)
+        - primary outcome NOT mentioned in paper (severe — review whether
+          the outcome was silently changed)
+
+      Writes workspace/logs/preregistration_diff.md. The dashboard's
+      "Deviations from pre-registration" panel surfaces this verbatim;
+      the paper's Discussion section MUST mention every deviation.
+
+  - id: report_in_paper
+    name: Report Deviations in the Paper's Discussion
+    description: |
+      Add a "Pre-registration" subsection to the Discussion (or its
+      own section for Registered Reports) covering:
+        - Pre-registration ID + URL.
+        - Confirmatory vs exploratory split.
+        - Every deviation logged by tool_preregister_diff with a
+          one-paragraph rationale.
+
+      tool_audit_quality_full will surface the deviation count as
+      part of its master report.
+
+expected_outputs:
+  - workspace/.preregistration/prereg_*.md
+  - workspace/.preregistration/prereg_*.yaml
+  - workspace/logs/preregistration_diff.md
+
+next_protocol: guidance/analysis_plan
+on_failure: null

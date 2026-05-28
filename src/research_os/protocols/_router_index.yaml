@@ -37,10 +37,11 @@ hierarchy:
   session:
     label: "Session management"
     sub_intents:
-      boot:       "Start of a session"
-      resume:     "Continue a paused project"
-      handoff:    "End session cleanly"
-      autopilot:  "Let the AI drive with explicit gates"
+      boot:          "Start of a session"
+      resume:        "Continue a paused project"
+      handoff:       "End session cleanly (AI → AI)"
+      collaborator:  "Hand off to a HUMAN outside Research-OS"
+      autopilot:     "Let the AI drive with explicit gates"
   discover:
     label: "Project intake + question lock-in"
     sub_intents:
@@ -74,6 +75,9 @@ hierarchy:
       meta:         "Meta-analysis / pooled effects"
       design:       "Study design"
       tool_pick:    "Find a candidate library / CLI"
+      prereg:       "Freeze SAP + hypotheses before analysis"
+      bayesian:     "Bayesian workflow (priors → posterior → checks)"
+      timeseries:   "Time-aware analysis + forecasting"
   literature:
     label: "Literature search + synthesis"
     sub_intents:
@@ -91,6 +95,7 @@ hierarchy:
       report:    "Technical / executive report"
       figures:   "Figure styling + guidelines"
       writing:   "Writing rules (methods, citations, conclusions, ...)"
+      null_findings: "Publishable companion for refuted / inconclusive / abandoned"
   audit_wrap:
     label: "Audit + reproducibility"
     sub_intents:
@@ -102,9 +107,11 @@ hierarchy:
       hypothesis: "Add / update / list hypotheses"
       glossary:   "Extend the glossary"
   review:
-    label: "Review someone else's paper"
+    label: "Review research artefacts"
     sub_intents:
-      quick:    "Fast critical appraisal"
+      quick:     "Fast critical appraisal of an external paper"
+      code:      "Code review of analysis scripts (yours or collaborator's)"
+      respond:   "Draft response to peer-review comments on YOUR paper"
 
 # ─────────────────────────────────────────────────────────────────────
 # GUIDANCE protocols
@@ -342,13 +349,6 @@ protocols:
       - tool: mem_hypothesis_add
       - tool: mem_hypothesis_list
 
-  guidance/writing_standards:
-    intent_class: synthesize
-    sub_intent: writing
-    summary: "Style + reporting-standard rules used by synthesis."
-    triggers: ["writing standard", "reporting standard", "consort",
-              "strobe", "tripod"]
-
   guidance/glossary_update:
     intent_class: memory
     sub_intent: glossary
@@ -377,11 +377,14 @@ protocols:
     summary: "Choose statistical / computational method given design + data."
     triggers: ["pick method", "which method", "choose model", "what should i use"]
 
-  methodology/research_methods:
+  methodology/preregistration:
     intent_class: methodology
-    sub_intent: pick
-    summary: "Generic method survey when unsure."
-    triggers: ["survey methods", "compare methods"]
+    sub_intent: prereg
+    summary: "Freeze SAP + hypotheses BEFORE data analysis; diff at synthesis."
+    triggers: ["preregister", "pre-register", "prereg", "freeze the plan",
+               "lock the analysis plan", "registered report", "sap",
+               "freeze the methods", "lock the methods"]
+    shortcut_tool: tool_preregister_freeze
 
   methodology/causal_inference_deep:
     intent_class: methodology
@@ -464,6 +467,22 @@ protocols:
     summary: "Find candidate libraries / CLIs for a task."
     triggers: ["find a library", "what tool", "candidate libraries",
               "best package"]
+
+  methodology/bayesian_analysis:
+    intent_class: methodology
+    sub_intent: bayesian
+    summary: "Bayesian workflow: priors → posterior → diagnostics → checks → sensitivity."
+    triggers: ["bayesian", "stan", "pymc", "brms", "posterior",
+               "credible interval", "rope", "bayes factor",
+               "hierarchical bayesian", "prior predictive"]
+
+  methodology/timeseries_analysis:
+    intent_class: methodology
+    sub_intent: timeseries
+    summary: "Time-aware analysis + forecasting (ARIMA/ETS/state-space/Prophet/ML)."
+    triggers: ["time series", "timeseries", "forecasting", "forecast",
+               "arima", "ets", "state-space", "kalman", "prophet",
+               "interrupted time series", "structural break"]
 
   literature/literature_search:
     intent_class: literature
@@ -582,6 +601,36 @@ protocols:
     summary: "Technical / executive report."
     triggers: ["technical report", "internal report", "stakeholder report"]
     shortcut_tool: tool_synthesize
+
+  synthesis/synthesis_null_findings:
+    intent_class: synthesize
+    sub_intent: null_findings
+    summary: "Publishable companion for refuted / inconclusive / underpowered / abandoned."
+    triggers: ["null findings", "null result", "what didn't work",
+               "negative results", "refuted hypothesis", "dead ends paper"]
+    shortcut_tool: tool_null_findings_report
+
+  guidance/code_review:
+    intent_class: review
+    sub_intent: code
+    summary: "Review analysis scripts for correctness / reproducibility / leakage."
+    triggers: ["review my code", "code review", "review the scripts",
+               "vet this script", "is this correct", "audit my analysis script"]
+
+  guidance/peer_review_response:
+    intent_class: review
+    sub_intent: respond
+    summary: "Structured response to external peer-review comments on YOUR paper."
+    triggers: ["respond to reviewers", "reviewer comments", "rebuttal",
+               "draft a response", "the editor sent back", "revise and resubmit"]
+
+  guidance/collaboration_handoff:
+    intent_class: session
+    sub_intent: collaborator
+    summary: "Package the project for a HUMAN collaborator outside Research-OS."
+    triggers: ["send to a collaborator", "hand off to the team",
+               "share with another lab", "package for handoff",
+               "another lab is taking this"]
 
 # ─────────────────────────────────────────────────────────────────────
 # AUDIT + REPRODUCIBILITY

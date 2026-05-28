@@ -1,94 +1,179 @@
 id: methodology_selection
-name: Methodology Selection
-version: '5.0.0'
+name: Methodology Selection (with lightweight lookup mode)
+version: '6.0.0'
 schema_version: '2.0'
-description: Pick the statistical / computational method(s) to test the active hypotheses. Document implementation, parameters, and assumptions. Validates every choice in the literature.
-trigger: After research_design (or directly from project_startup when the design is obviously fixed). Re-run if outcome class changes.
+description: |
+  Pick the statistical / computational method(s) for the active
+  hypotheses. Document implementation, parameters, and assumptions.
+  Ground every choice in the literature; never commit a method from
+  training memory alone.
+
+  Includes a lightweight "lookup" mode (formerly `research_methods`)
+  for the case where the AI just needs a quick scan of candidates
+  before committing to a deeper grounding pass.
+
+trigger: |
+  After research_design, or directly from project_startup when the
+  design is fixed. Also enter here when the researcher asks
+  "what method should I use" / "which model fits this".
+
+editorial_voice:
+  mode: hybrid
+  rules:
+    - "Frame methodological choices as REASONING — 'consider whether
+       the outcome's distribution is skewed enough to motivate a rank-
+       based test' beats 'run Welch ANOVA'."
+    - "Hard requirement: every chosen method cites at least two prior
+       sources in the justification. Lightweight lookup mode allows
+       one for runners-up."
+    - "Defaults are starting points, not commitments. Document the
+       reasoning that led to the final pick."
 
 steps:
   - id: classify_problem
-    name: Classify the Problem on 3 Axes
+    name: Classify the problem on three axes
     description: |
-      Decide:
-        1. Outcome type:  continuous | binary | count | time-to-event | ordinal | nominal | text | image | network
-        2. Data structure: independent | repeated | nested | spatial | temporal | sequential
-        3. Dimensionality: univariate | low-D (p << n) | high-D (p ~ n or p >> n)
-      Cross-check against the data profile reports from project_startup
-      (outputs/reports/profile_*.md). Write the (type, structure, dim) triple
-      to workspace/methods.md via mem_methods_append (one entry per hypothesis).
+      A method's appropriateness almost always reduces to three
+      questions about the data:
+
+        1. Outcome type — continuous / binary / count / time-to-event /
+           ordinal / nominal / text / image / network.
+        2. Data structure — independent / repeated / nested / spatial
+           / temporal / sequential.
+        3. Dimensionality — univariate / low-D (p ≪ n) / high-D
+           (p ≈ n or p ≫ n).
+
+      Cross-check against the data profile reports under
+      `outputs/reports/profile_*.md`. Record the (type, structure,
+      dim) triple in the project methods record (one entry per
+      hypothesis is the usual factoring).
 
   - id: enumerate_candidates
-    name: Enumerate 2-3 Candidate Methods
+    name: Enumerate 2-3 candidate methods
     description: |
-      Starting points — verify with literature, never commit blindly:
+      A non-exhaustive starting map. Treat these as the FIRST set
+      to consider, not the only set; verify each against the
+      literature before committing.
 
-        Continuous · independent · low-D  → OLS / Ridge / LASSO; MLR for multi-IV
-        Continuous · repeated             → Mixed-effects (lme4 / statsmodels)
-        Continuous · nested               → Multilevel / hierarchical Bayes
+        Continuous · independent · low-D  → OLS / Ridge / LASSO
+        Continuous · repeated             → Mixed-effects
+        Continuous · nested               → Multilevel / hierarchical
         Continuous · spatial              → Kriging / spatial regression
         Continuous · high-D               → LASSO / Elastic Net / PCA + reg
         Binary · independent              → Logistic / GLM
         Binary · time-varying covariates  → Time-varying logistic
-        Count                             → Poisson / Negative Binomial / zero-inflated
-        Time-to-event                     → Cox PH; Fine-Gray for competing risks
-        Causal observational              → Propensity scoring, DiD, IV, RDD
+        Count                             → Poisson / NegBin / zero-inflated
+        Time-to-event                     → Cox PH; Fine-Gray (competing risks)
+        Causal observational              → Propensity / DiD / IV / RDD
         ML benchmark                      → Baseline + main + ablations
-        Text                              → Pretrained transformer fine-tune + calibration
+        Text                              → Pretrained transformer + calibration
         Image                             → CNN baseline + domain transfer
-      Document 2-3 candidates with pros/cons in workspace/methods.md.
+        Bayesian (any outcome)            → see methodology/bayesian_analysis
+        Time-series (any outcome)         → see methodology/timeseries_analysis
+
+      Record 2-3 candidates with pros / cons. The runner-ups are
+      not wasted work — they're the sensitivity-analysis options.
 
   - id: ground_in_literature
-    name: Ground Each Candidate (MANDATORY)
+    name: Ground each candidate in the literature (MANDATORY)
     description: |
-      For each candidate, call tool_research_method query="<method> for <triple>".
-      This writes a structured report to outputs/reports/method_research_*.md.
-      Cite at least 2 sources supporting the winning method (in the
-      mem_methods_append justification field) and at least 1 source for each
-      runner-up.
+      For each candidate, consult the literature before committing.
+      The depth of the pass scales with the stakes:
 
-      For ML / software-heavy methodologies, also call tool_research_tool to
-      validate the chosen library is maintained and installable.
+        - **Light** (a familiar method, a routine choice): one or two
+          targeted searches via the literature tools, citing the
+          canonical reference and a recent best-practice paper.
+        - **Deep** (an unfamiliar method, a high-stakes choice, or a
+          method whose conventions have shifted): a fuller research
+          pass producing a structured report under
+          `outputs/reports/method_research_*.md`.
+
+      The winning method's justification field must cite at least two
+      sources; each runner-up at least one. If the citation chain
+      can't be built, the method is not yet groundable — pick again
+      or expand the literature pass.
 
   - id: pick_tools
-    name: Pick Tools / Libraries
+    name: Pick the implementation
     description: |
-      tool_research_tool task="<method implementation>" language="<py|r|julia>"
-      Prefer installable libraries (tag: installable_via_package_manager).
-      If best option is external (website, paid, GUI) — call
-      tool_external_tool_instructions and warn the researcher.
-      Use tool_package_install on the winner; it appends to requirements.txt
-      automatically.
+      Once the method is settled, decide on the implementation.
+      Prefer installable libraries (Python / R / Julia) over GUI or
+      paid tools. Verify the library is maintained (recent commits,
+      open issues handled, semver discipline) and compatible with the
+      project environment. For ML / software-heavy methods, this is
+      often a separate decision from the method choice.
+
+      Where an external / paid / GUI tool genuinely fits best,
+      document why and capture instructions so the workflow remains
+      reproducible without it being installed locally.
 
   - id: record_choice_and_assumptions
-    name: Record Choice, Implementation & Assumptions
+    name: Record choice + assumptions
     description: |
-      For the WINNING method, call mem_methods_append with:
-        method=<name>
-        step_number=<NN>           # next experiment number
-        step_name=<slug>
-        dataset_name=<from intake>
-        dataset_hash=<sha256 from intake>
-        implementation=<library>==<version>
-        parameters=<key hyperparams>
-        justification=<1-2 sentences with citation keys>
-        assumptions=[<list of assumptions to TEST>]
-      Plus mem_decision_log (context / selected / rationale / options considered).
+      Commit the WINNING method to the project methods record:
+        - method name
+        - which step will run it (slug + number)
+        - dataset name + hash from intake
+        - implementation library + version
+        - key parameters
+        - justification (2 sentences + citation keys)
+        - assumptions list (every assumption to be tested in-step).
+
+      Also log the decision (context / selected / rationale / options
+      considered / linked citation keys). The grounding registry will
+      see this and surface it during master audit.
 
   - id: list_assumption_tests
-    name: Plan Assumption Tests
+    name: Plan assumption checks (guidance, not prescription)
     description: |
-      For every assumption, name the diagnostic test to run during execution:
-        Normality           → Shapiro-Wilk (n<5000) / Q-Q plot
-        Homoscedasticity    → Levene / Breusch-Pagan
-        Multicollinearity   → VIF (>10 = problem)
-        Independence        → Durbin-Watson on residuals
-        Proportional hazards → Schoenfeld residuals
-        Calibration (binary)→ Hosmer-Lemeshow / calibration plot
-        Class balance (ML)  → Class-frequency ratio + stratified split
-      Write the test plan into workspace/methods.md under "Assumption tests planned".
+      For every assumption, name the diagnostic that would falsify
+      it — without prescribing the exact tool call. The point is
+      that the AI thinks about WHAT to check; the WHICH (the test
+      family) follows from the WHAT.
+
+        - Normality of residuals          → consider a graphical
+          diagnostic (Q-Q) plus a formal test if a follow-up
+          inferential step assumes it.
+        - Homoscedasticity                → consider Levene or
+          Breusch-Pagan; visual diagnostic via scale-location.
+        - Multicollinearity               → consider VIF; pairwise
+          correlation as a sanity check.
+        - Independence (residual)         → consider Durbin-Watson
+          for time-series; ACF plot for serial correlation.
+        - Proportional hazards            → Schoenfeld residuals
+          (Cox); stratified KM plots.
+        - Calibration (binary classifier) → calibration plot;
+          Hosmer-Lemeshow if the count of events allows.
+        - Class balance (ML)              → frequency table;
+          stratified split.
+
+      Record the assumption-test plan inside the methods record so
+      the in-step audit can pick it up automatically.
+
+  - id: lookup_mode
+    name: Lookup mode (lightweight scan when uncertain)
+    description: |
+      Sometimes you don't yet know enough to enumerate candidates —
+      you need a quick "what's the current best practice" scan.
+      Run this step BEFORE `enumerate_candidates`:
+
+        1. Characterise the data quickly from intake + any existing
+           profile report.
+        2. State the analytical GOAL in one phrase (description /
+           association / prediction / causal effect / classification
+           / clustering / ranking / anomaly detection / generation).
+        3. Run two-to-four targeted literature searches against the
+           goal-and-data combination.
+        4. Pull the 2-4 most recent or most cited candidates into the
+           `enumerate_candidates` step.
+
+      This replaces the previous standalone `research_methods`
+      protocol — same workflow, absorbed here so the AI doesn't
+      have to context-switch.
 
 expected_outputs:
   - workspace/methods.md
+  - workspace/<active step>/outputs/reports/method_research_*.md (when deep grounding)
 
 next_protocol: literature/literature_search
 on_failure: guidance/dead_end_routing

@@ -37,6 +37,7 @@ EXPERIMENT_SUBDIRS = (
     "data/output",
     "scripts",
     "literature",        # per-step PDFs; populated by tool_literature_download(step_id=…)
+    "context",           # per-step prose notes, methodology rationale, hand-overs
     "outputs/reports",
     "outputs/figures",
     "outputs/tables",
@@ -44,6 +45,13 @@ EXPERIMENT_SUBDIRS = (
 )
 # NOTE: no `outputs/dashboards` here on purpose. Dashboards are a *project-level*
 # synthesis output (synthesis/dashboard.html), not a per-step artifact.
+#
+# `context/` is the step's "if a new analyst opened this folder today, what
+# narrative would let them act?" — methodology rationale, drafts, screen-grab
+# notes from upstream meetings. Distinct from `literature/` (formal sources)
+# and `data/` (machine-readable). `finalize_path` rewrites its README to
+# summarise whatever was deposited so the dashboard's per-step appendix can
+# surface it.
 
 TOP_LEVEL_DIRS = (
     ".os_state",
@@ -159,37 +167,11 @@ def compute_file_hash(path: Path) -> str:
 
 
 def default_state() -> dict:
-    """Canonical default state. Used by ResearchLedger when no file exists."""
-    return {
-        "schema_version": "3.0",
-        "project_id": str(uuid.uuid4()),
-        "project_name": "Research Project",
-        "project": "",  # legacy alias
-        "created_at": now_iso(),
-        "updated_at": now_iso(),
-        "phase": "init",  # legacy alias
-        "pipeline_stage": "init",
-        "step": 0,
-        "current_path": "main",
-        "checkpoints": {},
-        "checkpoint_history": [],
-        "active_hypotheses": [],
-        "dead_ends": [],
-        "loaded_data": [],
-        "errors": [],
-        "resumable_from": None,
-        "context_transfer_memos": [],
-        "linked_external_data": [],
-        "paths": {
-            "main": {
-                "path_id": "main",
-                "status": "active",
-                "experiment_dir": "workspace",
-                "created_at": now_iso(),
-                "input_data_hashes": {},
-            }
-        },
-    }
+    """Canonical default state — delegates to ResearchLedger's canonical schema.
+
+    Kept as a thin wrapper for callers that import ``default_state`` directly.
+    """
+    return ResearchLedger._default_state()
 
 
 def load_state(root: Path | None = None) -> dict:
@@ -203,14 +185,14 @@ def load_state(root: Path | None = None) -> dict:
 
 
 def save_state(root: Path, state: dict) -> dict:
+    """Persist state via ResearchLedger. Migration runs on ``_load``, so any
+    legacy keys that re-appear here from callers are normalised on read."""
     root = _resolve_root(root)
     ledger = ResearchLedger(state_json_path(root))
     state["updated_at"] = now_iso()
-    # Keep legacy + canonical fields in sync for older readers.
-    if "pipeline_stage" in state:
-        state.setdefault("phase", state["pipeline_stage"])
-    if "project_name" in state and not state.get("project"):
-        state["project"] = state["project_name"]
+    # If callers handed us a legacy-shaped dict, normalise before saving so
+    # the on-disk view stays canonical from this point forward.
+    ResearchLedger._migrate(state)
     ledger._save(state)
     _write_os_state_summary(root)
     return state
@@ -230,8 +212,8 @@ def _write_os_state_summary(root: Path) -> None:
     except Exception:
         paths = []
 
-    name = state.get("project_name") or state.get("project") or "Research Project"
-    stage = state.get("pipeline_stage", state.get("phase", "init"))
+    name = state.get("project_name") or "Research Project"
+    stage = state.get("pipeline_stage", "init")
     current = state.get("current_path", "main")
 
     lines = [
@@ -448,8 +430,6 @@ def scaffold_minimal_workspace(
 
     state = default_state()
     state["project_name"] = project_name
-    state["project"] = project_name
-    state["paths"]["main"]["input_data_hashes"] = compute_input_hashes(root)
     save_state(root, state)
 
     regenerate_intake(root, project_name, config_overrides)
@@ -457,6 +437,7 @@ def scaffold_minimal_workspace(
     _setup_mcp_configs(root, ide_flags)
     _setup_gitignore(root)
     _write_getting_started(root, project_name)
+    _write_sharing_scripts(root, project_name)
     _update_manifest(root)
     _prune_stale_gitkeeps(root)
     if git_init and not (root / ".git").exists():
@@ -464,6 +445,333 @@ def scaffold_minimal_workspace(
             subprocess.run(["git", "init"], cwd=root, capture_output=True)
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Sharing — zip + GitHub init scripts written at scaffold time.
+# ---------------------------------------------------------------------------
+
+
+# Files / directories EXCLUDED from the share-safe archive. These are
+# either AI-internal (CLAUDE.md, AGENTS.md, MCP configs) or onboarding
+# artefacts a downstream researcher does not need (GETTING_STARTED.md).
+_SHARE_EXCLUDE_NAMES = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GETTING_STARTED.md",
+    ".os_state",
+    ".claude",
+    ".cursor",
+    ".vscode",
+    ".antigravity",
+    ".opencode",
+    "mcp_config.json",
+    ".mcp.json",
+    "opencode.json",
+    "__pycache__",
+    ".pytest_cache",
+    ".DS_Store",
+    "node_modules",
+    "venv",
+    ".venv",
+    "env",
+)
+
+# Folders that ARE included by default. Anything else at the project root
+# is preserved as-is unless it matches an exclusion above.
+_SHARE_INCLUDE_DIRS = (
+    "inputs",
+    "workspace",
+    "synthesis",
+    "docs",
+    "environment",
+)
+
+
+def _write_sharing_scripts(root: Path, project_name: str) -> None:
+    """Scaffold the export-to-zip + GitHub init scripts. Idempotent."""
+    scripts_dir = root / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+
+    export_py = scripts_dir / "export_share_archive.py"
+    if not export_py.exists():
+        export_py.write_text(_EXPORT_PY_TEMPLATE)
+        try:
+            export_py.chmod(0o755)
+        except OSError:
+            pass
+
+    export_sh = scripts_dir / "export_share_archive.sh"
+    if not export_sh.exists():
+        export_sh.write_text(
+            "#!/usr/bin/env bash\n"
+            "# Build a share-safe zip of this project (no AI internals).\n"
+            "# Equivalent to `python scripts/export_share_archive.py`.\n"
+            "set -euo pipefail\n"
+            'HERE="$(cd "$(dirname "$0")/.." && pwd)"\n'
+            'python "$HERE/scripts/export_share_archive.py" "$@"\n'
+        )
+        try:
+            export_sh.chmod(0o755)
+        except OSError:
+            pass
+
+    init_gh = scripts_dir / "init_github.sh"
+    if not init_gh.exists():
+        slug = slugify(project_name, "research-project").replace("_", "-")
+        init_gh.write_text(_INIT_GITHUB_TEMPLATE.replace("__SLUG__", slug))
+        try:
+            init_gh.chmod(0o755)
+        except OSError:
+            pass
+
+    sharing_doc = root / "docs" / "SHARING.md"
+    if not sharing_doc.exists():
+        sharing_doc.write_text(_SHARING_DOC_TEMPLATE)
+
+
+_EXPORT_PY_TEMPLATE = '''"""Build a share-safe zip of the project.
+
+What is included:
+  inputs/, workspace/, synthesis/, docs/, environment/, README.md (if present)
+What is EXCLUDED (always):
+  AGENTS.md, CLAUDE.md, GETTING_STARTED.md, .os_state/, .claude/,
+  .cursor/, .vscode/, .antigravity/, .opencode/, MCP configs,
+  __pycache__/, .pytest_cache/, .DS_Store, virtualenvs, node_modules/.
+
+The zip is written to <project>_share_<YYYY-MM-DD>.zip in the project
+root. Use --out PATH to override.
+
+Usage:
+    python scripts/export_share_archive.py
+    python scripts/export_share_archive.py --out /tmp/myproj.zip
+    python scripts/export_share_archive.py --include-raw-data
+"""
+from __future__ import annotations
+import argparse
+import datetime as _dt
+import sys
+import zipfile
+from pathlib import Path
+
+EXCLUDE_NAMES = {
+    "AGENTS.md", "CLAUDE.md", "GETTING_STARTED.md",
+    ".os_state", ".claude", ".cursor", ".vscode",
+    ".antigravity", ".opencode",
+    "mcp_config.json", ".mcp.json", "opencode.json",
+    "__pycache__", ".pytest_cache", ".DS_Store",
+    "node_modules", "venv", ".venv", "env",
+}
+
+INCLUDE_DIRS = ("inputs", "workspace", "synthesis", "docs", "environment")
+
+
+def _excluded(path: Path) -> bool:
+    parts = path.parts
+    for part in parts:
+        if part in EXCLUDE_NAMES:
+            return True
+        if part.startswith(".") and part not in {".gitignore", ".gitkeep"}:
+            return True
+    return False
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out", type=Path, default=None,
+                    help="Output zip path. Default: <project>_share_<date>.zip")
+    ap.add_argument("--include-raw-data", action="store_true",
+                    help="Include inputs/raw_data/ (default: skipped to keep "
+                    "the archive small and avoid PII leaks).")
+    args = ap.parse_args()
+
+    root = Path(__file__).resolve().parents[1]
+    today = _dt.date.today().isoformat()
+    out = args.out or (root / f"{root.name}_share_{today}.zip")
+    out = out.resolve()
+
+    files_added = 0
+    bytes_added = 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        # Top-level README.md if it exists
+        readme = root / "README.md"
+        if readme.exists():
+            zf.write(readme, arcname=f"{root.name}/README.md")
+            files_added += 1
+            bytes_added += readme.stat().st_size
+        for sub in INCLUDE_DIRS:
+            base = root / sub
+            if not base.exists():
+                continue
+            for p in base.rglob("*"):
+                if not p.is_file():
+                    continue
+                if not args.include_raw_data and "raw_data" in p.relative_to(root).parts:
+                    continue
+                rel = p.relative_to(root)
+                if _excluded(rel):
+                    continue
+                arc = f"{root.name}/{rel.as_posix()}"
+                zf.write(p, arcname=arc)
+                files_added += 1
+                bytes_added += p.stat().st_size
+
+    print(f"[done] {out}")
+    print(f"       {files_added} files, {bytes_added / 1024:.1f} KB compressed "
+          f"({out.stat().st_size / 1024:.1f} KB on disk)")
+    if not args.include_raw_data:
+        print("       NOTE: inputs/raw_data/ skipped. Pass --include-raw-data to bundle it.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+
+_INIT_GITHUB_TEMPLATE = """#!/usr/bin/env bash
+# Initialise a GitHub repo from this project — share-safe by default.
+#
+# Excludes AI-internal files (AGENTS.md, CLAUDE.md, .os_state/, .claude/,
+# MCP configs, GETTING_STARTED.md) and large raw data via .gitignore.
+#
+# Requires: gh CLI installed and authenticated (`gh auth login`).
+#
+# Usage:
+#   ./scripts/init_github.sh                    # default name from project slug
+#   ./scripts/init_github.sh my-repo-name       # custom repo name
+#   ./scripts/init_github.sh my-repo --public   # public repo (default private)
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$HERE"
+
+REPO_NAME="${1:-__SLUG__}"
+VISIBILITY="--private"
+for arg in "$@"; do
+  [[ "$arg" == "--public" ]] && VISIBILITY="--public"
+  [[ "$arg" == "--internal" ]] && VISIBILITY="--internal"
+done
+
+# 1. Make sure git is initialised.
+if [ ! -d ".git" ]; then
+  git init -b main
+fi
+
+# 2. Make sure the share-safe .gitignore additions are present.
+GI=".gitignore"
+touch "$GI"
+add_ignore() {
+  grep -qxF "$1" "$GI" 2>/dev/null || echo "$1" >> "$GI"
+}
+add_ignore "AGENTS.md"
+add_ignore "CLAUDE.md"
+add_ignore "GETTING_STARTED.md"
+add_ignore ".os_state/"
+add_ignore ".claude/"
+add_ignore ".cursor/"
+add_ignore ".vscode/"
+add_ignore ".antigravity/"
+add_ignore ".opencode/"
+add_ignore "mcp_config.json"
+add_ignore ".mcp.json"
+add_ignore "opencode.json"
+add_ignore "inputs/raw_data/"
+add_ignore "__pycache__/"
+add_ignore "*.pyc"
+add_ignore ".DS_Store"
+
+# 3. Stage + commit (idempotent — skips if nothing changed).
+git add .
+if ! git diff --staged --quiet; then
+  git commit -m "Initial commit: Research OS project (share-safe)"
+fi
+
+# 4. Create the remote + push.
+if ! command -v gh >/dev/null 2>&1; then
+  echo "gh CLI not installed. Skipping remote creation."
+  echo "Install: https://cli.github.com/  then re-run."
+  exit 0
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+  echo "gh CLI not authenticated. Run: gh auth login"
+  exit 1
+fi
+
+if ! gh repo view "$REPO_NAME" >/dev/null 2>&1; then
+  gh repo create "$REPO_NAME" $VISIBILITY --source=. --remote=origin --push
+else
+  echo "Repo $REPO_NAME already exists. Pushing current branch."
+  git push -u origin main
+fi
+
+echo "[done] Repo URL:"
+gh repo view --json url -q .url
+"""
+
+
+_SHARING_DOC_TEMPLATE = """# Sharing this project
+
+Two paths, both share-safe by default (AI-internal files are excluded):
+
+## Option 1 — Zip archive
+
+```sh
+python scripts/export_share_archive.py
+# → <project>_share_<YYYY-MM-DD>.zip in the project root
+```
+
+What's included: `inputs/` (minus raw data unless you pass
+`--include-raw-data`), `workspace/`, `synthesis/`, `docs/`, `environment/`,
+and a top-level `README.md` if present.
+
+What's excluded (always): `AGENTS.md`, `CLAUDE.md`, `GETTING_STARTED.md`,
+`.os_state/`, `.claude/`, `.cursor/`, `.vscode/`, `.antigravity/`,
+`.opencode/`, MCP configs, `__pycache__/`, virtualenvs, `node_modules/`.
+
+Pass `--out PATH` to override the destination, e.g.
+
+```sh
+python scripts/export_share_archive.py --out /tmp/myproj.zip
+```
+
+## Option 2 — GitHub repo
+
+```sh
+./scripts/init_github.sh                  # private repo named after the project
+./scripts/init_github.sh my-repo-name     # custom repo name
+./scripts/init_github.sh my-repo --public # public repo
+```
+
+This script:
+
+1. Initialises `git` if needed.
+2. Appends the share-safe exclusions to `.gitignore` (idempotent).
+3. Commits if there are any new changes.
+4. Creates the GitHub repo via the `gh` CLI and pushes the first commit.
+
+Requires the [GitHub CLI](https://cli.github.com/) authenticated
+(`gh auth login`). If `gh` is not installed, the local commit still
+happens — push manually afterward.
+
+## What collaborators get
+
+A clean research workspace they can read without any Research-OS context:
+
+* `synthesis/dashboard.html` — the polished single-file dashboard
+  (open in any browser; self-contained).
+* `synthesis/figures/` — every curated figure with its caption sidecar.
+* `synthesis/REPORT.md` / `synthesis/paper.md` — the narrative deliverable.
+* `workspace/NN_*/conclusions.md` — the per-step reasoning chain.
+* `workspace/NN_*/scripts/` — the actual analysis code (reproducible).
+* `workspace/NN_*/data/output/` — derived artefacts each step persisted.
+* `docs/` — research question, glossary, workflow diagram.
+
+The AI-side configuration is intentionally excluded, so the share
+reads as a finished research project, not an in-progress AI workspace.
+"""
+
 
 
 def _prune_stale_gitkeeps(root: Path) -> None:
@@ -698,7 +1006,7 @@ def regenerate_intake(
     config_overrides = config_overrides or {}
     try:
         state = load_state(root)
-        project_name = project_name or state.get("project_name") or state.get("project") or "Research Project"
+        project_name = project_name or state.get("project_name") or "Research Project"
     except Exception:
         project_name = project_name or "Research Project"
 
@@ -823,6 +1131,184 @@ def _prune_old_checkpoints(root: Path, keep: int = 5) -> None:
             shutil.rmtree(snapshot_dir, ignore_errors=True)
 
 
+def _seed_step_subfolder_readmes(
+    exp_dir: Path,
+    root: Path,
+    branch_id: str,
+    next_num: int,
+    from_step: str | None,
+) -> None:
+    """Write informative README.md stubs in every step subfolder so an empty
+    folder still tells the researcher what to do — and points at the project-
+    global resource (inputs/literature, environment/) when nothing step-
+    specific was needed. Idempotent.
+    """
+    rel_root = root.absolute()
+
+    def _write_if_missing(path: Path, body: str) -> None:
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(body)
+
+    upstream_hint = (
+        f"data/input → previous step's data/output (step {next_num - 1:02d})."
+        if next_num > 1 and not from_step
+        else "data/input → inputs/raw_data (this is the ingest step)."
+        if next_num == 1
+        else f"data/input copied from `{from_step}`."
+    )
+
+    # Top-level data/ — explains the symlink + how downstream steps consume it.
+    _write_if_missing(
+        exp_dir / "data" / "README.md",
+        f"# `{branch_id}` — data\n\n"
+        "Two subfolders, both managed by the harness:\n\n"
+        "- **`input/`** — usually a symlink. Source of truth for this step's "
+        f"raw or pre-processed inputs. Default: {upstream_hint}\n"
+        "- **`output/`** — write CSV/parquet/pickle artefacts here. "
+        "Downstream steps' `data/input/` will symlink to this folder, so "
+        "name files for reuse (e.g. `tidy_survey.csv`, `composites.csv`).\n\n"
+        "When this step is complete `tool_path_finalize` rewrites this file "
+        "with the actual filename → downstream-step consumer mapping derived "
+        "from the workflow DAG.\n",
+    )
+    _write_if_missing(
+        exp_dir / "data" / "input" / "README.md"
+        if (exp_dir / "data" / "input").is_dir() and not (exp_dir / "data" / "input").is_symlink()
+        else exp_dir / "data" / "_input_readme.md",
+        f"# `{branch_id}/data/input` — usage\n\n"
+        f"Default wiring: {upstream_hint}\n\n"
+        "Replace the symlink with a directory only if this step has bespoke "
+        "inputs that aren't a clean function of the previous step's outputs. "
+        "Document any divergence in `analysis.md` (`mem_decision_log`).\n",
+    )
+    _write_if_missing(
+        exp_dir / "data" / "output" / "README.md",
+        f"# `{branch_id}/data/output` — usage\n\n"
+        "Persist analytic artefacts (CSV, parquet, pickle, JSON) here so "
+        "downstream steps and the synthesis dashboard can consume them.\n\n"
+        "Each saved file should be reproducible from `scripts/` alone — no "
+        "ad-hoc REPL edits. After `tool_path_finalize` runs, this README is "
+        "rewritten to list every persisted artefact with its consumer step.\n",
+    )
+
+    # Environment — by default points at global env; only step-specific if the
+    # researcher snapshotted with sys_env_snapshot.
+    _write_if_missing(
+        exp_dir / "environment" / "README.md",
+        f"# `{branch_id}` — environment\n\n"
+        "**Default:** this step uses the project-global environment at "
+        f"`{rel_root.name}/environment/` (see `environment/requirements.txt`).\n\n"
+        "Run `sys_env_snapshot` ONLY if this step needs different package "
+        "versions than the global env — otherwise this folder stays empty "
+        "(intentionally; the global snapshot is sufficient for reproducibility).\n\n"
+        "When `tool_path_finalize` runs at step completion it confirms one of "
+        "the two states above and updates this note accordingly.\n",
+    )
+
+    # Literature — points at global inputs/literature; step-specific only if
+    # the step has its own evidence chain (e.g. methodology pick, sensitivity
+    # comparison). Seed a structured `key_papers.md` so the analyst has a
+    # template, not a blank page.
+    _write_if_missing(
+        exp_dir / "literature" / "README.md",
+        f"# `{branch_id}` — literature\n\n"
+        "**Default:** this step uses the project-global literature corpus at "
+        "`inputs/literature/` (search via `tool_literature_search` or "
+        "`tool_evidence_synthesise`).\n\n"
+        "Put a PDF / DOI / sidecar `.notes.md` here ONLY if the citation is "
+        "specific to a methodological choice made in *this* step (and not "
+        "broadly relevant to the project). For decisions that hang on "
+        "literature, also call `mem_decision_log` with the citation key + a "
+        "one-line rationale so the reasoning is captured in `analysis.md`.\n\n"
+        "For statistical / methodological choices (e.g. 'use Welch ANOVA "
+        "because variances unequal'), include a short *Why this method?* "
+        "block citing either a textbook reference or the EDA result that "
+        "triggered the choice. See `key_papers.md` for the template the "
+        "finaliser fills in.\n\n"
+        "`tool_path_finalize` will normalise this README to summarise the "
+        "actual decisions + sources captured.\n",
+    )
+    _write_if_missing(
+        exp_dir / "literature" / "key_papers.md",
+        f"# `{branch_id}` — key papers (template)\n\n"
+        "Per-decision evidence list. Fill in only those rows where this step "
+        "leans on a specific source; leave the rest blank. The synthesis "
+        "tools read this to anchor each methodological claim to a real "
+        "citation when they assemble the paper / dashboard.\n\n"
+        "| Decision | Citation key | DOI / URL | One-line rationale |\n"
+        "|---|---|---|---|\n"
+        "| _(e.g. method choice)_ | | | |\n"
+        "| _(e.g. parameter pick)_ | | | |\n"
+        "| _(e.g. assumption check)_ | | | |\n\n"
+        "Tip: `tool_literature_search_and_save query=\"<method>\" step_id="
+        f"\"{branch_id}\" limit=5 download_top=2` populates this folder + the "
+        "step-level `literature_index.yaml` in one shot.\n",
+    )
+
+    # Context — the step's narrative scratchpad. Distinct from literature
+    # (formal sources) and data (machine-readable). Holds: methodology
+    # rationale prose, prior conversation snippets, hand-overs from
+    # upstream collaborators, screenshots the analysis depends on.
+    _write_if_missing(
+        exp_dir / "context" / "README.md",
+        f"# `{branch_id}` — context (narrative scratchpad)\n\n"
+        "Drop anything *prose* here that the next analyst would need to act:\n\n"
+        "- Methodology rationale that doesn't fit in `conclusions.md`.\n"
+        "- Notes from upstream conversations / Slack threads.\n"
+        "- Screenshots of source documents the analysis depends on.\n"
+        "- Drafts of plain-language explanations for the dashboard.\n"
+        "- Hand-overs from a previous chat (auto-written by "
+        "  `sys_session_handoff` when relevant).\n\n"
+        "What does NOT go here:\n\n"
+        "- PDFs / DOIs / formal citations → `literature/`.\n"
+        "- CSV / parquet outputs → `data/output/`.\n"
+        "- Figures / tables → `outputs/figures/` and `outputs/tables/`.\n\n"
+        "Files here are read by the synthesis dashboard's per-step appendix "
+        "and surface in the paper's discussion when relevant. Empty is fine "
+        "for routine steps; `tool_path_finalize` will note the folder was "
+        "intentionally left blank.\n",
+    )
+    _write_if_missing(
+        exp_dir / "context" / "notes.md",
+        f"# `{branch_id}` — notes\n\n"
+        "*(Free-form. Anything that would help a new reader pick this step up.)*\n\n"
+        "## Plain-language summary\n\n"
+        "_If you had to explain this step's purpose to a non-statistician in "
+        "two sentences, what would you say? This is what the dashboard will "
+        "surface for executive / teaching audiences._\n\n"
+        "## Decisions made informally (not yet in mem_decision_log)\n\n"
+        "_Capture the reasoning as it happens so it doesn't get lost between "
+        "the script and the formal log._\n",
+    )
+
+    # Outputs — explain what each subfolder is for.
+    _write_if_missing(
+        exp_dir / "outputs" / "README.md",
+        f"# `{branch_id}` — outputs\n\n"
+        "- **`reports/`** — Markdown narratives (`*.md`) summarising results "
+        "for humans. The synthesis report + dashboard surface these verbatim.\n"
+        "- **`figures/`** — PNG / SVG plots. Each figure SHOULD have a "
+        "sibling `<name>.caption.md` describing what the reader is looking at "
+        "in plain language (the dashboard embeds the caption inline).\n"
+        "- **`tables/`** — CSV / TSV tables. Each table SHOULD have a "
+        "sibling `<name>.caption.md` for the same reason.\n\n"
+        "Follow `figure_guidelines` (DPI ≥150 screen / ≥300 print, colour-blind "
+        "safe palette, axis units). Audit with `tool_audit_figure`.\n",
+    )
+
+    # Scripts — explain naming + reproducibility expectation.
+    _write_if_missing(
+        exp_dir / "scripts" / "README.md",
+        f"# `{branch_id}` — scripts\n\n"
+        f"Place runnable analysis scripts here (preferred name: "
+        f"`{branch_id}_v1.py`). Bump the suffix when the analysis materially "
+        "changes; the dashboard surfaces the latest version. Each script must "
+        "be re-runnable end-to-end with only `data/input/` and the documented "
+        "environment as inputs.\n",
+    )
+
+
 def create_numbered_experiment(
     root: Path,
     name: str,
@@ -885,22 +1371,74 @@ def create_numbered_experiment(
                 except OSError:
                     pass
 
-    # README + conclusions stubs
+    # README — the OVERVIEW reader: short, easy to read, no statistical jargon.
+    # `conclusions.md` is the thorough version with method details.
     (exp_dir / "README.md").write_text(
         f"# Experiment: {branch_id}\n*Created: {now_iso()}*\n\n"
+        "> **What this file is.** A short overview a non-expert reader can "
+        "skim in 60 seconds. The detailed methodology, statistics, and "
+        "limitations live in [`conclusions.md`](./conclusions.md). "
+        "When the step is finished, run `tool_path_finalize` to populate "
+        "the sections below from what was actually produced.\n\n"
         f"## Goal\n{hypothesis or name}\n\n"
+        "## In plain English\n"
+        "*(One paragraph. Imagine you're explaining this step to a colleague "
+        "from a different field. What is being asked? Why does it matter? "
+        "What did we find?)*\n\n"
         "## Input data\n- *(list inputs used)*\n\n"
-        "## Methods\n- *(list methods/models)*\n\n"
-        "## Outputs\n- *(describe expected outputs)*\n\n"
-        "## Decision\n- *(proceed | branch | dead-end)*\n"
+        "## Methods (one line each)\n- *(name the method; full justification "
+        "lives in `conclusions.md` and `literature/key_papers.md`)*\n\n"
+        "## Headline finding\n- *(the single most important result — "
+        "researchers should be able to quote this sentence verbatim)*\n\n"
+        "## Outputs\n- *(figures / tables / reports produced)*\n\n"
+        "## Decision\n- *(proceed | branch | dead-end)*\n\n"
+        "## Read next\n"
+        "- [`conclusions.md`](./conclusions.md) — full statistical results, "
+        "limitations, decisions.\n"
+        "- [`outputs/figures/`](./outputs/figures/) — every figure has a "
+        "sibling `.caption.md` (technical) and `.summary.md` (plain English).\n"
+        "- [`literature/key_papers.md`](./literature/key_papers.md) — the "
+        "sources that anchor each decision.\n"
+        "- [`context/notes.md`](./context/notes.md) — narrative "
+        "rationale + hand-overs.\n"
     )
+    # conclusions.md — the THOROUGH reader: full statistical detail, edge
+    # cases, sensitivity checks, every limitation. Targets the same audience
+    # as a journal Methods + Results + Discussion section.
     (exp_dir / "conclusions.md").write_text(
         f"# {branch_id} — Conclusions\n*Created: {now_iso()}*\n\n"
-        "## Findings\n*(populate after analysis)*\n\n"
-        "## Limitations\n*(assumption tests + their result)*\n\n"
+        "> **What this file is.** The full statistical record of the step. "
+        "Method, assumption checks, every effect size, every limitation. "
+        "If `README.md` is the elevator pitch, this is the full paper.\n\n"
+        "## Plain-language summary\n"
+        "*(2-3 sentences. What was tested, what was found, and the strength "
+        "of the evidence — in language an undergraduate could follow. The "
+        "dashboard's executive/teaching views surface this verbatim.)*\n\n"
+        "## Findings\n"
+        "*(2-5 quantitative bullets with numbers + units + 95% CI where "
+        "applicable. Lead with effect sizes, not p-values. Plain frequencies "
+        "preferred over percentages for risk communication — see the "
+        "statistical glossary in `synthesis/dashboard.html`.)*\n\n"
+        "## Hypothesis evidence\n"
+        "*(For each hypothesis touched: H<id> status + one-line evidence + "
+        "the figure / table the verdict rests on.)*\n\n"
+        "## Methods (full detail)\n"
+        "*(Dataset shape, transforms applied, model spec, parameter values, "
+        "RNG seed, software versions. Reproducible: a competent reader "
+        "should be able to re-run this from `scripts/` alone.)*\n\n"
+        "## Methodological notes\n"
+        "*(Assumption checks, sensitivity analyses, robustness — use "
+        "supportive voice. e.g. \"the analysis would benefit from\" rather "
+        "than \"is wrong\".)*\n\n"
+        "## Limitations\n"
+        "*(What this step cannot conclude, and why — sample size, design "
+        "constraints, measurement bias, etc. Honest framing: \"no detectable "
+        "difference\" beats \"no effect\" when underpowered.)*\n\n"
         "## Decision\n*(proceed | branch | dead-end)*\n\n"
         "## Next steps\n*(2-3 candidates with rationale)*\n"
     )
+
+    _seed_step_subfolder_readmes(exp_dir, root, branch_id, next_num, from_step)
 
     # State update
     state = load_state(root)

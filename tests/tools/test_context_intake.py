@@ -5,7 +5,7 @@ from research_os.tools.actions.data.context_intake import context_intake
 
 
 def test_intake_routes_pdf_to_literature(tmp_path):
-    scaffold_minimal_workspace(tmp_path, "Test")
+    scaffold_minimal_workspace(tmp_path, "Test", ide_flags=[], copy_agents=False)
     # Drop a PDF outside inputs/
     dropbox = tmp_path / "dropbox"
     dropbox.mkdir()
@@ -17,7 +17,7 @@ def test_intake_routes_pdf_to_literature(tmp_path):
 
 
 def test_intake_routes_csv_to_raw_data(tmp_path):
-    scaffold_minimal_workspace(tmp_path, "Test")
+    scaffold_minimal_workspace(tmp_path, "Test", ide_flags=[], copy_agents=False)
     dropbox = tmp_path / "incoming"
     dropbox.mkdir()
     (dropbox / "fresh.csv").write_text("a,b\n1,2\n")
@@ -27,7 +27,7 @@ def test_intake_routes_csv_to_raw_data(tmp_path):
 
 
 def test_intake_routes_md_to_context(tmp_path):
-    scaffold_minimal_workspace(tmp_path, "Test")
+    scaffold_minimal_workspace(tmp_path, "Test", ide_flags=[], copy_agents=False)
     (tmp_path / "stray_note.md").write_text("# Hi")
     res = context_intake(tmp_path)
     assert res["status"] == "success"
@@ -35,7 +35,7 @@ def test_intake_routes_md_to_context(tmp_path):
 
 
 def test_intake_never_overwrites(tmp_path):
-    scaffold_minimal_workspace(tmp_path, "Test")
+    scaffold_minimal_workspace(tmp_path, "Test", ide_flags=[], copy_agents=False)
     (tmp_path / "inputs" / "literature" / "paper.pdf").write_text("existing")
     (tmp_path / "extra" / "paper.pdf").parent.mkdir()
     (tmp_path / "extra" / "paper.pdf").write_text("new content")
@@ -49,7 +49,7 @@ def test_intake_never_overwrites(tmp_path):
 
 
 def test_intake_dry_run_does_not_copy(tmp_path):
-    scaffold_minimal_workspace(tmp_path, "Test")
+    scaffold_minimal_workspace(tmp_path, "Test", ide_flags=[], copy_agents=False)
     (tmp_path / "incoming").mkdir()
     (tmp_path / "incoming" / "f.csv").write_text("a,b\n")
     res = context_intake(tmp_path, dry_run=True)

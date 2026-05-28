@@ -121,6 +121,8 @@ def step_env_lock(
     step_id: str | None = None,
     write_conda_yaml: bool = False,
     write_dockerfile: bool = False,
+    write_apptainer: bool = False,
+    write_entrypoint: bool = True,
 ) -> dict[str, Any]:
     """Lock the current Python (+ optional R/Julia/conda) env into a SPECIFIC step.
 
@@ -241,17 +243,98 @@ def step_env_lock(
 
         if write_dockerfile:
             lines = [
-                f"# Auto-generated per-step lock for {step_dir.name}",
+                f"# Auto-generated per-step Dockerfile for {step_dir.name}",
+                f"# Reproduces every output via the per-step entrypoint.sh.",
                 f"FROM python:{py_version.rsplit('.', 1)[0]}-slim",
-                "ENV DEBIAN_FRONTEND=noninteractive",
+                "ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 \\",
+                "    PYTHONUNBUFFERED=1 LC_ALL=C.UTF-8 LANG=C.UTF-8",
+                "RUN apt-get update && apt-get install -y --no-install-recommends \\",
+                "      build-essential git ca-certificates && \\",
+                "    rm -rf /var/lib/apt/lists/*",
                 "WORKDIR /step",
-                "COPY environment/requirements.txt /step/requirements.txt",
-                "RUN pip install --no-cache-dir -r requirements.txt",
+                "COPY environment/requirements.txt /step/environment/requirements.txt",
+                "RUN pip install --no-cache-dir -r environment/requirements.txt",
                 "COPY . /step",
-                'CMD ["/bin/bash"]',
+                "ENTRYPOINT [\"bash\", \"environment/entrypoint.sh\"]",
             ]
             (env_dir / "Dockerfile").write_text("\n".join(lines) + "\n")
             artifacts.append("Dockerfile")
+
+        if write_apptainer:
+            # HPC-friendly Apptainer definition file. Builds on top of the
+            # Dockerfile when present, or directly off python:slim.
+            lines = [
+                f"# Auto-generated per-step Apptainer definition for {step_dir.name}",
+                "BootStrap: docker",
+                f"From: python:{py_version.rsplit('.', 1)[0]}-slim",
+                "",
+                "%files",
+                "    environment/requirements.txt /opt/req.txt",
+                "",
+                "%post",
+                "    apt-get update && apt-get install -y --no-install-recommends \\",
+                "        build-essential git ca-certificates",
+                "    pip install --no-cache-dir -r /opt/req.txt",
+                "    rm -rf /var/lib/apt/lists/*",
+                "",
+                "%environment",
+                "    export LC_ALL=C.UTF-8",
+                "    export LANG=C.UTF-8",
+                "",
+                "%runscript",
+                f"    cd /step && exec bash environment/entrypoint.sh \"$@\"",
+                "",
+                "%labels",
+                f"    StepID {step_dir.name}",
+                f"    Python {py_version}",
+                f"    BuiltAt {_now_iso()}",
+            ]
+            (env_dir / "step.def").write_text("\n".join(lines) + "\n")
+            artifacts.append("step.def")
+
+        if write_entrypoint:
+            # entrypoint.sh — single command that reproduces every output
+            # by walking the step's sub-task DAG (pipeline.yaml). When no
+            # pipeline.yaml exists, falls back to running every script in
+            # scripts/ in alphabetical order.
+            pipe_path = step_dir / "pipeline.yaml"
+            if pipe_path.exists():
+                cmd_block = (
+                    "# Sub-task DAG present — walk it via the runner.\n"
+                    "python -m research_os.tools.actions.exec.step_pipeline "
+                    f"--step-id \"{step_dir.name}\" --root \"$(pwd)/../..\" "
+                    "|| python -c \"from research_os.tools.actions.exec.step_pipeline "
+                    f"import run_pipeline; from pathlib import Path; "
+                    f"print(run_pipeline('{step_dir.name}', Path('$(pwd)/../..')))\""
+                )
+            else:
+                cmd_block = (
+                    "# No pipeline.yaml — run every script in scripts/ in order.\n"
+                    "for script in scripts/*.py; do\n"
+                    "    echo \"--- $script ---\"\n"
+                    "    python \"$script\"\n"
+                    "done"
+                )
+            entry = (
+                "#!/usr/bin/env bash\n"
+                f"# Auto-generated reproducer for {step_dir.name}.\n"
+                "# Re-creates every output the step produced; meant to be the\n"
+                "# single command that a reviewer / future-you runs.\n"
+                "set -euo pipefail\n"
+                "echo \"# entrypoint started $(date -u +%Y-%m-%dT%H:%M:%SZ) "
+                "on $(hostname)\"\n"
+                "\n"
+                f"{cmd_block}\n"
+                "\n"
+                "echo \"# entrypoint finished $(date -u +%Y-%m-%dT%H:%M:%SZ)\"\n"
+            )
+            ep_path = env_dir / "entrypoint.sh"
+            ep_path.write_text(entry)
+            try:
+                ep_path.chmod(0o755)
+            except OSError:
+                pass
+            artifacts.append("entrypoint.sh")
 
         result = {
             "status": "success",

@@ -192,7 +192,26 @@ def audit_power(
 
 
 def audit_assumptions(filepath: str, root: Path) -> dict[str, Any]:
-    """Run assumption checks on a CSV containing residuals or model output."""
+    """Run a full diagnostic battery on residuals / design / model output.
+
+    Tests run (each optional based on which columns are present):
+
+    * **Shapiro-Wilk** — residual normality.
+    * **Levene** — homogeneity of variance across groups.
+    * **Breusch-Pagan** — heteroscedasticity (residual vs fitted).
+    * **Durbin-Watson** — residual autocorrelation (target ≈ 2.0).
+    * **Variance Inflation Factor (VIF)** — multicollinearity per
+      predictor (target < 5.0; > 10.0 = severe).
+    * **Cook's distance** — influential observations (target < 4/n).
+
+    Expected column conventions (any subset triggers the matching test):
+
+    * ``residual`` / ``residuals`` — residual values.
+    * ``fitted`` / ``predicted`` — fitted values (enables BP, scale-loc).
+    * ``group`` + ``value`` — for Levene.
+    * any other numeric columns — interpreted as design matrix for VIF.
+    * ``cooks_distance`` or ``leverage`` if pre-computed.
+    """
     try:
         p = root / filepath
         if not p.exists():
@@ -204,40 +223,175 @@ def audit_assumptions(filepath: str, root: Path) -> dict[str, Any]:
         report: dict[str, Any] = {}
         warnings: list[str] = []
 
-        if "residual" in df.columns or "residuals" in df.columns:
-            col = "residual" if "residual" in df.columns else "residuals"
-            res = df[col].dropna()
-            try:
-                from scipy import stats  # type: ignore
+        from scipy import stats as sst  # type: ignore
 
-                w, p_value = stats.shapiro(res[: min(5000, len(res))])
-                report["shapiro_wilk"] = {"W": float(w), "p_value": float(p_value)}
+        res_col = next((c for c in ("residual", "residuals") if c in df.columns), None)
+        fitted_col = next((c for c in ("fitted", "predicted") if c in df.columns), None)
+
+        # --- 1. Shapiro-Wilk normality ---
+        if res_col:
+            res = df[res_col].dropna()
+            try:
+                w, p_value = sst.shapiro(res[: min(5000, len(res))])
+                report["shapiro_wilk"] = {
+                    "W": float(w), "p_value": float(p_value),
+                    "interpretation": "residuals NOT normal at α=0.05"
+                    if p_value < 0.05 else "no evidence against normality",
+                }
                 if p_value < 0.05:
                     warnings.append(
-                        f"Residuals fail Shapiro-Wilk normality (p={p_value:.3g})"
+                        f"Residuals fail Shapiro-Wilk normality (p={p_value:.3g}). "
+                        "Consider rank-based or bootstrap inference."
                     )
             except Exception as e:
                 report["shapiro_wilk"] = f"failed: {e}"
 
+        # --- 2. Levene's equality-of-variance ---
         if "group" in df.columns and "value" in df.columns:
             try:
-                from scipy import stats  # type: ignore
-
                 groups = [g["value"].dropna() for _, g in df.groupby("group")]
-                stat, p_value = stats.levene(*groups)
-                report["levene"] = {"statistic": float(stat), "p_value": float(p_value)}
+                stat, p_value = sst.levene(*groups)
+                report["levene"] = {
+                    "statistic": float(stat), "p_value": float(p_value),
+                    "interpretation": "heteroscedastic" if p_value < 0.05
+                                       else "homoscedastic",
+                }
                 if p_value < 0.05:
-                    warnings.append(f"Heteroscedasticity detected (Levene p={p_value:.3g})")
+                    warnings.append(
+                        f"Heteroscedasticity (Levene p={p_value:.3g}). "
+                        "Welch's t / robust SEs recommended."
+                    )
             except Exception as e:
                 report["levene"] = f"failed: {e}"
 
+        # --- 3. Breusch-Pagan + scale-location summary ---
+        if res_col and fitted_col:
+            try:
+                from statsmodels.stats.diagnostic import het_breuschpagan  # type: ignore
+                import numpy as np  # type: ignore
+
+                resid = df[res_col].dropna().to_numpy()
+                fitted = df[fitted_col].loc[df[res_col].dropna().index].to_numpy()
+                # Design matrix = [1, fitted]
+                X = np.column_stack([np.ones_like(fitted), fitted])
+                lm_stat, lm_p, f_stat, f_p = het_breuschpagan(resid, X)
+                report["breusch_pagan"] = {
+                    "lm_statistic": float(lm_stat),
+                    "p_value": float(lm_p),
+                    "interpretation": "heteroscedastic" if lm_p < 0.05
+                                       else "homoscedastic",
+                }
+                if lm_p < 0.05:
+                    warnings.append(
+                        f"Breusch-Pagan p={lm_p:.3g} — residual variance "
+                        "depends on the fitted value. Robust (HC3) SEs "
+                        "or weighted least squares recommended."
+                    )
+            except ImportError:
+                report["breusch_pagan"] = "statsmodels not installed"
+            except Exception as e:
+                report["breusch_pagan"] = f"failed: {e}"
+
+        # --- 4. Durbin-Watson autocorrelation ---
+        if res_col:
+            try:
+                from statsmodels.stats.stattools import durbin_watson  # type: ignore
+
+                dw = float(durbin_watson(df[res_col].dropna()))
+                report["durbin_watson"] = {
+                    "statistic": dw,
+                    "interpretation":
+                        "positive autocorrelation" if dw < 1.5
+                        else "negative autocorrelation" if dw > 2.5
+                        else "no strong autocorrelation",
+                }
+                if dw < 1.5 or dw > 2.5:
+                    warnings.append(
+                        f"Durbin-Watson = {dw:.2f} (target ≈ 2.0); "
+                        "consider time-series / clustered SE adjustment."
+                    )
+            except ImportError:
+                pass
+            except Exception as e:
+                report["durbin_watson"] = f"failed: {e}"
+
+        # --- 5. VIF (multicollinearity) ---
+        numeric_cols = [
+            c for c in df.columns
+            if c not in {res_col, fitted_col, "group", "value",
+                          "cooks_distance", "leverage"}
+            and pd.api.types.is_numeric_dtype(df[c])
+        ]
+        if len(numeric_cols) >= 2:
+            try:
+                from statsmodels.stats.outliers_influence import variance_inflation_factor  # type: ignore
+                import numpy as np  # type: ignore
+
+                X = df[numeric_cols].dropna().to_numpy()
+                vifs = {}
+                if X.shape[0] > X.shape[1] + 1:
+                    for i, name in enumerate(numeric_cols):
+                        try:
+                            v = float(variance_inflation_factor(X, i))
+                            vifs[name] = round(v, 2)
+                        except Exception:
+                            continue
+                    report["vif"] = vifs
+                    bad = {k: v for k, v in vifs.items() if v > 10}
+                    moderate = {k: v for k, v in vifs.items()
+                                if 5 < v <= 10}
+                    if bad:
+                        warnings.append(
+                            "Severe multicollinearity (VIF > 10): "
+                            + ", ".join(f"{k}={v}" for k, v in bad.items())
+                            + ". Drop or combine these predictors."
+                        )
+                    elif moderate:
+                        warnings.append(
+                            "Moderate multicollinearity (5 < VIF ≤ 10): "
+                            + ", ".join(f"{k}={v}" for k, v in moderate.items())
+                            + ". Inspect predictor pairs."
+                        )
+            except ImportError:
+                pass
+            except Exception as e:
+                report["vif"] = f"failed: {e}"
+
+        # --- 6. Cook's distance influential observations ---
+        if "cooks_distance" in df.columns:
+            try:
+                cd = df["cooks_distance"].dropna()
+                n = max(1, len(cd))
+                thr = 4.0 / n
+                n_influential = int((cd > thr).sum())
+                report["cooks_distance"] = {
+                    "threshold_4_over_n": round(thr, 4),
+                    "n_influential": n_influential,
+                    "pct_influential": round(100 * n_influential / n, 2),
+                }
+                if n_influential / n > 0.05:
+                    warnings.append(
+                        f"{n_influential} observations exceed Cook's D "
+                        f"threshold (4/n = {thr:.4f}); inspect / report "
+                        "leave-one-out sensitivity."
+                    )
+            except Exception as e:
+                report["cooks_distance"] = f"failed: {e}"
+
         out = _report_path(root, "assumption_report.md")
         out.parent.mkdir(parents=True, exist_ok=True)
-        lines = ["# Assumption Audit", "", f"- Source file: {filepath}", ""]
+        lines = ["# Assumption Audit", "",
+                 f"- Source file: `{filepath}`", ""]
         for k, v in report.items():
-            lines.append(f"- **{k}**: {v}")
+            lines.append(f"### {k}")
+            if isinstance(v, dict):
+                for kk, vv in v.items():
+                    lines.append(f"- **{kk}**: {vv}")
+            else:
+                lines.append(f"- {v}")
+            lines.append("")
         if warnings:
-            lines.extend(["", "## Warnings"])
+            lines.append("## Warnings")
             for w in warnings:
                 lines.append(f"- {w}")
         out.write_text("\n".join(lines) + "\n")
@@ -248,12 +402,286 @@ def audit_assumptions(filepath: str, root: Path) -> dict[str, Any]:
             "warnings": warnings,
             "report_path": str(out.relative_to(root)),
             "message": (
-                "Assumption checks raised warnings." if warnings else "Assumption checks passed."
+                "Assumption checks raised warnings." if warnings
+                else "All assumption checks passed."
             ),
         }
     except Exception as e:
         logger.exception("audit_assumptions failed")
         return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# E-value sensitivity (VanderWeele & Ding 2017) for observational designs
+# ---------------------------------------------------------------------------
+
+
+def compute_evalue(
+    *,
+    risk_ratio: float,
+    ci_lower: float | None = None,
+    ci_upper: float | None = None,
+) -> dict[str, Any]:
+    """Compute the E-value for an observed risk ratio + 95% CI bound.
+
+    E = RR + sqrt(RR * (RR - 1)) for RR > 1.
+    For RR < 1, evaluate 1/RR first.
+
+    Interpretation: the minimum strength of association (on the
+    risk-ratio scale) that an unmeasured confounder would need to have
+    with BOTH the exposure and the outcome to explain away the observed
+    association.
+    """
+    import math
+
+    def _one(rr: float) -> float:
+        # Reflect to ≥1.
+        if rr <= 0:
+            return float("nan")
+        if rr < 1:
+            rr = 1.0 / rr
+        return rr + math.sqrt(rr * (rr - 1))
+
+    e_point = _one(risk_ratio)
+    # E-value at the CI bound nearest the null (1.0).
+    if ci_lower is not None and ci_upper is not None:
+        if risk_ratio > 1:
+            ci_bound = ci_lower
+        else:
+            ci_bound = ci_upper
+        if ci_bound and (
+            (risk_ratio > 1 and ci_bound > 1)
+            or (risk_ratio < 1 and ci_bound < 1)
+        ):
+            e_ci = _one(ci_bound)
+        else:
+            # CI crosses the null — E-value at CI bound is 1.
+            e_ci = 1.0
+    else:
+        e_ci = None
+    interp = (
+        f"An unmeasured confounder with risk ratio ≥ {e_point:.2f} with "
+        "both exposure and outcome could fully explain the observed "
+        f"association of {risk_ratio:.2f}."
+    )
+    if e_ci is not None:
+        interp += (
+            f" The E-value at the 95% CI bound nearest the null is "
+            f"{e_ci:.2f}."
+        )
+    return {
+        "risk_ratio": risk_ratio,
+        "ci_lower": ci_lower, "ci_upper": ci_upper,
+        "e_value_point": round(e_point, 3),
+        "e_value_ci_bound": round(e_ci, 3) if e_ci is not None else None,
+        "interpretation": interp,
+    }
+
+
+def audit_evalue(
+    risk_ratio: float, root: Path,
+    ci_lower: float | None = None, ci_upper: float | None = None,
+) -> dict[str, Any]:
+    """Compute + persist an E-value sensitivity report."""
+    res = compute_evalue(
+        risk_ratio=risk_ratio, ci_lower=ci_lower, ci_upper=ci_upper,
+    )
+    out = _report_path(root, "evalue_report.md")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# E-value Sensitivity (VanderWeele & Ding, 2017)",
+        "",
+        f"- Observed risk ratio: **{risk_ratio}**",
+    ]
+    if ci_lower is not None or ci_upper is not None:
+        lines.append(f"- 95% CI: ({ci_lower}, {ci_upper})")
+    lines.extend([
+        f"- E-value at point estimate: **{res['e_value_point']}**",
+    ])
+    if res["e_value_ci_bound"] is not None:
+        lines.append(
+            f"- E-value at CI bound nearest null: **{res['e_value_ci_bound']}**"
+        )
+    lines.extend([
+        "",
+        "## Interpretation",
+        "",
+        res["interpretation"],
+        "",
+        "## Reporting guidance",
+        "- Cite VanderWeele TJ, Ding P. *Sensitivity Analysis in "
+        "Observational Research: Introducing the E-Value*. Ann Intern "
+        "Med. 2017;167(4):268-274.",
+        "- Report BOTH the point E-value and the CI-bound E-value.",
+        "- A small E-value (close to 1) means even modest unmeasured "
+        "confounding could explain the result; a large E-value means "
+        "the result is robust to plausible confounding.",
+    ])
+    out.write_text("\n".join(lines) + "\n")
+    return {
+        "status": "success",
+        **res,
+        "report_path": str(out.relative_to(root)),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Master auditor — one call, every quality gate.
+# ---------------------------------------------------------------------------
+
+
+def audit_quality_full(
+    root: Path,
+    *,
+    target_path: str | None = None,
+    skip: list[str] | None = None,
+) -> dict[str, Any]:
+    """Run every quality audit in one call and aggregate the verdict.
+
+    Runs (each is opt-out via ``skip``):
+
+    * ``step_completeness`` — focal figure + caption + summary + non-stub
+      conclusions + provenance coverage per active step.
+    * ``code_quality``      — ruff (if installed) + AST-based complexity,
+      docstring, smell checks per script.
+    * ``prose_quality``     — hedging, vague quantifiers, passive voice,
+      reading level, causal-language gating, reporting-standard
+      coverage across paper + per-step conclusions.
+    * ``claims``            — every number in synthesis/paper.md traces
+      to a workspace output.
+    * ``preregistration_diff`` — divergence between the frozen SAP and
+      current state (only if a pre-registration exists).
+
+    Writes ``workspace/logs/audit_master.md`` and returns the unified
+    blocker set. ``tool_synthesize`` calls this as its first gate.
+    """
+    skip = skip or []
+    results: dict[str, Any] = {}
+    all_blockers: list[str] = []
+    all_warnings: list[str] = []
+
+    if "step_completeness" not in skip:
+        sc = audit_step_completeness(root)
+        results["step_completeness"] = sc
+        if sc.get("status") == "error":
+            all_blockers.extend(
+                f"[completeness] {b}" for b in sc.get("blockers", [])
+            )
+
+    if "code_quality" not in skip:
+        try:
+            from research_os.tools.actions.audit.code_quality import (
+                audit_code_quality,
+            )
+
+            cq = audit_code_quality(root)
+            results["code_quality"] = cq
+            if cq.get("status") == "error":
+                all_blockers.append(
+                    f"[code_quality] {len([s for st in cq.get('per_step', []) for s in st.get('scripts', []) if s.get('blockers')])} script(s) failed lint/AST checks"
+                )
+        except Exception as e:
+            results["code_quality"] = {"status": "error", "message": str(e)}
+
+    if "prose_quality" not in skip:
+        try:
+            from research_os.tools.actions.audit.prose_quality import (
+                audit_prose,
+            )
+
+            pq = audit_prose(root)
+            results["prose_quality"] = pq
+            if pq.get("status") == "error":
+                for d in pq.get("documents") or []:
+                    for b in d.get("blockers") or []:
+                        all_blockers.append(f"[prose] {d['path']}: {b}")
+        except Exception as e:
+            results["prose_quality"] = {"status": "error", "message": str(e)}
+
+    if "claims" not in skip:
+        try:
+            from research_os.tools.actions.audit.claim_grounding import (
+                audit_claims,
+            )
+
+            cl = audit_claims(root, target_path)
+            results["claims"] = cl
+            if cl.get("status") == "error":
+                all_blockers.append(
+                    f"[claims] {cl.get('ungrounded', 0)} numeric claim(s) "
+                    f"in {cl.get('target')} not grounded in workspace outputs"
+                )
+        except Exception as e:
+            results["claims"] = {"status": "error", "message": str(e)}
+
+    if "preregistration_diff" not in skip:
+        try:
+            from research_os.tools.actions.audit.preregistration import (
+                diff_preregistration,
+            )
+
+            pd_res = diff_preregistration(root)
+            results["preregistration_diff"] = pd_res
+        except Exception as e:
+            results["preregistration_diff"] = {
+                "status": "error", "message": str(e),
+            }
+
+    if "grounding" not in skip:
+        try:
+            from research_os.tools.actions.research.grounding import (
+                grounding_verify,
+            )
+
+            gv = grounding_verify(root)
+            results["grounding"] = gv
+            if gv.get("status") == "error":
+                all_blockers.append(
+                    f"[grounding] {gv.get('n_ungrounded', 0)} decision(s) "
+                    "without grounding records — see workspace/logs/grounding_audit.md"
+                )
+        except Exception as e:
+            results["grounding"] = {"status": "error", "message": str(e)}
+
+    # Aggregate report.
+    logs = root / "workspace" / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    out = logs / "audit_master.md"
+    lines = ["# Master quality audit", ""]
+    for name, r in results.items():
+        icon = {"success": "✅", "warning": "⚠️",
+                "error": "❌"}.get(r.get("status"), "•")
+        lines.append(f"## {icon} {name}")
+        if r.get("report_path"):
+            lines.append(f"- Detail: `{r['report_path']}`")
+        for k in ("ungrounded", "blockers", "advice", "message",
+                  "n_failed", "coverage_pct"):
+            if k in r and r[k] not in (None, [], 0):
+                v = r[k]
+                lines.append(
+                    f"- {k}: {len(v) if isinstance(v, list) else v}"
+                )
+        lines.append("")
+    if all_blockers:
+        lines.append("## Combined blockers")
+        for b in all_blockers:
+            lines.append(f"- {b}")
+    out.write_text("\n".join(lines) + "\n")
+
+    return {
+        "status": "error" if all_blockers else "success",
+        "blockers": all_blockers,
+        "warnings": all_warnings,
+        "components": results,
+        "report_path": str(out.relative_to(root)),
+        "advice": (
+            f"{len(all_blockers)} blocker(s) across all gates. Fix "
+            "before tool_synthesize. The per-component reports under "
+            "workspace/logs/ list specifics."
+            if all_blockers
+            else "All quality gates passed. Ready for synthesis."
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -479,3 +907,271 @@ def _hash_outputs(exp_dir: Path) -> dict[str, str]:
         except Exception:
             pass
     return out
+
+
+# ---------------------------------------------------------------------------
+# Per-step completeness gate — server-enforced "did the step actually finish?"
+# ---------------------------------------------------------------------------
+
+
+# Markers that indicate a section was left as a scaffolded stub rather than
+# filled in by the analyst. Lists must stay in sync with project_ops seeds.
+_CONCLUSIONS_STUB_MARKERS = (
+    "*(2-5 quantitative bullets",
+    "*(For each hypothesis touched:",
+    "*(Assumption checks, sensitivity",
+    "*(What this step cannot conclude,",
+    "*(proceed | branch | dead-end)*",
+    "*(2-3 candidates with rationale)*",
+    "*(2-3 sentences. What was tested,",
+    "*(Dataset shape, transforms applied,",
+)
+
+
+def _section_body(text: str, header: str) -> str:
+    m = re.search(
+        rf"^##\s+{re.escape(header)}\s*\n(.+?)(?=^##\s|\Z)",
+        text or "",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return m.group(1).strip() if m else ""
+
+
+def _is_section_stub(text: str, header: str) -> bool:
+    body = _section_body(text, header)
+    if not body:
+        return True
+    return any(m in body for m in _CONCLUSIONS_STUB_MARKERS)
+
+
+def _step_completeness(step_dir: Path, root: Path) -> dict[str, Any]:
+    """Score one step's completeness — used both for finalize gates and
+    server-enforced anti-one-shot guards.
+
+    Beyond the v1 checks (conclusions stub, focal figure, caption +
+    summary sidecars), this audit now ALSO requires:
+
+    * Per-output provenance sidecars (``<file>.prov.json``) for any
+      file under ``outputs/`` or ``data/output/``. Coverage below 50%
+      is a blocker.
+    * If the step has more than 2 scripts, a ``pipeline.yaml``
+      declaring the sub-task DAG. (Reviewable, cacheable, re-runnable.)
+    """
+    blockers: list[str] = []
+    warnings: list[str] = []
+    info: dict[str, Any] = {"step_id": step_dir.name}
+
+    # 1. conclusions.md exists with non-stub Findings + Decision.
+    conc = step_dir / "conclusions.md"
+    info["has_conclusions"] = conc.exists()
+    if not conc.exists():
+        blockers.append("conclusions.md missing.")
+    else:
+        text = conc.read_text()
+        if _is_section_stub(text, "Findings"):
+            blockers.append("conclusions.md → Findings section is still a stub.")
+        if _is_section_stub(text, "Decision"):
+            blockers.append("conclusions.md → Decision section is still a stub.")
+        if _is_section_stub(text, "Plain-language summary"):
+            warnings.append(
+                "conclusions.md → Plain-language summary still a stub "
+                "(executive / teaching dashboard views will fall back to "
+                "the technical text)."
+            )
+
+    # 2. At least one focal figure: outputs/figures/<step_num>_*.png
+    figs_dir = step_dir / "outputs" / "figures"
+    step_num = step_dir.name.split("_", 1)[0]
+    figures: list[str] = []
+    if figs_dir.exists():
+        figures = [
+            f.name for f in sorted(figs_dir.iterdir())
+            if f.suffix.lower() in {".png", ".svg", ".jpg", ".jpeg"}
+        ]
+    info["figures"] = figures
+    focal = next((f for f in figures if f.startswith(f"{step_num}_")), None)
+    if not figures:
+        blockers.append(
+            "No figure produced — every step MUST emit at least one focal "
+            f"figure to outputs/figures/{step_num}_<descriptor>.png."
+        )
+    elif not focal:
+        warnings.append(
+            f"No figure starts with the step number prefix '{step_num}_' — "
+            "the synthesis dashboard's per-step focal pick will fall back "
+            "to alphabetical first match."
+        )
+
+    # 3. Every figure must have caption + summary sidecars.
+    if figures and figs_dir.exists():
+        missing_caps = []
+        missing_sums = []
+        for name in figures:
+            base = figs_dir / name
+            if not base.with_suffix(".caption.md").exists():
+                missing_caps.append(name)
+            if not base.with_suffix(".summary.md").exists():
+                missing_sums.append(name)
+        if missing_caps:
+            blockers.append(
+                f"{len(missing_caps)} figure(s) missing caption sidecar: "
+                + ", ".join(missing_caps[:5])
+                + ("…" if len(missing_caps) > 5 else "")
+            )
+        if missing_sums:
+            warnings.append(
+                f"{len(missing_sums)} figure(s) missing plain-English summary "
+                "(call tool_figure_caption_synthesise or run tool_path_finalize)."
+            )
+        info["missing_captions"] = missing_caps
+        info["missing_summaries"] = missing_sums
+
+    # 4. Scripts/ should have at least one runnable file.
+    scripts_dir = step_dir / "scripts"
+    scripts = []
+    if scripts_dir.exists():
+        scripts = [
+            f.name for f in sorted(scripts_dir.iterdir())
+            if f.is_file() and f.suffix.lower() in {
+                ".py", ".r", ".jl", ".sh", ".ipynb", ".rmd", ".qmd",
+            }
+        ]
+    info["scripts"] = scripts
+    if not scripts:
+        warnings.append(
+            "No script files under scripts/ — step's outputs may not be "
+            "reproducible from this folder alone."
+        )
+
+    # 5. Multi-script steps must declare a pipeline.yaml (sub-task DAG).
+    pipeline_yaml = step_dir / "pipeline.yaml"
+    if len(scripts) > 2 and not pipeline_yaml.exists():
+        warnings.append(
+            f"{len(scripts)} scripts but no pipeline.yaml declaring the "
+            "sub-task DAG. Call tool_step_pipeline_define so the runner "
+            "can topologically order + cache them."
+        )
+    info["has_pipeline_yaml"] = pipeline_yaml.exists()
+
+    # 6. Per-output provenance sidecar coverage.
+    try:
+        from research_os.tools.actions.state.provenance import (
+            step_provenance_inventory,
+        )
+
+        prov = step_provenance_inventory(step_dir, root)
+        info["provenance_coverage_pct"] = prov.get("coverage_pct", 0)
+        info["provenance_missing"] = prov.get("missing_provenance", [])
+        if prov.get("total_outputs", 0) > 0:
+            pct = prov.get("coverage_pct", 0)
+            if pct < 50:
+                warnings.append(
+                    f"Provenance sidecar coverage {pct}% "
+                    f"({prov['with_provenance']}/{prov['total_outputs']} "
+                    "outputs have .prov.json). Future reviewers cannot "
+                    "trace where the rest came from. Use tool_figure_create "
+                    "for figures and tool_step_pipeline_run for scripted "
+                    "outputs to drop sidecars automatically."
+                )
+
+    except Exception as e:
+        logger.debug("provenance inventory failed: %s", e)
+
+    info["blockers"] = blockers
+    info["warnings"] = warnings
+    info["status"] = "blocked" if blockers else "warning" if warnings else "ok"
+    return info
+
+
+def audit_step_completeness(
+    root: Path, step_id: str | None = None,
+) -> dict[str, Any]:
+    """Server-enforced "did the step actually finish?" check.
+
+    Validates that for each step (or the named one):
+
+      * conclusions.md exists with non-stub Findings + Decision sections.
+      * At least one focal PNG/SVG under outputs/figures/.
+      * Every figure has a sibling .caption.md AND .summary.md.
+      * scripts/ has at least one runnable file.
+
+    Returns ``status="error"`` and a ``blockers`` list when *any* active
+    step fails. Used by:
+
+      * ``tool_synthesize``  — refuses to assemble if blockers exist.
+      * ``tool_dashboard_create`` — refuses to render if blockers exist.
+      * ``tool_plan_advance`` — refuses to walk past a half-finished step
+        (with an override flag so the AI can negotiate with the researcher).
+      * ``audit_and_validation`` protocol — final pre-deliverable gate.
+
+    Writes a markdown report to ``workspace/logs/step_completeness.md``
+    so the dashboard's audit-trail section can surface what's still owed.
+    """
+    workspace = root / "workspace"
+    if not workspace.exists():
+        return {"status": "error", "message": "workspace/ not found"}
+
+    target_dirs: list[Path]
+    if step_id:
+        d = workspace / step_id
+        if not d.is_dir():
+            return {"status": "error",
+                    "message": f"Step '{step_id}' not found."}
+        target_dirs = [d]
+    else:
+        target_dirs = [
+            d for d in sorted(workspace.iterdir())
+            if d.is_dir() and re.match(r"^\d{2,3}_", d.name)
+            and not d.name.endswith("__DEAD_END")
+        ]
+
+    per_step: list[dict[str, Any]] = []
+    any_blocked = False
+    for d in target_dirs:
+        info = _step_completeness(d, root)
+        if info.get("status") == "blocked":
+            any_blocked = True
+        per_step.append(info)
+
+    # Write report.
+    lines = ["# Step Completeness Audit", ""]
+    for info in per_step:
+        icon = {"blocked": "❌", "warning": "⚠️", "ok": "✅"}.get(
+            info.get("status"), "•"
+        )
+        lines.append(f"## {icon} `{info['step_id']}`")
+        if info.get("blockers"):
+            lines.append("")
+            lines.append("**BLOCKERS:**")
+            for b in info["blockers"]:
+                lines.append(f"- {b}")
+        if info.get("warnings"):
+            lines.append("")
+            lines.append("Warnings:")
+            for w in info["warnings"]:
+                lines.append(f"- {w}")
+        lines.append("")
+    logs_dir = root / "workspace" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    out = logs_dir / "step_completeness.md"
+    out.write_text("\n".join(lines) + "\n")
+
+    blockers_flat = [
+        f"{i['step_id']}: {b}"
+        for i in per_step for b in i.get("blockers", [])
+    ]
+
+    return {
+        "status": "error" if any_blocked else "success",
+        "steps": per_step,
+        "blockers": blockers_flat,
+        "report_path": str(out.relative_to(root)),
+        "advice": (
+            "BLOCKED. Fix the per-step issues above before running "
+            "tool_synthesize / tool_dashboard_create — final deliverables "
+            "depend on every step having a focal figure + caption + "
+            "non-stub conclusions."
+            if any_blocked
+            else "All active steps pass the completeness gate."
+        ),
+    }

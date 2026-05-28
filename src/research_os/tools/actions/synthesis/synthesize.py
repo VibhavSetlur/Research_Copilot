@@ -494,28 +494,121 @@ def _build_introduction(root: Path, key_to_num: dict[str, int]) -> str:
 
 
 def _build_abstract(root: Path, experiments: list[dict[str, Any]], output_type: str) -> str:
-    """A short, structured-ish abstract built from experiment headline findings."""
+    """Construct a real IMRAD-style abstract from what the workspace records.
+
+    Hierarchy:
+      1. ``synthesis/synthesis_spec.yaml`` ``abstract`` field — author's voice.
+      2. The synthesis step's ``Plain-language summary`` (most readable).
+      3. Top findings + last step's limitations + first step's methods.
+      4. Fallback stub clearly marked as needing author input.
+    """
+    # 1. Spec override.
+    try:
+        from research_os.tools.actions.synthesis.dashboard import _load_spec
+
+        spec = _load_spec(root)
+        if spec.get("abstract"):
+            return "## Abstract\n\n" + str(spec["abstract"]).strip() + "\n"
+    except Exception:
+        spec = {}
+
+    # 2. Plain-language summary from a synthesis / audit / final step.
+    finalist_text = ""
+    for exp in reversed(experiments):
+        conc = exp.get("conclusions", "")
+        m = re.search(
+            r"##\s*Plain-language summary\s*\n(.+?)(?=^##|\Z)",
+            conc, flags=re.MULTILINE | re.DOTALL | re.IGNORECASE,
+        )
+        if m:
+            body = m.group(1).strip()
+            if body and not body.startswith("*("):
+                finalist_text = body
+                break
+    if finalist_text:
+        # Already plain-language — package as a single paragraph.
+        return "## Abstract\n\n" + finalist_text + "\n"
+
+    # 3. Build a real Background/Methods/Results/Conclusion abstract.
     findings: list[str] = []
     for exp in experiments:
         m = re.search(
-            r"##\s*Findings\s*\n(.+?)(?:\n##|\Z)", exp.get("conclusions", ""), flags=re.DOTALL
+            r"##\s*Findings\s*\n(.+?)(?:\n##|\Z)",
+            exp.get("conclusions", ""), flags=re.DOTALL,
         )
         if m:
             for line in m.group(1).splitlines():
                 line = line.strip()
-                if line.startswith("-"):
-                    findings.append(line[1:].strip())
-                if len(findings) >= 3:
+                if line.startswith(("-", "*")):
+                    findings.append(line.lstrip("-* ").strip())
+                if len(findings) >= 4:
                     break
-        if len(findings) >= 3:
+        if len(findings) >= 4:
             break
+
+    methods_summary = ""
+    for exp in experiments[:3]:
+        m = re.search(
+            r"##\s*Methods\s*(?:\(full detail\))?\s*\n(.+?)(?:\n##|\Z)",
+            exp.get("conclusions", ""), flags=re.DOTALL | re.IGNORECASE,
+        )
+        if m:
+            body = m.group(1).strip()
+            if body and not body.startswith("*("):
+                first_para = body.split("\n\n")[0].strip()
+                methods_summary = first_para[:280] + (
+                    "…" if len(first_para) > 280 else ""
+                )
+                break
+
+    limitation_summary = ""
+    for exp in reversed(experiments):
+        m = re.search(
+            r"##\s*Limitations\s*\n(.+?)(?:\n##|\Z)",
+            exp.get("conclusions", ""), flags=re.DOTALL | re.IGNORECASE,
+        )
+        if m:
+            body = m.group(1).strip()
+            for line in body.splitlines():
+                line = line.strip().lstrip("-* ").strip()
+                if line and not line.startswith("*("):
+                    limitation_summary = line[:200]
+                    break
+            if limitation_summary:
+                break
+
     rq = _research_question(root)
+    background = (
+        f"This study investigates: {rq}"
+        if rq and "(blank" not in rq.lower()
+        else "*(Populate the research question via the intake or the spec's "
+        "`overview.background` field.)*"
+    )
+    methods_line = (
+        methods_summary
+        if methods_summary
+        else "*(No methods recorded yet — add via `mem_methods_append` "
+        "or set `synthesis_spec.yaml > methods_summary`.)*"
+    )
+    results_line = (
+        " ".join(f.rstrip(".") + "." for f in findings[:3])
+        if findings
+        else "*(Add ≥1 numbered analysis step with Findings before building the paper.)*"
+    )
+    conclusion_line = (
+        f"Implications follow directly from the findings above; the main "
+        f"limitation is that {limitation_summary.rstrip('.').lower()}."
+        if limitation_summary
+        else "*(Add `## Limitations` to the final step's conclusions.md so "
+        "the abstract can close honestly.)*"
+    )
+
     return (
         "## Abstract\n\n"
-        f"**Background.** {rq}\n\n"
-        "**Methods.** *(1-2 sentences summarising design, data, and analysis.)*\n\n"
-        f"**Results.** {'; '.join(findings) if findings else '(populate from experiment conclusions)'}.\n\n"
-        "**Conclusion.** *(1-2 sentences on implications and main limitation.)*\n"
+        f"**Background.** {background}\n\n"
+        f"**Methods.** {methods_line}\n\n"
+        f"**Results.** {results_line}\n\n"
+        f"**Conclusion.** {conclusion_line}\n"
     )
 
 
@@ -715,65 +808,240 @@ def _escape_latex(s: str) -> str:
     )
 
 
+def _inline_md_to_latex(text: str) -> str:
+    """Render inline markdown to LaTeX with **bold**, *italic*, `code`,
+    [text](url), and bracketed [N] citation references preserved."""
+    if not text:
+        return ""
+    out = text
+    # Pull out code spans first so we don't escape inside them.
+    code_spans: list[str] = []
+
+    def _stash_code(m):
+        code_spans.append(m.group(1))
+        return f"\x00CODE{len(code_spans) - 1}\x00"
+
+    out = re.sub(r"`([^`]+)`", _stash_code, out)
+
+    # Bold + italic markers before LaTeX-escape.
+    bold_spans: list[str] = []
+
+    def _stash_bold(m):
+        bold_spans.append(m.group(1))
+        return f"\x00BOLD{len(bold_spans) - 1}\x00"
+
+    out = re.sub(r"\*\*([^*]+)\*\*", _stash_bold, out)
+
+    italic_spans: list[str] = []
+
+    def _stash_italic(m):
+        italic_spans.append(m.group(1))
+        return f"\x00ITA{len(italic_spans) - 1}\x00"
+
+    out = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", _stash_italic, out)
+
+    # Link spans.
+    link_spans: list[tuple[str, str]] = []
+
+    def _stash_link(m):
+        link_spans.append((m.group(1), m.group(2)))
+        return f"\x00LINK{len(link_spans) - 1}\x00"
+
+    out = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", _stash_link, out)
+
+    # Now escape the remaining text.
+    out = _escape_latex(out)
+
+    # Restore stashed elements.
+    for i, span in enumerate(code_spans):
+        out = out.replace(f"\x00CODE{i}\x00",
+                          "\\texttt{" + _escape_latex(span) + "}")
+    for i, span in enumerate(bold_spans):
+        out = out.replace(f"\x00BOLD{i}\x00",
+                          "\\textbf{" + _inline_md_to_latex(span) + "}")
+    for i, span in enumerate(italic_spans):
+        out = out.replace(f"\x00ITA{i}\x00",
+                          "\\textit{" + _inline_md_to_latex(span) + "}")
+    for i, (label, url) in enumerate(link_spans):
+        out = out.replace(
+            f"\x00LINK{i}\x00",
+            "\\href{" + url.replace("%", r"\%").replace("#", r"\#")
+            + "}{" + _inline_md_to_latex(label) + "}",
+        )
+
+    # Numeric citations [N] / [N,M] stay as-is (LaTeX accepts them inside text).
+    return out
+
+
+def _try_pandoc(markdown: str, tmp_dir: Path) -> str | None:
+    """If pandoc is on PATH, use it to produce a polished LaTeX fragment."""
+    import shutil as _shutil
+    import subprocess as _sp
+
+    pandoc = _shutil.which("pandoc")
+    if not pandoc:
+        return None
+    src = tmp_dir / "paper.md"
+    src.write_text(markdown)
+    dest = tmp_dir / "paper.body.tex"
+    try:
+        res = _sp.run(
+            [pandoc, "-f", "markdown", "-t", "latex",
+             "--wrap=preserve", str(src), "-o", str(dest)],
+            capture_output=True, text=True, timeout=60,
+        )
+        if res.returncode == 0 and dest.exists():
+            return dest.read_text()
+    except Exception as e:
+        logger.debug("pandoc fallback skipped: %s", e)
+    return None
+
+
 def _markdown_to_latex(
     *,
     title: str,
     chunks: list[str],
     figures: list[dict[str, Any]],
     references: list[dict[str, Any]],
+    tmp_dir: Path | None = None,
 ) -> str:
     """Render the IMRAD markdown into a citation-aware LaTeX document.
 
-    The body just inherits the markdown verbatim inside ``\\begin{verbatim}``
-    blocks for paragraphs, but headers, figures, and ``[N]`` citations are
-    rewritten properly. For pixel-perfect typesetting, run the markdown through
-    pandoc instead.
+    Uses pandoc when available (best fidelity). Otherwise emits a real
+    LaTeX body honouring headers, lists, tables, inline formatting,
+    figures, and ``[N]`` citation references — no more raw escaped text.
     """
     head = [
         r"\documentclass[11pt]{article}",
         r"\usepackage[utf8]{inputenc}",
+        r"\usepackage[T1]{fontenc}",
+        r"\usepackage{lmodern}",
         r"\usepackage{graphicx}",
         r"\usepackage[numbers,sort&compress]{natbib}",
         r"\usepackage{hyperref}",
         r"\usepackage{geometry}",
         r"\geometry{margin=1in}",
         r"\usepackage{booktabs}",
+        r"\usepackage{microtype}",
+        r"\usepackage{parskip}",
+        r"\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}",
         r"\title{" + _escape_latex(title) + "}",
         r"\date{\today}",
         r"\begin{document}",
         r"\maketitle",
     ]
+
+    markdown_body = "\n\n".join(chunks)
+
+    # Try pandoc — gives the best typesetting.
+    if tmp_dir is None:
+        import tempfile as _tf
+        tmp_dir = Path(_tf.mkdtemp(prefix="research_os_synth_"))
+    pandoc_body = _try_pandoc(markdown_body, tmp_dir)
+    if pandoc_body:
+        return "\n".join(head + [pandoc_body, r"\bibliographystyle{unsrtnat}",
+                                 r"\bibliography{references}",
+                                 r"\end{document}"])
+
+    # Fallback: our own block renderer.
     body: list[str] = []
-    for chunk in chunks:
-        for line in chunk.splitlines():
-            if line.startswith("# "):
-                # title already in \maketitle — skip the project title repeats
+    in_list = False
+    in_table = False
+    table_buf: list[list[str]] = []
+
+    def _flush_list():
+        nonlocal in_list
+        if in_list:
+            body.append(r"\end{itemize}")
+            in_list = False
+
+    def _flush_table():
+        nonlocal in_table
+        if in_table and table_buf:
+            cols = len(table_buf[0])
+            body.append("\\begin{table}[h!]\n\\centering")
+            body.append("\\begin{tabular}{" + "l" * cols + "}")
+            body.append("\\toprule")
+            for i, row in enumerate(table_buf):
+                cells = [_inline_md_to_latex(c) for c in row]
+                body.append(" & ".join(cells) + " \\\\")
+                if i == 0:
+                    body.append("\\midrule")
+            body.append("\\bottomrule")
+            body.append("\\end{tabular}\n\\end{table}")
+            table_buf.clear()
+            in_table = False
+
+    for line in markdown_body.splitlines():
+        stripped = line.strip()
+
+        # Markdown table row?
+        if "|" in stripped and stripped.startswith("|") and stripped.endswith("|"):
+            # Separator row (|---|---|): skip; the table builder uses
+            # row[0] as the header.
+            if re.fullmatch(r"\|[\s\-\|:]+\|", stripped):
                 continue
-            if line.startswith("## "):
-                body.append(r"\section*{" + _escape_latex(line[3:].strip()) + "}")
-            elif line.startswith("### "):
-                body.append(r"\subsection*{" + _escape_latex(line[4:].strip()) + "}")
-            elif line.startswith("#### "):
-                body.append(r"\subsubsection*{" + _escape_latex(line[5:].strip()) + "}")
-            elif line.startswith("!["):
-                # Markdown figure → \begin{figure}...\end{figure}
-                m = re.match(r"!\[(.*?)\]\((.+?)\)", line)
-                if m:
-                    caption, path = m.group(1), m.group(2)
-                    body.append(r"\begin{figure}[h!]")
-                    body.append(r"  \centering")
-                    body.append(
-                        r"  \includegraphics[width=0.85\linewidth]{" + path + "}"
-                    )
-                    body.append(r"  \caption{" + _escape_latex(caption) + "}")
-                    body.append(r"\end{figure}")
-                else:
-                    body.append(_escape_latex(line))
-            elif line.strip():
-                body.append(_escape_latex(line))
-            else:
-                body.append("")
-    # Bibliography
+            _flush_list()
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            table_buf.append(cells)
+            in_table = True
+            continue
+        else:
+            if in_table:
+                _flush_table()
+
+        if line.startswith("# "):
+            _flush_list()
+            continue  # title already in \maketitle
+        if line.startswith("## "):
+            _flush_list()
+            body.append(r"\section*{" + _inline_md_to_latex(line[3:].strip()) + "}")
+            continue
+        if line.startswith("### "):
+            _flush_list()
+            body.append(r"\subsection*{" + _inline_md_to_latex(line[4:].strip()) + "}")
+            continue
+        if line.startswith("#### "):
+            _flush_list()
+            body.append(r"\subsubsection*{" + _inline_md_to_latex(line[5:].strip()) + "}")
+            continue
+        if line.startswith("!["):
+            _flush_list()
+            m = re.match(r"!\[(.*?)\]\((.+?)\)", line)
+            if m:
+                caption, path = m.group(1), m.group(2)
+                body.append(r"\begin{figure}[h!]")
+                body.append(r"  \centering")
+                body.append(
+                    r"  \includegraphics[width=0.85\linewidth]{" + path + "}"
+                )
+                body.append(
+                    r"  \caption{" + _inline_md_to_latex(caption) + "}"
+                )
+                body.append(r"\end{figure}")
+            continue
+        if stripped.startswith(("- ", "* ")):
+            if not in_list:
+                body.append(r"\begin{itemize}")
+                in_list = True
+            body.append("  \\item " + _inline_md_to_latex(stripped[2:]))
+            continue
+        if stripped.startswith("> "):
+            _flush_list()
+            body.append(r"\begin{quote}")
+            body.append(_inline_md_to_latex(stripped[2:]))
+            body.append(r"\end{quote}")
+            continue
+        if stripped:
+            _flush_list()
+            body.append(_inline_md_to_latex(line))
+        else:
+            _flush_list()
+            body.append("")
+
+    _flush_list()
+    _flush_table()
+
     body.append(r"\bibliographystyle{unsrtnat}")
     body.append(r"\bibliography{references}")
     body.append(r"\end{document}")

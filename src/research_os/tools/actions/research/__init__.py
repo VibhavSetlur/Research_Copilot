@@ -1,5 +1,24 @@
-"""Reasoning + iterative planning + tool/method/literature research."""
+"""Reasoning, planning, grounding, and lessons-learned.
 
+* ``planning``  — branch + plan_next_step.
+* ``research``  — research_method, research_tool, plan_step (decompose).
+* ``grounding`` — ReAct thought log + PROV-O grounding registry + CoVe.
+* ``lessons``   — Reflexion-style lessons + relevance ranking.
+"""
+
+from research_os.tools.actions.research.grounding import (  # noqa: F401
+    claim_verify,
+    ground_from_context,
+    grounding_for_decision,
+    grounding_register,
+    grounding_verify,
+    thought_log,
+    thought_trace,
+)
+from research_os.tools.actions.research.lessons import (  # noqa: F401
+    lessons_consult,
+    lessons_record,
+)
 from research_os.tools.actions.research.planning import (  # noqa: F401
     branch_recommendation,
     plan_next_step,
@@ -7,6 +26,7 @@ from research_os.tools.actions.research.planning import (  # noqa: F401
 from research_os.tools.actions.research.research import (  # noqa: F401
     external_tool_instructions,
     plan_step,
+    plan_step_grounded,
     research_method,
     research_tool,
 )

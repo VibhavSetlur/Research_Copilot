@@ -1,14 +1,39 @@
 id: audit_and_validation
 name: Audit & Validation
-version: '4.0.0'
+version: '6.0.0'
 schema_version: '2.0'
-description: Validate citations, statistical assumptions, figure quality, and code style across the project.
+description: |
+  Validate citations, statistical assumptions, figure quality,
+  per-step completeness, causal language, and code style across the
+  project. Per-step completeness is server-enforced — it BLOCKS the
+  final synthesis until every active step has a focal figure with both
+  caption sidecars and non-stub conclusions.
 trigger: After every experiment completes and reproducibility has been recorded. Re-run before synthesis.
 prerequisites:
   - At least one workspace/<step>/conclusions.md exists
   - workspace/citations.md exists
 
 steps:
+  - id: audit_master
+    name: Master Quality Audit — one call, every gate (PREFERRED)
+    description: |
+      tool_audit_quality_full
+      Runs the complete audit chain and aggregates the blockers:
+        - step_completeness — focal figure + caption + summary +
+          provenance + non-stub conclusions per step;
+        - code_quality — ruff + AST complexity + smells + docstrings;
+        - prose_quality — hedging + vague quantifiers + passive +
+          reading level + causal language + reporting-standard sections;
+        - claims — every number in synthesis/paper.md traces to a
+          workspace output (catches AI hallucination);
+        - preregistration_diff — deviations from the frozen SAP if any.
+      Writes workspace/logs/audit_master.md. tool_synthesize calls this
+      as its first gate.
+
+      For per-step debugging, the components are also exposed
+      individually: tool_audit_step_completeness, tool_audit_code_quality,
+      tool_audit_prose, tool_audit_claims, tool_preregister_diff.
+
   - id: audit_citations
     name: Audit Citations
     description: |
@@ -30,8 +55,28 @@ steps:
     name: Audit Figure Quality
     description: |
       For every PNG in workspace/<step>/outputs/figures/, call:
-        tool_audit_figure filepath=<png>
-      Aggregate warnings (low DPI, small size) into workspace/logs/figure_audit_summary.md.
+        tool_audit_figure_full filepath=<png>
+      Checks DPI, dimensions, caption + summary sidecars, SVG companion,
+      time-series aspect-ratio sanity. (`tool_audit_figure` is the lighter
+      DPI-only version, retained for cheap intra-step spot checks.)
+
+      Aggregate warnings into workspace/logs/figure_audit_summary.md.
+      Any figure WITHOUT a sibling .caption.md AND .summary.md is a
+      blocker — the deliverables embed both.
+
+  - id: audit_step_readmes
+    name: Audit Step READMEs (finalize gate)
+    description: |
+      For each numbered step, confirm:
+        - README.md does NOT contain any stub markers
+          ("*(list inputs used)*", "*(list methods/models)*",
+          "*(the single most important result", etc.).
+        - environment/, literature/, context/, data/ all carry a
+          non-trivial README (≥1 paragraph; not just the create-time stub).
+      For every step that fails, run tool_path_finalize and re-check.
+      Persistently empty step folders after finalize indicate the step
+      had no environment/literature/data activity at all — fine, the
+      finalize note already explains that.
 
   - id: audit_causal_language
     name: Scan for Causal Over-Reach
@@ -53,9 +98,12 @@ steps:
     description: |
       Write workspace/logs/audit_report.md combining all findings + counts.
       One section per audit. Mark blocking issues with "BLOCKER:" prefix.
+      The step-completeness section is mandatory — surface every BLOCKER
+      from tool_audit_step_completeness at the top.
 
 expected_outputs:
   - workspace/logs/audit_report.md
+  - workspace/logs/step_completeness.md
 
 next_protocol: synthesis/synthesis_paper
 on_failure: guidance/dead_end_routing

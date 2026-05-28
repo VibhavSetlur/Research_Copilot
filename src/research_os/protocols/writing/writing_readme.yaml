@@ -1,8 +1,13 @@
 id: writing_readme
 name: Writing — README
-version: '4.0.0'
+version: '5.0.0'
 schema_version: '2.0'
-description: Maintain the project-level README and per-step READMEs.
+description: |
+  Maintain the project-level README and per-step READMEs. Per-step
+  READMEs are 60-second OVERVIEWS for non-experts — the thorough
+  statistical record lives in conclusions.md. tool_path_finalize
+  derives the README from conclusions.md, the decision log, and
+  context/notes.md; do NOT hand-write the README directly.
 
 project_readme_template: |
   # {project_name}
@@ -10,6 +15,9 @@ project_readme_template: |
   **Research Question:** {question}
   **Status:** {status}
   **Last Updated:** {date}
+
+  ## In plain English
+  {2-3 sentence non-expert summary — what was studied, what was found.}
 
   ## Pipeline
   ![Workflow](workspace/workflow.png)
@@ -23,6 +31,7 @@ project_readme_template: |
   - [Abstract](synthesis/abstract.md)
   - [Paper](synthesis/paper.md) · [PDF](synthesis/paper.pdf)
   - [Dashboard](synthesis/dashboard.html)
+  - [Poster](synthesis/poster.pdf) — billboard layout for conferences
 
   ## Reproduce
   1. Clone the repo.
@@ -30,39 +39,64 @@ project_readme_template: |
   3. Run experiment scripts in order: see workspace/*/README.md.
 
 per_step_readme_template: |
-  # {step_id}
-  Created: {date}
+  # Experiment: {step_id}
+  *Created: {date}*
+
+  > **What this file is.** A short overview a non-expert reader can skim
+  > in 60 seconds. The detailed methodology, statistics, and limitations
+  > live in [conclusions.md](./conclusions.md).
 
   ## Goal
   {one-paragraph goal}
 
+  ## In plain English
+  {one paragraph — explain the step to a colleague from a different field.}
+
   ## Input data
   - {input file 1} (sha256:{hash})
 
-  ## Methods
+  ## Methods (one line each)
   - {method 1}
 
+  ## Headline finding
+  - {the single most important result, quotable verbatim}
+
   ## Outputs
-  - {output 1}
+  - {figure / table / report list}
 
   ## Decision
   {proceed | branch | dead-end} — {one-line rationale}
+
+  ## Read next
+  - [conclusions.md](./conclusions.md) — full statistical results.
+  - [outputs/figures/](./outputs/figures/) — each figure has .caption.md (technical) and .summary.md (plain English).
+  - [literature/key_papers.md](./literature/key_papers.md) — sources informing decisions.
+  - [context/notes.md](./context/notes.md) — narrative rationale.
 
 steps:
   - id: update_project
     name: Update Project README
     description: |
       After synthesis completes, populate README.md at the project root using the
-      template above. sys_file_write filepath="README.md" force=true.
+      template above. Lead with the "In plain English" section so any reader
+      (researcher, sponsor, journalist) can understand the project before
+      diving into the methodology. sys_file_write filepath="README.md" force=true.
 
   - id: update_step
-    name: Update Step README
+    name: Update Step README (via tool_path_finalize, NOT manually)
     description: |
-      After each experiment step's conclusions are written, refresh
-      workspace/<step>/README.md with the actual inputs/methods/outputs.
+      After each experiment step's conclusions are written, call
+      tool_path_finalize. This rewrites README.md from conclusions.md,
+      the decision log, context/notes.md plain-language summary, and
+      the actual outputs inventory. Manual edits get clobbered.
+
+      To override what shows up in the README's "In plain English"
+      section, edit context/notes.md under "## Plain-language summary"
+      then re-run tool_path_finalize — the finalizer pulls from there.
 
 expected_outputs:
   - README.md
+  - workspace/*/README.md
 
 next_protocol: null
 on_failure: null

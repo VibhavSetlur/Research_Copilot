@@ -40,7 +40,8 @@ class ResearchLedger:
     def _load(self) -> dict:
         if self._path.exists():
             with open(self._path) as f:
-                return json.load(f)
+                raw = json.load(f)
+            return self._migrate(raw)
         return self._default_state()
 
     def _save(self, data: dict) -> None:
@@ -77,36 +78,117 @@ class ResearchLedger:
 
     @staticmethod
     def _default_state() -> dict:
+        """Canonical default state — ONE schema, no legacy aliases.
+
+        Fields removed (kept only as compatibility shims via _migrate):
+          * ``run_id``                — duplicated ``project_id``; dropped.
+          * ``phase``                 — legacy alias of ``pipeline_stage``.
+          * ``project``               — legacy alias of ``project_name``.
+          * ``token_budget``          — vestigial 200K-static placeholder.
+          * ``knowledge_graph_path``  — never read by any tool.
+          * ``data_scale_profile``    — placeholder, never populated.
+          * ``execution_dag_path``    — DAG file lives at a fixed
+            ``.os_state/execution_dag.json`` path; no need to record.
+
+        Fields externalised to disk-only logs (NOT inlined in state):
+          * ``context_transfer_memos`` — kept in
+            ``.os_state/context_transfer_memos/<ctm_id>.json``; the in-state
+            list now stores only ``{ctm_id, generated_at, phase}`` stubs
+            so the JSON doesn't bloat across long sessions.
+          * ``checkpoint_history`` / ``rollback_history`` — pulled from
+            ``.os_state/checkpoints/*.meta.json`` on demand.
+        """
+        now = datetime.now(timezone.utc).isoformat()
         return {
-            "run_id": str(uuid.uuid4()),
-            "project": "",
-            "phase": "domain_analysis",
+            "schema_version": "4.0",
+            "project_id": str(uuid.uuid4()),
+            "project_name": "Research Project",
+            "created_at": now,
+            "updated_at": now,
+            "pipeline_stage": "init",
             "step": 0,
+            "current_path": "main",
             "checkpoints": {},
             "active_hypotheses": [],
             "dead_ends": [],
             "loaded_data": [],
-            "token_budget": {"used": 0, "remaining": 200000, "limit": 200000},
-            "last_checkpoint": datetime.now(timezone.utc).isoformat(),
             "errors": [],
             "resumable_from": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "context_transfer_memos": [],
-            "execution_dag_path": None,
-            "data_scale_profile": None,
-            "current_path": "main",
+            "last_checkpoint": now,
+            "context_transfer_memo_stubs": [],
+            "linked_external_data": [],
             "paths": {
                 "main": {
                     "path_id": "main",
-                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": now,
                     "status": "active",
                     "experiment_dir": "workspace",
-                    "data_hashes": {},
                 }
             },
-            "knowledge_graph_path": None,
         }
+
+    @staticmethod
+    def _migrate(state: dict) -> dict:
+        """Translate legacy fields into the canonical schema in-place.
+
+        Kept for one release cycle so existing projects continue to boot
+        without manual intervention. Logs at INFO when migration runs.
+        """
+        changed = False
+        # phase → pipeline_stage
+        if "phase" in state and "pipeline_stage" not in state:
+            state["pipeline_stage"] = state.pop("phase")
+            changed = True
+        elif "phase" in state and "pipeline_stage" in state:
+            state.pop("phase", None)
+            changed = True
+        # project → project_name
+        if "project" in state and not state.get("project_name"):
+            state["project_name"] = state.pop("project") or "Research Project"
+            changed = True
+        elif "project" in state:
+            state.pop("project", None)
+            changed = True
+        # run_id → project_id
+        if "run_id" in state and not state.get("project_id"):
+            state["project_id"] = state.pop("run_id")
+            changed = True
+        elif "run_id" in state:
+            state.pop("run_id", None)
+            changed = True
+        # Drop vestigial fields outright.
+        for vestigial in (
+            "token_budget", "knowledge_graph_path", "data_scale_profile",
+            "execution_dag_path",
+        ):
+            if vestigial in state:
+                state.pop(vestigial)
+                changed = True
+        # Externalise full CTM blobs. We keep only stubs in-state.
+        if state.get("context_transfer_memos"):
+            stubs = []
+            for ctm in state["context_transfer_memos"]:
+                if isinstance(ctm, dict):
+                    stubs.append({
+                        "ctm_id": ctm.get("ctm_id"),
+                        "generated_at": ctm.get("generated_at"),
+                        "phase": ctm.get("phase"),
+                    })
+            state["context_transfer_memo_stubs"] = stubs
+            del state["context_transfer_memos"]
+            changed = True
+        state.setdefault("context_transfer_memo_stubs", [])
+        # Per-path: drop the bulky input_data_hashes / data_hashes mirrors;
+        # `compute_input_hashes` returns the live view on demand.
+        for p in state.get("paths", {}).values():
+            for legacy_key in ("input_data_hashes", "data_hashes"):
+                if legacy_key in p:
+                    p.pop(legacy_key)
+                    changed = True
+        if changed:
+            state["schema_version"] = "4.0"
+            logger.info("ResearchLedger migrated legacy state → schema 4.0")
+        return state
 
 
 
@@ -126,8 +208,9 @@ class ResearchLedger:
         return state
 
     def set_phase(self, phase: str, step: int = 0) -> dict:
+        """Backward-compatible name; updates ``pipeline_stage``."""
         state = self._load()
-        state["phase"] = phase
+        state["pipeline_stage"] = phase
         state["step"] = step
         state["checkpoints"][phase] = "in_progress"
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -186,15 +269,14 @@ class ResearchLedger:
         return state
 
     def track_tokens(self, used: int, limit: Optional[int] = None) -> dict:
+        """Deprecated — token_budget removed from state schema in v4.0.
+
+        The runtime token accounting was never reliable (numbers were a
+        static 200k placeholder unrelated to the actual model). The IDE's
+        own context manager is the authoritative source; this no-op stub
+        is kept only so existing callers don't break.
+        """
         state = self._load()
-        budget = state.get(
-            "token_budget", {"used": 0, "remaining": 200000, "limit": 200000}
-        )
-        if limit is not None:
-            budget["limit"] = limit
-        budget["used"] = used
-        budget["remaining"] = max(0, budget["limit"] - used)
-        state["token_budget"] = budget
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save(state)
         return state
@@ -208,25 +290,25 @@ class ResearchLedger:
         return state
 
     def save_ctm(self, ctm_data: dict) -> dict:
-        """Save a Context Transfer Memorandum to state and write to disk.
+        """Save a Context Transfer Memorandum.
 
-        CTMs are generated at 90% token budget to preserve latent context
-        that cannot be transferred via structured state alone.
+        Architecture: full CTM blob is written to disk at
+        ``.os_state/context_transfer_memos/<ctm_id>.json``. The state
+        ledger keeps only a 3-field STUB (``ctm_id``, ``generated_at``,
+        ``phase``) so multi-day sessions don't accumulate megabytes of
+        CTM text inside the state ledger.
 
-        Args:
-            ctm_data: Dict with keys: phase, token_usage_pct, abandoned_paths,
-                      micro_decisions, immediate_goals, partial_results,
-                      open_questions, state_file_refs, handoff_notes
-
-        Returns:
-            Updated state dict
+        CTMs are typically generated at 90% token budget to preserve
+        context that doesn't survive structured-state transfer alone.
         """
         state = self._load()
         now = datetime.now(timezone.utc)
 
         ctm = {
             "ctm_id": f"ctm_{now.strftime('%Y%m%d_%H%M%S')}",
-            "phase": ctm_data.get("phase", state.get("phase", "unknown")),
+            "phase": ctm_data.get(
+                "phase", state.get("pipeline_stage", "unknown"),
+            ),
             "token_usage_pct": ctm_data.get("token_usage_pct", 0.9),
             "generated_at": now.isoformat(),
             "abandoned_paths": ctm_data.get("abandoned_paths", []),
@@ -238,29 +320,58 @@ class ResearchLedger:
             "handoff_notes": ctm_data.get("handoff_notes", ""),
         }
 
-        state.setdefault("context_transfer_memos", []).append(ctm)
-        state["updated_at"] = now.isoformat()
-        self._save(state)
-
+        # Disk-side: full blob.
         ctm_dir = self._path.parent / "context_transfer_memos"
         ctm_dir.mkdir(parents=True, exist_ok=True)
         ctm_path = ctm_dir / f"{ctm['ctm_id']}.json"
         self._save_to_path(ctm_path, ctm)
 
+        # State-side: stub only.
+        state.setdefault("context_transfer_memo_stubs", []).append({
+            "ctm_id": ctm["ctm_id"],
+            "generated_at": ctm["generated_at"],
+            "phase": ctm["phase"],
+        })
+        state["updated_at"] = now.isoformat()
+        self._save(state)
+
         return state
 
     def get_latest_ctm(self) -> Optional[dict]:
-        """Retrieve the most recent Context Transfer Memorandum."""
+        """Load the most recent Context Transfer Memorandum from disk."""
         state = self._load()
-        memos = state.get("context_transfer_memos", [])
-        if memos:
-            return memos[-1]
-        return None
+        stubs = state.get("context_transfer_memo_stubs", [])
+        if not stubs:
+            return None
+        latest = stubs[-1]
+        ctm_path = (
+            self._path.parent
+            / "context_transfer_memos"
+            / f"{latest['ctm_id']}.json"
+        )
+        if not ctm_path.exists():
+            return latest  # stub-only fallback
+        try:
+            return json.loads(ctm_path.read_text())
+        except Exception:
+            return latest
 
     def get_all_ctms(self) -> list:
-        """Retrieve all Context Transfer Memoranda."""
+        """Load every Context Transfer Memorandum from disk (or stubs if missing)."""
         state = self._load()
-        return state.get("context_transfer_memos", [])
+        stubs = state.get("context_transfer_memo_stubs", [])
+        out: list = []
+        ctm_dir = self._path.parent / "context_transfer_memos"
+        for stub in stubs:
+            p = ctm_dir / f"{stub['ctm_id']}.json"
+            if p.exists():
+                try:
+                    out.append(json.loads(p.read_text()))
+                    continue
+                except Exception:
+                    pass
+            out.append(stub)
+        return out
 
     def get_dag_path(self) -> Path:
         """Get or create the execution DAG file path."""
@@ -422,70 +533,64 @@ class ResearchLedger:
             return "error"
 
     def summary(self) -> str:
+        """Human-readable status snapshot. Slimmer than the dump form:
+        no token-budget panel, no per-error trace tail."""
         state = self._load()
         lines = [
             "=" * 60,
-            "GLOBAL RESEARCH LEDGER",
+            "RESEARCH LEDGER",
             "=" * 60,
             "",
-            f"  Run ID:      {state.get('run_id', 'N/A')}",
-            f"  Project:     {state.get('project', 'N/A')}",
-            f"  Phase:       {state.get('phase', 'N/A')} (step {state.get('step', 0)})",
-            f"  Created:     {state.get('created_at', 'N/A')}",
-            f"  Updated:     {state.get('updated_at', 'N/A')}",
+            f"  Project:        {state.get('project_name', 'unnamed')}",
+            f"  Pipeline:       {state.get('pipeline_stage', 'init')} (step {state.get('step', 0)})",
+            f"  Current path:   {state.get('current_path', 'main')}",
+            f"  Updated:        {state.get('updated_at', 'N/A')}",
             "",
             "  Checkpoints:",
         ]
-        for phase, status in state.get("checkpoints", {}).items():
+        for phase, status in (state.get("checkpoints", {}) or {}).items():
             marker = "✓" if status == "complete" else "○"
             lines.append(f"    {marker} {phase}: {status}")
         if not state.get("checkpoints"):
             lines.append("    (none yet)")
 
+        hyps = state.get("active_hypotheses", []) or []
         lines.append("")
-        lines.append(f"  Hypotheses: {len(state.get('active_hypotheses', []))}")
-        for h in state.get("active_hypotheses", []):
+        lines.append(f"  Hypotheses ({len(hyps)}):")
+        for h in hyps[:8]:
             eff = f", effect={h['effect']}" if h.get("effect") is not None else ""
             lines.append(f"    - {h['id']}: {h['status']}{eff}")
+        if len(hyps) > 8:
+            lines.append(f"    … and {len(hyps) - 8} more")
 
+        dead = state.get("dead_ends", []) or []
         lines.append("")
-        lines.append(f"  Dead ends: {len(state.get('dead_ends', []))}")
-        for d in state.get("dead_ends", []):
+        lines.append(f"  Dead ends: {len(dead)}")
+        for d in dead[-3:]:
             lines.append(f"    - {d}")
 
+        errors = state.get("errors", []) or []
         lines.append("")
-        lines.append(f"  Loaded data: {len(state.get('loaded_data', []))} file(s)")
-        for d in state.get("loaded_data", []):
-            lines.append(f"    - {d}")
+        lines.append(f"  Errors: {len(errors)} (latest only)")
+        if errors:
+            e = errors[-1]
+            lines.append(f"    - [{e.get('timestamp', '')}] {e.get('message', '')[:120]}")
 
-        budget = state.get("token_budget", {})
-        lines.append("")
-        lines.append("  Token Budget:")
-        lines.append(f"    Used:      {budget.get('used', 0):,}")
-        lines.append(f"    Remaining: {budget.get('remaining', 0):,}")
-        lines.append(f"    Limit:     {budget.get('limit', 0):,}")
-
-        errors = state.get("errors", [])
-        lines.append("")
-        lines.append(f"  Errors: {len(errors)}")
-        for e in errors[-5:]:
-            lines.append(f"    - [{e.get('timestamp', '')}] {e.get('message', '')}")
-        if len(errors) > 5:
-            lines.append(f"    ... and {len(errors) - 5} more")
-
-        lines.append("")
-        lines.append(f"  Resumable from: {state.get('resumable_from', 'none')}")
-
-        paths = state.get("paths", {})
+        paths = state.get("paths", {}) or {}
+        active = state.get("current_path", "main")
         lines.append("")
         lines.append(f"  Paths: {len(paths)}")
-        active = state.get("current_path", "main")
         for pid, p in paths.items():
             marker = "▶" if pid == active else " "
-            status_icon = {"active": "○", "completed": "✓", "dead_end": "✗", "abandoned": "✗"}.get(
-                p.get("status", "active"), "○"
-            )
+            status_icon = {
+                "active": "○", "completed": "✓",
+                "dead_end": "✗", "abandoned": "✗",
+            }.get(p.get("status", "active"), "○")
             lines.append(f"    {marker} {status_icon} {pid}")
+
+        ctm_count = len(state.get("context_transfer_memo_stubs", []))
+        if ctm_count:
+            lines.extend(["", f"  Context transfers archived: {ctm_count}"])
 
         lines.append("")
         return "\n".join(lines)
@@ -504,8 +609,8 @@ class ResearchLedger:
         """
         state = self._load()
         lines = [
-            f"Project: {state.get('project', 'unnamed')}",
-            f"Phase: {state.get('phase', 'unknown')} (step {state.get('step', 0)})",
+            f"Project: {state.get('project_name', 'unnamed')}",
+            f"Phase: {state.get('pipeline_stage', 'unknown')} (step {state.get('step', 0)})",
             f"Path: {state.get('current_path', 'main')}",
         ]
 

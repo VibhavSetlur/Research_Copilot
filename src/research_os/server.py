@@ -210,23 +210,28 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "tool_route": {
-        "short": "Map a user prompt to the right protocol + decomposition WITHOUT loading every protocol.",
-        "description": "Takes a raw user prompt and returns: primary_protocol, shortcut_tool (if applicable), decomposition (planned sequence of tool calls), alternatives, complexity ('low'|'high'), why. For complex prompts (>25 words, multiple verbs, conjunctions) it writes a planning record to .os_state/active_plan.json so the AI is forced to step through instead of one-shotting. CALL THIS BEFORE sys_protocol_get on every researcher turn.",
+        "short": "Prompt → protocol + decomposition. Call after every researcher message.",
+        "description": "Hierarchical L1→L2→L3 picker. Returns primary_protocol, shortcut_tool, decomposition, complexity, ask_user, alternatives. High-complexity prompts get an active_plan persisted to .os_state/. See guidance/iterative_planning for the workflow.",
         "category": "routing",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "prompt": {"type": "string", "description": "The researcher's raw message (verbatim, including typos / rambling)."},
-                "persist_plan": {"type": "boolean", "description": "If true (default), persist a planning record for complex prompts."},
+                "prompt": {"type": "string"},
+                "persist_plan": {"type": "boolean"},
             },
             "required": ["prompt"],
         },
     },
     "tool_plan_advance": {
-        "short": "Mark current step of the active plan done; get the next step.",
-        "description": "After completing each step of an active plan (set by tool_route on a complex prompt), call this to advance to the next step. Returns the next step body + remaining count. When all steps are done the plan auto-archives.",
+        "short": "Mark current step done; get next step. Returns status='blocked' when a deliverable gate fails.",
+        "description": "Walk the active_plan. Returns next_step + remaining. Returns status='blocked' when the next step is a deliverable tool (tool_synthesize / tool_dashboard_create / tool_poster_create / tool_latex_compile) and the quality gate finds blockers. Pass override_gate=true only on explicit researcher approval of a partial deliverable.",
         "category": "routing",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "override_gate": {"type": "boolean"},
+            },
+        },
     },
     "tool_plan_turn": {
         "short": "Slice the active plan into this_turn (do now) + next_turn (queued) per model_profile.",
@@ -460,6 +465,73 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "description": "List all numbered experiment folders with their status (active|completed|dead_end).",
         "category": "path",
         "inputSchema": {"type": "object", "properties": {}},
+    },
+    "sys_export_share_archive": {
+        "description": (
+            "Build a share-safe zip of this project (default: "
+            "<project>_share_<YYYY-MM-DD>.zip in the project root). "
+            "Excludes AI-internal files (AGENTS.md, CLAUDE.md, .os_state/, "
+            ".claude/, MCP configs, GETTING_STARTED.md) and — unless "
+            "include_raw_data=true — inputs/raw_data/. Includes inputs/ "
+            "(minus raw_data), workspace/, synthesis/, docs/, environment/, "
+            "and a top-level README.md if present. Equivalent to running "
+            "`python scripts/export_share_archive.py` from the project root."
+        ),
+        "category": "interaction",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "out": {"type": "string",
+                        "description": "Optional explicit output zip path."},
+                "include_raw_data": {
+                    "type": "boolean",
+                    "description": "Set true to bundle inputs/raw_data/ (default false to keep archives small and avoid PII)."
+                },
+            },
+        },
+    },
+    "tool_synthesis_curate_figures": {
+        "description": (
+            "Collect each step's focal figure into synthesis/figures/ with "
+            "stable, ordered names (fig01_<slug>.png, fig02_<slug>.png, …) "
+            "so the dashboard + paper can embed them deterministically. "
+            "Copies the figure's existing .caption.md sidecar if present, "
+            "or seeds a placeholder explaining how to write one. Returns the "
+            "list of curated figures plus any step that produced no figures "
+            "(to flag in the audit) and any figure missing a caption. Run "
+            "BEFORE tool_dashboard_create / tool_synthesize so the deliverables "
+            "use a single canonical figure set rather than scanning the "
+            "workspace anew each time."
+        ),
+        "category": "synthesis",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_path_finalize": {
+        "description": (
+            "Rewrite a step's stub README + every subfolder README from what "
+            "actually got produced. Call this BEFORE marking a step complete: "
+            "(a) `environment/README.md` is normalised to either 'used the "
+            "project-global env' or a list of bespoke requirements, (b) "
+            "`literature/README.md` either points at the global corpus + the "
+            "step's decision log or lists the step-specific sources + the "
+            "decisions they informed, (c) `data/output/README.md` lists every "
+            "persisted artefact and which downstream step consumes it, (d) "
+            "`outputs/README.md` enumerates produced figures / tables / "
+            "reports, and (e) any stub sections in the step's main `README.md` "
+            "are populated from `conclusions.md` + `analysis.md` decisions. "
+            "Idempotent — running it a second time is a no-op if nothing "
+            "changed. Defaults to the current path."
+        ),
+        "category": "path",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path_name": {
+                    "type": "string",
+                    "description": "Step folder name (e.g. '03_replicate_attitude_demographics'). Defaults to current_path.",
+                },
+            },
+        },
     },
 
     # ── Checkpoints ───────────────────────────────────────────────────
@@ -866,6 +938,507 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "category": "audit",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    "tool_audit_step_completeness": {
+        "short": "Per-step gate: focal figure + caption + summary + non-stub conclusions. BLOCKS tool_synthesize when failing.",
+        "description": "Server-enforced 'did the step actually finish?' check. Validates that EVERY active numbered step has: (a) conclusions.md with non-stub Findings + Decision; (b) at least one focal figure under outputs/figures/; (c) sibling .caption.md + .summary.md for each figure; (d) at least one runnable script. Returns status='error' if any step has BLOCKERS — tool_synthesize honours this and refuses to assemble until cleared. Pass step_id to audit one step instead of the whole project. Writes report to workspace/logs/step_completeness.md.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {
+                    "type": "string",
+                    "description": "Optional — audit one step instead of all active ones.",
+                }
+            },
+        },
+    },
+    "tool_figure_create": {
+        "short": "Publication-grade figure with enforced palette / DPI / dual PNG+SVG export + caption sidecars.",
+        "description": "Build a figure that clears the figure_guidelines bar in one call: SciencePlots-style typography (or built-in equivalent), Okabe-Ito / viridis / PuOr palettes, mandatory axis labels with units, inline n annotation, 95% CI band on regression overlays. Writes <step>/outputs/figures/<step_num>_<name>.{png,svg} + <name>.caption.md + (when plain_english is given) <name>.summary.md. Supported `kind`: bar, barh, line, scatter, hist, box, violin, heatmap, forest. `data` accepts a list-of-dicts, column-dict, or a path to CSV/TSV/JSON/Parquet. Set `interactive=true` (or `backend='plotly'`) for an interactive HTML companion when plotly is installed.",
+        "category": "viz",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string", "description": "Numbered step folder, e.g. '03_logistic_baseline'."},
+                "name": {"type": "string", "description": "Short descriptor — step number auto-prefixed if missing."},
+                "kind": {"type": "string", "description": "bar | barh | line | scatter | hist | box | violin | heatmap | forest"},
+                "data": {"description": "list of row-dicts, column-dict, OR string path to CSV/TSV/JSON/Parquet."},
+                "x": {"type": "string"},
+                "y": {"type": "string"},
+                "z": {"type": "string", "description": "heatmap value column"},
+                "error": {"type": "string", "description": "column with error/CI radius"},
+                "color_by": {"type": "string", "description": "grouping column for line / scatter"},
+                "bins": {"type": "number", "description": "histogram bin count (default 30)"},
+                "regression": {"type": "boolean", "description": "scatter: add OLS line + 95% CI band"},
+                "palette": {"type": "string", "description": "qualitative (default) | sequential | diverging | accent"},
+                "style": {"type": "string", "description": "default | nature | ieee | notebook | no_latex"},
+                "title": {"type": "string"},
+                "xlabel": {"type": "string"},
+                "ylabel": {"type": "string"},
+                "caption": {"type": "string", "description": "Technical caption for the figure sidecar."},
+                "plain_english": {"type": "string", "description": "Plain-language summary for the .summary.md sidecar."},
+                "interactive": {"type": "boolean", "description": "Also write an HTML plotly companion (requires plotly)."},
+                "backend": {"type": "string", "description": "matplotlib (default) | plotnine | plotly"},
+            },
+            "required": ["step_id", "name", "kind", "data"],
+        },
+    },
+    "tool_figure_caption_synthesise": {
+        "short": "Write a plain-English <name>.summary.md next to a figure.",
+        "description": "Generate a 2-3 sentence plain-language description next to a figure for non-expert / accessibility audiences (W3C two-part guidance). Reads the figure's existing <name>.caption.md sidecar + the step's conclusions.md Findings section to anchor the summary in the actual result. Idempotent — pass overwrite=true to replace an existing summary.",
+        "category": "viz",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "figure_path": {"type": "string", "description": "Path relative to project root (e.g. workspace/03_baseline/outputs/figures/03_calibration.png)."},
+                "technical_caption": {"type": "string"},
+                "findings_context": {"type": "string"},
+                "overwrite": {"type": "boolean"},
+            },
+            "required": ["figure_path"],
+        },
+    },
+    "tool_audit_figure_full": {
+        "short": "Full figure audit — DPI + caption + summary + SVG companion + aspect ratio.",
+        "description": "Strict superset of `tool_audit_figure` (which checks DPI + dimensions only). Adds: missing caption / summary sidecars, PNG without SVG companion, time-series aspect-ratio sanity. Emits BLOCKERs vs warnings the step-completeness gate consumes. Use this for any figure heading into the dashboard, paper, or poster.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "figure_path": {"type": "string"},
+            },
+            "required": ["figure_path"],
+        },
+    },
+    "tool_figure_palette": {
+        "short": "Recommended palette for a chart's encoding.",
+        "description": "Returns colour-blind-safe defaults: Okabe-Ito (qualitative), viridis (sequential), PuOr (diverging), or the dashboard primary/gold/green/red accent set.",
+        "category": "viz",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "description": "qualitative (default) | sequential | diverging | accent"},
+                "n": {"type": "number", "description": "Number of colours (default 8)."},
+            },
+        },
+    },
+    "tool_step_pipeline_define": {
+        "short": "Author the step's sub-task DAG (ingest→clean→validate→fit→diagnose→visualize→report).",
+        "description": "Seeds workspace/<step>/pipeline.yaml from a 7-node template; required for any step with >2 scripts (audit gate). See guidance/analysis_plan for the workflow.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string", "description": "Numbered step folder (e.g. 03_logistic_baseline)."},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "nodes": {"type": "array", "description": "Optional custom node list — see protocol for shape."},
+                "template": {"type": "string", "description": "default (7-node ingest→...→report)."},
+            },
+            "required": ["step_id"],
+        },
+    },
+    "tool_step_pipeline_run": {
+        "short": "Execute the step's sub-task DAG with content-hash caching.",
+        "description": "Walks the pipeline.yaml DAG in topological order. Nodes whose script + inputs + params hash matches a previous successful run are SKIPPED (cached) — only the affected downstream chain re-runs after an edit. Each produced output gets a .prov.json sidecar (PROV-O). Pass `only` to restrict to a subset of nodes (their upstream deps are pulled in automatically). Pass `force=true` to bypass the cache. Pass `dry_run=true` to see what would run.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "only": {"type": "array", "items": {"type": "string"}, "description": "Node IDs to run (transitive deps auto-included)."},
+                "force": {"type": "boolean", "description": "Skip the cache and re-run every node."},
+                "dry_run": {"type": "boolean", "description": "Plan only; do not execute."},
+            },
+            "required": ["step_id"],
+        },
+    },
+    "tool_step_pipeline_status": {
+        "short": "Per-node staleness report — what's fresh, stale, or never run.",
+        "description": "Reads pipeline.yaml + the most recent run log; for each node reports fresh (content hash matches last successful run), stale (inputs/params/script changed), or never_run.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"step_id": {"type": "string"}},
+            "required": ["step_id"],
+        },
+    },
+    "tool_step_pipeline_diagram": {
+        "short": "Render the step's sub-task DAG as a Mermaid + (optional) PNG.",
+        "description": "Writes workspace/<step>/pipeline.mermaid; the dashboard's per-step appendix embeds it so reviewers see the analysis as a graph, not a mystery script.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"step_id": {"type": "string"}},
+            "required": ["step_id"],
+        },
+    },
+    "tool_dashboard_test_generate": {
+        "short": "Scaffold tests/dashboard/ with Playwright invariant suite + axe-core accessibility.",
+        "description": "Writes a baseline pytest-playwright suite covering: no console errors, semantic landmarks, TOC anchors, theme toggle CSS-var flip, sortable tables, figure lightbox, print stylesheet, ARIA landmarks, axe-core WCAG 2.1 AA. Visual regression is opt-in via ROS_DASHBOARD_VISUAL=1. Researcher adds their own test_*.py files in the same folder; tool_dashboard_test_run picks them up.",
+        "category": "viz",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "overwrite": {"type": "boolean"},
+            },
+        },
+    },
+    "tool_dashboard_test_run": {
+        "short": "Execute the Playwright suite; return structured failures + trace.zip paths.",
+        "description": "Subprocess pytest under tests/dashboard/. Parses junit.xml; returns per-test failures with message + trace tail. Persists workspace/logs/dashboard_tests.json so the next iteration can read the failure set. trace.zip files under test-results/ are time-travel debug UIs (`playwright show-trace`).",
+        "category": "viz",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "only": {"type": "string", "description": "Pytest node-id filter."},
+                "visual": {"type": "boolean", "description": "Enable visual regression."},
+                "update_snapshots": {"type": "boolean"},
+                "timeout": {"type": "number"},
+            },
+        },
+    },
+    # ── Grounded reasoning (ReAct + PROV-O + CoVe + Reflexion) ──────────
+    "tool_thought_log": {
+        "short": "Append one ReAct trace entry — thought / plan / action / observation / reflection / decision.",
+        "description": "Persistent thinking log at workspace/.thoughts/thoughts.jsonl. Use to surface reasoning BEFORE acting (ReAct: thought → action → observation). Optional decision_id links the trace to a grounding record.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "description": "thought | plan | action | observation | reflection | decision"},
+                "content": {"type": "string"},
+                "step_id": {"type": "string"},
+                "decision_id": {"type": "string"},
+                "metadata": {"type": "object"},
+            },
+            "required": ["kind", "content"],
+        },
+    },
+    "tool_thought_trace": {
+        "short": "Read the recent thought trace (filterable by step / decision).",
+        "description": "Returns the tail of workspace/.thoughts/thoughts.jsonl. Use to remind yourself what you concluded earlier in the session.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "decision_id": {"type": "string"},
+                "tail": {"type": "number"},
+            },
+        },
+    },
+    "tool_grounding_register": {
+        "short": "Bind a decision/claim to PROV-O sources (papers, context files, datasets, web, prior decisions).",
+        "description": "Every methodological decision should cite the evidence that informed it. Sources are typed: paper | preprint | dataset | context_file | web | workspace_artefact | tool_research | prior_decision. Cited_text spans recommended where available. tool_grounding_verify gates synthesis on coverage.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "decision_id": {"type": "string"},
+                "claim": {"type": "string"},
+                "sources": {"type": "array"},
+                "step_id": {"type": "string"},
+                "confidence": {"type": "string", "description": "low | medium | high"},
+                "notes": {"type": "string"},
+            },
+            "required": ["claim", "sources"],
+        },
+    },
+    "tool_ground_from_context": {
+        "short": "Shortcut: build a grounding record from inputs/context/ files in one call.",
+        "description": "For decisions grounded in the researcher's narrative notes (not formal papers). Hashes each context file + records the cited excerpt.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "decision_id": {"type": "string"},
+                "claim": {"type": "string"},
+                "context_paths": {"type": "array", "items": {"type": "string"}},
+                "cited_excerpts": {"type": "array", "items": {"type": "string"}},
+                "confidence": {"type": "string"},
+            },
+            "required": ["claim", "context_paths"],
+        },
+    },
+    "tool_claim_verify": {
+        "short": "Chain-of-Verification (CoVe): record verification Q&A for a claim.",
+        "description": "Each claim heading into the paper should be paired with N verification questions, independently answered. Claim is `verified` only when all `supports==true`. Surfaces in the master audit + dashboard.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "claim": {"type": "string"},
+                "verifications": {"type": "array"},
+                "decision_id": {"type": "string"},
+                "step_id": {"type": "string"},
+            },
+            "required": ["claim", "verifications"],
+        },
+    },
+    "tool_grounding_verify": {
+        "short": "Audit gate — every decision in analysis.md must carry a grounding record.",
+        "description": "Walks workspace/analysis.md decisions; flags any whose evidence chain is missing. Writes workspace/logs/grounding_audit.md; the master quality auditor uses it as a blocker for synthesis.",
+        "category": "audit",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_lessons_record": {
+        "short": "Reflexion: record a what-worked / what-didn't lesson for future runs.",
+        "description": "After each step or plan, capture a textual lesson. tool_lessons_consult retrieves the top-K matching lessons for the next task and produces a prompt block to prepend to the next system prompt.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "outcome": {"type": "string", "description": "success | failure | partial | abandoned"},
+                "reflection": {"type": "string"},
+                "what_worked": {"type": "string"},
+                "what_didnt": {"type": "string"},
+                "recommendation": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "step_id": {"type": "string"},
+                "scope": {"type": "string"},
+            },
+            "required": ["outcome", "reflection"],
+        },
+    },
+    "tool_lessons_consult": {
+        "short": "Retrieve top-K prior lessons relevant to the current task.",
+        "description": "Returns lessons ranked by recency + tag overlap + keyword overlap. Failure-outcome lessons get a small boost (more actionable). Use the returned `prompt_block` to prepend a 'Prior lessons' section to the next AI turn.",
+        "category": "memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "top_k": {"type": "number"},
+                "scope_filter": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["task"],
+        },
+    },
+    "tool_plan_step_grounded": {
+        "short": "Plan a step with explicit Thought / Required-grounding / Action / Verification per sub-task.",
+        "description": "Stronger than tool_plan_step. Auto-inventories the project's available evidence (inputs, context notes, literature, prior conclusions). Each sub-task has filled slots for thought, required grounding (which evidence will be consulted), action, expected outputs, verification question, and prior lessons consulted. Use for substantive analyses where every action should be traceable to evidence.",
+        "category": "research",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "goal": {"type": "string"},
+                "inputs_to_consult": {"type": "array", "items": {"type": "string"}},
+                "context_to_consult": {"type": "array", "items": {"type": "string"}},
+                "literature_queries": {"type": "array", "items": {"type": "string"}},
+                "max_substeps": {"type": "number"},
+            },
+            "required": ["goal"],
+        },
+    },
+    # ── New audit tools (code, prose, claims, preregistration, master) ──
+    "tool_audit_code_quality": {
+        "short": "Per-script audit: ruff + AST complexity + smells + docstrings.",
+        "description": "Walks workspace/<step>/scripts/*.py. Runs ruff if installed; runs an AST-based scan for cyclomatic complexity (>10 warn, >20 block), function length (>80 warn, >150 block), missing module/public-function docstrings, bare-except / import-* / eval-exec / hardcoded-absolute-path smells. Writes workspace/logs/code_quality.md; returns blockers that the master quality auditor consumes.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "run_ruff": {"type": "boolean"},
+                "run_mypy": {"type": "boolean"},
+            },
+        },
+    },
+    "tool_audit_prose": {
+        "short": "Prose audit: hedging, vague quantifiers, passive voice, reading level, reporting-standard coverage.",
+        "description": "Audits synthesis/*.md + every conclusions.md. Flags 40+ hedge phrases, numbers-without-precision ('many subjects'), passive-voice ratio, Flesch-Kincaid grade level, causal language on observational designs. Checks CONSORT / STROBE / PRISMA / ARRIVE section coverage based on the project's domain. Writes workspace/logs/prose_audit.md.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "targets": {"type": "array", "items": {"type": "string"}},
+                "is_observational": {"type": "boolean"},
+            },
+        },
+    },
+    "tool_audit_claims": {
+        "short": "Verify every quantitative number in the paper traces to a workspace output.",
+        "description": "Extracts every numeric claim (AUROC = 0.84, p = 0.012, n = 423) from synthesis/paper.md (or target_path) and confirms each appears verbatim or within 1% tolerance in some workspace CSV/TSV/JSON/MD/TXT. Catches AI-hallucinated numbers. BLOCKS tool_synthesize when ungrounded claims are found.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target_path": {"type": "string", "description": "Default synthesis/paper.md."},
+                "tolerance": {"type": "number", "description": "Float tolerance (default 0.01 = 1%)."},
+            },
+        },
+    },
+    "tool_audit_evalue": {
+        "short": "E-value sensitivity to unmeasured confounding (VanderWeele & Ding 2017).",
+        "description": "Given an observed risk ratio + 95% CI, computes the E-value — the minimum strength of association an unmeasured confounder would need (with BOTH exposure and outcome) to explain away the observed effect. Persists workspace/<step>/outputs/reports/evalue_report.md.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "risk_ratio": {"type": "number"},
+                "ci_lower": {"type": "number"},
+                "ci_upper": {"type": "number"},
+            },
+            "required": ["risk_ratio"],
+        },
+    },
+    "tool_preregister_freeze": {
+        "short": "Freeze SAP + hypotheses BEFORE data analysis (content-hashed, immutable).",
+        "description": "Snapshots methods.md + active hypotheses to workspace/.preregistration/prereg_<iso>.{md,yaml}. Diffed at synthesis time via tool_preregister_diff. See methodology/preregistration for the full SAP field list and the OSF submission flow.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "primary_outcomes": {"type": "string"},
+                "secondary_outcomes": {"type": "string"},
+                "target_n": {"type": "number"},
+                "power_assumption": {"type": "string"},
+                "stopping_rule": {"type": "string"},
+                "subgroups": {"type": "array", "items": {"type": "string"}},
+                "sensitivity": {"type": "array", "items": {"type": "string"}},
+                "multiplicity": {"type": "string"},
+                "inclusion": {"type": "array", "items": {"type": "string"}},
+                "exclusion": {"type": "array", "items": {"type": "string"}},
+                "missing_data": {"type": "string"},
+                "additional_analyses": {"type": "array", "items": {"type": "string"}},
+                "contingencies": {"type": "array", "items": {"type": "string"}},
+                "anticipated_deviations": {"type": "array", "items": {"type": "string"}},
+                "data_status": {"type": "string"},
+            },
+        },
+    },
+    "tool_preregister_diff": {
+        "short": "Diff the frozen SAP against the current state — lists every deviation.",
+        "description": "Loads the most recent .preregistration/prereg_*.yaml; compares hypotheses (added / removed / re-worded), methods.md (lines added / removed since freeze), and the paper's primary-outcome mention. Surfaces deviations the discussion section must acknowledge. Writes workspace/logs/preregistration_diff.md.",
+        "category": "audit",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_sensitivity_define": {
+        "short": "Author a multiverse / specification-curve sensitivity grid.",
+        "description": "Creates workspace/<step>/sensitivity.yaml — base_script + a grid of analytic choices (covariate sets, exclusion rules, transformations, model families). The runner will fan out the Cartesian product; the base script reads each spec via env vars (RESEARCH_OS_SPEC_<KEY>) and writes a one-row {estimate, ci_lo, ci_hi, <spec_columns>} record per run.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "base_script": {"type": "string"},
+                "estimate_column": {"type": "string"},
+                "ci_columns": {"type": "array", "items": {"type": "string"}},
+                "grid": {"type": "object"},
+                "output_csv": {"type": "string"},
+            },
+            "required": ["step_id", "base_script"],
+        },
+    },
+    "tool_sensitivity_run": {
+        "short": "Execute the sensitivity grid + render the specification curve.",
+        "description": "Runs base_script once per combination; collects {estimate, ci_lo, ci_hi, spec_columns} into the output CSV; renders a Steegen-style specification curve (ordered effect dots + CIs over a choice matrix) into outputs/figures/<NN>_specification_curve.png. Drops a provenance sidecar.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "max_specs": {"type": "number", "description": "Cap for testing — default = all combos."},
+                "render_figure": {"type": "boolean"},
+            },
+            "required": ["step_id"],
+        },
+    },
+    "tool_redteam_review": {
+        "short": "Generate a hostile-reviewer report scaffold against the paper.",
+        "description": "Writes workspace/reviews/redteam_<persona>_<ts>.md — the structure of a real journal reviewer report: summary, overall recommendation, major comments M1-M5, minor comments, threats-to-validity (internal/external/construct/statistical), devil's-advocate questions. Personas: methodological_skeptic | statistical_referee | sympathetic_peer. The model fills the scaffold using ONLY the listed workspace inventory.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "persona": {"type": "string", "description": "methodological_skeptic (default) | statistical_referee | sympathetic_peer"},
+            },
+        },
+    },
+    "tool_response_to_reviewers": {
+        "short": "Write a response-to-reviewers template paired with the latest red-team report.",
+        "description": "Produces synthesis/response_to_reviewers.md with one heading per reviewer comment (Mn, mn), pre-formatted for line-referenced rebuttal text. Read by the model to generate concrete response text once revisions are in.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "review_path": {"type": "string"},
+            },
+        },
+    },
+    "tool_null_findings_report": {
+        "short": "Companion document for refuted / inconclusive / underpowered / abandoned analyses.",
+        "description": "Walks the hypothesis tracker (refuted + inconclusive), every step's power_report.md (computed power < 0.8), and every __DEAD_END path. Writes synthesis/null_findings.md — a publishable companion that fights the file-drawer problem.",
+        "category": "audit",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_audit_quality_full": {
+        "short": "Run every quality gate in one call — completeness + code + prose + claims + prereg diff.",
+        "description": "Master auditor. Runs tool_audit_step_completeness + tool_audit_code_quality + tool_audit_prose + tool_audit_claims + tool_preregister_diff in one shot; aggregates the blocker set; writes workspace/logs/audit_master.md. tool_synthesize calls this as its first gate when no `section` is given.",
+        "category": "audit",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target_path": {"type": "string"},
+                "skip": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    "tool_slurm_submit": {
+        "short": "Submit a SLURM job from researcher_config.runtime.cluster_defaults.",
+        "description": "Generates an sbatch script (cpus, mem, time, partition, gpus, array, dependency, modules, conda env), submits it, records job_id + script in .os_state/cluster/jobs/<job_id>.json. All optional params default to runtime.cluster_defaults; typical call is just (step_id, cmd).",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {"type": "string"},
+                "cmd": {"type": "string"},
+                "job_name": {"type": "string"},
+                "cpus": {"type": "number"},
+                "mem": {"type": "string"},
+                "time_limit": {"type": "string"},
+                "partition": {"type": "string"},
+                "gpus": {"type": "number"},
+                "array": {"type": "string", "description": "e.g. '1-100%10' for 100 tasks, 10 concurrent."},
+                "dependency": {"type": "string", "description": "e.g. 'afterok:12345'."},
+                "modules": {"type": "array", "items": {"type": "string"}},
+                "conda_env": {"type": "string"},
+                "extra_sbatch": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["cmd"],
+        },
+    },
+    "tool_slurm_status": {
+        "short": "Live status via squeue + finished status via sacct for one or all project jobs.",
+        "description": "When job_id is given, returns a single record (live + finished state, elapsed, max RSS, exit code). Without job_id, returns every job submitted from this project.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"job_id": {"type": "string"}},
+        },
+    },
+    "tool_slurm_fetch": {
+        "short": "Block until a SLURM job finishes; return stdout / stderr paths.",
+        "description": "Polls squeue every poll_interval seconds until the job is no longer queued / running, then collects the log files under the recorded log_dir.",
+        "category": "exec",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string"},
+                "poll_interval": {"type": "number"},
+                "max_wait": {"type": "number"},
+            },
+            "required": ["job_id"],
+        },
+    },
+    "tool_slurm_list": {
+        "short": "List every SLURM job submitted from this project.",
+        "description": "Reads .os_state/cluster/jobs/*.json. No external calls.",
+        "category": "exec",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 
     # ── Synthesis & output ────────────────────────────────────────────
     "tool_synthesize_plan": {
@@ -904,9 +1477,21 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {}},
     },
     "tool_poster_create": {
-        "description": "Generate a LaTeX poster (tikzposter) from the workspace.",
+        "description": "Generate a LaTeX poster (tikzposter) from the workspace. Layouts: `billboard` (default — Mike Morrison Better Poster pattern: giant plain-English headline + ammo bar of methods/findings/limitations + QR code) or `classic` (two-column IMRAD). Audience profile gates copy density and call-to-action: academic_conference (default), symposium, industry, teaching.",
         "category": "synthesis",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "layout": {
+                    "type": "string",
+                    "description": "billboard (default — readable from across the hall) | classic (IMRAD two-column)",
+                },
+                "audience": {
+                    "type": "string",
+                    "description": "academic_conference (default) | symposium | industry | teaching",
+                },
+            },
+        },
     },
     "tool_dashboard_create": {
         "description": "Generate a standalone, offline HTML dashboard (sortable tables, lightbox gallery, light/dark toggle, print-friendly) at synthesis/dashboard.html. Tailored to audience: academic | executive | technical | teaching.",
@@ -1036,7 +1621,8 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
 
     # ── Multi-language script support ────────────────────────────────
     "tool_notebook_exec": {
-        "description": "Execute a Jupyter .ipynb in place (jupyter nbconvert --execute --inplace).",
+        "short": "Execute a Jupyter notebook (papermill-aware with provenance sidecar).",
+        "description": "Executes a .ipynb. When papermill is installed AND parameters is given, runs the notebook with parameter injection — output lands at notebook/runs/<stem>_<param-hash>.ipynb with a .prov.json sidecar capturing the input notebook + parameters + RNG seed + wall time. When papermill is absent, falls back to `jupyter nbconvert --execute --inplace` (parameters dict is ignored with a warning). Pass output_path to override the default runs/ location.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -1044,6 +1630,9 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
                 "notebook_path": {"type": "string"},
                 "timeout": {"type": "number"},
                 "kernel": {"type": "string"},
+                "parameters": {"type": "object",
+                               "description": "Injected into the `parameters`-tagged cell (papermill only)."},
+                "output_path": {"type": "string"},
             },
             "required": ["notebook_path"],
         },
@@ -1247,8 +1836,8 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         },
     },
     "tool_step_env_lock": {
-        "short": "Pin per-step requirements.txt + python_version.txt (optionally conda.yaml + Dockerfile).",
-        "description": "Lock the current Python environment INSIDE a specific numbered step's environment/ folder so the step is reproducible years later, even if the global workspace env drifts. Writes requirements.txt + python_version.txt + session.yaml. Pass write_conda_yaml=true to add a conda spec; write_dockerfile=true to add a per-step Dockerfile. Prefer this over sys_env_snapshot for any step you intend to publish.",
+        "short": "Pin per-step env (requirements + python_version + optional conda / Docker / Apptainer / entrypoint).",
+        "description": "Locks the active step's environment/ for years-later reproduction. Optional artefacts via write_conda_yaml, write_dockerfile, write_apptainer, write_entrypoint. Prefer over sys_env_snapshot for any step you intend to publish.",
         "category": "execution",
         "inputSchema": {
             "type": "object",
@@ -1259,6 +1848,8 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
                 },
                 "write_conda_yaml": {"type": "boolean"},
                 "write_dockerfile": {"type": "boolean"},
+                "write_apptainer": {"type": "boolean", "description": "Emit step.def for HPC Apptainer/Singularity."},
+                "write_entrypoint": {"type": "boolean", "description": "Emit environment/entrypoint.sh (default true)."},
             },
         },
     },
@@ -1394,8 +1985,11 @@ def _handle_tool_route(name, arguments, root):
 def _handle_tool_plan_advance(name, arguments, root):
     from research_os.tools.actions.router import advance_plan
 
-    res = advance_plan(root)
-    if res.get("status") == "success":
+    res = advance_plan(
+        root, override_gate=bool(arguments.get("override_gate", False)),
+    )
+    # status='blocked' is informational, not a transport-level error.
+    if res.get("status") in {"success", "blocked"}:
         return _text(_success(res))
     return _text(_error(res.get("message", "tool_plan_advance failed")))
 
@@ -1451,6 +2045,8 @@ def _handle_tool_step_env_lock(name, arguments, root):
         step_id=arguments.get("step_id"),
         write_conda_yaml=bool(arguments.get("write_conda_yaml", False)),
         write_dockerfile=bool(arguments.get("write_dockerfile", False)),
+        write_apptainer=bool(arguments.get("write_apptainer", False)),
+        write_entrypoint=bool(arguments.get("write_entrypoint", True)),
     )
     if res.get("status") == "success":
         return _text(_success(res))
@@ -1683,6 +2279,59 @@ def _handle_sys_path_abandon(name, arguments, root):
 
 def _handle_sys_path_list(name, arguments, root):
     return _text(_success(list_paths(root)))
+
+
+def _handle_tool_path_finalize(name, arguments, root):
+    from research_os.tools.actions.state.path import finalize_path
+
+    res = finalize_path(arguments.get("path_name"), root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "finalize failed")))
+
+
+def _handle_tool_synthesis_curate_figures(name, arguments, root):
+    from research_os.tools.actions.synthesis.dashboard import curate_figures
+
+    res = curate_figures(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "curate failed")))
+
+
+def _handle_sys_export_share_archive(name, arguments, root):
+    """Run scripts/export_share_archive.py for the project root."""
+    import subprocess as _sp
+    import sys as _sys
+
+    script = root / "scripts" / "export_share_archive.py"
+    if not script.exists():
+        # Lazy-scaffold the script if the project pre-dates the feature.
+        try:
+            from research_os.project_ops import _write_sharing_scripts, load_state
+            project_name = (load_state(root) or {}).get("project_name") or root.name
+            _write_sharing_scripts(root, project_name)
+        except Exception as e:
+            return _text(_error(f"export script missing and could not be scaffolded: {e}"))
+
+    cmd = [_sys.executable, str(script)]
+    if arguments.get("out"):
+        cmd += ["--out", str(arguments["out"])]
+    if arguments.get("include_raw_data"):
+        cmd += ["--include-raw-data"]
+    try:
+        res = _sp.run(cmd, capture_output=True, text=True, timeout=180, cwd=str(root))
+        if res.returncode != 0:
+            return _text(_error(
+                f"export failed (rc={res.returncode}):\n"
+                f"stdout:\n{res.stdout[-1000:]}\n"
+                f"stderr:\n{res.stderr[-1000:]}"
+            ))
+        return _text(_success({"status": "success", "stdout": res.stdout.strip()}))
+    except _sp.TimeoutExpired:
+        return _text(_error("export timed out (>180s)"))
+    except Exception as e:
+        return _text(_error(f"export failed: {e}"))
 
 
 def _handle_sys_checkpoint_create(name, arguments, root):
@@ -2045,7 +2694,44 @@ def _handle_tool_synthesize_plan(name, arguments, root):
 
 
 def _handle_tool_synthesize(name, arguments, root):
+    from research_os.tools.actions.audit.audit import (
+        audit_quality_full, audit_step_completeness,
+    )
     from research_os.tools.actions.synthesis.synthesize import synthesize_workspace
+
+    # Server-enforced quality gate. Single-section synthesis (e.g. just
+    # the abstract) clears with a lightweight check; full-document
+    # synthesis must pass the master quality auditor.
+    skip_gate = arguments.get("override_completeness_gate", False)
+    full_doc = not arguments.get("section")
+    if full_doc and not skip_gate:
+        gate = audit_quality_full(
+            root,
+            # Skip claims gate on the FIRST synthesis (paper.md doesn't
+            # exist yet to extract claims from).
+            skip=arguments.get("skip_gates") or ["claims"],
+        )
+        if gate.get("status") == "error":
+            return _text(_error(
+                "BLOCKED by master quality gate. "
+                + (gate.get("advice") or "")
+                + "\n\nBlockers:\n"
+                + "\n".join(f"- {b}" for b in (gate.get("blockers") or [])[:15])
+                + (f"\n  … and {len(gate.get('blockers') or []) - 15} more"
+                   if len(gate.get("blockers") or []) > 15 else "")
+                + "\n\nReport: " + str(gate.get("report_path"))
+                + "\n\nTo bypass for a partial / WIP deliverable, call "
+                "again with override_completeness_gate=true."
+            ))
+    elif not skip_gate:
+        # Lightweight gate for single-section calls — still want focal
+        # figure + caption coverage.
+        sc = audit_step_completeness(root)
+        if sc.get("status") == "error":
+            return _text(_error(
+                "BLOCKED by step-completeness gate (section-only synthesis). "
+                + sc.get("advice", "")
+            ))
 
     res = synthesize_workspace(
         root,
@@ -2056,6 +2742,31 @@ def _handle_tool_synthesize(name, arguments, root):
     )
     if "error" in res:
         return _text(_error(res["error"]))
+
+    # After writing the full paper, run the claims audit as a second
+    # pass so any AI hallucinations surface immediately.
+    if full_doc and not skip_gate:
+        try:
+            from research_os.tools.actions.audit.claim_grounding import (
+                audit_claims,
+            )
+
+            cl = audit_claims(root)
+            res["claim_grounding"] = {
+                "status": cl.get("status"),
+                "ungrounded": cl.get("ungrounded"),
+                "coverage_pct": cl.get("coverage_pct"),
+                "report_path": cl.get("report_path"),
+            }
+            if cl.get("ungrounded"):
+                res["advice"] = (
+                    f"Paper written, but {cl['ungrounded']} numeric claim(s) "
+                    "are NOT grounded in any workspace output. Review "
+                    f"{cl.get('report_path')} before submitting."
+                )
+        except Exception as e:
+            logger.debug("claims audit skipped: %s", e)
+
     return _text(_success(res))
 
 
@@ -2068,11 +2779,26 @@ def _handle_tool_latex_compile(name, arguments, root):
 def _handle_tool_poster_create(name, arguments, root):
     from research_os.tools.actions.synthesis.latex import create_poster
 
-    return _text(_success(create_poster(root)))
+    return _text(_success(create_poster(
+        root,
+        layout=arguments.get("layout", "billboard"),
+        audience=arguments.get("audience", "academic_conference"),
+    )))
 
 
 def _handle_tool_dashboard_create(name, arguments, root):
+    from research_os.tools.actions.audit.audit import audit_step_completeness
     from research_os.tools.actions.synthesis.latex import create_dashboard
+
+    skip_gate = arguments.get("override_completeness_gate", False)
+    if not skip_gate:
+        gate = audit_step_completeness(root)
+        if gate.get("status") == "error":
+            # Soft-fail to a warning the dashboard still renders. The
+            # dashboard is more useful as a "where are we now" snapshot
+            # than the paper, so we don't BLOCK it — we annotate that
+            # blockers exist so the editor sees them.
+            arguments.setdefault("_completeness_warnings", gate.get("blockers"))
 
     res = create_dashboard(
         root,
@@ -2080,8 +2806,476 @@ def _handle_tool_dashboard_create(name, arguments, root):
         audience=arguments.get("audience", "academic"),
     )
     if res.get("status") == "success":
+        if arguments.get("_completeness_warnings"):
+            res["completeness_warnings"] = arguments["_completeness_warnings"]
+            res["advice"] = (
+                "Dashboard rendered, but step-completeness audit flagged "
+                f"{len(arguments['_completeness_warnings'])} blocker(s). "
+                "Resolve them before the FINAL deliverable."
+            )
         return _text(_success(res))
     return _text(_error(res.get("message", "dashboard create failed")))
+
+
+def _handle_tool_audit_step_completeness(name, arguments, root):
+    from research_os.tools.actions.audit.audit import audit_step_completeness
+
+    return _text(_success(audit_step_completeness(
+        root, step_id=arguments.get("step_id"),
+    )))
+
+
+def _handle_tool_figure_create(name, arguments, root):
+    from research_os.tools.actions.viz import figure_create
+
+    try:
+        res = figure_create(
+            root=root,
+            step_id=arguments["step_id"],
+            name=arguments["name"],
+            kind=arguments["kind"],
+            data=arguments["data"],
+            x=arguments.get("x"),
+            y=arguments.get("y"),
+            z=arguments.get("z"),
+            error=arguments.get("error"),
+            color_by=arguments.get("color_by"),
+            bins=int(arguments.get("bins", 30)),
+            regression=bool(arguments.get("regression", False)),
+            palette=arguments.get("palette", "qualitative"),
+            style=arguments.get("style", "default"),
+            title=arguments.get("title", ""),
+            xlabel=arguments.get("xlabel", ""),
+            ylabel=arguments.get("ylabel", ""),
+            caption=arguments.get("caption", ""),
+            plain_english=arguments.get("plain_english"),
+            interactive=bool(arguments.get("interactive", False)),
+            backend=arguments.get("backend", "matplotlib"),
+            extra=arguments.get("extra"),
+        )
+    except KeyError as e:
+        return _text(_error(f"Missing required parameter: {e}"))
+    except Exception as e:
+        return _text(_error(f"figure_create failed: {e}"))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "figure_create failed")))
+
+
+def _handle_tool_figure_caption_synthesise(name, arguments, root):
+    from research_os.tools.actions.viz import caption_synthesise
+
+    res = caption_synthesise(
+        root=root,
+        figure_path=arguments["figure_path"],
+        technical_caption=arguments.get("technical_caption"),
+        findings_context=arguments.get("findings_context"),
+        overwrite=bool(arguments.get("overwrite", False)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "caption_synthesise failed")))
+
+
+def _handle_tool_audit_figure_full(name, arguments, root):
+    from research_os.tools.actions.viz import audit_figure_quality
+
+    return _text(_success(audit_figure_quality(
+        arguments["figure_path"], root,
+    )))
+
+
+def _handle_tool_figure_palette(name, arguments, root):
+    from research_os.tools.actions.viz import palette_for
+
+    colors = palette_for(arguments.get("kind", "qualitative"),
+                         n=int(arguments.get("n", 8)))
+    return _text(_success({"kind": arguments.get("kind", "qualitative"),
+                           "colors": colors}))
+
+
+def _handle_tool_step_pipeline_define(name, arguments, root):
+    from research_os.tools.actions.exec.step_pipeline import define_pipeline
+
+    res = define_pipeline(
+        arguments["step_id"], root,
+        name=arguments.get("name"),
+        description=arguments.get("description", ""),
+        nodes=arguments.get("nodes"),
+        template=arguments.get("template", "default"),
+    )
+    if res.get("status") in {"success", "exists"}:
+        return _text(_success(res))
+    return _text(_error(res.get("message", "step_pipeline_define failed")))
+
+
+def _handle_tool_step_pipeline_run(name, arguments, root):
+    from research_os.tools.actions.exec.step_pipeline import run_pipeline
+
+    res = run_pipeline(
+        arguments["step_id"], root,
+        only=arguments.get("only"),
+        force=bool(arguments.get("force", False)),
+        dry_run=bool(arguments.get("dry_run", False)),
+    )
+    return _text(_success(res) if res.get("status") == "success"
+                 else _error(res.get("advice") or res.get("message", "pipeline run failed")))
+
+
+def _handle_tool_step_pipeline_status(name, arguments, root):
+    from research_os.tools.actions.exec.step_pipeline import pipeline_status
+
+    return _text(_success(pipeline_status(arguments["step_id"], root)))
+
+
+def _handle_tool_step_pipeline_diagram(name, arguments, root):
+    from research_os.tools.actions.exec.step_pipeline import render_pipeline_diagram
+
+    res = render_pipeline_diagram(arguments["step_id"], root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "pipeline diagram failed")))
+
+
+def _handle_tool_dashboard_test_generate(name, arguments, root):
+    from research_os.tools.actions.viz.dashboard_tests import (
+        generate_dashboard_test_suite,
+    )
+
+    return _text(_success(generate_dashboard_test_suite(
+        root, overwrite=bool(arguments.get("overwrite", False)),
+    )))
+
+
+def _handle_tool_dashboard_test_run(name, arguments, root):
+    from research_os.tools.actions.viz.dashboard_tests import run_dashboard_tests
+
+    return _text(_success(run_dashboard_tests(
+        root,
+        only=arguments.get("only"),
+        visual=bool(arguments.get("visual", False)),
+        update_snapshots=bool(arguments.get("update_snapshots", False)),
+        timeout=int(arguments.get("timeout", 300)),
+    )))
+
+
+# ── Grounded reasoning handlers ──────────────────────────────────────
+
+
+def _handle_tool_thought_log(name, arguments, root):
+    from research_os.tools.actions.research.grounding import thought_log
+
+    res = thought_log(
+        root,
+        kind=arguments["kind"],
+        content=arguments["content"],
+        step_id=arguments.get("step_id"),
+        decision_id=arguments.get("decision_id"),
+        metadata=arguments.get("metadata"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "thought_log failed")))
+
+
+def _handle_tool_thought_trace(name, arguments, root):
+    from research_os.tools.actions.research.grounding import thought_trace
+
+    return _text(_success(thought_trace(
+        root,
+        step_id=arguments.get("step_id"),
+        decision_id=arguments.get("decision_id"),
+        tail=int(arguments.get("tail", 50)),
+    )))
+
+
+def _handle_tool_grounding_register(name, arguments, root):
+    from research_os.tools.actions.research.grounding import grounding_register
+
+    res = grounding_register(
+        root,
+        decision_id=arguments.get("decision_id"),
+        claim=arguments["claim"],
+        sources=arguments["sources"],
+        step_id=arguments.get("step_id"),
+        confidence=arguments.get("confidence", "medium"),
+        notes=arguments.get("notes", ""),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "grounding_register failed")))
+
+
+def _handle_tool_ground_from_context(name, arguments, root):
+    from research_os.tools.actions.research.grounding import ground_from_context
+
+    res = ground_from_context(
+        root,
+        decision_id=arguments.get("decision_id"),
+        claim=arguments["claim"],
+        context_paths=arguments["context_paths"],
+        cited_excerpts=arguments.get("cited_excerpts"),
+        confidence=arguments.get("confidence", "medium"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "ground_from_context failed")))
+
+
+def _handle_tool_claim_verify(name, arguments, root):
+    from research_os.tools.actions.research.grounding import claim_verify
+
+    res = claim_verify(
+        root,
+        claim=arguments["claim"],
+        verifications=arguments["verifications"],
+        decision_id=arguments.get("decision_id"),
+        step_id=arguments.get("step_id"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "claim_verify failed")))
+
+
+def _handle_tool_grounding_verify(name, arguments, root):
+    from research_os.tools.actions.research.grounding import grounding_verify
+
+    return _text(_success(grounding_verify(root)))
+
+
+def _handle_tool_lessons_record(name, arguments, root):
+    from research_os.tools.actions.research.lessons import lessons_record
+
+    res = lessons_record(
+        root,
+        outcome=arguments["outcome"],
+        reflection=arguments["reflection"],
+        what_worked=arguments.get("what_worked", ""),
+        what_didnt=arguments.get("what_didnt", ""),
+        recommendation=arguments.get("recommendation", ""),
+        tags=arguments.get("tags"),
+        step_id=arguments.get("step_id"),
+        scope=arguments.get("scope", "step"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "lessons_record failed")))
+
+
+def _handle_tool_lessons_consult(name, arguments, root):
+    from research_os.tools.actions.research.lessons import lessons_consult
+
+    return _text(_success(lessons_consult(
+        root,
+        task=arguments["task"],
+        tags=arguments.get("tags"),
+        top_k=int(arguments.get("top_k", 5)),
+        scope_filter=arguments.get("scope_filter"),
+    )))
+
+
+def _handle_tool_plan_step_grounded(name, arguments, root):
+    from research_os.tools.actions.research.research import plan_step_grounded
+
+    res = plan_step_grounded(
+        arguments["goal"], root,
+        inputs_to_consult=arguments.get("inputs_to_consult"),
+        context_to_consult=arguments.get("context_to_consult"),
+        literature_queries=arguments.get("literature_queries"),
+        max_substeps=int(arguments.get("max_substeps", 6)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "plan_step_grounded failed")))
+
+
+# ── New: code / prose / claims / prereg / sensitivity / redteam / null / master / SLURM ──
+
+
+def _handle_tool_audit_code_quality(name, arguments, root):
+    from research_os.tools.actions.audit.code_quality import audit_code_quality
+
+    return _text(_success(audit_code_quality(
+        root,
+        step_id=arguments.get("step_id"),
+        run_ruff=bool(arguments.get("run_ruff", True)),
+        run_mypy=bool(arguments.get("run_mypy", False)),
+    )))
+
+
+def _handle_tool_audit_prose(name, arguments, root):
+    from research_os.tools.actions.audit.prose_quality import audit_prose
+
+    return _text(_success(audit_prose(
+        root,
+        targets=arguments.get("targets"),
+        is_observational=arguments.get("is_observational"),
+    )))
+
+
+def _handle_tool_audit_claims(name, arguments, root):
+    from research_os.tools.actions.audit.claim_grounding import audit_claims
+
+    return _text(_success(audit_claims(
+        root,
+        target_path=arguments.get("target_path"),
+        tolerance=float(arguments.get("tolerance", 0.01)),
+    )))
+
+
+def _handle_tool_audit_evalue(name, arguments, root):
+    from research_os.tools.actions.audit.audit import audit_evalue
+
+    return _text(_success(audit_evalue(
+        float(arguments["risk_ratio"]), root,
+        ci_lower=arguments.get("ci_lower"),
+        ci_upper=arguments.get("ci_upper"),
+    )))
+
+
+def _handle_tool_preregister_freeze(name, arguments, root):
+    from research_os.tools.actions.audit.preregistration import (
+        freeze_preregistration,
+    )
+
+    res = freeze_preregistration(
+        root,
+        primary_outcomes=arguments.get("primary_outcomes"),
+        secondary_outcomes=arguments.get("secondary_outcomes"),
+        target_n=arguments.get("target_n"),
+        power_assumption=arguments.get("power_assumption"),
+        stopping_rule=arguments.get("stopping_rule"),
+        subgroups=arguments.get("subgroups"),
+        sensitivity=arguments.get("sensitivity"),
+        multiplicity=arguments.get("multiplicity"),
+        inclusion=arguments.get("inclusion"),
+        exclusion=arguments.get("exclusion"),
+        missing_data=arguments.get("missing_data"),
+        additional_analyses=arguments.get("additional_analyses"),
+        contingencies=arguments.get("contingencies"),
+        anticipated_deviations=arguments.get("anticipated_deviations"),
+        data_status=arguments.get("data_status", "not yet collected"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "preregister_freeze failed")))
+
+
+def _handle_tool_preregister_diff(name, arguments, root):
+    from research_os.tools.actions.audit.preregistration import (
+        diff_preregistration,
+    )
+
+    return _text(_success(diff_preregistration(root)))
+
+
+def _handle_tool_sensitivity_define(name, arguments, root):
+    from research_os.tools.actions.exec.sensitivity import define_sensitivity
+
+    res = define_sensitivity(
+        arguments["step_id"], root,
+        base_script=arguments["base_script"],
+        estimate_column=arguments.get("estimate_column", "estimate"),
+        ci_columns=tuple(arguments.get("ci_columns", ["ci_lo", "ci_hi"])),
+        grid=arguments.get("grid"),
+        output_csv=arguments.get("output_csv", "data/output/grid_results.csv"),
+    )
+    if res.get("status") in {"success", "exists"}:
+        return _text(_success(res))
+    return _text(_error(res.get("message", "sensitivity_define failed")))
+
+
+def _handle_tool_sensitivity_run(name, arguments, root):
+    from research_os.tools.actions.exec.sensitivity import run_sensitivity
+
+    res = run_sensitivity(
+        arguments["step_id"], root,
+        max_specs=arguments.get("max_specs"),
+        render_figure=bool(arguments.get("render_figure", True)),
+    )
+    return _text(_success(res))
+
+
+def _handle_tool_redteam_review(name, arguments, root):
+    from research_os.tools.actions.audit.redteam import redteam_scaffold
+
+    res = redteam_scaffold(
+        root, persona=arguments.get("persona", "methodological_skeptic"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "redteam_review failed")))
+
+
+def _handle_tool_response_to_reviewers(name, arguments, root):
+    from research_os.tools.actions.audit.redteam import write_response_template
+
+    res = write_response_template(root, review_path=arguments.get("review_path"))
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "response_to_reviewers failed")))
+
+
+def _handle_tool_null_findings_report(name, arguments, root):
+    from research_os.tools.actions.audit.null_findings import write_null_findings
+
+    return _text(_success(write_null_findings(root)))
+
+
+def _handle_tool_audit_quality_full(name, arguments, root):
+    from research_os.tools.actions.audit.audit import audit_quality_full
+
+    return _text(_success(audit_quality_full(
+        root,
+        target_path=arguments.get("target_path"),
+        skip=arguments.get("skip"),
+    )))
+
+
+def _handle_tool_slurm_submit(name, arguments, root):
+    from research_os.tools.actions.exec.cluster import submit_slurm
+
+    res = submit_slurm(
+        root,
+        step_id=arguments.get("step_id"),
+        cmd=arguments["cmd"],
+        job_name=arguments.get("job_name"),
+        cpus=arguments.get("cpus"),
+        mem=arguments.get("mem"),
+        time_limit=arguments.get("time_limit"),
+        partition=arguments.get("partition"),
+        gpus=arguments.get("gpus"),
+        array=arguments.get("array"),
+        dependency=arguments.get("dependency"),
+        modules=arguments.get("modules"),
+        conda_env=arguments.get("conda_env"),
+        extra_sbatch=arguments.get("extra_sbatch"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "slurm_submit failed")))
+
+
+def _handle_tool_slurm_status(name, arguments, root):
+    from research_os.tools.actions.exec.cluster import status_slurm
+
+    return _text(_success(status_slurm(root, job_id=arguments.get("job_id"))))
+
+
+def _handle_tool_slurm_fetch(name, arguments, root):
+    from research_os.tools.actions.exec.cluster import fetch_slurm
+
+    return _text(_success(fetch_slurm(
+        root, arguments["job_id"],
+        poll_interval=int(arguments.get("poll_interval", 30)),
+        max_wait=int(arguments.get("max_wait", 7200)),
+    )))
+
+
+def _handle_tool_slurm_list(name, arguments, root):
+    from research_os.tools.actions.exec.cluster import list_slurm
+
+    return _text(_success(list_slurm(root)))
 
 
 # ── Research / reasoning ──────────────────────────────────────────────
@@ -2202,6 +3396,8 @@ def _handle_tool_notebook_exec(name, arguments, root):
         root,
         timeout=int(arguments.get("timeout", 1800)),
         kernel=arguments.get("kernel", "python3"),
+        parameters=arguments.get("parameters"),
+        output_path=arguments.get("output_path"),
     )
     if res.get("status") == "success":
         return _text(_success(res))
@@ -2450,6 +3646,9 @@ _HANDLERS = {
     "sys_path_create": _handle_sys_path_create,
     "sys_path_abandon": _handle_sys_path_abandon,
     "sys_path_list": _handle_sys_path_list,
+    "tool_path_finalize": _handle_tool_path_finalize,
+    "tool_synthesis_curate_figures": _handle_tool_synthesis_curate_figures,
+    "sys_export_share_archive": _handle_sys_export_share_archive,
     # checkpoints
     "sys_checkpoint_create": _handle_sys_checkpoint_create,
     "sys_checkpoint_rollback": _handle_sys_checkpoint_rollback,
@@ -2497,6 +3696,44 @@ _HANDLERS = {
     "tool_audit_figure": _handle_tool_audit_figure,
     "tool_audit_citations": _handle_tool_audit_citations,
     "tool_audit_reproducibility": _handle_tool_audit_reproducibility,
+    "tool_audit_step_completeness": _handle_tool_audit_step_completeness,
+    "tool_figure_create": _handle_tool_figure_create,
+    "tool_figure_caption_synthesise": _handle_tool_figure_caption_synthesise,
+    "tool_audit_figure_full": _handle_tool_audit_figure_full,
+    "tool_figure_palette": _handle_tool_figure_palette,
+    "tool_step_pipeline_define": _handle_tool_step_pipeline_define,
+    "tool_step_pipeline_run": _handle_tool_step_pipeline_run,
+    "tool_step_pipeline_status": _handle_tool_step_pipeline_status,
+    "tool_step_pipeline_diagram": _handle_tool_step_pipeline_diagram,
+    "tool_dashboard_test_generate": _handle_tool_dashboard_test_generate,
+    "tool_dashboard_test_run": _handle_tool_dashboard_test_run,
+    # Grounded reasoning.
+    "tool_thought_log": _handle_tool_thought_log,
+    "tool_thought_trace": _handle_tool_thought_trace,
+    "tool_grounding_register": _handle_tool_grounding_register,
+    "tool_ground_from_context": _handle_tool_ground_from_context,
+    "tool_claim_verify": _handle_tool_claim_verify,
+    "tool_grounding_verify": _handle_tool_grounding_verify,
+    "tool_lessons_record": _handle_tool_lessons_record,
+    "tool_lessons_consult": _handle_tool_lessons_consult,
+    "tool_plan_step_grounded": _handle_tool_plan_step_grounded,
+    # New audit suite.
+    "tool_audit_code_quality": _handle_tool_audit_code_quality,
+    "tool_audit_prose": _handle_tool_audit_prose,
+    "tool_audit_claims": _handle_tool_audit_claims,
+    "tool_audit_evalue": _handle_tool_audit_evalue,
+    "tool_preregister_freeze": _handle_tool_preregister_freeze,
+    "tool_preregister_diff": _handle_tool_preregister_diff,
+    "tool_sensitivity_define": _handle_tool_sensitivity_define,
+    "tool_sensitivity_run": _handle_tool_sensitivity_run,
+    "tool_redteam_review": _handle_tool_redteam_review,
+    "tool_response_to_reviewers": _handle_tool_response_to_reviewers,
+    "tool_null_findings_report": _handle_tool_null_findings_report,
+    "tool_audit_quality_full": _handle_tool_audit_quality_full,
+    "tool_slurm_submit": _handle_tool_slurm_submit,
+    "tool_slurm_status": _handle_tool_slurm_status,
+    "tool_slurm_fetch": _handle_tool_slurm_fetch,
+    "tool_slurm_list": _handle_tool_slurm_list,
     # synthesis
     "tool_synthesize_plan": _handle_tool_synthesize_plan,
     "tool_synthesize": _handle_tool_synthesize,
@@ -2546,30 +3783,17 @@ _HANDLERS = {
 
 # Aliases — keep the AI's life easy when it forgets exact naming.
 _ALIASES = {
-    # Legacy: dot notation
-    # Handled generically by dot→underscore in dispatcher.
-    # Legacy: old tool names
-    "sys_guidance_get": "sys_protocol_get",
-    "sys_guidance_list": "sys_protocol_list",
-    "sys_guidance_validate": "sys_protocol_validate",
-    "sys_md_validate": "sys_file_validate_md",
-    "tool_audit_md_consistency": "sys_file_validate_md",
-    "view_workspace_tree": "sys_workspace_tree",
-    "tool_env_freeze": "sys_env_snapshot",
-    "tool_env_restore": "sys_env_snapshot",
-    "tool_log_decision": "mem_decision_log",
+    # Dot notation is handled generically by the dispatcher's dot→underscore
+    # rewrite, no need to list here.
+    #
+    # Only aliases that an active researcher might still type at the prompt
+    # survive. Aliases that pointed at stale names with no real callers have
+    # been removed — they were costing list-tools tokens without paying back.
+    "tool_audit_figure_quality": "tool_audit_figure_full",
     "tool_audit_statistical_power": "tool_audit_power",
-    "tool_audit_figure_quality": "tool_audit_figure",
-    "tool_audit_reproducibility_full": "tool_audit_reproducibility",
     "sys_state_summary": "sys_state_get",
-    "sys_state_summary_md": "sys_state_get",
-    "sys_state_health": "sys_state_get",
-    "sys_state_minimal_context": "sys_state_get",
-    "sys_config_profile": "sys_config_get",
-    "sys_config_init": "sys_workspace_scaffold",
-    "sys_config_explain": "sys_config_get",
-    "sys_tool_info": "sys_protocol_get",
-    "sys_tool_search": "sys_protocol_list",
+    "tool_log_decision": "mem_decision_log",
+    "view_workspace_tree": "sys_workspace_tree",
 }
 
 

@@ -122,13 +122,37 @@ steps:
       underscore-joined).
 
   - id: write_atomic_scripts
-    name: Write Atomic Versioned Scripts
+    name: Write Atomic Versioned Scripts AS A SUB-TASK DAG
     description: |
-      DO NOT one-shot a 400-line mega-script. Break the step into atomic
-      sub-tasks (a plan_step report exists if scope was non-trivial). One
-      script per sub-task. Naming:
+      DO NOT one-shot a 400-line mega-script. The canonical structure
+      for a serious analysis step is a SUB-TASK PIPELINE:
+
+         ingest → validate → clean → featurize → split → fit
+                                                  ↘ diagnose → visualize → report
+
+      Declare it once via tool_step_pipeline_define which seeds
+      workspace/<step>/pipeline.yaml with the 7-node template; edit
+      the script + inputs + outputs per node; run with
+      tool_step_pipeline_run. The runner topologically orders nodes,
+      content-hash-caches inputs+params+script (so editing the
+      clean script only re-runs clean → fit → diagnose → report),
+      writes a .pipeline_run/run_<ts>.json audit trail, and drops a
+      .prov.json sidecar for every output a node produces.
+
+      One script per sub-task. Naming:
         workspace/<step>/scripts/<step_number>_<short_name>_v<n>.<ext>
         e.g. 03_fit_baseline_v1.py / 03_calibration_v1.R / 03_feature_eng_v1.ipynb
+
+      Server-enforced gates (no fast path through them):
+        - tool_audit_step_completeness BLOCKS multi-script steps (>2)
+          without a pipeline.yaml, missing focal figures, missing
+          caption / summary sidecars, missing provenance coverage <50%.
+        - tool_audit_code_quality BLOCKS scripts with bare `except`,
+          `import *`, `eval`/`exec`, hardcoded absolute paths, or
+          functions >150 lines / complexity >20.
+        - tool_audit_quality_full runs every gate together before
+          synthesis. tool_plan_advance refuses to walk past a
+          deliverable tool until the gate is green.
 
       Allowed script types (pick the right tool for the language):
         Python (.py)        → tool_python_exec
@@ -149,38 +173,100 @@ steps:
         - Write derived data to workspace/<step>/data/output/.
         - Write at least one report to outputs/reports/ (markdown summary
           WITH numbers + interpretation).
-        - Write at least one figure (PNG ≥ 150 DPI) to outputs/figures/ OR
-          a table to outputs/tables/ — empty outputs/ is a fail.
+        - Write AT LEAST ONE focal figure (PNG ≥ 300 DPI) to
+          outputs/figures/, named <step_number>_<short_descriptor>.png
+          (e.g. 03_attitude_by_demographic.png). PREFER tool_figure_create
+          which auto-applies SciencePlots / Okabe-Ito / DPI / dual PNG+SVG
+          export / both caption sidecars in one call. Even steps that
+          don't contribute to the final synthesis benefit from a figure —
+          the researcher follows the analysis visually. The focal figure
+          is the one promoted into the dashboard + paper.
+        - Pair every figure with a sibling <name>.caption.md (technical;
+          one-sentence finding) AND <name>.summary.md (plain-English;
+          2-3 short paragraphs for non-expert audiences). tool_figure_create
+          writes both when you pass `caption` + `plain_english`. Otherwise
+          tool_figure_caption_synthesise auto-drafts the summary from the
+          caption + the step's Findings.
+        - Write tables to outputs/tables/ as CSV (one table per analytic
+          question; bare numbers go in tables, narrative stays in reports).
         - Set RNG seeds explicitly; print library versions to stderr.
+
+      Empty outputs/figures/ is a HARD FAIL — tool_audit_step_completeness
+      BLOCKS the final synthesis until cleared.
 
       Bump _v<n> on every meaningful re-run; do NOT silently overwrite.
 
   - id: document_conclusions
     name: Document Conclusions for This Step
     description: |
-      Update workspace/<step>/conclusions.md:
+      Two files matter, with deliberately different audiences:
+
+      **conclusions.md** — the THOROUGH record (statistical + reproducible):
+        ## Plain-language summary
+          - 2-3 sentences a non-statistician could follow. Surfaces in
+            the dashboard's executive and teaching audience views.
         ## Findings
-          - 2-5 quantitative bullets (numbers + units).
+          - 2-5 quantitative bullets (numbers + units; effect sizes
+            preferred over p-values; 95% CI where applicable).
         ## Hypothesis evidence
-          - For each hypothesis you tested: mem_hypothesis_update H<id>
+          - For each hypothesis touched: mem_hypothesis_update H<id>
             status=<supported|refuted|inconclusive> evidence=<one-line>.
+        ## Methods (full detail)
+          - Dataset shape, transforms, model spec, params, RNG seed, versions.
+        ## Methodological notes
+          - Assumption checks, sensitivity, robustness. Supportive tone.
         ## Limitations
-          - Assumption tests run + results. If any failed → flag here AND
-            in the audit at end-of-pipeline.
+          - What this step CANNOT conclude, and why. Honest framing
+            ("no detectable difference" beats "no effect" when underpowered).
         ## Decision
           - proceed | branch (new experiment, why) | dead-end (call dead_end_routing).
         ## Next steps
           - 2-3 concrete candidate experiments with brief rationale.
 
+      **README.md** — the 60-SECOND overview (non-experts):
+        The finalize step (below) rewrites this from conclusions.md +
+        decisions + outputs. DO NOT manually rewrite it. If you want
+        the dashboard to surface a particular plain-English summary,
+        write it in context/notes.md under "## Plain-language summary"
+        — finalize promotes it into the README and the appendix.
+
       Also: mem_analysis_log entry="<step_id> done: <one-line summary>".
-      Then update workspace/<step>/README.md with actual inputs/methods/outputs.
 
   - id: snapshot_step_environment
-    name: Snapshot Step Environment
+    name: Snapshot Step Environment (only if step-specific)
     description: |
-      sys_env_snapshot — writes requirements.txt / Project.toml / renv.lock
-      into workspace/<step>/environment/. Always do this BEFORE moving on
-      so the step is independently reproducible.
+      ONLY run sys_env_snapshot if this step needs different package
+      versions than the project-global env at environment/requirements.txt.
+      If it does not (the common case), SKIP this step — leave the
+      step's environment/ folder empty and let finalize_step normalise
+      the README to "used the project-global environment".
+
+      Snapshotting redundantly on every step bloats the workspace and
+      makes the dashboard noisier without improving reproducibility.
+
+  - id: finalize_step
+    name: Finalize Step READMEs (mandatory before decide_next)
+    description: |
+      tool_path_finalize — rewrites the step's stub README + every
+      subfolder README from what actually got produced. Specifically:
+        - environment/README.md ← either "used the project-global env"
+          OR a list of bespoke requirements.
+        - literature/README.md ← either "used the project-global corpus"
+          + this step's decision-log entries OR a list of step-specific
+          sources + the decisions they informed.
+        - data/output/README.md ← every persisted artefact + which
+          downstream step consumes it (derived from the workflow DAG).
+        - outputs/README.md ← inventory of figures / tables / reports.
+        - README.md ← stub Methods / Outputs / Decision sections
+          populated from conclusions.md + per-step decision log.
+
+      Idempotent. Run it again after any post-hoc edit to refresh.
+
+      Captions: each figure SHOULD also have a sibling
+      <name>.caption.md describing what the reader is looking at — the
+      synthesis dashboard embeds the caption inline. Add one whenever
+      you save a figure; finalize_step does NOT generate them
+      automatically (they require the analyst's interpretation).
 
   - id: lightweight_step_audit
     name: Lightweight In-Step Audit

@@ -73,9 +73,11 @@ def test_dispatcher_resolves_dots_to_underscores():
 
 
 def test_dispatcher_resolves_legacy_aliases():
-    assert _resolve_tool_name("sys_guidance_get") == "sys_protocol_get"
-    assert _resolve_tool_name("sys_md_validate") == "sys_file_validate_md"
+    # Only the still-useful aliases survive 2.0 cleanup.
     assert _resolve_tool_name("tool_audit_statistical_power") == "tool_audit_power"
+    assert _resolve_tool_name("sys_state_summary") == "sys_state_get"
+    assert _resolve_tool_name("tool_log_decision") == "mem_decision_log"
+    assert _resolve_tool_name("view_workspace_tree") == "sys_workspace_tree"
 
 
 def test_dispatcher_passes_underscore_names_through():

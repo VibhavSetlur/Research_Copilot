@@ -1,0 +1,178 @@
+id: timeseries_analysis
+name: Time-Series Analysis
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  First-class protocol for analyses where time order matters:
+  trend / seasonality / structural break detection, autocorrelation
+  modeling, intervention analysis, forecasting, and time-respecting
+  evaluation. Parallels `causal_inference_deep` and `machine_learning`
+  for its domain.
+
+  Many "standard" methodology choices (cross-validation, residual
+  diagnostics, train/test splits) need time-aware variants here.
+  Routed when the data has a time index AND the analytical goal
+  cares about time dynamics (not just point-in-time correlations).
+
+trigger: |
+  Researcher says any of: "time series", "forecasting", "ARIMA",
+  "ETS", "state-space", "Kalman", "Prophet", "intervention
+  analysis", "interrupted time series", "structural break".
+  Also routed when research_design notes the outcome is
+  time-indexed AND the goal involves prediction-over-time.
+
+prerequisites:
+  - Outcome (or primary covariate) is indexed by time at a
+    well-defined frequency.
+  - Either the goal is forecasting / explanation-over-time OR
+    standard methods would be wrong because of autocorrelation.
+
+editorial_voice:
+  mode: guidance
+  rules:
+    - "Time-ordered data violates IID. Every standard method needs
+       a time-aware variant — defaulting to a random train/test
+       split or a regular k-fold CV is almost always wrong."
+    - "Stationarity is the precondition for many classical methods.
+       Don't apply ARMA to a non-stationary series — difference
+       (or detrend) first, OR use a method that doesn't require
+       stationarity (state-space / Bayesian)."
+    - "Report forecast intervals, not just point forecasts. A
+       point estimate with no uncertainty band is misleading."
+
+steps:
+  - id: characterise_series
+    name: Characterise the series
+    description: |
+      Before choosing a method, examine the series:
+        - Sampling frequency + regularity (daily, monthly, irregular).
+        - Length (n_obs) and missingness pattern.
+        - Visible trend / level / seasonality / structural break.
+        - Stationarity (visual inspection + a formal test like
+          ADF / KPSS as confirmation, but plots usually settle it).
+        - Autocorrelation structure (ACF / PACF plots).
+        - Multiple seasonalities (e.g. daily + weekly + yearly)?
+        - Exogenous covariates available?
+        - Multiple series (panel / cross-sectional)?
+
+      Persist the characterisation report under
+      `outputs/reports/<step>_series_profile.md`. The downstream
+      method choice falls out of this.
+
+  - id: pick_method_family
+    name: Pick a method family
+    description: |
+      The method follows the characterisation. A non-exhaustive map:
+
+        Univariate · stationary · short             → ARMA
+        Univariate · non-stationary · with trend    → ARIMA (with d=1 or 2)
+        Univariate · seasonal                        → SARIMA / TBATS
+        Univariate · multiple seasonalities          → Prophet / MSTL + ARMA
+        State-space + interpretation                 → Structural time series / BSTS
+        Intervention analysis                        → Interrupted time series
+        Forecasting with exog covariates             → ARIMAX / dynamic regression
+        Cross-sectional time-series (panels)         → Panel data methods / hierarchical model
+        High-frequency / irregular                   → Hawkes / point process
+        ML forecasting baseline                      → Naive seasonal + ETS + ARIMA
+        ML forecasting deep                          → Temporal Fusion Transformer / N-BEATS / N-HiTS
+        Bayesian forecasting                         → BSTS (CausalImpact) / Prophet / Bayesian SSM
+        Structural-break detection                   → Bai-Perron / changepoint detection
+        Multivariate / VAR                           → VAR + Granger causality if appropriate
+
+      For decisive single-step choices, ground in literature via
+      methodology_selection's grounding step.
+
+  - id: stationarity_decision
+    name: Stationarity decision (when classical methods apply)
+    description: |
+      If the chosen method assumes stationarity (ARMA / SARIMA /
+      most non-state-space classical methods):
+        - Visually inspect (level + variance over time).
+        - Apply ADF + KPSS (their disagreement tells a story —
+          "trend-stationary" vs "difference-stationary").
+        - Difference (d=1 or d=2) OR detrend OR transform (log,
+          Box-Cox) as appropriate.
+        - For seasonal data, seasonal-difference if SARIMA.
+
+      Document the differencing decision and any transforms in the
+      methods record so the inverse transform is unambiguous when
+      reporting forecasts back on the original scale.
+
+  - id: time_aware_split
+    name: Time-aware train/test split (CRITICAL)
+    description: |
+      The split must respect time order:
+        - Hold out the LAST k observations for testing — never
+          random.
+        - For multiple test horizons, use rolling-origin
+          (expanding-window) cross-validation.
+        - For panel data with multiple subjects, additionally
+          group-aware split (don't split mid-subject across
+          train/test).
+        - State the forecast HORIZON explicitly (1-step ahead?
+          h-step ahead? full out-of-sample?).
+
+      A random k-fold split here is a leakage bug.
+
+  - id: fit_and_diagnose
+    name: Fit + residual diagnostics
+    description: |
+      After fitting:
+        - Residuals should look like white noise (ACF flat,
+          Ljung-Box p > 0.05).
+        - For state-space models, also examine smoothed states
+          and the Kalman gain.
+        - For Bayesian / state-space models, posterior predictive
+          checks (re-use bayesian_analysis's PPC step).
+        - For ML forecasters, the residual-by-time plot reveals
+          whether the model is missing periodic structure.
+
+  - id: evaluate_forecast
+    name: Evaluate the forecast
+    description: |
+      Metrics depend on the data:
+        - Point accuracy: MAPE / sMAPE / MAE / RMSE — use what
+          your domain reports.
+        - Scale-free: MASE (mean absolute scaled error) lets you
+          compare across series.
+        - Probabilistic forecast: CRPS / pinball loss / coverage
+          of the prediction interval at the nominal level.
+        - Comparison baseline: Naive (random walk) + seasonal
+          naive are the floor every model must beat.
+
+      Report the metrics for at least three horizons (1-step,
+      mid, h-step) — a model that wins at 1-step often loses at
+      long horizons.
+
+  - id: forecast_intervals
+    name: Forecast intervals + scenarios
+    description: |
+      The point forecast is rarely the most useful thing:
+        - Always include a 90% / 95% interval.
+        - For decision-supporting forecasts, present 2-3 scenarios
+          (low / central / high) so the consumer reasons about
+          uncertainty.
+        - For long-horizon forecasts, the interval will dominate
+          the point — visualising the interval (fan chart) is the
+          honest representation.
+
+  - id: structural_break_check
+    name: Structural break check
+    description: |
+      If the series spans regime changes (policy intervention,
+      pandemic, technology shift), the assumption that the past
+      forecasts the future may not hold:
+        - Visually + formally test for breaks (Chow / Bai-Perron /
+          changepoint methods).
+        - When a break is detected, model the regimes separately
+          OR include a level shift / intercept term OR move to a
+          state-space frame that allows time-varying parameters.
+
+expected_outputs:
+  - workspace/<step>/outputs/reports/<step>_series_profile.md
+  - workspace/<step>/outputs/figures/<step>_forecast_fan.png
+  - workspace/<step>/outputs/figures/<step>_residual_diagnostics.png
+  - workspace/methods.md (entry with model spec + split rule + horizon)
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing
