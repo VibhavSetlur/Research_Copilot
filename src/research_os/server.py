@@ -57,12 +57,35 @@ class _MissingDependency:
         )
 
 
+# Tracks (module, attribute) pairs that failed to import so the AI can ask
+# for a real status read instead of finding out tool-by-tool.
+_MISSING_DEPS: list[tuple[str, str]] = []
+
+
 def _lazy_import(module_name: str, names: list[str]):
     try:
         mod = __import__(module_name, fromlist=names)
         return [getattr(mod, name) for name in names]
     except ImportError:
+        for n in names:
+            _MISSING_DEPS.append((module_name, n))
         return [_MissingDependency(name) for name in names]
+
+
+def _optional_dep_inventory() -> dict:
+    """Return a structured report of what's installed vs missing."""
+    return {
+        "missing": [
+            {"module": m, "symbol": n} for (m, n) in _MISSING_DEPS
+        ],
+        "missing_count": len(_MISSING_DEPS),
+        "advice": (
+            "Install with: pip install 'research-os[all]' "
+            "(omits R / Julia / Docker bindings — install those separately)."
+            if _MISSING_DEPS
+            else "All optional dependencies present."
+        ),
+    }
 
 
 search_web, scrape_web = _lazy_import(
@@ -168,21 +191,6 @@ def _error(message: str) -> dict:
     return {"status": "error", "error": message}
 
 
-# Backward-compatible aliases for older callers / tests.
-def _envelope(data: Any = None, *, status: str = "success") -> dict:
-    if status == "error":
-        return {"status": "error", "data": {"error": data if isinstance(data, str) else (data or {})}}
-    return {"status": status, "data": data or {}}
-
-
-def _success_envelope(data: Any = None) -> dict:
-    return _envelope(data, status="success")
-
-
-def _error_envelope(message: str) -> dict:
-    return _envelope(message, status="error")
-
-
 def _text(payload: Any) -> list[TextContent]:
     if isinstance(payload, str):
         return [TextContent(type="text", text=payload)]
@@ -194,13 +202,73 @@ def _text(payload: Any) -> list[TextContent]:
 # ---------------------------------------------------------------------------
 
 TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
+    # ── Routing (call THESE first) ───────────────────────────────────
+    "sys_boot": {
+        "short": "One-call session bootstrap — state + config + history + dep inventory + next protocol. Replaces 4-5 separate calls.",
+        "description": "Single-call session bootstrap. Returns state + researcher config + protocol history tail + optional-dep inventory + recommended next protocol + pause classification + any active plan from a previous turn. Call this ONCE per session instead of sys_state_get + sys_config_get + sys_protocol_history + sys_protocol_next + sys_dep_inventory separately. Cuts a typical boot from ~5K tokens to ~800.",
+        "category": "routing",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_route": {
+        "short": "Map a user prompt to the right protocol + decomposition WITHOUT loading every protocol.",
+        "description": "Takes a raw user prompt and returns: primary_protocol, shortcut_tool (if applicable), decomposition (planned sequence of tool calls), alternatives, complexity ('low'|'high'), why. For complex prompts (>25 words, multiple verbs, conjunctions) it writes a planning record to .os_state/active_plan.json so the AI is forced to step through instead of one-shotting. CALL THIS BEFORE sys_protocol_get on every researcher turn.",
+        "category": "routing",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "The researcher's raw message (verbatim, including typos / rambling)."},
+                "persist_plan": {"type": "boolean", "description": "If true (default), persist a planning record for complex prompts."},
+            },
+            "required": ["prompt"],
+        },
+    },
+    "tool_plan_advance": {
+        "short": "Mark current step of the active plan done; get the next step.",
+        "description": "After completing each step of an active plan (set by tool_route on a complex prompt), call this to advance to the next step. Returns the next step body + remaining count. When all steps are done the plan auto-archives.",
+        "category": "routing",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_plan_turn": {
+        "short": "Slice the active plan into this_turn (do now) + next_turn (queued) per model_profile.",
+        "description": "Reads the active plan + the researcher's model_profile (small/medium/large) and returns the batch of steps the AI should execute THIS turn versus what to queue for the next turn. Also returns `chat_split_recommended` (true when the remaining plan is too long for one chat — the AI should hand off + open a fresh chat). Small models get 1 step/turn; medium 3; large 6. Heavyweight tools (tool_synthesize, tool_audit_reproducibility) count for more.",
+        "category": "routing",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_plan_clear": {
+        "short": "Discard the active plan (researcher pivoted away).",
+        "description": "Use when the researcher abandons the previously-routed task mid-flow. Subsequent tool_route calls start fresh.",
+        "category": "routing",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "sys_tool_describe": {
+        "short": "Return the full description + schema for one tool.",
+        "description": "list_tools ships only short descriptions to keep context lean. When you genuinely need the full detail (parameter semantics, longer rationale, examples) for one tool, call this. Cheaper than re-listing every tool.",
+        "category": "routing",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"tool_name": {"type": "string"}},
+            "required": ["tool_name"],
+        },
+    },
+
     # ── Protocols / guidance ──────────────────────────────────────────
     "sys_protocol_get": {
-        "description": "Load a protocol YAML by name (e.g. 'guidance/project_startup'). Returns the steps, expected_outputs, and next_protocol the AI should follow.",
+        "short": "Load a protocol — format='summary' (cheap), 'step' (one step), or 'full' (entire YAML).",
+        "description": "Load a protocol YAML by name (e.g. 'guidance/project_startup'). Three formats — summary returns id + step headings + quality_bar + expected outputs in ~300 tokens; step returns one specific step body (requires step_id); full returns the entire YAML (~1.5-3K tokens). Prefer summary first, then step on demand. Routing tip: call tool_route(prompt) BEFORE this to pick the right protocol_name.",
         "category": "protocol",
         "inputSchema": {
             "type": "object",
-            "properties": {"protocol_name": {"type": "string"}},
+            "properties": {
+                "protocol_name": {"type": "string"},
+                "format": {
+                    "type": "string",
+                    "description": "summary | step | full (default: full for backward compatibility, but summary is recommended).",
+                },
+                "step_id": {
+                    "type": "string",
+                    "description": "Required when format='step'.",
+                },
+            },
             "required": ["protocol_name"],
         },
     },
@@ -1108,6 +1176,46 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "category": "synthesis",
         "inputSchema": {"type": "object", "properties": {}},
     },
+
+    # ── Session resume + progress digest ─────────────────────────────
+    "tool_session_resume": {
+        "description": "Reconstruct intent + status from logs after a pause / handoff / new chat session. Returns a structured 'resume brief' (current stage, hypotheses, open paths, running tasks, recommended next protocol) plus the message the AI should hand back to the researcher.",
+        "category": "interaction",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_progress_digest": {
+        "description": "One-page summary of the project: experiments active/completed/dead-end, hypotheses by status, figures/tables/reports counts, citations counted. Writes workspace/logs/progress_digest.md AND returns the markdown.",
+        "category": "interaction",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_dead_end_lessons": {
+        "description": "Pull lessons from every __DEAD_END folder so future steps don't repeat them. Writes workspace/logs/dead_end_lessons.md.",
+        "category": "research",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "tool_quick_review": {
+        "description": "Stage a one-page critical-appraisal skeleton for a paper at workspace/reviews/<slug>.md. AI then populates it per the `guidance/quick_paper_review` protocol. Use for fast peer-review or 'what do you think of this paper?' requests.",
+        "category": "research",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "paper_path": {
+                    "type": "string",
+                    "description": "Path to a local PDF/MD/TXT in inputs/literature/ OR a URL.",
+                },
+                "lens": {
+                    "type": "string",
+                    "description": "claims_vs_evidence (default) | methodological_rigour | novelty | statistical_inference | replicability",
+                },
+            },
+            "required": ["paper_path"],
+        },
+    },
+    "sys_dep_inventory": {
+        "description": "Report which optional dependencies (search, viz, audit, ml, notebook, literature, web) failed to import. Call once at session start so you know which tools will work.",
+        "category": "state",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 }
 
 
@@ -1164,22 +1272,115 @@ def _handle_sys_protocol_list(name, arguments, root):
 
 def _handle_sys_protocol_get(name, arguments, root):
     p_name = arguments.get("protocol_name")
+    fmt = (arguments.get("format") or "full").lower()
+    step_id = arguments.get("step_id")
     profile = _read_profile(root)
     model_profile = profile.get("model_profile", "medium")
     try:
         import yaml as _yaml
 
-        data = load_protocol(p_name, model_profile=model_profile)
-        response = {"content": _yaml.dump(data, sort_keys=False)}
-        if model_profile == "small":
-            response["note"] = "Loaded in light mode (small model profile)."
-        if p_name != "guidance/session_boot":
-            response["_reminder"] = (
-                "Confirm session_boot has run this session; if not, load it first."
+        data = load_protocol(
+            p_name, model_profile=model_profile, format=fmt, step_id=step_id
+        )
+        if fmt in {"summary", "step"}:
+            # Lean structured payload (no yaml dump bulk).
+            response = dict(data)
+            response.setdefault(
+                "_loaded_as", fmt
+            )
+        else:
+            response = {"content": _yaml.dump(data, sort_keys=False)}
+            if model_profile == "small":
+                response["note"] = "Loaded in light mode (small model profile)."
+            if p_name != "guidance/session_boot":
+                response["_reminder"] = (
+                    "Confirm session_boot has run this session; if not, load it first."
+                )
+            response["_load_tip"] = (
+                "Loaded as full. Prefer format='summary' (~300 tokens) or "
+                "format='step' + step_id='<id>' to save context."
             )
         return _text(_success(response))
     except Exception as e:
         return _text(_error(str(e)))
+
+
+# ── Routing handlers ──────────────────────────────────────────────────
+
+
+def _handle_sys_boot(name, arguments, root):
+    from research_os.tools.actions.router import sys_boot
+
+    res = sys_boot(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "sys_boot failed")))
+
+
+def _handle_tool_route(name, arguments, root):
+    from research_os.tools.actions.router import route_request
+
+    res = route_request(
+        arguments["prompt"],
+        root,
+        persist_plan=bool(arguments.get("persist_plan", True)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_route failed")))
+
+
+def _handle_tool_plan_advance(name, arguments, root):
+    from research_os.tools.actions.router import advance_plan
+
+    res = advance_plan(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_plan_advance failed")))
+
+
+def _handle_tool_plan_turn(name, arguments, root):
+    from research_os.tools.actions.router import plan_turn
+
+    res = plan_turn(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_plan_turn failed")))
+
+
+def _handle_tool_plan_clear(name, arguments, root):
+    from research_os.tools.actions.router import clear_active_plan
+
+    res = clear_active_plan(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_plan_clear failed")))
+
+
+def _handle_sys_tool_describe(name, arguments, root):
+    tool_name = arguments.get("tool_name")
+    if not tool_name:
+        return _text(_error("tool_name is required"))
+    canonical = _resolve_tool_name(tool_name)
+    schema = TOOL_DEFINITIONS.get(canonical)
+    if not schema:
+        return _text(
+            _error(
+                f"Unknown tool '{tool_name}'. Try sys_protocol_list to browse, "
+                "or tool_route to find by prompt."
+            )
+        )
+    return _text(
+        _success(
+            {
+                "name": canonical,
+                "category": schema.get("category", ""),
+                "short": schema.get("short", ""),
+                "description": schema.get("description", ""),
+                "inputSchema": schema.get("inputSchema", {}),
+            }
+        )
+    )
 
 
 def _handle_sys_protocol_validate(name, arguments, root):
@@ -2056,7 +2257,61 @@ def _handle_tool_citations_verify(name, arguments, root):
     return _text(_error(res.get("message", "citations_verify failed")))
 
 
+# ── Session resume / progress digest / dead-end lessons / quick review ─
+
+
+def _handle_tool_session_resume(name, arguments, root):
+    from research_os.tools.actions.research.planning import session_resume
+
+    res = session_resume(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "session_resume failed")))
+
+
+def _handle_tool_progress_digest(name, arguments, root):
+    from research_os.tools.actions.research.planning import progress_digest
+
+    res = progress_digest(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "progress_digest failed")))
+
+
+def _handle_tool_dead_end_lessons(name, arguments, root):
+    from research_os.tools.actions.research.planning import dead_end_lessons
+
+    res = dead_end_lessons(root)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "dead_end_lessons failed")))
+
+
+def _handle_tool_quick_review(name, arguments, root):
+    from research_os.tools.actions.research.planning import quick_review
+
+    res = quick_review(
+        root,
+        arguments["paper_path"],
+        lens=arguments.get("lens", "claims_vs_evidence"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "quick_review failed")))
+
+
+def _handle_sys_dep_inventory(name, arguments, root):
+    return _text(_success(_optional_dep_inventory()))
+
+
 _HANDLERS = {
+    # routing (call these first)
+    "sys_boot": _handle_sys_boot,
+    "tool_route": _handle_tool_route,
+    "tool_plan_advance": _handle_tool_plan_advance,
+    "tool_plan_turn": _handle_tool_plan_turn,
+    "tool_plan_clear": _handle_tool_plan_clear,
+    "sys_tool_describe": _handle_sys_tool_describe,
     # protocol
     "sys_protocol_get": _handle_sys_protocol_get,
     "sys_protocol_list": _handle_sys_protocol_list,
@@ -2164,6 +2419,12 @@ _HANDLERS = {
     "tool_context_intake": _handle_tool_context_intake,
     # verified citations
     "tool_citations_verify": _handle_tool_citations_verify,
+    # session resume + digest + dead-end lessons + quick review
+    "tool_session_resume": _handle_tool_session_resume,
+    "tool_progress_digest": _handle_tool_progress_digest,
+    "tool_dead_end_lessons": _handle_tool_dead_end_lessons,
+    "tool_quick_review": _handle_tool_quick_review,
+    "sys_dep_inventory": _handle_sys_dep_inventory,
 }
 
 # Aliases — keep the AI's life easy when it forgets exact naming.
@@ -2226,6 +2487,23 @@ def _handle_tool_call(name: str, arguments: dict, root: Path) -> list[TextConten
 # ---------------------------------------------------------------------------
 
 
+def _short_for_list(schema: dict) -> str:
+    """Tight description used by list_tools — saves ~2K tokens per message.
+
+    Resolution order:
+        1. Explicit `short` field if present.
+        2. First sentence of the full description, capped at 160 chars.
+    The AI can call sys_tool_describe(name) for the full text on demand.
+    """
+    if isinstance(schema.get("short"), str) and schema["short"].strip():
+        return schema["short"].strip()
+    full = schema.get("description", "")
+    first = full.split(". ")[0].strip()
+    if not first.endswith("."):
+        first += "."
+    return first[:160]
+
+
 if HAS_MCP:
     server = Server("research-os")
 
@@ -2235,10 +2513,10 @@ if HAS_MCP:
         profile = _read_profile(root)
         tools: list[Tool] = []
         for name, schema in TOOL_DEFINITIONS.items():
-            desc = schema["description"]
+            desc = _short_for_list(schema)
             if profile.get("model_profile") == "small":
-                # Keep only the first sentence to save context for small models.
-                desc = desc.split(".")[0] + "."
+                # Already terse — but cap aggressively for the smallest models.
+                desc = desc[:120]
             tools.append(
                 Tool(name=name, description=desc, inputSchema=schema["inputSchema"])
             )

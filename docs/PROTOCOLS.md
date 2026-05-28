@@ -1,11 +1,38 @@
 # Protocol Reference
 
-Research OS ships 34 YAML protocols organised into 9 categories. Each
-protocol is a sequence of steps the AI should follow, with explicit
-`expected_outputs`, a `next_protocol` pointer, and quality minimums.
+Research OS ships **47 YAML protocols** organised into nine categories.
+Each protocol is a sequence of steps the AI should follow, with explicit
+`expected_outputs`, a `next_protocol` pointer, and a `quality_bar`. All
+are indexed in `src/research_os/protocols/_router_index.yaml` for
+hierarchical routing via `tool_route`.
 
 For the format of a protocol file, see
 [CONTRIBUTING.md § Adding or modifying a protocol](../CONTRIBUTING.md).
+
+---
+
+## How the AI picks a protocol (the hierarchical router)
+
+The AI does **not** load every YAML to find the right one. Instead:
+
+1. **`sys_boot`** — single call returns workspace state + recommended
+   pipeline-next protocol + advice.
+2. **`tool_route(prompt=<researcher's message>)`** — hierarchical
+   L1 → L2 → L3 picker. Returns the deepest unambiguous level:
+   * L1 `intent_class` — one of `session | discover | plan | execute |
+     methodology | literature | synthesize | audit_wrap | memory |
+     review`
+   * L2 `sub_intent` — narrower bucket within the class
+   * L3 specific protocol
+   When ambiguous at any level, the router returns an `ask_user`
+   sentence so the AI disambiguates with one researcher follow-up
+   instead of guessing wrong.
+3. **`sys_protocol_get format='summary'`** loads step headings only
+   (~300 tokens). `format='step' step_id='<id>'` loads one step body
+   when ready to execute.
+
+This entire path costs ~1.2K tokens — vs the ~5K it took before the
+routing layer existed.
 
 ---
 
@@ -13,8 +40,8 @@ For the format of a protocol file, see
 
 | # | Protocol | What it does | Done when |
 |---|---|---|---|
-| 1 | `guidance/session_boot` | Read config + state, apply blank-field defaults, choose next protocol | first entry in execution log |
-| 2 | `guidance/project_startup` | Run intake autofill, profile data, lock research question | intake.md filled + research_question.md confirmed |
+| 1 | `guidance/session_boot` | One-call boot via `sys_boot`; route first message via `tool_route` | first entry in execution log |
+| 2 | `guidance/project_startup` | Intake autofill, profile data, lock research question | intake.md filled + research_question.md confirmed |
 | 3 | `domain/domain_analysis` | Classify domain, pick reporting standard, list biases | docs/domain_summary.md exists |
 | 4 | `domain/research_design` | Choose study design + sample size justification | docs/research_design.md exists |
 | 5 | `methodology/methodology_selection` | Pick statistical / computational methods (literature-grounded) | workspace/methods.md substantive |
@@ -24,85 +51,95 @@ For the format of a protocol file, see
 | 9 | `audit/audit_and_validation` | Citation / power / assumption / figure / code audits | workspace/logs/audit_report.md exists |
 | 10 | `synthesis/synthesis_paper` | Compile paper (venue-tailored, verified citations) | synthesis/paper.md exists |
 
-`sys_protocol_next` returns the first stage whose outputs (or execution log)
-say "not done yet". The pipeline is robust to migrating projects — it works
-off both the execution log AND on-disk artifacts.
+`sys_protocol_next` returns the first stage whose outputs (or execution
+log) say "not done yet". The pipeline works off both the execution log
+AND on-disk artifacts so migrated projects resume cleanly.
 
 ---
 
 ## On-demand protocols
 
-### Guidance
+### Guidance — session + flow control
 
-* `guidance/iterative_planning` — for "what should I do next?" workflows.
-  Surveys state, pulls fresh literature + tools, proposes 2-3 options.
-* `guidance/dead_end_routing` — abandon a failed experiment cleanly:
-  document, rename to `__DEAD_END`, choose where to resume.
-* `guidance/hypothesis_tracking` — register or update a hypothesis with
-  evidence + status (testing / supported / refuted / inconclusive).
-* `guidance/glossary_update` — add or refine domain terms.
-* `guidance/writing_standards` — universal writing rules (loaded implicitly
-  by every writing/ and synthesis/ protocol).
+| Protocol | Intent (L1 / L2) | Triggered by |
+|---|---|---|
+| `guidance/session_boot` | session / boot | "start session", "hi", "begin" |
+| `guidance/session_resume` | session / resume | "pick up", "where were we", "another session" |
+| `guidance/chat_handoff` | session / handoff | "wrap up", "going to lunch", "switch chat" |
+| `guidance/autopilot` | session / autopilot | "autopilot", "you drive", "wake me up" |
+| `guidance/casual_exploration` | plan / casual | "just poke", "exploratory only", "sanity check" |
+| `guidance/quick_paper_review` | review / quick | "tear apart", "tough reviewer", "quick review" |
+| `guidance/project_startup` | discover / intake | "fill the intake", "what do I have" |
+| `guidance/analysis_plan` | execute / new_experiment | "run a baseline", "next experiment", "fit a model" |
+| `guidance/iterative_planning` | plan / next_step | "what should I do next", "I'm stuck" |
+| `guidance/dead_end_routing` | execute / abandon | "dead end", "abandon", "not working" |
+| `guidance/hypothesis_tracking` | memory / hypothesis | "add hypothesis", "list hypotheses" |
+| `guidance/glossary_update` | memory / glossary | "add to glossary", "define term" |
+| `guidance/writing_standards` | synthesize / writing | "writing standard", "reporting standard" |
 
-### Domain
+### Domain — classification + design
 
 * `domain/domain_analysis` — classify the field + reporting standard.
 * `domain/research_design` — pick design + justify sample size.
 
-### Methodology
+### Methodology — pick + apply
 
-* `methodology/methodology_selection` — top-level method picker.
-* `methodology/research_methods` — deep dive when uncertain which method fits.
-* `methodology/tool_discovery` — find + evaluate libraries / CLIs.
-* `methodology/clinical_trials` — CONSORT-compliant RCT analysis.
-* `methodology/machine_learning` — TRIPOD-AI ML workflow.
-* `methodology/meta_analysis` — random/fixed effects, heterogeneity, forest plots.
-* `methodology/causal_inference_deep` — DAG, identification, refutation, E-values.
-* `methodology/survey_psychometrics` — α/ω, EFA/CFA, sampling weights.
+| Protocol | When |
+|---|---|
+| `methodology/methodology_selection` | Top-level method picker |
+| `methodology/research_methods` | Generic survey when unsure |
+| `methodology/causal_inference_deep` | DAG + dowhy / IPW / DiD / RDD |
+| `methodology/machine_learning` | TRIPOD-AI ML pipeline |
+| `methodology/clinical_trials` | CONSORT-compliant RCT |
+| `methodology/meta_analysis` | Random/fixed effects + heterogeneity |
+| `methodology/survey_psychometrics` | EFA/CFA + reliability + IRT |
+| `methodology/qualitative_research` | COREQ/SRQR interviews / thematic |
+| `methodology/simulation_studies` | ADEMP Monte Carlo / agent-based |
+| `methodology/replication_study` | Direct / conceptual replication |
+| `methodology/ablation_study` | Component-by-component ablation |
+| `methodology/pilot_study` | Feasibility / variance estimation |
+| `methodology/mixed_methods` | Concurrent / sequential qual + quant |
+| `methodology/tool_discovery` | Find candidate libraries / CLIs |
 
 ### Literature
 
-* `literature/literature_search` — multi-database systematic search.
+* `literature/literature_search` — multi-database search.
 * `literature/systematic_review` — full PRISMA workflow.
-* `literature/evidence_synthesis` — evidence table, GRADE, contradiction detection.
+* `literature/evidence_synthesis` — GRADE-style grading + contradiction detection.
 
 ### Writing
 
-* `writing/writing_core` — banned phrases, tense, number formatting (loaded by all writers).
+* `writing/writing_core` — universal rules; loaded implicitly by every synthesis.
 * `writing/writing_methods` — append a structured method entry.
 * `writing/writing_citations` — maintain workspace/citations.md.
 * `writing/writing_conclusions` — per-step conclusions.md.
 * `writing/writing_analysis_log` — append structured entry to analysis.md.
 * `writing/writing_readme` — project + per-step README.
 
-### Synthesis (the final-output protocols)
+### Synthesis — final deliverables
 
 Each is venue/audience-tailored and enforces quality minimums:
 
-* `synthesis/synthesis_paper` — IMRAD, venue profiles:
-  journal / conference / preprint / dissertation / report.
-  Word-count bands, figure DPI ≥300, citation cap 40, verified online.
+* `synthesis/synthesis_paper` — IMRAD, venue profiles
+  (journal / conference / preprint / dissertation / report). Word-count
+  bands, figure DPI ≥300, citation cap 40, verified online.
 * `synthesis/synthesis_abstract` — structured (journal/preprint) vs
   unstructured (conference) vs grant style. Cap 3 citations.
-* `synthesis/synthesis_poster` — tikzposter, audience profiles:
-  academic_conference / symposium / industry / teaching. ≥2 figures
+* `synthesis/synthesis_poster` — tikzposter, audience profiles
+  (academic_conference / symposium / industry / teaching). ≥2 figures
   ≥300 DPI, ≤6 citations.
-* `synthesis/synthesis_dashboard` — single-file HTML, audience profiles:
-  academic / executive / technical / teaching. Sortable tables, lightbox,
-  light/dark, print stylesheet.
-* `synthesis/synthesis_grant` — funder profiles: nih_r01 / nsf / wellcome /
-  erc / doe / industry. Specific Aims first, every aim has milestones +
-  pitfalls + alternatives.
-* `synthesis/synthesis_report` — audience profiles: internal_team / client /
-  technical_audit / policy_brief. Every recommendation evidence-linked.
+* `synthesis/synthesis_dashboard` — single-file HTML, audience profiles
+  (academic / executive / technical / teaching). Sortable tables,
+  lightbox, light/dark, print stylesheet.
+* `synthesis/synthesis_grant` — funder profiles
+  (nih_r01 / nsf / wellcome / erc / doe / industry). Specific Aims first.
+* `synthesis/synthesis_report` — audience profiles
+  (internal_team / client / technical_audit / policy_brief).
 
-### Audit
+### Audit + reproducibility
 
 * `audit/audit_and_validation` — citations, assumptions, figures, causal
-  language, code lint. Aggregates to workspace/logs/audit_report.md.
-
-### Reproducibility
-
+  language, code lint. Aggregates to `workspace/logs/audit_report.md`.
 * `reproducibility/reproducibility` — per-experiment env snapshot, seed
   verification, output hashing, Dockerfile generation.
 
@@ -113,20 +150,66 @@ Each is venue/audience-tailored and enforces quality minimums:
 
 ---
 
+## Cross-intent shortcuts (no protocol load, single tool call)
+
+`tool_route` also matches cross-cutting intents that don't need a
+protocol:
+
+| Trigger | Tool called |
+|---|---|
+| "progress", "where are we", "digest" | `tool_progress_digest` |
+| "lessons", "what did we learn" | `tool_dead_end_lessons` |
+| "list protocols", "available protocols" | `sys_protocol_list` |
+| "missing dependencies", "what's installed" | `sys_dep_inventory` |
+| "broken", "fix workspace" | `tool_workspace_repair` |
+| "background", "kick off", "going to lunch" | `tool_task_run` |
+| "quick test", "scratch", "throwaway" | `tool_scratch_write` |
+
+---
+
+## Anti-one-shot: the active plan + per-turn batching
+
+When `tool_route` detects a complex prompt (>25 words OR multiple verbs
+OR conjunctions like "and then" / "also"), it persists a planning
+record to `.os_state/active_plan.json` and returns `complexity="high"`.
+The AI MUST walk the plan instead of one-shotting:
+
+* `tool_plan_turn` — returns `this_turn` (steps to execute now) +
+  `next_turn` (queued), sized to the researcher's `model_profile`
+  (small=1 step/turn, medium=3, large=6; heavy tools like
+  `tool_synthesize` count for more).
+* `tool_plan_advance` — after each step completes.
+* `tool_plan_clear` — if the researcher pivots mid-plan.
+
+When `chat_split_recommended=true` (long plan remaining), the AI hands
+off + asks the researcher to open a fresh chat with "pick up where we
+left off". `tool_session_resume` will read the handoff and active plan.
+
+---
+
 ## Quality minimums
 
-Every protocol declares its own minimums in a `quality_bar` block (some
-synthesis protocols are especially strict). Examples:
+Every protocol declares a `quality_bar` block. Examples:
 
-* `synthesis_paper`: abstract 200-300 words, methods ≥400 words, ≥1 figure,
-  ≥8 citations, every claim grounded, no causal language for observational
-  designs.
+* `synthesis_paper`: abstract 200-300 words, methods ≥400 words, ≥1
+  figure, ≥8 citations, every claim grounded, no causal language for
+  observational designs.
 * `synthesis_poster`: ≥2 figures ≥300 DPI, ≤6 citations, font ≥24pt,
   one headline message.
 * `synthesis_dashboard`: single-file offline HTML, semantic landmarks,
   print-friendly, ≤12 citations, ≥3 sections.
-* `synthesis_grant`: Specific Aims ≤500 words (1 page), Approach ≥1500 words,
-  every Aim has milestones + pitfalls + alternatives, ≥15 citations.
+* `synthesis_grant`: Specific Aims ≤500 words (1 page), Approach
+  ≥1500 words, every Aim has milestones + pitfalls + alternatives,
+  ≥15 citations.
+* `methodology/qualitative_research`: every theme ≥2 quotes from ≥2
+  participants; at least one disconfirming case reported; codebook
+  reproducible by a second coder; reflexivity statement explicit.
+* `methodology/replication_study`: replication criterion declared
+  BEFORE looking at the new estimate; verdict supported by both
+  criterion + sensitivity around original spec.
+* `methodology/simulation_studies`: ADEMP written BEFORE code runs;
+  Monte Carlo SE reported with every point estimate; sensitivity rerun
+  confirms headline.
 
 The AI is instructed to refuse to mark a synthesis complete until the
 quality bar passes.
@@ -136,43 +219,31 @@ quality bar passes.
 ## How `model_profile` affects protocols
 
 When the protocol loader reads a YAML, it applies the researcher's
-`model_profile` setting:
+`model_profile`:
 
-* `small` — drops verbose keys (`model_adaptations`, `examples`, `templates`)
-  to keep tokens minimal. AI tool descriptions are also trimmed to first
-  sentence only.
-* `medium` — standard.
+* `small` — drops verbose keys (`model_adaptations`, `examples`,
+  `templates`) to keep tokens minimal. AI tool descriptions are also
+  trimmed.
+* `medium` — standard (default).
 * `large` — full detail; protocols may suggest multi-step planning.
 
-This means a researcher on DeepSeek-7B local gets a leaner experience than
-one on Claude Opus, without protocol authors needing to maintain two files.
+`tool_plan_turn` also reads `model_profile` to size per-turn batches.
+A researcher on a small local model gets 1 tool call per turn; a large
+frontier model gets 6.
 
 ---
 
 ## Adding a new protocol
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for the schema. Briefly:
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the schema. Two
+mandatory follow-ups:
 
-```yaml
-id: my_protocol
-name: My Protocol
-version: '1.0.0'
-schema_version: '2.0'
-description: One-line summary.
-trigger: When the AI should run this.
-prerequisites: [list of files/states required]
+1. Add an entry to `_router_index.yaml` with `intent_class`,
+   `sub_intent`, `summary`, `triggers` (plus optional `shortcut_tool`,
+   `token_estimate`, `decomposition`). Preflight will fail if you
+   forget.
+2. Add a test in `tests/tools/test_router.py` for a triggering prompt
+   to verify the router picks your protocol.
 
-steps:
-  - id: step_id
-    name: Step Name
-    description: |
-      Concrete tool calls (underscore form), one numbered action per step.
-
-expected_outputs:
-  - path/to/file
-
-next_protocol: category/next_one     # null if terminal
-on_failure: guidance/dead_end_routing
-```
-
-The loader auto-injects a `protocol_completion` step — don't add one yourself.
+The loader auto-injects a `protocol_completion` step — don't add one
+yourself.

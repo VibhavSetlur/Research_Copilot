@@ -239,10 +239,10 @@ the server starts.
 
 In your IDE, in a fresh chat:
 
-> "Read `AGENTS.md`. Call `sys_config_get` and `sys_state_get` and report
-> what you see."
+> "Read `AGENTS.md`. Call `sys_boot` and report what you see."
 
-A healthy install returns the config + state in one short message.
+A healthy install returns project + config + state + dep inventory +
+recommended next protocol in one short message.
 
 ---
 

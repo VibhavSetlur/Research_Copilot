@@ -1,0 +1,640 @@
+# Hierarchical routing registry — single source of truth for `tool_route`
+# and `sys_boot`.
+#
+# Three levels of resolution:
+#   L1  intent_class   — one of {session, discover, plan, execute,
+#                                synthesize, audit_wrap, methodology,
+#                                literature, memory, review}
+#   L2  sub_intent     — narrows within an intent_class (e.g. execute →
+#                        new_experiment | extend | branch | abandon | casual)
+#   L3  protocol       — the specific YAML to load
+#
+# tool_route resolves to the DEEPEST unambiguous level. If multiple
+# protocols tie at L3, it returns a non-null `ask_user` and the
+# candidates. If multiple sub-intents tie at L2, same thing at L2.
+#
+# Per-protocol metadata:
+#   intent_class      L1 class this protocol serves
+#   sub_intent        L2 narrowing
+#   summary           one-line description shown in alternatives
+#   triggers          short trigger phrases (case-insensitive substring)
+#   shortcut_tool     single tool the AI may call instead of the protocol
+#   token_estimate    rough cost of full protocol load (helps the AI
+#                     decide between format=summary vs full)
+#   decomposition     planned tool sequence persisted to
+#                     .os_state/active_plan.json on complex prompts
+#
+# When you add a new protocol, add an entry here too — preflight will
+# complain if you don't.
+
+version: 2
+
+# ─────────────────────────────────────────────────────────────────────
+# L1 ↔ L2 hierarchy (used for ambiguity resolution + ask_user prompts)
+# ─────────────────────────────────────────────────────────────────────
+
+hierarchy:
+  session:
+    label: "Session management"
+    sub_intents:
+      boot:       "Start of a session"
+      resume:     "Continue a paused project"
+      handoff:    "End session cleanly"
+      autopilot:  "Let the AI drive with explicit gates"
+  discover:
+    label: "Project intake + question lock-in"
+    sub_intents:
+      intake:     "Read inputs and propose project metadata"
+  plan:
+    label: "Planning + iteration"
+    sub_intents:
+      next_step:  "Propose the best next experiment"
+      casual:     "Lightweight exploration"
+  execute:
+    label: "Experiment execution"
+    sub_intents:
+      new_experiment: "Create + run the next numbered step"
+      extend:         "Iterate on the active step"
+      branch:         "Fork into an alternative approach"
+      abandon:        "Mark current path as a dead end"
+  methodology:
+    label: "Methodology choice + study design"
+    sub_intents:
+      pick:         "Choose statistical / computational method"
+      causal:       "Causal inference (DAG / IV / DiD)"
+      ml:           "Supervised learning"
+      rct:          "Randomised controlled trial"
+      survey:       "Survey + psychometric"
+      qualitative:  "Interviews / thematic / grounded theory"
+      simulation:   "ADEMP simulation study"
+      replication:  "Replication of a published analysis"
+      ablation:     "Component-by-component ablation"
+      pilot:        "Small-N feasibility before full study"
+      mixed:        "Mixed methods (qual + quant)"
+      meta:         "Meta-analysis / pooled effects"
+      design:       "Study design"
+      tool_pick:    "Find a candidate library / CLI"
+  literature:
+    label: "Literature search + synthesis"
+    sub_intents:
+      search:           "Broad literature pass"
+      systematic:       "PRISMA systematic review"
+      evidence_grade:   "GRADE-style evidence synthesis"
+  synthesize:
+    label: "Final deliverables"
+    sub_intents:
+      paper:     "IMRAD paper with verified citations"
+      abstract:  "Structured / unstructured abstract"
+      poster:    "LaTeX conference poster"
+      dashboard: "Offline HTML dashboard"
+      grant:     "Grant narrative"
+      report:    "Technical / executive report"
+      figures:   "Figure styling + guidelines"
+      writing:   "Writing rules (methods, citations, conclusions, ...)"
+  audit_wrap:
+    label: "Audit + reproducibility"
+    sub_intents:
+      audit:    "Audit a synthesis output"
+      repro:    "Snapshot + verify everything reruns clean"
+  memory:
+    label: "Hypothesis + glossary bookkeeping"
+    sub_intents:
+      hypothesis: "Add / update / list hypotheses"
+      glossary:   "Extend the glossary"
+  review:
+    label: "Review someone else's paper"
+    sub_intents:
+      quick:    "Fast critical appraisal"
+
+# ─────────────────────────────────────────────────────────────────────
+# GUIDANCE protocols
+# ─────────────────────────────────────────────────────────────────────
+protocols:
+
+  guidance/session_boot:
+    intent_class: session
+    sub_intent: boot
+    summary: "First protocol of every session. Loads state + config + sets behaviour."
+    triggers: ["hi", "hello", "start session", "begin", "open", "boot",
+              "let's begin", "good morning"]
+    shortcut_tool: sys_boot
+    token_estimate: 1500
+    decomposition:
+      - tool: sys_boot
+        purpose: "Load state + config + history + dep inventory + next protocol in one call."
+      - decision: "If pause_classification != 'fresh_session', route to session_resume."
+      - decision: "Else greet researcher and wait for their first ask."
+
+  guidance/session_resume:
+    intent_class: session
+    sub_intent: resume
+    summary: "Re-enter a paused / interrupted / handed-off project."
+    triggers:
+      - "resume"
+      - "pick up"
+      - "where were we"
+      - "continue from"
+      - "what was I doing"
+      - "back to work"
+      - "another session"
+      - "next day"
+      - "i'm back"
+    shortcut_tool: tool_session_resume
+    token_estimate: 800
+    decomposition:
+      - tool: tool_session_resume
+        purpose: "Reconstruct intent + status in one call."
+      - tool: sys_protocol_next
+        purpose: "Confirm pipeline-recommended next step."
+
+  guidance/chat_handoff:
+    intent_class: session
+    sub_intent: handoff
+    summary: "Hand off cleanly to another chat / AI / collaborator."
+    triggers:
+      - "wrap up"
+      - "end session"
+      - "handoff"
+      - "hand off"
+      - "switch chat"
+      - "come back tomorrow"
+      - "context filling up"
+      - "different chat"
+      - "going to lunch"
+      - "done for today"
+    shortcut_tool: sys_session_handoff
+    token_estimate: 900
+    decomposition:
+      - tool: sys_checkpoint_create
+        purpose: "Snapshot workspace as a rollback target."
+      - tool: sys_session_handoff
+        purpose: "Write the handoff doc with running tasks, hypotheses, dead-end lessons."
+
+  guidance/autopilot:
+    intent_class: session
+    sub_intent: autopilot
+    summary: "Drive the project hands-off; explicit gates only."
+    triggers:
+      - "autopilot"
+      - "you drive"
+      - "run with it"
+      - "just do it"
+      - "wake me up"
+      - "hands off"
+    token_estimate: 1100
+    decomposition:
+      - tool: sys_config_set
+        args: {key: "interaction.autonomy_level", value: "autopilot"}
+      - protocol: guidance/autopilot
+        purpose: "Load gates + heartbeat policy."
+      - protocol: guidance/analysis_plan
+        purpose: "Start executing under autopilot."
+
+  guidance/casual_exploration:
+    intent_class: plan
+    sub_intent: casual
+    summary: "Lightweight mode — skip reproducibility paperwork, sandbox-first."
+    triggers:
+      - "just poke"
+      - "casual"
+      - "quick look"
+      - "exploratory only"
+      - "no publication"
+      - "sanity check"
+      - "just curious"
+      - "totally side thing"
+    token_estimate: 600
+    decomposition:
+      - protocol: guidance/casual_exploration
+        purpose: "Confirm casual mode + create lightweight step."
+
+  guidance/quick_paper_review:
+    intent_class: review
+    sub_intent: quick
+    summary: "Fast 20-40 min critical appraisal of a paper."
+    triggers:
+      - "review this paper"
+      - "tear apart"
+      - "critique"
+      - "tough reviewer"
+      - "quick review"
+      - "what do you think of this paper"
+      - "peer review"
+      - "brutal review"
+    shortcut_tool: tool_quick_review
+    token_estimate: 700
+    decomposition:
+      - tool: tool_quick_review
+        purpose: "Stage the review skeleton."
+      - protocol: guidance/quick_paper_review
+        purpose: "Walk through the appraisal."
+
+  guidance/project_startup:
+    intent_class: discover
+    sub_intent: intake
+    summary: "First substantive protocol: intake + classify + question lock-in."
+    triggers:
+      - "fill the intake"
+      - "fill intake"
+      - "autofill"
+      - "read my data"
+      - "what do I have"
+      - "what's in inputs"
+      - "i dropped some files"
+      - "new project"
+      - "figure out what's going on"
+    shortcut_tool: tool_intake_autofill
+    token_estimate: 1400
+    decomposition:
+      - tool: tool_context_intake
+        purpose: "Route any loose files into inputs/ first."
+      - tool: tool_intake_autofill
+        purpose: "Infer domain + question + hypotheses from inputs."
+      - tool: sys_state_get
+        purpose: "Confirm registered hypotheses + new docs."
+
+  guidance/analysis_plan:
+    intent_class: execute
+    sub_intent: new_experiment
+    summary: "Iterative experiment loop — create step, script, audit, conclude."
+    triggers:
+      - "run a baseline"
+      - "run an analysis"
+      - "fit a model"
+      - "do an eda"
+      - "exploratory data analysis"
+      - "start the analysis"
+      - "next experiment"
+      - "new step"
+      - "let's analyse"
+      - "let's analyze"
+      - "now run"
+    token_estimate: 2100
+    decomposition:
+      - tool: sys_path_create
+        purpose: "Create the next numbered experiment folder."
+      - tool: tool_research_method
+        purpose: "Ground methodology before coding."
+      - tool: tool_plan_step
+        purpose: "Decompose the step into atomic sub-tasks."
+      - tool: sys_file_write
+        purpose: "Write scripts/<NN>_<slug>_v1.<ext>."
+      - tool: tool_python_exec
+        purpose: "Run the script (or tool_r_exec / tool_julia_exec / tool_bash_exec)."
+      - tool: mem_methods_append
+        purpose: "Log method + parameters + justification."
+      - tool: sys_file_write
+        purpose: "Write conclusions.md for the step."
+
+  guidance/iterative_planning:
+    intent_class: plan
+    sub_intent: next_step
+    summary: "AI proposes the next best step based on state + literature + tools."
+    triggers:
+      - "what should i do next"
+      - "what's next"
+      - "propose next"
+      - "iterate"
+      - "i'm stuck"
+      - "what now"
+      - "what do i do"
+    shortcut_tool: tool_plan_next_step
+    token_estimate: 800
+    decomposition:
+      - tool: tool_plan_next_step
+        purpose: "Survey state + search + propose options."
+      - tool: mem_decision_log
+        purpose: "Log the chosen direction."
+
+  guidance/dead_end_routing:
+    intent_class: execute
+    sub_intent: abandon
+    summary: "Abandon a path cleanly + decide where to go from here."
+    triggers:
+      - "dead end"
+      - "this isn't working"
+      - "abandon"
+      - "scrap this"
+      - "give up"
+      - "wrong approach"
+      - "not working"
+    token_estimate: 700
+    decomposition:
+      - tool: sys_path_abandon
+        purpose: "Mark folder as __DEAD_END with rationale."
+      - tool: tool_dead_end_lessons
+        purpose: "Capture the lesson for future steps."
+      - tool: tool_plan_next_step
+        purpose: "Propose alternative direction."
+
+  guidance/hypothesis_tracking:
+    intent_class: memory
+    sub_intent: hypothesis
+    summary: "Add / update / list hypotheses (registry across steps)."
+    triggers:
+      - "add hypothesis"
+      - "register hypothesis"
+      - "new hypothesis"
+      - "update hypothesis"
+      - "list hypotheses"
+      - "hypothesis status"
+    decomposition:
+      - tool: mem_hypothesis_add
+      - tool: mem_hypothesis_list
+
+  guidance/writing_standards:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "Style + reporting-standard rules used by synthesis."
+    triggers: ["writing standard", "reporting standard", "consort",
+              "strobe", "tripod"]
+
+  guidance/glossary_update:
+    intent_class: memory
+    sub_intent: glossary
+    summary: "Extend docs/glossary.md with new terms."
+    triggers: ["add to glossary", "glossary", "define term", "explain term"]
+
+# ─────────────────────────────────────────────────────────────────────
+# DOMAIN + METHODOLOGY protocols
+# ─────────────────────────────────────────────────────────────────────
+
+  domain/domain_analysis:
+    intent_class: methodology
+    sub_intent: design
+    summary: "Classify domain + bias profile + reporting standard."
+    triggers: ["classify domain", "what reporting standard", "domain summary"]
+
+  domain/research_design:
+    intent_class: methodology
+    sub_intent: design
+    summary: "Pick study design (RCT / cohort / cross-sectional / qual / sim)."
+    triggers: ["study design", "research design", "design the study"]
+
+  methodology/methodology_selection:
+    intent_class: methodology
+    sub_intent: pick
+    summary: "Choose statistical / computational method given design + data."
+    triggers: ["pick method", "which method", "choose model", "what should i use"]
+
+  methodology/research_methods:
+    intent_class: methodology
+    sub_intent: pick
+    summary: "Generic method survey when unsure."
+    triggers: ["survey methods", "compare methods"]
+
+  methodology/causal_inference_deep:
+    intent_class: methodology
+    sub_intent: causal
+    summary: "DAG + dowhy / IPW / DiD / RDD pipeline."
+    triggers: ["causal", "counterfactual", "treatment effect", "iv estimator",
+              "did", "rdd", "instrumental variable"]
+
+  methodology/machine_learning:
+    intent_class: methodology
+    sub_intent: ml
+    summary: "TRIPOD-AI ML pipeline (split, baseline, tune, eval, interpret)."
+    triggers: ["ml pipeline", "train a model", "classification",
+              "regression model", "random forest", "xgboost",
+              "neural net", "deep learning", "gradient boosting"]
+
+  methodology/clinical_trials:
+    intent_class: methodology
+    sub_intent: rct
+    summary: "CONSORT-compliant RCT analysis."
+    triggers: ["rct", "randomised", "randomized", "consort", "clinical trial"]
+
+  methodology/meta_analysis:
+    intent_class: methodology
+    sub_intent: meta
+    summary: "Pooled effect estimates + heterogeneity."
+    triggers: ["meta analysis", "meta-analysis", "pooled estimate", "forest plot"]
+
+  methodology/survey_psychometrics:
+    intent_class: methodology
+    sub_intent: survey
+    summary: "Scale validation, EFA/CFA, reliability."
+    triggers: ["psychometric", "factor analysis", "scale validation",
+              "cronbach", "irt"]
+
+  methodology/qualitative_research:
+    intent_class: methodology
+    sub_intent: qualitative
+    summary: "COREQ/SRQR interview / focus-group / thematic analysis."
+    triggers: ["interviews", "thematic", "qualitative", "coding", "coreq",
+              "srqr", "grounded theory", "ethnography", "focus group",
+              "open coding", "axial coding"]
+
+  methodology/simulation_studies:
+    intent_class: methodology
+    sub_intent: simulation
+    summary: "ADEMP simulation study (Monte Carlo / agent-based)."
+    triggers: ["simulation", "monte carlo", "agent based", "in silico",
+              "synthetic data", "ademp"]
+
+  methodology/replication_study:
+    intent_class: methodology
+    sub_intent: replication
+    summary: "Direct or conceptual replication of a published analysis."
+    triggers: ["replicate", "replication", "reproduce paper", "does x hold"]
+
+  methodology/ablation_study:
+    intent_class: methodology
+    sub_intent: ablation
+    summary: "Component-by-component ablation of a model or pipeline."
+    triggers: ["ablate", "ablation", "which part matters", "remove component"]
+
+  methodology/pilot_study:
+    intent_class: methodology
+    sub_intent: pilot
+    summary: "Small-N feasibility / variance estimation before the full study."
+    triggers: ["pilot", "feasibility", "before the full study",
+              "test the protocol"]
+
+  methodology/mixed_methods:
+    intent_class: methodology
+    sub_intent: mixed
+    summary: "Concurrent or sequential qual + quant integration."
+    triggers: ["mixed methods", "qual and quant", "qualitative and quantitative",
+              "convergent", "sequential explanatory"]
+
+  methodology/tool_discovery:
+    intent_class: methodology
+    sub_intent: tool_pick
+    summary: "Find candidate libraries / CLIs for a task."
+    triggers: ["find a library", "what tool", "candidate libraries",
+              "best package"]
+
+  literature/literature_search:
+    intent_class: literature
+    sub_intent: search
+    summary: "Broad literature pass on the research question."
+    triggers: ["literature search", "find papers", "search the literature"]
+
+  literature/systematic_review:
+    intent_class: literature
+    sub_intent: systematic
+    summary: "PRISMA-compliant systematic review."
+    triggers: ["systematic review", "prisma", "screen papers", "scoping review"]
+
+  literature/evidence_synthesis:
+    intent_class: literature
+    sub_intent: evidence_grade
+    summary: "Grade body of evidence (GRADE-style)."
+    triggers: ["grade the evidence", "evidence synthesis", "body of evidence"]
+
+# ─────────────────────────────────────────────────────────────────────
+# WRITING + VISUALIZATION (granular rules)
+# ─────────────────────────────────────────────────────────────────────
+
+  writing/writing_core:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "Universal writing rules. Implicitly loaded by every synthesis."
+    triggers: ["writing rules", "style guide", "core writing"]
+
+  writing/writing_methods:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "How to document methods in workspace/methods.md."
+    triggers: ["document methods", "log method", "methods section", "methods file"]
+
+  writing/writing_citations:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "Maintain workspace/citations.md so every claim is grounded."
+    triggers: ["citations", "bibliography", "add citation", "cite this"]
+
+  writing/writing_analysis_log:
+    intent_class: memory
+    sub_intent: hypothesis
+    summary: "Format for structured entries in workspace/analysis.md."
+    triggers: ["analysis log", "narrative log", "log entry"]
+
+  writing/writing_conclusions:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "How to write per-step conclusions.md."
+    triggers: ["step conclusions", "write conclusions", "wrap up step"]
+
+  writing/writing_readme:
+    intent_class: synthesize
+    sub_intent: writing
+    summary: "Maintain the project + per-step READMEs."
+    triggers: ["update readme", "step readme", "project readme"]
+
+  visualization/figure_guidelines:
+    intent_class: synthesize
+    sub_intent: figures
+    summary: "Picking the right chart type and styling for publication."
+    triggers: ["figure", "chart", "plot type", "color palette", "dpi",
+              "axis labels"]
+
+# ─────────────────────────────────────────────────────────────────────
+# SYNTHESIS — final deliverables
+# ─────────────────────────────────────────────────────────────────────
+
+  synthesis/synthesis_paper:
+    intent_class: synthesize
+    sub_intent: paper
+    summary: "Write IMRAD paper with verified citations + numbered figures."
+    triggers: ["write the paper", "draft the paper", "write a manuscript",
+              "the manuscript", "imrad", "for a journal", "for the journal"]
+    shortcut_tool: tool_synthesize
+    decomposition:
+      - tool: tool_synthesize_plan
+      - tool: tool_audit_synthesis
+      - tool: tool_audit_citations
+      - tool: tool_synthesize
+        args: {output_type: paper}
+
+  synthesis/synthesis_abstract:
+    intent_class: synthesize
+    sub_intent: abstract
+    summary: "Structured / unstructured abstract from finished workspace."
+    triggers: ["write abstract", "draft abstract", "tldr", "structured abstract"]
+    shortcut_tool: tool_synthesize
+
+  synthesis/synthesis_poster:
+    intent_class: synthesize
+    sub_intent: poster
+    summary: "Tikzposter LaTeX poster."
+    triggers: ["make a poster", "conference poster", "tikzposter"]
+    shortcut_tool: tool_poster_create
+
+  synthesis/synthesis_dashboard:
+    intent_class: synthesize
+    sub_intent: dashboard
+    summary: "Standalone offline HTML dashboard."
+    triggers: ["dashboard", "executive summary", "html report", "lab meeting"]
+    shortcut_tool: tool_dashboard_create
+
+  synthesis/synthesis_grant:
+    intent_class: synthesize
+    sub_intent: grant
+    summary: "Grant narrative (R01 / NSF / Wellcome / etc.)."
+    triggers: ["grant", "r01", "nsf proposal", "wellcome", "specific aims"]
+    shortcut_tool: tool_synthesize
+
+  synthesis/synthesis_report:
+    intent_class: synthesize
+    sub_intent: report
+    summary: "Technical / executive report."
+    triggers: ["technical report", "internal report", "stakeholder report"]
+    shortcut_tool: tool_synthesize
+
+# ─────────────────────────────────────────────────────────────────────
+# AUDIT + REPRODUCIBILITY
+# ─────────────────────────────────────────────────────────────────────
+
+  audit/audit_and_validation:
+    intent_class: audit_wrap
+    sub_intent: audit
+    summary: "Full audit pass on a synthesis output."
+    triggers: ["audit", "validate", "check the paper", "is this ready"]
+    decomposition:
+      - tool: tool_audit_synthesis
+      - tool: tool_audit_citations
+      - tool: tool_audit_figure
+
+  reproducibility/reproducibility:
+    intent_class: audit_wrap
+    sub_intent: repro
+    summary: "Snapshot env + verify everything reruns clean."
+    triggers: ["reproducibility", "reproducible", "rerun from scratch",
+              "snapshot environment"]
+    shortcut_tool: tool_audit_reproducibility
+
+# ─────────────────────────────────────────────────────────────────────
+# Cross-intent shortcuts (no protocol, just a tool)
+# ─────────────────────────────────────────────────────────────────────
+
+shortcut_intents:
+  progress_check:
+    triggers: ["progress", "status", "where are we", "what's done", "digest"]
+    tool: tool_progress_digest
+
+  dead_end_lessons:
+    triggers: ["lessons", "what did we learn", "past mistakes",
+              "previous dead ends"]
+    tool: tool_dead_end_lessons
+
+  list_protocols:
+    triggers: ["list protocols", "what protocols", "available protocols"]
+    tool: sys_protocol_list
+
+  dep_inventory:
+    triggers: ["missing dependencies", "what's installed", "which tools work"]
+    tool: sys_dep_inventory
+
+  workspace_repair:
+    triggers: ["broken", "workspace is broken", "fix workspace", "repair"]
+    tool: tool_workspace_repair
+
+  background_task:
+    triggers: ["background", "long running", "kick off", "fire and forget"]
+    tool: tool_task_run
+
+  scratch_sandbox:
+    triggers: ["quick test", "syntax check", "scratch", "throwaway"]
+    tool: tool_scratch_write

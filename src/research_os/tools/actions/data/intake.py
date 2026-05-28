@@ -226,7 +226,9 @@ def intake_autofill(root: Path, *, overwrite: bool = False) -> dict[str, Any]:
         rq_changed = False
         if rq_path.exists():
             current = rq_path.read_text()
-            if overwrite or "(to be" in current.lower() or len(current.strip()) < 60:
+            placeholders = ("(blank", "(to be", "*(blank", "*(to be", "to be filled")
+            is_placeholder = any(m in current.lower() for m in placeholders)
+            if overwrite or is_placeholder or len(current.strip()) < 60:
                 rq_body = (
                     f"# Research Question\n\n"
                     f"{question}\n\n"

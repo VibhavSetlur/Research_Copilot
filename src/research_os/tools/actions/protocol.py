@@ -92,6 +92,7 @@ def _find_protocol_file(name: str) -> Path | None:
     """Locate ``<protocols>/<category>/<name>.yaml``.
 
     Accepts ``"guidance/session_boot"`` or bare ``"session_boot"``.
+    Registry / index files (prefix ``_``) are NOT addressable as protocols.
     """
     if "/" in name:
         candidate = PROTOCOLS_DIR / f"{name}.yaml"
@@ -100,6 +101,8 @@ def _find_protocol_file(name: str) -> Path | None:
     for yaml_file in PROTOCOLS_DIR.rglob("*.yaml"):
         # Skip any legacy light/ folder that might still be on disk.
         if "light" in yaml_file.parts:
+            continue
+        if yaml_file.name.startswith("_"):
             continue
         if yaml_file.stem == name:
             return yaml_file
@@ -154,13 +157,26 @@ def _inject_completion_step(data: dict) -> dict:
     return data
 
 
-def load_protocol(name: str, model_profile: str = "medium") -> dict:
+def load_protocol(
+    name: str,
+    model_profile: str = "medium",
+    *,
+    format: str = "full",
+    step_id: str | None = None,
+) -> dict:
     """Load a protocol YAML and post-process it.
 
     Args:
         name: ``"guidance/project_startup"`` or bare ``"project_startup"``.
         model_profile: ``small`` | ``medium`` | ``large``. ``small`` trims verbose
                        keys (model_adaptations, examples, etc.) to save tokens.
+        format: ``full`` (default) | ``summary`` | ``step``.
+                * ``summary`` returns id + name + description + step
+                  headings + expected_outputs + next_protocol + quality_bar
+                  — roughly 300 tokens vs 2K for the full load.
+                * ``step`` requires ``step_id`` and returns just that step
+                  body plus its position in the protocol.
+        step_id: which step to load when ``format='step'``.
     """
     file = _find_protocol_file(name)
     if not file:
@@ -174,11 +190,11 @@ def load_protocol(name: str, model_profile: str = "medium") -> dict:
     if isinstance(adaptations, dict) and model_profile in adaptations:
         overrides = adaptations.get(model_profile) or {}
         if isinstance(overrides, dict):
-            for step_id, patch in overrides.items():
+            for sid, patch in overrides.items():
                 if not isinstance(patch, dict):
                     continue
                 for step in data.get("steps", []):
-                    if isinstance(step, dict) and step.get("id") == step_id:
+                    if isinstance(step, dict) and step.get("id") == sid:
                         step.update(patch)
 
     if model_profile == "small":
@@ -187,6 +203,57 @@ def load_protocol(name: str, model_profile: str = "medium") -> dict:
     data = _inject_completion_step(data)
     data.setdefault("name", name.split("/")[-1])
     data.setdefault("_path", str(file.relative_to(PROTOCOLS_DIR)))
+
+    if format == "summary":
+        steps = data.get("steps", []) or []
+        return {
+            "id": data.get("id", name.split("/")[-1]),
+            "name": data.get("name", ""),
+            "description": data.get("description", ""),
+            "trigger": data.get("trigger", ""),
+            "prerequisites": data.get("prerequisites", []),
+            "step_summary": [
+                {"id": s.get("id", ""), "name": s.get("name", "")}
+                for s in steps
+                if isinstance(s, dict)
+            ],
+            "expected_outputs": data.get("expected_outputs", []),
+            "quality_bar": data.get("quality_bar", ""),
+            "next_protocol": data.get("next_protocol"),
+            "on_failure": data.get("on_failure"),
+            "_path": data.get("_path"),
+            "_load_hint": (
+                f"Loaded as summary. For one specific step body call "
+                f"sys_protocol_get name='{name}' format='step' step_id='<id>'. "
+                f"For the full YAML use format='full'."
+            ),
+        }
+
+    if format == "step":
+        if not step_id:
+            raise ValueError("format='step' requires step_id")
+        steps = data.get("steps", []) or []
+        match = next(
+            (s for s in steps if isinstance(s, dict) and s.get("id") == step_id),
+            None,
+        )
+        if not match:
+            raise ValueError(
+                f"Step '{step_id}' not in protocol '{name}'. "
+                f"Available: {[s.get('id') for s in steps if isinstance(s, dict)]}"
+            )
+        step_ids = [s.get("id") for s in steps if isinstance(s, dict)]
+        idx = step_ids.index(step_id)
+        return {
+            "id": data.get("id"),
+            "name": data.get("name"),
+            "step": match,
+            "position": idx + 1,
+            "of": len(step_ids),
+            "previous_step_id": step_ids[idx - 1] if idx > 0 else None,
+            "next_step_id": step_ids[idx + 1] if idx + 1 < len(step_ids) else None,
+        }
+
     return data
 
 
@@ -195,6 +262,9 @@ def list_protocols() -> list[dict]:
     out: list[dict] = []
     for yaml_file in sorted(PROTOCOLS_DIR.rglob("*.yaml")):
         if "light" in yaml_file.parts:
+            continue
+        # Skip registry/index files (e.g. _router_index.yaml).
+        if yaml_file.name.startswith("_"):
             continue
         rel = yaml_file.relative_to(PROTOCOLS_DIR).with_suffix("")
         name = str(rel).replace("\\", "/")

@@ -49,13 +49,41 @@ def _load(task_path: Path) -> dict[str, Any] | None:
 
 
 def _pid_alive(pid: int) -> bool:
+    """True if pid points at a running, non-zombie process.
+
+    Background tasks are spawned via ``subprocess.Popen`` and the parent
+    drops the handle. When the child exits it becomes a zombie until
+    reaped. ``os.kill(pid, 0)`` still succeeds for zombies, so naïve
+    liveness checks report ``running`` long after the process finished.
+    Reap with ``waitpid(WNOHANG)`` when we are the parent; fall back to
+    ``/proc/<pid>/status`` (Linux) when we are not.
+    """
     if not pid:
         return False
+    # Try non-blocking reap — succeeds when we are the parent and child
+    # has already exited.
+    try:
+        reaped, _ = os.waitpid(pid, os.WNOHANG)
+        if reaped == pid:
+            return False
+    except (ChildProcessError, OSError):
+        pass
     try:
         os.kill(pid, 0)
-        return True
     except (OSError, ProcessLookupError):
         return False
+    # Process exists in the table — distinguish running from zombie.
+    try:
+        with open(f"/proc/{pid}/status") as f:
+            for line in f:
+                if line.startswith("State:"):
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1].upper().startswith("Z"):
+                        return False
+                    return True
+    except (FileNotFoundError, PermissionError, OSError):
+        pass
+    return True
 
 
 # ---------------------------------------------------------------------------

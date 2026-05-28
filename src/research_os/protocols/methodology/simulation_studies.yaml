@@ -1,0 +1,91 @@
+id: simulation_studies
+name: Simulation Studies (ADEMP)
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  Monte Carlo, agent-based, discrete-event, or in-silico studies. Follows
+  the ADEMP framework (Aims, Data-generating mechanisms, Estimands,
+  Methods, Performance measures). Enforces reproducible random-state
+  control and per-scenario seed logging.
+trigger: |
+  Research goal is "evaluate a method's behaviour under controlled
+  conditions", "simulate", "synthetic data", "Monte Carlo",
+  "agent-based model", "compare estimators under known truth". Domain may
+  be stats, ML, ops research, epidemiology, climate, etc.
+
+steps:
+  - id: create_step
+    name: Create Simulation Step
+    description: sys_path_create name="sim_<scenario>"
+
+  - id: ademp
+    name: Specify ADEMP Up Front
+    description: |
+      Write outputs/reports/ademp.md with:
+        - Aims: what claim about the method(s) we want to evaluate
+        - Data-generating mechanisms: distributions, sample sizes, scenario
+          grid (factorial design preferred)
+        - Estimands: the population-level quantities of interest
+        - Methods: candidates being compared (with library + version)
+        - Performance measures: bias, MSE, coverage, power, type-I rate,
+          calibration, computational cost — pick what matters for the aim
+
+  - id: seed_plan
+    name: Random-state Plan
+    description: |
+      One master seed; per-scenario seeds derived deterministically
+      (e.g. seed = master_seed * scenario_id). Document the seed strategy
+      and the master_seed in outputs/reports/seed_plan.md. Every script
+      must print its seed at start-up.
+
+  - id: scale_pilot_then_full
+    name: Pilot Then Full Run
+    description: |
+      Run a tiny pilot (e.g. 10 reps per scenario) to confirm the pipeline,
+      audit outputs, then scale to the planned N_reps. Background the full
+      run with tool_task_run if expected runtime > 5 min on shared infra.
+
+  - id: tidy_results
+    name: Tidy Results into Long Format
+    description: |
+      Aggregate outputs into outputs/data/results.parquet with columns
+      (scenario_id, scenario_params..., method, replicate, metric, value).
+      Tidy form is non-negotiable — downstream visualisation depends on it.
+
+  - id: performance_table
+    name: Performance Table + Visualisation
+    description: |
+      Build outputs/reports/performance_table.md with one row per
+      (method × scenario × metric), reporting point estimate + Monte Carlo
+      SE (sd / sqrt(N_reps)). Add a figure showing each method's headline
+      metric across the scenario grid.
+
+  - id: sensitivity
+    name: Sensitivity to Design Choices
+    description: |
+      Rerun a subset of scenarios with a perturbed master seed AND with
+      doubled N_reps. Both should yield qualitatively the same conclusions;
+      if not, the original run was under-powered — document and re-scale.
+
+  - id: report
+    name: Per-step Conclusions
+    description: |
+      conclusions.md states: did the simulation answer the aim, which method
+      wins under which regime, where the methods cross over, computational
+      cost trade-offs, and limitations of the data-generating model itself.
+
+expected_outputs:
+  - workspace/*/outputs/reports/ademp.md
+  - workspace/*/outputs/reports/seed_plan.md
+  - workspace/*/outputs/reports/performance_table.md
+  - workspace/*/outputs/data/results.parquet
+
+quality_bar: |
+  - ADEMP is written BEFORE any code runs.
+  - Every random draw is reproducible: master_seed → scenario seed → run
+    seed chain documented.
+  - Monte Carlo SE is reported alongside every point estimate.
+  - At least one sensitivity rerun confirms the headline result.
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

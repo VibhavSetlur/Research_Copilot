@@ -1,0 +1,59 @@
+# Time Series / Forecasting — preset researcher_config.yaml
+# Copy to inputs/researcher_config.yaml. Tuned for univariate / multivariate
+# time-series modelling and forecasting (ARIMA, state-space, Prophet, deep
+# learning forecasters).
+
+project_name: "Time Series Study"
+research_question: ""
+domain: "time_series"
+hypotheses: []
+
+researcher:
+  name: ""
+  field: "time series / forecasting"
+  expertise_level: "intermediate"
+  institution: ""
+  orcid: ""
+
+interaction:
+  autonomy_level: "supervised"
+
+model_profile: "medium"
+
+runtime:
+  shared_server: false
+  long_running_threshold_seconds: 60
+  default_n_for_sampling: 5000
+
+research_goal:
+  output_types: ["paper", "dashboard"]
+  target_venue: "journal"
+  reporting_standard: ""  # IJF reporting checklist for forecasting
+  suggested_methodology: "research_methods"
+  suggested_protocols:
+    - "methodology/methodology_selection"
+    - "guidance/analysis_plan"
+
+writing_preferences:
+  citation_style: "apa"
+  language: "en-US"
+
+api_keys:
+  semantic_scholar: ""
+  pubmed: ""
+  crossref: ""
+  firecrawl: ""
+  serpapi: ""
+
+domain_hints:
+  expected_columns:
+    [timestamp, date, ds, y, value, target, lag_1, lag_7, group_id, freq]
+  expected_file_extensions: [.csv, .parquet, .feather, .arrow, .json]
+  biases_to_monitor:
+    - Lookahead bias / data leakage in feature engineering
+    - Improper cross-validation (use rolling-origin / expanding-window CV)
+    - Stationarity assumption violations (unit-root tests omitted)
+    - Backtest fragility across regime changes (COVID, crises)
+    - Survivorship bias when assembling the panel
+    - Reporting only one horizon when policy use is multi-horizon
+    - Confusing point forecast accuracy with calibration of intervals

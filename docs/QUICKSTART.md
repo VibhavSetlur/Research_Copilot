@@ -9,10 +9,13 @@ or [RESEARCHER_GUIDE.md](RESEARCHER_GUIDE.md).
 ## 1. Install (60 s)
 
 ```bash
-pip install "research-os[all] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+pip install "research-os[ci] @ git+https://github.com/VibhavSetlur/Research-OS.git"
 ```
 
-Need help with Python / pip / virtualenvs? See [SETUP.md](SETUP.md).
+`[ci]` is the lean install (enough for 90% of use cases). Use `[all]`
+if you want shap / xgboost / jupyter / full literature providers
+preinstalled. Need help with Python / pip / virtualenvs? See
+[SETUP.md](SETUP.md).
 
 ## 2. Scaffold a project (15 s)
 
@@ -95,6 +98,9 @@ through install and IDE wiring for whatever IDE you use.
 
 ## Next reads
 
+* [WALKTHROUGH.md](WALKTHROUGH.md) — exhaustive 10-day simulated
+  project with realistic messy researcher prompts. Best for seeing
+  every feature in context.
 * [RESEARCHER_GUIDE.md](RESEARCHER_GUIDE.md) — non-technical walk-through of
   the workflow.
 * [GUIDE.md](GUIDE.md) — full tool + protocol reference.

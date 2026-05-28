@@ -10,7 +10,7 @@ Cursor, VS Code, Windsurf, Continue, Aider) without managing any LLM
 provider keys.**
 
 Research OS is a [Model Context Protocol](https://modelcontextprotocol.io)
-server exposing ~85 research tools and 34 YAML protocols. The AI in your
+server exposing 94 research tools and 47 YAML protocols. The AI in your
 IDE plans and reasons; Research OS executes, records state, enforces
 immutability, and walks the AI through the right protocol for the current
 pipeline stage. Every citation in every final output is verified online —
@@ -21,7 +21,8 @@ no hallucinations leak through.
 ## Quick start (≤60 seconds)
 
 ```bash
-pip install "research-os[all] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+pip install "research-os[ci] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+# (or [all] for shap / xgboost / jupyter and full search providers)
 
 mkdir my-project && cd my-project
 research-os init                     # scaffolds + drops MCP config for every IDE
@@ -67,6 +68,9 @@ the install + IDE wiring without needing one.
 | Iterating on direction (researcher wants AI to propose) | `guidance/iterative_planning` protocol reads state + searches literature/tools + proposes 2-3 options with rationale. |
 | Multiple hypotheses to track | `mem_hypothesis_add` / `_update` / `_list` maintains a ledger across experiment steps. |
 | Per-step literature | `tool_literature_download step_id=<NN_slug>` saves PDFs to `workspace/<step>/literature/`. Sidecar `.meta.yaml` lets synthesis cite them properly. |
+| AI burns tokens picking the wrong protocol | `tool_route` does a hierarchical L1→L2→L3 walk over `_router_index.yaml` and returns the answer in ~250 tokens. `sys_protocol_get format='summary'` loads a 300-token outline. A typical session boot costs ~1.2K tokens (vs ~5K under the old "load everything" pattern). |
+| AI one-shots complex prompts on smaller models | `tool_route` persists an `active_plan` for any complex prompt. `tool_plan_turn` slices it into batches sized to `model_profile` (1 / 3 / 6 steps per turn). When the plan won't fit one chat, it recommends a handoff + fresh chat. |
+| Same project, different AI tomorrow | `sys_session_handoff` snapshots a checkpoint + writes a "fresh AI can resume cold" doc. `tool_session_resume` reconstructs intent + status in one call. |
 
 ---
 
@@ -286,14 +290,22 @@ ledger + manifest + protocol log are committed so collaborators can resume.
 ## Architecture (45 seconds)
 
 ```
-AI IDE (Claude Code / OpenCode / Antigravity / Cursor / Claude / VS Code / Windsurf / Continue)
+AI IDE (Claude Code / OpenCode / Antigravity / Cursor / Claude / VS Code / Windsurf / Continue / Aider)
         │ MCP stdio
         ▼
 research-os MCP server (Python)
         │
-        ├── sys.*    workspace, state, paths, checkpoints, config, files, repair, env, scratch
-        ├── tool.*   search, exec, audit, synthesis, tasks, research, intake, literature
-        └── mem.*    append-only methods / analysis / citations / decisions / hypotheses
+        ├── Routing layer    sys_boot  →  tool_route (L1→L2→L3 hierarchical)
+        │                    sys_protocol_get format=summary | step | full
+        │                    tool_plan_turn (per-model_profile batching)
+        │                    tool_plan_advance / tool_plan_clear
+        ├── sys.*    workspace, state, paths, checkpoints, config, files,
+        │            repair, env, scratch, session_handoff, tool_describe
+        ├── tool.*   search, exec, audit, synthesis, tasks, research,
+        │            intake, literature, session_resume, progress_digest,
+        │            dead_end_lessons, quick_review, workspace_repair
+        └── mem.*    append-only methods / analysis / citations / decisions
+                     / hypotheses
         │
         ▼
     Workspace files
@@ -301,7 +313,9 @@ research-os MCP server (Python)
 ```
 
 The IDE plans and decides; Research OS executes and records. No autonomous
-decisions in Research OS — your model stays in control.
+decisions in Research OS — your model stays in control. The routing layer
+keeps a typical session boot under ~1.2K tokens regardless of how many
+protocols + tools exist on disk.
 
 ---
 
@@ -310,6 +324,7 @@ decisions in Research OS — your model stays in control.
 | File | Read when |
 |---|---|
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | First time. 5-minute walkthrough. |
+| [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) | End-to-end simulated project — shell commands + realistic chat prompts from data download through paper + handoff + resume. |
 | [`docs/SETUP.md`](docs/SETUP.md) | Install + per-IDE MCP wiring + troubleshooting. |
 | [`docs/SETUP_PROMPT.md`](docs/SETUP_PROMPT.md) | Paste-into-any-AI installer prompt (no project needed). |
 | [`docs/RESEARCHER_GUIDE.md`](docs/RESEARCHER_GUIDE.md) | Non-technical walkthrough of the workflow. |
@@ -325,21 +340,40 @@ decisions in Research OS — your model stays in control.
 
 ## What's in the box
 
-* **~85 MCP tools** across `sys_*`, `tool_*`, `mem_*` namespaces. Dot
+* **94 MCP tools** across `sys_*`, `tool_*`, `mem_*` namespaces. Dot
   notation (`sys.state.get`) and legacy names auto-rewrite. Run
   `python scripts/preflight.py` after install to verify everything is wired.
-* **34 YAML protocols** — the AI loads the right one based on what you ask.
+* **47 YAML protocols** — the AI loads the right one based on what you ask.
   Each declares an explicit `quality_bar` so output stays publication-grade
-  even on smaller models.
-* **5 domain presets** for `researcher_config.yaml`: RCTs, observational
-  epidemiology, genomics, NLP benchmarks, economic panels.
+  even on smaller models. Coverage spans methodology (RCTs, clinical
+  trials, observational causal, ML, meta-analysis, survey psychometrics,
+  qualitative research, simulation/ADEMP studies, replication studies,
+  ablation studies, pilot studies, mixed methods) and guidance (session
+  boot/resume, autopilot mode with explicit gates, quick paper review,
+  casual exploration, chat/AI-to-AI handoff, iterative planning,
+  dead-end routing).
+* **10 domain presets** for `researcher_config.yaml`: RCTs, observational
+  epidemiology, genomics, NLP benchmarks, economic panels, qualitative
+  research, geospatial / remote sensing, time-series / forecasting,
+  survival / time-to-event, psychometric / survey.
 * **8 IDE rule templates** auto-dropped on init.
 * **Real, verified citations** — synthesis outputs cannot contain
   hallucinated references.
 * **Per-step literature** — papers can be scoped to a specific experiment
   step with full metadata sidecars.
+* **Session resume + handoff** — `tool_session_resume` reconstructs intent
+  from logs after any pause (different chat, different AI model, next
+  day). `sys_session_handoff` snapshots a checkpoint and writes a
+  fresh-AI-readable handoff doc.
+* **Progress digest + dead-end lessons** — one-page status report
+  (`tool_progress_digest`) plus reusable lessons from every abandoned
+  path (`tool_dead_end_lessons`) so the next attempt doesn't repeat
+  yesterday's mistake.
 * **Workspace repair, scratch sandbox, mid-flow context intake, background
   tasks** — built-in robustness for shared servers and long-running work.
+* **Optional-dependency inventory** (`sys_dep_inventory`) — surfaces at
+  session start which extras failed to import so the AI doesn't try a
+  broken tool late.
 
 ---
 

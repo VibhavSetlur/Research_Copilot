@@ -36,9 +36,35 @@ _ROUTING = {
         ".fasta", ".fastq", ".bam", ".vcf", ".gtf", ".gff",
         ".nii", ".dcm", ".h5", ".hdf5", ".json", ".jsonl",
         ".tiff", ".tif", ".png", ".jpg", ".jpeg",
-        ".shp", ".geojson", ".nc",
+        ".shp", ".geojson", ".nc", ".npy", ".npz", ".pkl",
     },
     "context": {".md", ".txt", ".rst", ".org", ".odt", ".docx", ".rtf"},
+}
+
+# Files written by ``research-os init`` (and ``_setup_mcp_configs``) at the
+# project root. These are scaffold, not researcher input; if context_intake
+# scoops them into ``inputs/`` it will (a) re-trigger intake autofill noise
+# and (b) confuse the AI when ``AGENTS.md`` shows up as "new literature".
+_SCAFFOLD_NAMES = {
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GETTING_STARTED.md",
+    "README.md",
+    "opencode.json",
+    "mcp_config.json",
+    ".aider.conf.yml",
+    ".windsurfrules",
+    ".continuerules",
+    ".cursorrules",
+}
+
+# Top-level directories the scaffold owns or that we never want to scan
+# for "new" researcher files. Includes the obvious project bookkeeping
+# folders plus common conda/git/IDE noise.
+_EXCLUDED_DIRS = {
+    "inputs", "workspace", "synthesis", "docs", "environment", ".os_state",
+    "node_modules", "__pycache__", "venv", ".venv", "env",
+    "dist", "build", ".pytest_cache", ".ruff_cache", ".mypy_cache",
 }
 
 
@@ -87,16 +113,21 @@ def context_intake(
                 return {"status": "error", "message": f"source_dir {source_dir} not found"}
             candidates.extend(p for p in base.rglob("*") if p.is_file())
         else:
-            # Scan everywhere EXCEPT inputs/ (already routed), .os_state/,
-            # workspace/ (research artifacts), .git, environment/, synthesis/,
-            # docs/, and any hidden dir.
-            excluded = {"inputs", "workspace", "synthesis", "docs", "environment", ".os_state"}
+            # Scan dirs the researcher would plausibly drop files into.
+            # Skip excluded dirs, hidden dirs, and any top-level scaffold
+            # file (AGENTS.md, CLAUDE.md, etc.).
             for child in root.iterdir():
-                if child.is_dir() and (child.name in excluded or child.name.startswith(".")):
+                if child.is_dir() and (
+                    child.name in _EXCLUDED_DIRS or child.name.startswith(".")
+                ):
                     continue
                 if child.is_dir():
                     candidates.extend(p for p in child.rglob("*") if p.is_file())
-                elif child.is_file() and not child.name.startswith("."):
+                elif (
+                    child.is_file()
+                    and not child.name.startswith(".")
+                    and child.name not in _SCAFFOLD_NAMES
+                ):
                     candidates.append(child)
 
         # Filter to candidates that look genuinely new.

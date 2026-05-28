@@ -1,0 +1,60 @@
+# Survival / Time-to-Event — preset researcher_config.yaml
+# Copy to inputs/researcher_config.yaml. Tuned for Kaplan-Meier, Cox PH,
+# competing-risks, parametric AFT models in clinical or industrial reliability
+# settings.
+
+project_name: "Survival Analysis Study"
+research_question: ""
+domain: "survival"
+hypotheses: []
+
+researcher:
+  name: ""
+  field: "survival / time-to-event analysis"
+  expertise_level: "intermediate"
+  institution: ""
+  orcid: ""
+
+interaction:
+  autonomy_level: "supervised"
+
+model_profile: "medium"
+
+runtime:
+  shared_server: false
+  long_running_threshold_seconds: 60
+  default_n_for_sampling: 1000
+
+research_goal:
+  output_types: ["paper"]
+  target_venue: "journal"
+  reporting_standard: "STROBE"  # observational survival; CONSORT for RCTs
+  suggested_methodology: "research_methods"
+  suggested_protocols:
+    - "methodology/methodology_selection"
+    - "methodology/causal_inference_deep"  # if estimating treatment effects
+    - "guidance/analysis_plan"
+
+writing_preferences:
+  citation_style: "vancouver"
+  language: "en-US"
+
+api_keys:
+  semantic_scholar: ""
+  pubmed: ""
+  crossref: ""
+  firecrawl: ""
+  serpapi: ""
+
+domain_hints:
+  expected_columns:
+    [time, duration, event, status, censored, group, treatment, start, stop]
+  expected_file_extensions: [.csv, .parquet, .sas7bdat, .sav, .dta]
+  biases_to_monitor:
+    - Informative censoring (lost-to-follow-up correlated with risk)
+    - Immortal-time bias when classifying exposure post-baseline
+    - Proportional-hazards violation untested
+    - Competing risks treated as independent censoring
+    - Time-varying covariates handled at single baseline measurement
+    - Selection bias from prevalent vs incident cohorts
+    - Inadequate follow-up to observe enough events

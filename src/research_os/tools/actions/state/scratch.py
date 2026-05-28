@@ -108,8 +108,11 @@ def scratch_run(filename: str, root: Path, *, timeout: int = 60) -> dict[str, An
         return {"status": "error", "message": str(e)}
 
 
+_PRESERVED = {".gitignore", ".gitkeep", "README.md"}
+
+
 def scratch_list(root: Path) -> dict[str, Any]:
-    """List files currently in scratch."""
+    """List files currently in scratch (excludes scaffold/preserved files)."""
     try:
         d = _scratch_dir(root)
         entries = [
@@ -121,7 +124,7 @@ def scratch_list(root: Path) -> dict[str, Any]:
                 ).isoformat(),
             }
             for f in d.iterdir()
-            if f.is_file() and f.name not in {".gitignore", "README.md"}
+            if f.is_file() and f.name not in _PRESERVED
         ]
         files = sorted(entries, key=lambda x: x["modified"])
         return {"status": "success", "count": len(files), "files": files}
@@ -131,12 +134,12 @@ def scratch_list(root: Path) -> dict[str, Any]:
 
 
 def scratch_clear(root: Path) -> dict[str, Any]:
-    """Wipe scratch contents (keeps .gitignore and README)."""
+    """Wipe scratch contents (keeps .gitignore, .gitkeep, README)."""
     try:
         d = _scratch_dir(root)
         removed = 0
         for f in d.iterdir():
-            if f.name in {".gitignore", "README.md"}:
+            if f.name in _PRESERVED:
                 continue
             if f.is_file():
                 f.unlink()

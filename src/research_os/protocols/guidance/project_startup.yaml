@@ -1,14 +1,26 @@
 id: project_startup
 name: Project Startup
-version: '5.0.0'
+version: '5.1.0'
 schema_version: '2.0'
 description: First substantive protocol. Auto-fills intake from researcher dumps, locks in research question, classifies domain, snapshots the base environment.
 trigger: Second protocol every new project — and any time inputs/ changes substantially.
 prerequisites:
-  - session_boot has completed this session
+  - session_boot has completed this session (sys_boot was called)
   - inputs/researcher_config.yaml exists (auto-created on `research-os init`)
 
 steps:
+  - id: route_first
+    name: Route Through tool_route Before Loading the Full Protocol
+    description: |
+      If you got here via session_boot's tool_route call, you already have
+      the right protocol — skip this step.
+
+      Otherwise, before loading this YAML at format='full', call
+      tool_route(prompt=<researcher's ask>). For an intake-shaped ask
+      ("fill the intake", "I dropped files", "what do I have") tool_route
+      will recommend tool_intake_autofill as a SHORTCUT — you can call
+      that directly without the full project_startup load.
+
   - id: scan_inputs
     name: Scan inputs/ at Coarse Granularity
     description: |

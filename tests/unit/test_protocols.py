@@ -73,6 +73,33 @@ class TestProtocolLoading:
         loaded = load_protocol("guidance/alpha")
         assert loaded["id"] == "alpha"
 
+    def test_load_summary_returns_lean_shape(self, full_protocol_dir):
+        summary = load_protocol("guidance/alpha", format="summary")
+        # summary should NOT include 'content' or full step bodies.
+        assert "step_summary" in summary
+        assert all("name" in s for s in summary["step_summary"])
+        # Step bodies are NOT included in summary mode.
+        for s in summary["step_summary"]:
+            assert "description" not in s
+        assert "_load_hint" in summary
+
+    def test_load_step_returns_one_step_body(self, full_protocol_dir):
+        step = load_protocol(
+            "guidance/alpha", format="step", step_id="alpha_step1"
+        )
+        assert step["step"]["id"] == "alpha_step1"
+        assert "description" in step["step"]
+        assert step["position"] == 1
+        assert step["of"] >= 2
+
+    def test_load_step_missing_id_raises(self, full_protocol_dir):
+        with pytest.raises(ValueError):
+            load_protocol("guidance/alpha", format="step", step_id="ghost")
+
+    def test_load_step_without_step_id_raises(self, full_protocol_dir):
+        with pytest.raises(ValueError):
+            load_protocol("guidance/alpha", format="step")
+
 
 class TestProtocolList:
     def test_list_all_protocols(self, full_protocol_dir):
@@ -124,17 +151,21 @@ class TestProtocolValidation:
 
 class TestRealProtocols:
     def test_every_real_protocol_loads(self):
-        root = Path(__file__).resolve().parent.parent
+        root = Path(__file__).resolve().parent.parent.parent
         pdir = root / "src" / "research_os" / "protocols"
         assert pdir.exists()
         for p in sorted(pdir.rglob("*.yaml")):
             if "light" in p.parts:
+                continue
+            # Registry / index files (e.g. _router_index.yaml) are not
+            # protocols and intentionally lack id/steps.
+            if p.name.startswith("_"):
                 continue
             data = yaml.safe_load(p.read_text())
             assert "id" in data, f"{p} missing id"
             assert "steps" in data, f"{p} missing steps"
 
     def test_no_light_folder(self):
-        root = Path(__file__).resolve().parent.parent
+        root = Path(__file__).resolve().parent.parent.parent
         light = root / "src" / "research_os" / "protocols" / "light"
         assert not light.exists(), "light/ folder should not exist (merged into single source)"

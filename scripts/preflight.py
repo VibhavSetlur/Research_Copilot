@@ -95,25 +95,31 @@ def check_cli_entrypoint():
 
 
 def check_flat_namespace_is_minimal():
-    """Only protocol.py + __init__.py should live at tools/actions/."""
+    """Only protocol.py + router.py + __init__.py should live at tools/actions/.
+
+    Everything else MUST live in a category sub-package (state/, data/,
+    exec/, search/, research/, audit/, synthesis/, memory/). protocol.py
+    and router.py are first-class cross-cutting modules — both touch every
+    category, so keeping them flat avoids a circular sub-package."""
     actions_dir = REPO_ROOT / "src" / "research_os" / "tools" / "actions"
     flat = sorted(
         f.name for f in actions_dir.iterdir()
         if f.is_file() and f.suffix == ".py"
     )
-    expected = {"__init__.py", "protocol.py"}
+    expected = {"__init__.py", "protocol.py", "router.py"}
     return set(flat) == expected, f"{flat}"
 
 
 def check_every_protocol_loads():
-    import yaml
-
     from research_os.tools.actions.protocol import load_protocol
 
     bad: list[str] = []
     count = 0
     for f in sorted(PROTOCOLS_DIR.rglob("*.yaml")):
         if "light" in f.parts:
+            continue
+        # Files prefixed with `_` are registry / index files, not protocols.
+        if f.name.startswith("_"):
             continue
         rel = f.relative_to(PROTOCOLS_DIR).with_suffix("").as_posix()
         try:
@@ -139,6 +145,8 @@ def check_no_dot_tool_calls_in_protocols():
     offenders: list[str] = []
     for f in PROTOCOLS_DIR.rglob("*.yaml"):
         if "light" in f.parts:
+            continue
+        if f.name.startswith("_"):
             continue
         text = f.read_text()
         for pat in bad_patterns:
@@ -198,7 +206,6 @@ def check_protocols_referenced_tools_resolve():
 
     from research_os.server import _ALIASES, TOOL_DEFINITIONS, _resolve_tool_name
 
-    known = set(TOOL_DEFINITIONS) | set(_ALIASES)
     # Add known false positives that aren't tool calls
     false_positive_strings = {
         "tool_name",        # field inside tool_external_tool_instructions
@@ -212,6 +219,10 @@ def check_protocols_referenced_tools_resolve():
     pattern = re.compile(r"\b((?:sys|tool|mem)_[a-z_]+)\b(?!\*)")
     for f in PROTOCOLS_DIR.rglob("*.yaml"):
         if "light" in f.parts:
+            continue
+        if f.name.startswith("_"):
+            # Registry / index files; their tool refs are validated below
+            # via a dedicated router-index check.
             continue
         text = f.read_text()
         for m in pattern.finditer(text):
@@ -233,6 +244,67 @@ def check_protocols_referenced_tools_resolve():
         sample = ", ".join(f"{k} (in {','.join(v)})" for k, v in list(unresolved.items())[:5])
         return False, sample
     return True, f"{len(refs)} unique tool refs all resolve"
+
+
+def check_router_index_consistent():
+    """Every protocol in _router_index.yaml must exist; every tool ref must resolve."""
+    import yaml
+
+    from research_os.server import TOOL_DEFINITIONS, _resolve_tool_name
+
+    idx_path = PROTOCOLS_DIR / "_router_index.yaml"
+    if not idx_path.exists():
+        return False, "_router_index.yaml missing"
+    idx = yaml.safe_load(idx_path.read_text()) or {}
+
+    bad: list[str] = []
+
+    # Every protocol entry must point at a real protocol YAML.
+    for proto_name in (idx.get("protocols") or {}).keys():
+        path = PROTOCOLS_DIR / f"{proto_name}.yaml"
+        if not path.exists():
+            bad.append(f"protocol `{proto_name}` not on disk")
+
+    # Every protocol on disk must be in the index (or in an allow-list).
+    on_disk = set()
+    for f in PROTOCOLS_DIR.rglob("*.yaml"):
+        if "light" in f.parts or f.name.startswith("_"):
+            continue
+        rel = f.relative_to(PROTOCOLS_DIR).with_suffix("").as_posix()
+        on_disk.add(rel)
+    in_index = set((idx.get("protocols") or {}).keys())
+    missing_from_index = sorted(on_disk - in_index)
+    if missing_from_index:
+        bad.append(
+            f"{len(missing_from_index)} protocol(s) not in _router_index.yaml: "
+            f"{missing_from_index[:3]}..."
+        )
+
+    # Every tool ref (shortcut_tool, decomposition.tool, shortcut_intents.tool)
+    # must resolve to a real TOOL_DEFINITIONS entry.
+    def _check_tool(t: str, ctx: str) -> None:
+        if not t:
+            return
+        if _resolve_tool_name(t) not in TOOL_DEFINITIONS:
+            bad.append(f"unknown tool `{t}` in {ctx}")
+
+    for name, data in (idx.get("protocols") or {}).items():
+        if not isinstance(data, dict):
+            continue
+        _check_tool(data.get("shortcut_tool", ""), f"protocols/{name}")
+        for entry in data.get("decomposition", []) or []:
+            if isinstance(entry, dict):
+                _check_tool(entry.get("tool", ""), f"protocols/{name} decomposition")
+    for sid, data in (idx.get("shortcut_intents") or {}).items():
+        if not isinstance(data, dict):
+            continue
+        _check_tool(data.get("tool", ""), f"shortcut_intents/{sid}")
+
+    return not bad, (
+        f"{len(in_index)} protocols indexed, all tool refs resolve"
+        if not bad
+        else "; ".join(bad[:3])
+    )
 
 
 def check_scaffold_smoke():
@@ -294,6 +366,7 @@ def main() -> int:
     tally.check("All handlers are callable", check_handlers_callable)
     tally.check("Dispatcher aliases resolve", check_dispatcher_aliases)
     tally.check("Protocol tool refs all resolve", check_protocols_referenced_tools_resolve)
+    tally.check("Router index references resolve", check_router_index_consistent)
     tally.check("Workspace scaffold smoke", check_scaffold_smoke)
 
     print()

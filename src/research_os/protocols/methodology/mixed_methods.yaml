@@ -1,0 +1,92 @@
+id: mixed_methods
+name: Mixed Methods (Qual + Quant)
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  Concurrent or sequential integration of qualitative and quantitative
+  strands. Enforces an explicit integration plan — not just "we ran both
+  and stapled the results together".
+trigger: |
+  Researcher says "mixed methods", "qual + quant", "interviews to inform
+  the model", "survey + focus groups", or research_design indicates a
+  convergent / sequential / embedded mixed-methods design.
+
+steps:
+  - id: design_typology
+    name: Declare Mixed-Methods Design Type
+    description: |
+      Pick one and document in outputs/reports/mixed_design.md:
+        - Convergent parallel — qual + quant collected simultaneously,
+          merged at interpretation
+        - Sequential explanatory — quant first, qual to explain
+          unexpected results
+        - Sequential exploratory — qual first to develop measures/theory,
+          quant to test
+        - Embedded — one strand dominant, the other supplementary
+      Justify why this design fits the research question.
+
+  - id: parallel_steps
+    name: Run Qual + Quant in Their Own Steps
+    description: |
+      Create one numbered step per strand:
+        sys_path_create name="quant_<topic>"  → routes through
+                                                 methodology/* (the chosen
+                                                 quant method)
+        sys_path_create name="qual_<topic>"   → routes through
+                                                 methodology/qualitative_research
+      Each strand runs its own protocol independently — do not blur
+      methods (e.g. don't apply quant inference to coded themes, don't
+      apply thematic coding to model residuals).
+
+  - id: integration_plan
+    name: Integration Plan (BEFORE Looking at Both)
+    description: |
+      Write outputs/reports/integration_plan.md describing how the strands
+      will be brought together:
+        - Joint display: side-by-side table of qual themes ↔ quant findings
+        - Connecting: how qual findings will inform quant interpretation
+          (or vice versa)
+        - Triangulation: agreement | partial agreement | dissonance →
+          how each will be handled in writing
+      This plan locks in BEFORE either strand's results are read.
+
+  - id: joint_display
+    name: Build the Joint Display
+    description: |
+      sys_path_create name="mixed_integration". Build
+      outputs/reports/joint_display.md:
+        | Theme | Quant finding | Convergence | Interpretation |
+        |-------|---------------|-------------|----------------|
+      Each row is one theme × one quant finding. "Convergence" is one of:
+      converges | partial | diverges | independent.
+
+  - id: meta_interpretation
+    name: Meta-interpretation
+    description: |
+      conclusions.md synthesises across strands:
+        - Where qual deepens quant (e.g. "the 0.4 effect is driven by a
+          mechanism only visible in the interviews")
+        - Where they diverge (a finding worth its own paper)
+        - What neither strand could have found alone
+
+  - id: report
+    name: Per-step Conclusions
+    description: |
+      conclusions.md cross-links to the conclusions of each strand step.
+      The mixed step is the integrator, not a re-statement.
+
+expected_outputs:
+  - workspace/*/outputs/reports/mixed_design.md
+  - workspace/*/outputs/reports/integration_plan.md
+  - workspace/*/outputs/reports/joint_display.md
+
+quality_bar: |
+  - Integration plan is written BEFORE either strand's results are read.
+  - Joint display has BOTH agreement AND divergence rows; perfect
+    triangulation is suspicious.
+  - The qual strand follows COREQ / SRQR; the quant strand follows its
+    method's reporting standard. Mixed methods is not an excuse to lower
+    either bar.
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

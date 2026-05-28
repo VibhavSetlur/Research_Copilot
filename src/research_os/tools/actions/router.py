@@ -1,0 +1,935 @@
+"""Hyper-efficient routing — `sys_boot` + `tool_route`.
+
+Goal: keep token cost per turn flat as the protocol + tool surface grows.
+
+* ``sys_boot``  — one MCP call returns state + config + history tail + dep
+  inventory + recommended next protocol + pause classification. Replaces 4-5
+  separate calls per session boot.
+
+* ``tool_route`` — takes a raw user prompt + optional state hint and
+  returns a tight routing decision: ``primary_protocol``,
+  ``shortcut_tool``, ``decomposition`` (planned tool sequence persisted to
+  ``.os_state/active_plan.json``), ``alternatives``, ``why``. ~250 tokens
+  out instead of the ~2-5K an AI would burn loading + scoring protocols
+  itself.
+
+* The router index lives at ``protocols/_router_index.yaml`` — a single
+  source of truth for trigger phrases, decompositions, and intent classes.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+logger = logging.getLogger("research_os.tools.router")
+
+# router.py lives at src/research_os/tools/actions/router.py
+# protocols/ live at src/research_os/protocols/
+_INDEX_PATH = Path(__file__).parent.parent.parent / "protocols" / "_router_index.yaml"
+_ACTIVE_PLAN_FILE = "active_plan.json"
+
+
+# ---------------------------------------------------------------------------
+# Index loading (cached)
+# ---------------------------------------------------------------------------
+
+
+_INDEX_CACHE: dict | None = None
+
+
+def _load_index() -> dict:
+    global _INDEX_CACHE
+    if _INDEX_CACHE is None:
+        with open(_INDEX_PATH) as f:
+            _INDEX_CACHE = yaml.safe_load(f) or {}
+    return _INDEX_CACHE
+
+
+def reload_index() -> None:
+    """Force-reload the index (test hook)."""
+    global _INDEX_CACHE
+    _INDEX_CACHE = None
+
+
+# ---------------------------------------------------------------------------
+# sys_boot — one-call session bootstrap
+# ---------------------------------------------------------------------------
+
+
+def sys_boot(root: Path) -> dict[str, Any]:
+    """Return everything needed to start (or continue) a session in ONE call.
+
+    Bundles: project / pipeline state, researcher config (autonomy +
+    expertise + model_profile + runtime), recent protocol history, missing
+    optional deps, recommended next protocol, pause classification, and
+    any active plan from a previous turn. Cuts a typical session boot
+    from 4-5 MCP calls (~5K tokens) down to one (~800 tokens).
+    """
+    try:
+        from research_os.project_ops import load_state
+        from research_os.tools.actions.protocol import (
+            get_next_protocol,
+            get_protocol_history,
+        )
+        from research_os.tools.actions.state.config import get_config
+
+        # State (graceful when the workspace is partially scaffolded).
+        try:
+            state = load_state(root)
+        except Exception:
+            state = {}
+
+        # Config.
+        cfg_res = get_config(root)
+        cfg = cfg_res.get("config", {}) if cfg_res.get("status") == "success" else {}
+
+        # History.
+        history = get_protocol_history(root, limit=5)
+        entries = history.get("entries", []) or []
+        last_entry = entries[-1] if entries else None
+
+        # Pause classification (drives whether to call session_resume next).
+        pause = _classify_pause(entries, root)
+
+        # Next protocol (cheap predicate scan).
+        next_proto = get_next_protocol(root)
+
+        # Active plan from a prior turn (set by tool_route for complex prompts).
+        active_plan = _load_active_plan(root)
+
+        # Optional-dep inventory (imported lazily — server.py owns the list).
+        dep_inv = _dep_inventory()
+
+        return {
+            "status": "success",
+            "project_name": state.get("project_name")
+            or state.get("project", "(unnamed)"),
+            "pipeline_stage": state.get("pipeline_stage", state.get("phase", "init")),
+            "current_path": state.get("current_path", "main"),
+            "domain": cfg.get("domain", ""),
+            "research_question_set": bool(
+                cfg.get("research_question") and "(blank" not in str(cfg.get("research_question", ""))
+            ),
+            "autonomy": cfg.get("interaction", {}).get("autonomy_level", "supervised"),
+            "expertise": cfg.get("researcher", {}).get(
+                "expertise_level", "intermediate"
+            ),
+            "model_profile": cfg.get("model_profile", "medium"),
+            "shared_server": cfg.get("runtime", {}).get("shared_server", False),
+            "long_running_threshold": cfg.get("runtime", {}).get(
+                "long_running_threshold_seconds", 60
+            ),
+            "active_hypotheses": state.get("active_hypotheses", []),
+            "history_tail": entries[-3:],
+            "last_protocol_entry": last_entry,
+            "pause_classification": pause,
+            "next_protocol": next_proto,
+            "dep_inventory": dep_inv,
+            "active_plan": active_plan,
+            "advice": _boot_advice(pause, active_plan, state, cfg),
+        }
+    except Exception as e:
+        logger.exception("sys_boot failed")
+        return {"status": "error", "message": str(e)}
+
+
+def _classify_pause(entries: list[dict], root: Path) -> str:
+    """Pick one of: fresh_session | mid_step | completed_step | dead_end |
+    ctx_exhaustion | long_running_job | unknown."""
+    if not entries:
+        return "fresh_session"
+    last = entries[-1]
+    proto = (last.get("protocol") or last.get("protocol_name") or "").lower()
+    status = last.get("status", "")
+    # Recent handoff?
+    handoffs = root / ".os_state" / "handoffs"
+    if handoffs.exists():
+        try:
+            recent = sorted(
+                handoffs.glob("handoff_*.md"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if recent:
+                age = (
+                    datetime.now(tz=timezone.utc).timestamp()
+                    - recent[0].stat().st_mtime
+                )
+                if age < 7 * 24 * 3600:
+                    return "ctx_exhaustion"
+        except OSError:
+            pass
+    if status == "started":
+        return "mid_step"
+    if "dead_end" in proto:
+        return "dead_end"
+    if status == "completed":
+        return "completed_step"
+    return "unknown"
+
+
+def _boot_advice(pause: str, active_plan: dict | None, state: dict, cfg: dict) -> str:
+    """One-line guidance the AI should follow next."""
+    if active_plan and active_plan.get("status") == "in_progress":
+        cur = active_plan.get("current_step", 1)
+        total = len(active_plan.get("decomposition", []))
+        return (
+            f"Active plan from a previous turn exists "
+            f"(step {cur}/{total}). Continue it before accepting a new ask."
+        )
+    if pause == "ctx_exhaustion":
+        return "Recent handoff doc found — call tool_session_resume."
+    if pause in {"mid_step", "long_running_job"}:
+        return "Previous session left work in-flight — call tool_session_resume."
+    if state.get("pipeline_stage", "init") == "init":
+        return (
+            "Fresh project. After the researcher's first message, call "
+            "tool_route with their prompt to pick the right protocol."
+        )
+    return (
+        "Wait for researcher's message, then call tool_route(prompt) before "
+        "loading any protocol."
+    )
+
+
+def _dep_inventory() -> dict:
+    """Defer to server's missing-dep registry; degrade gracefully when isolated."""
+    try:
+        from research_os.server import _optional_dep_inventory  # type: ignore
+
+        return _optional_dep_inventory()
+    except Exception:
+        return {"missing_count": 0, "missing": [], "advice": "unknown"}
+
+
+# ---------------------------------------------------------------------------
+# tool_route — prompt → routing decision
+# ---------------------------------------------------------------------------
+
+_COMPLEXITY_TOKENS = (
+    " and then ",
+    " then ",
+    " also ",
+    " plus ",
+    " after that ",
+    " followed by ",
+    " and audit ",
+    " and write ",
+    " and run ",
+    " and check ",
+    " ; ",
+)
+
+
+def route_request(
+    prompt: str,
+    root: Path,
+    *,
+    state_hint: dict | None = None,
+    persist_plan: bool = True,
+) -> dict[str, Any]:
+    """Pick the right protocol via a HIERARCHICAL walk: L1 → L2 → L3.
+
+    The router resolves to the deepest unambiguous level:
+      * L1 ``intent_class`` (e.g. ``execute``, ``synthesize``)
+      * L2 ``sub_intent``   (e.g. ``execute/new_experiment``,
+                              ``synthesize/paper``)
+      * L3 specific protocol (e.g. ``guidance/analysis_plan``)
+
+    Resolution is greedy + ambiguity-aware. If the top L3 candidates are
+    too close, the router returns ``resolved_level=2`` plus an
+    ``ask_user`` line so the AI can disambiguate cheaply (a 1-sentence
+    follow-up) instead of guessing wrong and loading the wrong YAML.
+
+    Side effect (only when ``persist_plan=True`` AND complexity is high
+    AND resolution made it to L3): writes ``.os_state/active_plan.json``.
+    """
+    try:
+        if not prompt or not prompt.strip():
+            return {"status": "error", "message": "empty prompt"}
+
+        index = _load_index()
+        protocols = index.get("protocols", {}) or {}
+        shortcuts = index.get("shortcut_intents", {}) or {}
+        hierarchy = index.get("hierarchy", {}) or {}
+
+        prompt_norm = " " + prompt.lower().strip() + " "
+
+        # ── Step 0: cross-intent shortcut wins outright ───────────────
+        # E.g. "what's the progress" → tool_progress_digest, no protocol
+        # load needed regardless of class/sub-intent.
+        shortcut_hit = _match_shortcut(prompt_norm, shortcuts)
+
+        # ── Step 1: score every protocol; group by (class, sub_intent) ─
+        scored = _score_protocols(prompt_norm, protocols)
+        is_complex = _is_complex(prompt_norm)
+
+        # No matches at all and no shortcut.
+        if not scored and not shortcut_hit:
+            return _fallback_response(prompt_norm, hierarchy, is_complex)
+
+        # ── Step 2: pick L1 winner (sum of scores per intent_class) ──
+        # Threshold 1 at L1: multi-goal prompts often span classes, so
+        # "strictly greater" is enough. L2 + L3 use the stricter 2.
+        class_scores = _aggregate(scored, key="intent_class")
+        if not class_scores and shortcut_hit:
+            # Shortcut wins; package it as a degenerate L3 response.
+            return _shortcut_response(shortcut_hit, root, prompt, is_complex,
+                                       persist_plan)
+
+        l1_winner, l1_alternatives = _resolve_level(class_scores, gap_threshold=1)
+
+        # ── Step 3: pick L2 winner within the L1 class ────────────────
+        subintent_scores = _aggregate(
+            [s for s in scored if s["data"].get("intent_class") == l1_winner],
+            key="sub_intent",
+        )
+        l2_winner, l2_alternatives = _resolve_level(
+            subintent_scores, gap_threshold=2
+        )
+
+        # ── Step 4: pick L3 winner within (L1, L2) ────────────────────
+        candidates_l3 = [
+            s for s in scored
+            if s["data"].get("intent_class") == l1_winner
+            and s["data"].get("sub_intent") == l2_winner
+        ]
+        l3_winner = candidates_l3[0] if candidates_l3 else None
+        l3_alternatives = candidates_l3[1:4]
+
+        # Ambiguity check at L3: if the second candidate is within 2 of
+        # the first, ask the user to disambiguate instead of guessing.
+        l3_ambiguous = (
+            len(candidates_l3) >= 2
+            and (candidates_l3[0]["score"] - candidates_l3[1]["score"]) < 2
+        )
+
+        # Final resolved level.
+        if not l1_winner:
+            resolved_level = 0
+        elif not l2_winner:
+            resolved_level = 1
+        elif not l3_winner or l3_ambiguous:
+            resolved_level = 2
+        else:
+            resolved_level = 3
+
+        # ── Build the response ────────────────────────────────────────
+        primary_name = l3_winner["name"] if l3_winner and not l3_ambiguous else None
+        primary_data = l3_winner["data"] if l3_winner else {}
+        decomposition = primary_data.get("decomposition", []) or []
+
+        # Prefer the cross-intent shortcut tool if one matched AND it's
+        # consistent with the L1 winner (or stronger than the L3 match).
+        shortcut_tool = None
+        if shortcut_hit:
+            shortcut_tool = shortcut_hit["tool"]
+        elif primary_data:
+            shortcut_tool = primary_data.get("shortcut_tool")
+
+        # Ambiguity prompt for the AI to surface to the researcher.
+        ask_user = _ask_user_for_level(
+            resolved_level,
+            hierarchy,
+            l1_winner,
+            l1_alternatives,
+            l2_winner,
+            l2_alternatives,
+            candidates_l3 if l3_ambiguous else [],
+        )
+
+        response: dict[str, Any] = {
+            "status": "success",
+            "resolved_level": resolved_level,
+            "intent_class": l1_winner,
+            "sub_intent": l2_winner if resolved_level >= 2 else None,
+            "primary_protocol": primary_name,
+            "shortcut_tool": shortcut_tool,
+            "decomposition": decomposition if resolved_level == 3 else [],
+            "alternatives": [c["name"] for c in l3_alternatives],
+            "ambiguous_alternatives": (
+                [c["name"] for c in candidates_l3[:3]] if l3_ambiguous else []
+            ),
+            "matched_triggers": (
+                shortcut_hit["matched"] if shortcut_hit
+                else (l3_winner["matched"] if l3_winner else [])
+            ),
+            "complexity": "high" if is_complex else "low",
+            "ask_user": ask_user,
+            "why": _why_hier(l1_winner, l2_winner, l3_winner, shortcut_hit),
+            "advice": _route_advice_hier(
+                resolved_level, is_complex, primary_name, shortcut_tool,
+                bool(ask_user),
+            ),
+            "token_estimate": primary_data.get("token_estimate"),
+        }
+
+        # Persist plan ONLY when we resolved to L3 AND the prompt is
+        # complex AND a decomposition exists. Ambiguous prompts never
+        # persist a plan — the AI must disambiguate first.
+        if (
+            persist_plan
+            and resolved_level == 3
+            and is_complex
+            and decomposition
+        ):
+            plan_path = _persist_active_plan(
+                root, prompt, primary_name, decomposition, shortcut_tool,
+            )
+            response["active_plan_path"] = plan_path
+
+        return response
+    except Exception as e:
+        logger.exception("route_request failed")
+        return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Hierarchy helpers
+# ---------------------------------------------------------------------------
+
+
+def _aggregate(scored: list[dict], *, key: str) -> list[tuple[str, int]]:
+    """Aggregate protocol scores by ``key`` (intent_class | sub_intent).
+
+    Returns a list of (key_value, summed_score), sorted desc.
+    """
+    bag: dict[str, int] = {}
+    for s in scored:
+        v = s["data"].get(key)
+        if not v:
+            continue
+        bag[v] = bag.get(v, 0) + s["score"]
+    return sorted(bag.items(), key=lambda kv: kv[1], reverse=True)
+
+
+def _resolve_level(
+    aggregated: list[tuple[str, int]], *, gap_threshold: int = 2
+) -> tuple[str | None, list[str]]:
+    """Pick the winning value at a level, or report ambiguity.
+
+    Returns (winner_or_none, top_alternatives). Winner is None when no
+    entries are scored OR when the top two are within ``gap_threshold``.
+    """
+    if not aggregated:
+        return None, []
+    top, top_score = aggregated[0]
+    alternatives = [k for k, _ in aggregated[1:4]]
+    if len(aggregated) >= 2 and (top_score - aggregated[1][1]) < gap_threshold:
+        return None, [top] + alternatives  # ambiguous — surface top + alts
+    return top, alternatives
+
+
+def _ask_user_for_level(
+    resolved_level: int,
+    hierarchy: dict,
+    l1: str | None,
+    l1_alts: list[str],
+    l2: str | None,
+    l2_alts: list[str],
+    l3_candidates: list[dict],
+) -> str | None:
+    """When ambiguous, return a 1-sentence disambiguation prompt."""
+    if resolved_level == 3:
+        return None
+    if resolved_level <= 1:
+        # Ambiguous at intent_class.
+        labels = [
+            hierarchy.get(c, {}).get("label", c)
+            for c in ([l1] if l1 else []) + l1_alts
+            if c
+        ]
+        if not labels:
+            return None
+        return (
+            "Your prompt could fit several work types: "
+            f"{', '.join(labels[:3])}. Which one — pick the closest."
+        )
+    if resolved_level == 2:
+        # L1 chosen; L2 ambiguous.
+        if l3_candidates:
+            opts = [c["data"].get("summary", c["name"]) for c in l3_candidates[:3]]
+            return (
+                f"Within `{l1}`, several protocols match: "
+                + "; ".join(f"({i+1}) {o}" for i, o in enumerate(opts))
+                + ". Which one?"
+            )
+        sub_labels = []
+        if l1 and l1 in hierarchy:
+            sub_map = hierarchy[l1].get("sub_intents", {}) or {}
+            sub_labels = [
+                f"{k} — {sub_map.get(k, '')}"
+                for k in ([l2] if l2 else []) + l2_alts
+                if k
+            ]
+        if not sub_labels:
+            return None
+        return (
+            f"Within `{l1}`, possible sub-intents: "
+            + "; ".join(sub_labels[:3])
+            + ". Which one?"
+        )
+    return None
+
+
+def _why_hier(
+    l1: str | None,
+    l2: str | None,
+    l3: dict | None,
+    shortcut: dict | None,
+) -> str:
+    parts: list[str] = []
+    if shortcut and shortcut.get("matched"):
+        parts.append(
+            f"Shortcut tool `{shortcut['tool']}` matched on "
+            f"{', '.join(shortcut['matched'][:2])}"
+        )
+    if l1:
+        parts.append(f"L1 intent_class=`{l1}`")
+    if l2:
+        parts.append(f"L2 sub_intent=`{l2}`")
+    if l3:
+        parts.append(
+            f"L3 protocol=`{l3['name']}` (triggers: "
+            f"{', '.join(l3['matched'][:2])})"
+        )
+    return " · ".join(parts) or "Best-effort match."
+
+
+def _route_advice_hier(
+    resolved_level: int,
+    is_complex: bool,
+    primary: str | None,
+    shortcut_tool: str | None,
+    has_ask_user: bool,
+) -> str:
+    if has_ask_user:
+        return (
+            "Ambiguous match — ask the researcher the `ask_user` "
+            "question, then re-call tool_route with their answer."
+        )
+    if is_complex and resolved_level == 3:
+        return (
+            "Prompt is complex — decomposition persisted to "
+            ".os_state/active_plan.json. Walk it with tool_plan_advance "
+            "after each step; never one-shot."
+        )
+    if shortcut_tool and not primary:
+        return (
+            f"Single shortcut tool: `{shortcut_tool}`. Call it directly — "
+            "no protocol load needed."
+        )
+    if primary:
+        return (
+            f"Load `{primary}` with sys_protocol_get format='summary' "
+            "first (~300 tokens). Drill into a step with format='step' + "
+            "step_id='<id>' when ready to execute."
+        )
+    return "No clear match — call sys_protocol_next or sys_protocol_list."
+
+
+def _fallback_response(
+    prompt_norm: str, hierarchy: dict, is_complex: bool
+) -> dict:
+    """When NOTHING matched, suggest the L1 classes as a menu."""
+    menu = [
+        f"{cls} — {data.get('label', cls)}"
+        for cls, data in hierarchy.items()
+    ]
+    return {
+        "status": "success",
+        "resolved_level": 0,
+        "intent_class": None,
+        "sub_intent": None,
+        "primary_protocol": None,
+        "shortcut_tool": None,
+        "decomposition": [],
+        "alternatives": [],
+        "ambiguous_alternatives": [],
+        "matched_triggers": [],
+        "complexity": "high" if is_complex else "low",
+        "ask_user": (
+            "I couldn't match your prompt to a protocol. Are you trying to "
+            "start a session, intake new data, plan, execute an experiment, "
+            "review someone else's paper, write a synthesis output, or "
+            "audit / wrap up?"
+        ),
+        "why": "No trigger matched any protocol or shortcut.",
+        "advice": (
+            "Ask the researcher the `ask_user` question, then re-call "
+            "tool_route with their answer. Available L1 classes: "
+            + "; ".join(menu)
+        ),
+        "token_estimate": None,
+    }
+
+
+def _shortcut_response(
+    shortcut_hit: dict,
+    root: Path,
+    prompt: str,
+    is_complex: bool,
+    persist_plan: bool,
+) -> dict:
+    """Wrap a clear shortcut-tool win as a degenerate L3 response."""
+    decomposition = [
+        {
+            "tool": shortcut_hit["tool"],
+            "purpose": "Shortcut intent match — no protocol load needed.",
+        }
+    ]
+    response = {
+        "status": "success",
+        "resolved_level": 3,
+        "intent_class": None,
+        "sub_intent": None,
+        "primary_protocol": None,
+        "shortcut_tool": shortcut_hit["tool"],
+        "decomposition": decomposition,
+        "alternatives": [],
+        "ambiguous_alternatives": [],
+        "matched_triggers": shortcut_hit["matched"],
+        "complexity": "high" if is_complex else "low",
+        "ask_user": None,
+        "why": (
+            f"Cross-intent shortcut `{shortcut_hit['tool']}` matched on "
+            f"{', '.join(shortcut_hit['matched'][:2])}"
+        ),
+        "advice": (
+            f"Call `{shortcut_hit['tool']}` directly. No protocol load "
+            "needed."
+        ),
+        "token_estimate": None,
+    }
+    if persist_plan and is_complex:
+        plan_path = _persist_active_plan(
+            root, prompt, None, decomposition, shortcut_hit["tool"]
+        )
+        response["active_plan_path"] = plan_path
+    return response
+
+
+def _score_protocols(prompt_norm: str, protocols: dict) -> list[dict]:
+    scored: list[dict] = []
+    for name, data in protocols.items():
+        if not isinstance(data, dict):
+            continue
+        score = 0
+        matched: list[str] = []
+        for trig in data.get("triggers", []) or []:
+            t = " " + str(trig).lower().strip() + " "
+            if t in prompt_norm:
+                # Multi-word triggers outrank single-word ones.
+                weight = max(1, len(str(trig).split()))
+                score += weight * 2
+                matched.append(str(trig))
+            elif str(trig).lower() in prompt_norm:
+                # partial match still counts (substring inside a longer word)
+                score += 1
+                matched.append(str(trig))
+        if score > 0:
+            scored.append({"name": name, "data": data, "score": score, "matched": matched})
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored
+
+
+def _match_shortcut(prompt_norm: str, shortcuts: dict) -> dict | None:
+    """Match cross-intent shortcuts that don't need a protocol load."""
+    best = None
+    best_score = 0
+    for intent_id, data in shortcuts.items():
+        if not isinstance(data, dict):
+            continue
+        matched: list[str] = []
+        score = 0
+        for trig in data.get("triggers", []) or []:
+            t = " " + str(trig).lower().strip() + " "
+            if t in prompt_norm:
+                score += max(1, len(str(trig).split())) * 2
+                matched.append(str(trig))
+        if score > best_score:
+            best_score = score
+            best = {
+                "intent_id": intent_id,
+                "tool": data.get("tool"),
+                "matched": matched,
+                "score": score,
+            }
+    return best
+
+
+def _is_complex(prompt_norm: str) -> bool:
+    word_count = len(prompt_norm.split())
+    if word_count > 25:
+        return True
+    if any(tok in prompt_norm for tok in _COMPLEXITY_TOKENS):
+        return True
+    # multiple verb-style asks
+    verbs = re.findall(
+        r"\b(run|write|fit|audit|check|build|draft|make|render|"
+        r"compile|verify|publish|generate|train|analyse|analyze)\b",
+        prompt_norm,
+    )
+    return len(verbs) >= 3
+
+
+# ---------------------------------------------------------------------------
+# Active plan persistence — anti one-shot
+# ---------------------------------------------------------------------------
+
+
+def _active_plan_path(root: Path) -> Path:
+    return root / ".os_state" / _ACTIVE_PLAN_FILE
+
+
+def _persist_active_plan(
+    root: Path,
+    prompt: str,
+    primary_protocol: str | None,
+    decomposition: list,
+    shortcut_tool: str | None,
+) -> str:
+    plan = {
+        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "user_prompt": prompt,
+        "primary_protocol": primary_protocol,
+        "shortcut_tool": shortcut_tool,
+        "decomposition": list(decomposition),
+        "current_step": 1,
+        "status": "in_progress",
+    }
+    p = _active_plan_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(plan, indent=2, default=str))
+    try:
+        return str(p.relative_to(root))
+    except ValueError:
+        return str(p)
+
+
+def _load_active_plan(root: Path) -> dict | None:
+    p = _active_plan_path(root)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+def advance_plan(root: Path) -> dict[str, Any]:
+    """Mark the current step of the active plan complete + move to next.
+
+    The AI calls this after finishing each decomposed step. When the plan
+    runs out of steps the file is moved to ``.os_state/handoffs/`` so it's
+    retrievable but stops blocking future routes.
+    """
+    plan = _load_active_plan(root)
+    if not plan:
+        return {"status": "success", "message": "No active plan."}
+    plan["current_step"] = int(plan.get("current_step", 1)) + 1
+    decomposition = plan.get("decomposition", []) or []
+    if plan["current_step"] > len(decomposition):
+        plan["status"] = "completed"
+        # Archive
+        path = _active_plan_path(root)
+        archive_dir = root / ".os_state" / "handoffs"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
+        try:
+            path.rename(archive_dir / f"plan_{ts}.json")
+        except OSError:
+            path.write_text(json.dumps(plan, indent=2, default=str))
+        return {"status": "success", "message": "Plan completed and archived."}
+    _active_plan_path(root).write_text(json.dumps(plan, indent=2, default=str))
+    next_step = decomposition[plan["current_step"] - 1]
+    return {
+        "status": "success",
+        "current_step": plan["current_step"],
+        "next_step": next_step,
+        "remaining": len(decomposition) - plan["current_step"] + 1,
+    }
+
+
+def clear_active_plan(root: Path) -> dict[str, Any]:
+    """Discard the active plan (researcher pivoted; old plan no longer applies)."""
+    p = _active_plan_path(root)
+    if not p.exists():
+        return {"status": "success", "message": "No active plan to clear."}
+    try:
+        p.unlink()
+    except OSError as e:
+        return {"status": "error", "message": str(e)}
+    return {"status": "success", "message": "Active plan cleared."}
+
+
+# ---------------------------------------------------------------------------
+# Per-turn batching — split a plan into bite-size chunks per AI turn
+# ---------------------------------------------------------------------------
+
+# How many decomposition steps a model can comfortably batch in one turn.
+# Tuned to keep each turn under ~3-5K tokens of tool I/O.
+_TURN_BUDGET = {
+    "small":  1,   # one tool call per turn; confirm in between
+    "medium": 3,   # standard
+    "large":  6,   # can plan multi-step batches
+}
+
+# If a planned tool is known to be heavyweight, count it as more than 1
+# step against the per-turn budget.
+_HEAVY_TOOLS = {
+    "tool_synthesize": 3,
+    "tool_audit_reproducibility": 3,
+    "tool_audit_synthesis": 2,
+    "tool_literature_search_and_save": 2,
+    "tool_research_method": 2,
+    "tool_dashboard_create": 2,
+    "tool_poster_create": 2,
+}
+
+
+def plan_turn(root: Path) -> dict[str, Any]:
+    """Slice the active plan into a ``this_turn`` batch + ``next_turn`` queue.
+
+    Reads:
+      * ``.os_state/active_plan.json`` (set by tool_route)
+      * researcher_config: ``model_profile`` (small | medium | large) and
+        ``runtime.shared_server``.
+
+    Returns:
+      * ``this_turn``: list of decomposition entries to execute now
+      * ``next_turn``: list of decomposition entries queued for later
+      * ``chat_split_recommended``: True when batch size is small AND
+        many turns remain — the AI should suggest the researcher start
+        a fresh chat after writing a handoff.
+      * ``model_profile``: which profile drove the budget
+      * ``turn_budget``: budget used (steps per turn after weighting)
+
+    When there is no active plan, returns ``status="success"`` with
+    ``message="No active plan."`` (not an error — it just means the AI
+    is free to act without a batched plan).
+    """
+    try:
+        plan = _load_active_plan(root)
+        if not plan:
+            return {
+                "status": "success",
+                "message": "No active plan. tool_route a complex prompt to create one.",
+                "this_turn": [],
+                "next_turn": [],
+            }
+
+        decomposition = plan.get("decomposition", []) or []
+        current = int(plan.get("current_step", 1))
+        remaining = decomposition[current - 1:]
+        if not remaining:
+            return {
+                "status": "success",
+                "message": "Active plan exhausted — call tool_plan_advance to archive.",
+                "this_turn": [],
+                "next_turn": [],
+            }
+
+        # Resolve model profile from config (fallback medium).
+        model_profile = _read_model_profile(root)
+        budget = _TURN_BUDGET.get(model_profile, _TURN_BUDGET["medium"])
+
+        # Greedy fill of this_turn until weighted budget is exhausted.
+        this_turn: list[dict] = []
+        used = 0
+        idx = 0
+        for entry in remaining:
+            tool_name = (
+                entry.get("tool") if isinstance(entry, dict) else None
+            ) or ""
+            weight = _HEAVY_TOOLS.get(tool_name, 1)
+            if this_turn and (used + weight) > budget:
+                break
+            this_turn.append(entry)
+            used += weight
+            idx += 1
+
+        next_turn = remaining[idx:]
+
+        # Chat-split recommendation: heuristic
+        # - small model with > 6 remaining steps → recommend
+        # - any model with > 12 remaining steps → recommend
+        # - any model with a heavyweight pending (synthesis / repro) AND
+        #   ≥ 4 more steps after it → recommend
+        chat_split = False
+        chat_split_reason = ""
+        if len(next_turn) > 6 and model_profile == "small":
+            chat_split = True
+            chat_split_reason = (
+                "Small model with many planned steps remaining. Suggest "
+                "a fresh chat after this batch to keep responses crisp."
+            )
+        elif len(next_turn) > 12:
+            chat_split = True
+            chat_split_reason = (
+                f"{len(next_turn)} steps still queued after this batch. "
+                "Suggest a fresh chat with a handoff doc to reset context."
+            )
+        else:
+            # Heavy pending tool deep in the queue?
+            for i, entry in enumerate(next_turn):
+                tool_name = (
+                    entry.get("tool") if isinstance(entry, dict) else None
+                ) or ""
+                if (
+                    tool_name in _HEAVY_TOOLS
+                    and _HEAVY_TOOLS[tool_name] >= 3
+                    and len(next_turn) - i >= 4
+                ):
+                    chat_split = True
+                    chat_split_reason = (
+                        f"`{tool_name}` is heavyweight and there are still "
+                        f"{len(next_turn) - i - 1} steps after it. Consider "
+                        "a fresh chat once that step finishes."
+                    )
+                    break
+
+        return {
+            "status": "success",
+            "this_turn": this_turn,
+            "next_turn": next_turn,
+            "model_profile": model_profile,
+            "turn_budget": budget,
+            "weighted_used": used,
+            "remaining_after_this_turn": len(next_turn),
+            "chat_split_recommended": chat_split,
+            "chat_split_reason": chat_split_reason or None,
+            "advice": (
+                "Execute every entry in `this_turn` IN ORDER. After each "
+                "one call tool_plan_advance. Once `this_turn` is done, "
+                "either continue with tool_plan_turn (next batch) OR — "
+                "if chat_split_recommended is true — call "
+                "sys_session_handoff and tell the researcher to open a "
+                "fresh chat with 'pick up where we left off'."
+            ),
+        }
+    except Exception as e:
+        logger.exception("plan_turn failed")
+        return {"status": "error", "message": str(e)}
+
+
+def _read_model_profile(root: Path) -> str:
+    """Read researcher_config.model_profile; default medium on any failure."""
+    try:
+        from research_os.tools.actions.state.config import get_config
+
+        cfg_res = get_config(root)
+        if cfg_res.get("status") != "success":
+            return "medium"
+        cfg = cfg_res.get("config", {}) or {}
+        profile = cfg.get("model_profile") or "medium"
+        return profile if profile in _TURN_BUDGET else "medium"
+    except Exception:
+        return "medium"

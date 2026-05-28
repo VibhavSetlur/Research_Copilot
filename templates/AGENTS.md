@@ -21,34 +21,57 @@ in the project loads.
 
 ---
 
-## Every session — boot in ONE turn
+## Every session — boot in TWO MCP calls (~1K tokens, not ~5K)
 
 ```
-1. sys_config_get        (in parallel)
-2. sys_state_get         (in parallel)
-3. sys_protocol_next  →  load that protocol with sys_protocol_get
+1. sys_boot                            (state + config + history + dep
+                                        inventory + next protocol +
+                                        pause classification + active plan)
+2. (await researcher's message)
+3. tool_route(prompt=<their message>)  (HIERARCHICAL pick — L1 → L2 → L3 —
+                                        without loading every YAML)
+4. If tool_route.ask_user is non-null → ASK the researcher that one
+   sentence, then re-route. Do not guess.
+5. If complexity="high":
+     a. tool_plan_turn                 (batch the plan for this turn,
+                                        respecting model_profile)
+     b. Execute every entry in this_turn IN ORDER.
+     c. After each entry, tool_plan_advance.
+     d. If tool_plan_turn returned chat_split_recommended=true → run
+        sys_session_handoff and tell the researcher to open a fresh chat
+        with "pick up where we left off".
+6. If complexity="low": call the shortcut_tool or load the primary
+   protocol with sys_protocol_get format='summary' (≈300 tokens) then
+   format='step' + step_id when ready to execute one step.
 ```
 
-Reply with one short summary, then run the protocol's first step.
+**Never** call `sys_state_get` + `sys_config_get` + `sys_protocol_history`
++ `sys_protocol_next` + `sys_dep_inventory` separately — `sys_boot`
+returns the union in one shot. **Never** load a protocol at `format='full'`
+just to learn what steps exist — `format='summary'` is what you want.
 
-If the researcher's message contains a specific ask ("write the methods
-section", "make a dashboard"), load THAT protocol instead and tell them
-you're skipping the default.
+**Never one-shot complex prompts.** The router persists an `active_plan`
+for high-complexity asks; walk it with `tool_plan_turn` + `tool_plan_advance`.
+A small-model session executes 1 step/turn; medium 3; large 6. The router
+decides for you — just respect it.
 
 ---
 
 ## How to operate, in one paragraph
 
-Protocols are the source of truth for "what to do". Always
-`sys_protocol_get` the relevant one and follow its numbered steps. Tool
-names use underscores; dot notation and legacy names auto-rewrite.
-`researcher_config.yaml` controls autonomy / model_profile / runtime —
-respect them. When uncertain about a method or library, search literature
-FIRST (`tool_research_method`, `tool_research_tool`). Log every
-meaningful decision (`mem_decision_log`), method (`mem_methods_append`),
-and hypothesis update (`mem_hypothesis_update`). Append-only files
-(`methods.md`, `analysis.md`, `citations.md`) are never edited directly
-— always via `mem_*`.
+Protocols are the source of truth for "what to do". Pick which one with
+`tool_route`, load it lean with `sys_protocol_get format='summary'`,
+drill into a single step with `format='step'` + `step_id=<id>` when
+ready to execute. Tool names use underscores; dot notation and legacy
+names auto-rewrite. `researcher_config.yaml` controls autonomy /
+model_profile / runtime — respect them. When uncertain about a method
+or library, search literature FIRST (`tool_research_method`,
+`tool_research_tool`). Log every meaningful decision
+(`mem_decision_log`), method (`mem_methods_append`), and hypothesis
+update (`mem_hypothesis_update`). Append-only files (`methods.md`,
+`analysis.md`, `citations.md`) are never edited directly — always via
+`mem_*`. Need a tool you don't recognise? `sys_tool_describe(name)`
+returns the full description without re-listing every tool.
 
 ---
 

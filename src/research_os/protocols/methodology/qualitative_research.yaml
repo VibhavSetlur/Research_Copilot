@@ -1,0 +1,102 @@
+id: qualitative_research
+name: Qualitative Research (COREQ / SRQR)
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  Interview / focus-group / ethnographic studies with thematic, framework,
+  grounded theory, or content analysis. Enforces COREQ (interviews/focus
+  groups) and SRQR (general qualitative) reporting expectations.
+trigger: |
+  Domain or research_design indicates qualitative methods. Researcher says
+  "interviews", "thematic analysis", "coding", "grounded theory",
+  "phenomenology", "ethnography", or drops transcripts (.txt / .docx / .rtf)
+  into inputs/raw_data/.
+
+steps:
+  - id: create_step
+    name: Create Qualitative Step
+    description: |
+      sys_path_create name="qual_<topic>" hypothesis="(qualitative — themes
+      emerge from data)"
+
+  - id: design_protocol
+    name: Document the Interview / Observation Protocol
+    description: |
+      Write outputs/reports/interview_protocol.md covering:
+        - Population + sampling strategy (purposive | snowball | theoretical)
+        - Sample-size justification (data saturation target or fixed N)
+        - Setting (in-person | video | phone | field)
+        - Interviewer role + reflexivity statement
+        - Topic guide (semi-structured questions; ≥ 5, ≤ 25)
+        - Recording + transcription approach
+        - Member-checking plan, if any
+      Cite the COREQ or SRQR item that each section addresses.
+
+  - id: ingest_transcripts
+    name: Ingest Transcripts to Step
+    description: |
+      For each transcript in inputs/raw_data/, copy (symlink, do not move)
+      into workspace/<step>/data/input/. If transcripts are .docx, also save
+      a .md copy via sys_file_write so coding can be text-aware.
+
+  - id: coding_pass_1
+    name: Open Coding — First Pass
+    description: |
+      Use scripts/qual_code_v1.py (or .R) to produce outputs/reports/
+      open_codes.md with: code label, definition, source quote (with
+      transcript + line ref). Aim for 30-100 codes; don't pre-cluster.
+      Custom or assisted (LLM-aided) coding is allowed — mem_methods_append
+      MUST document which.
+
+  - id: coding_pass_2
+    name: Axial / Focused Coding
+    description: |
+      Cluster open codes into 5-20 categories. Document the codebook in
+      outputs/reports/codebook.md with: code, definition, inclusion criteria,
+      exclusion criteria, exemplar quote.
+
+  - id: theme_synthesis
+    name: Theme Synthesis
+    description: |
+      Distil 3-7 themes. Each theme gets a section in
+      outputs/reports/themes.md:
+        - Theme name (verb-phrase or descriptive)
+        - One-sentence essence
+        - Constituent codes
+        - 2-4 illustrative quotes (with transcript IDs)
+        - Negative / disconfirming case, if any
+
+  - id: trustworthiness
+    name: Trustworthiness / Quality Strategy
+    description: |
+      In outputs/reports/trustworthiness.md, document at minimum:
+        - Credibility: triangulation, member checks
+        - Transferability: thick description of context
+        - Dependability: audit trail (this protocol IS the audit trail)
+        - Confirmability: reflexivity statement, second-coder reliability
+          (κ or %-agreement) if claimed
+        - Saturation evidence (if claimed)
+
+  - id: report
+    name: Per-step Conclusions
+    description: |
+      conclusions.md captures: 3-7 themes, their relationships (consider a
+      thematic map figure), implications for the research question, what
+      surprised you, and where the analysis was thin.
+
+expected_outputs:
+  - workspace/*/outputs/reports/interview_protocol.md
+  - workspace/*/outputs/reports/codebook.md
+  - workspace/*/outputs/reports/themes.md
+  - workspace/*/outputs/reports/trustworthiness.md
+
+quality_bar: |
+  - Every theme is supported by ≥ 2 quotes from ≥ 2 distinct participants.
+  - At least one negative / disconfirming case is reported (or its absence
+    is justified).
+  - The codebook is reproducible: a second coder could apply it to a held-out
+    transcript.
+  - Reflexivity is explicit, not implied.
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

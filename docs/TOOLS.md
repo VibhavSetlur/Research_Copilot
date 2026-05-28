@@ -1,11 +1,26 @@
 # Tool Catalog
 
-~75 MCP tools under three namespaces. Names use underscores; dot notation
-(`sys.state.get`) and legacy names (`sys_guidance_get`) auto-rewrite.
+**94 MCP tools** across three namespaces. Names use underscores; dot
+notation (`sys.state.get`) and legacy names (`sys_guidance_get`) auto-rewrite.
 
 For most users this is a quick lookup. For *when* to use a tool, see
-[PROTOCOLS.md](PROTOCOLS.md) — protocols string tools together to do real
-work.
+[PROTOCOLS.md](PROTOCOLS.md) — protocols string tools together to do
+real work. For *which* protocol to load, the AI calls `tool_route` and
+the router picks one for you.
+
+---
+
+## Routing layer — call these FIRST every session
+
+| Tool | Purpose |
+|---|---|
+| `sys_boot` | **One call** returns state + config + history + dep inventory + recommended next protocol + pause classification + any active plan. Replaces 4-5 separate calls per session boot. |
+| `tool_route` | Hierarchical L1 → L2 → L3 picker. Takes the researcher's raw prompt, returns `primary_protocol`, `shortcut_tool`, `decomposition`, `complexity`, `ask_user`. ~250 tokens out. |
+| `tool_plan_turn` | Slices the active plan into a `this_turn` batch + `next_turn` queue sized to the researcher's `model_profile`. Returns `chat_split_recommended` when the plan won't fit in one chat. |
+| `tool_plan_advance` | Mark current step done; get next step. Called after every executed step. |
+| `tool_plan_clear` | Discard the active plan (researcher pivoted away). |
+| `sys_tool_describe` | Return the full description for one tool (cheaper than re-listing every tool). |
+| `sys_dep_inventory` | Report which optional dependencies failed to import this session. |
 
 ---
 
@@ -13,30 +28,51 @@ work.
 
 | Tool | Purpose |
 |---|---|
-| `sys_protocol_get` | Load a protocol YAML by name. |
+| `sys_boot` | (Listed above — call first.) |
+| `sys_tool_describe` | (Listed above — full description on demand.) |
+| `sys_dep_inventory` | (Listed above — missing-extras report.) |
+| `sys_protocol_get` | Load a protocol YAML. Supports `format='summary'` (~300 tokens), `format='step' step_id='<id>'`, or `format='full'`. |
 | `sys_protocol_list` | List every protocol + one-line summary. |
 | `sys_protocol_next` | Recommend the next protocol from state + on-disk artifacts. |
 | `sys_protocol_validate` | Check whether a protocol's expected_outputs exist. |
 | `sys_protocol_log` | Record a protocol execution (started / completed / failed / skipped). |
 | `sys_protocol_history` | Show recent execution log entries. |
-| `sys_state_get` | Full / minimal / markdown state snapshot. |
+| `sys_state_get` | Full / minimal / markdown state snapshot. (Prefer `sys_boot` at session start.) |
 | `sys_workspace_scaffold` | Re-create the directory tree. |
 | `sys_workspace_tree` | Structured workspace listing. |
-| `sys_file_read/_write/_list/_delete/_validate_md` | File I/O (writes to inputs/raw_data + inputs/literature blocked). |
+| `sys_file_read` / `_write` / `_list` / `_delete` / `_validate_md` | File I/O. Writes to `inputs/raw_data` + `inputs/literature` blocked. |
 | `sys_path_create` | Create the next numbered experiment folder. |
 | `sys_path_abandon` | Mark a path as `__DEAD_END` (preserved, never deleted). |
 | `sys_path_list` | List numbered experiment paths + status. |
-| `sys_checkpoint_create/_rollback/_list` | Hardlinked workspace snapshots. |
-| `sys_config_get/_set/_validate` | researcher_config.yaml. |
+| `sys_checkpoint_create` / `_rollback` / `_list` | Workspace snapshots. |
+| `sys_config_get` / `_set` / `_validate` | researcher_config.yaml. (Prefer `sys_boot` at session start.) |
 | `sys_notify` | Append to workspace/logs/notifications.log. |
-| `sys_session_handoff` | Generate a markdown summary + resume prompt. |
-| `sys_env_snapshot/_docker_generate` | Capture + containerise the environment. |
+| `sys_session_handoff` | Generate a structured handoff doc + a fresh checkpoint. |
+| `sys_env_snapshot` / `_docker_generate` | Capture + containerise the environment. |
 
 ---
 
 ## `tool_*` — search, exec, audit, synthesis, research, intake, scratch, tasks, repair
 
-### Search
+### Routing + planning
+
+| Tool | Purpose |
+|---|---|
+| `tool_route` | Hierarchical L1→L2→L3 protocol picker. |
+| `tool_plan_turn` | Per-turn batching sized to model_profile. |
+| `tool_plan_advance` | Walk the active plan. |
+| `tool_plan_clear` | Discard the active plan. |
+
+### Session continuity
+
+| Tool | Purpose |
+|---|---|
+| `tool_session_resume` | Reconstruct intent + status from logs after any pause / handoff / new chat. |
+| `tool_progress_digest` | One-page summary of experiments / hypotheses / outputs / citations. |
+| `tool_dead_end_lessons` | Pull reusable lessons from every `__DEAD_END` folder. |
+| `tool_quick_review` | Stage a critical-appraisal skeleton for someone else's paper. |
+
+### Search + literature
 
 | Tool | Purpose |
 |---|---|
@@ -46,164 +82,134 @@ work.
 | `tool_search_arxiv` | arXiv (no key needed). |
 | `tool_search_web` | Firecrawl → SerpAPI fallback. |
 | `tool_web_scrape` | Scrape a URL to markdown. |
-| `tool_literature_download` | Save a paper PDF into inputs/literature/. |
+| `tool_literature_download` | Save a paper PDF. Pass `step_id='NN_<slug>'` to scope to a step. |
+| `tool_literature_search_and_save` | Search + download top-N PDFs in one shot. |
+| `tool_step_literature_list` | List PDFs in one step's literature/ (or across all steps). |
 
 ### Script execution
 
 | Tool | File types |
 |---|---|
-| `tool_python_exec` | .py |
-| `tool_r_exec` | .R |
-| `tool_julia_exec` | .jl |
-| `tool_bash_exec` | .sh |
-| `tool_notebook_exec` | .ipynb (jupyter nbconvert --execute --inplace) |
-| `tool_rmarkdown_render` | .Rmd / .qmd |
-| `tool_package_install` | pip install + append to requirements |
+| `tool_python_exec` | `.py` |
+| `tool_r_exec` | `.R` (requires Rscript on PATH) |
+| `tool_julia_exec` | `.jl` (requires julia on PATH) |
+| `tool_bash_exec` | `.sh` (returncode-aware) |
+| `tool_notebook_exec` | `.ipynb` (jupyter nbconvert --execute --inplace) |
+| `tool_rmarkdown_render` | `.Rmd` / `.qmd` (rmarkdown::render OR quarto render) |
+| `tool_package_install` | pip install + append to environment/requirements.txt |
+
+### Long-running background work
+
+| Tool | Purpose |
+|---|---|
+| `tool_task_run` | Spawn a real subprocess (Popen) and return immediately with a task_id. |
+| `tool_task_status` | Check status + tail log; zombie-aware (waitpid + /proc fallback). |
+| `tool_task_list` | List every known background task. |
+| `tool_task_kill` | SIGTERM (default) or SIGKILL a task. |
 
 ### Data
 
 | Tool | Purpose |
 |---|---|
-| `tool_data_sample` | Sample N rows from CSV / Parquet / Feather / Excel / JSON. |
-| `tool_data_profile` | Schema + missingness + descriptive stats + suggestions. |
+| `tool_data_sample` | Head / random / tail sample. |
+| `tool_data_profile` | Schema + dtypes + missingness + descriptive stats + suggestions. |
 | `tool_data_convert` | CSV ↔ Parquet ↔ Feather ↔ RDS. |
+| `tool_intake_autofill` | Read inputs/, infer domain + question + hypotheses, fill researcher_config blanks. |
+| `tool_context_intake` | Route mid-flow file drops into the right `inputs/` subfolder. Skips scaffold files. |
 
 ### Audit
 
 | Tool | Purpose |
 |---|---|
-| `tool_audit_synthesis` | Section coverage, causal-language hits, citation density. |
-| `tool_audit_power` | Post-hoc statistical power (statsmodels). |
-| `tool_audit_assumptions` | Re-run normality / homoscedasticity / etc. on residuals. |
-| `tool_audit_figure` | DPI, size, format checks (Pillow). |
-| `tool_audit_citations` | Verify every citation in workspace/citations.md online. |
-| `tool_audit_reproducibility` | Re-run every script and hash-compare outputs. |
+| `tool_audit_synthesis` | Audit a manuscript: claim grounding, citation coverage, causal language. |
+| `tool_audit_power` | Post-hoc statistical power. |
+| `tool_audit_assumptions` | Normality + homoscedasticity + independence on residuals. |
+| `tool_audit_figure` | DPI / colorblind palette / axis labels / error bars. |
+| `tool_audit_citations` | Verify every workspace/citations.md entry against Crossref. |
+| `tool_audit_reproducibility` | Re-run every script in a clean env and compare hashes. (Slow.) |
 
 ### Synthesis
 
 | Tool | Purpose |
 |---|---|
-| `tool_synthesize_plan` | Show available sources + recommended ordering. |
-| `tool_synthesize` | Build synthesis/<section>.md (or full paper). Output_type tunes citations cap. |
-| `tool_latex_compile` | paper.tex → PDF. |
-| `tool_poster_create` | tikzposter → PDF. |
-| `tool_dashboard_create` | Single-file HTML dashboard (sortable, lightbox, light/dark, print-friendly). Audience: academic / executive / technical / teaching. |
+| `tool_synthesize_plan` | Inspect available sources; propose section order. |
+| `tool_synthesize` | Compile workspace into paper / abstract / poster / dashboard / grant / report. Verified citations only. |
+| `tool_latex_compile` | pdflatex + bibtex on synthesis/paper.tex. |
+| `tool_poster_create` | Tikzposter LaTeX poster. |
+| `tool_dashboard_create` | Single-file offline HTML dashboard. |
 | `tool_citations_verify` | Re-verify every citation_key in workspace/citations.md. |
 
-### Research / reasoning
+### Research / grounding
 
 | Tool | Purpose |
 |---|---|
-| `tool_research_method` | Deep-dive a method via 3-4 academic providers + web. |
-| `tool_research_tool` | Find candidate libraries / CLIs / websites, tag each: installable / api / external / paid. |
-| `tool_external_tool_instructions` | Write a WORKSHEET.md when the chosen tool is non-AI-executable. |
+| `tool_research_method` | 5-10 academic + web sources on a method; structured report. Required BEFORE choosing any method. |
+| `tool_research_tool` | Find candidate libraries / CLIs / websites; tagged as installable / api / external / paid. |
+| `tool_external_tool_instructions` | Writes a WORKSHEET.md when the chosen tool is external (website / paid / GUI). |
 | `tool_plan_step` | Force a complex step into atomic sub-tasks BEFORE coding. |
-| `tool_plan_next_step` | Single-turn next-step recommendation. |
-| `tool_branch_recommendation` | Branch into parallel experiment vs extend current. |
+| `tool_plan_next_step` | Survey state + search + propose 2-3 options for "what should I do next?". |
+| `tool_branch_recommendation` | Branch into a new parallel experiment vs extend the current one. |
 
-### Intake
-
-| Tool | Purpose |
-|---|---|
-| `tool_intake_autofill` | Read inputs/, classify domain, extract question + hypotheses, fill blanks in config. |
-| `tool_context_intake` | Route mid-flow file drops into the right inputs/ subfolder. |
-
-### Background tasks (real `subprocess.Popen`)
+### Scratch sandbox
 
 | Tool | Purpose |
 |---|---|
-| `tool_task_run` | Spawn a background process; returns task_id immediately. |
-| `tool_task_status` | Live PID check + tail of log. |
-| `tool_task_list` | List all known tasks. |
-| `tool_task_kill` | Terminate a task (TERM by default). |
+| `tool_scratch_write` | Write a file into `workspace/scratch/` (gitignored). |
+| `tool_scratch_run` | Execute by extension (`.py` / `.R` / `.jl` / `.sh`). |
+| `tool_scratch_list` | List scratch files. (Excludes `.gitkeep`.) |
+| `tool_scratch_clear` | Wipe scratch contents (keeps README + .gitignore + .gitkeep). |
 
-### Scratch
-
-| Tool | Purpose |
-|---|---|
-| `tool_scratch_write` | Write a quick-test file to workspace/scratch/. |
-| `tool_scratch_run` | Execute it (language by extension). |
-| `tool_scratch_list` / `tool_scratch_clear` | Inspect / wipe scratch. |
-
-### Repair
+### Workspace robustness
 
 | Tool | Purpose |
 |---|---|
-| `tool_workspace_repair` | Detect + heal missing dirs / corrupted state / stale paths. NEVER deletes. |
+| `tool_workspace_repair` | Detect missing dirs / corrupted state / stale paths and (optionally) heal. NEVER deletes. |
 
 ---
 
-## `mem_*` — append-only logs, decisions, hypotheses
+## `mem_*` — append-only ledgers
 
 | Tool | Purpose |
 |---|---|
-| `mem_analysis_log` | Append a line to workspace/analysis.md. |
-| `mem_methods_append` | Append a structured method entry (step, dataset, implementation, parameters, justification, assumptions). |
-| `mem_citations_generate` | Regenerate workspace/citations.md from inputs/literature_index.yaml. |
-| `mem_intake_regenerate` | Refresh inputs/intake.md (recompute file hashes). |
+| `mem_analysis_log` | Append a chronological narrative entry to workspace/analysis.md. |
+| `mem_methods_append` | Append a structured method entry (step / dataset / params / justification / assumptions) to workspace/methods.md. |
+| `mem_citations_generate` | Refresh workspace/citations.md from project + per-step literature sidecars. |
+| `mem_intake_regenerate` | Regenerate inputs/intake.md with fresh hashes. |
 | `mem_decision_log` | Append a structured decision (context / selected / rationale). |
-| `mem_hypothesis_add/_update/_list` | Multi-hypothesis ledger. |
+| `mem_hypothesis_add` | Register a new hypothesis (state.active_hypotheses + analysis.md). |
+| `mem_hypothesis_update` | Update a hypothesis (status + evidence). |
+| `mem_hypothesis_list` | List every tracked hypothesis. |
 
 ---
 
-## Tool naming compatibility
+## Token-cost reference
 
-Three accepted forms:
-
-| Form | Example | Notes |
+| Pattern | Tokens | When to use |
 |---|---|---|
-| canonical underscore | `sys_state_get` | Preferred. |
-| dot notation | `sys.state.get` | Auto-rewritten by the dispatcher. |
-| legacy aliases | `sys_guidance_get` | Mapped to `sys_protocol_get`. |
+| `sys_boot` | ~800 | EVERY session start. |
+| `tool_route(prompt)` | ~250 | Before loading any protocol. |
+| `sys_protocol_get format='summary'` | ~300 | To see step headings + quality_bar. |
+| `sys_protocol_get format='step' step_id='...'` | ~150-500 | When executing one step. |
+| `sys_protocol_get format='full'` | ~1.5-3K | Only when you need every step at once. |
+| `sys_tool_describe(name)` | ~200 | Full description for one tool. |
+| `tool_synthesize output_type='paper'` | ~2-5K | One-shot — actual paper draft. |
 
-The full alias table lives in `src/research_os/server.py::_ALIASES`. The AI
-should default to canonical underscore form in new code.
+**Default `list_tools` payload is ~1K tokens** (down from ~3K) — each
+tool ships its `short` field, full description available on demand.
 
 ---
 
-## Example invocations (raw MCP)
+## Adding a new tool
 
-> You rarely call these by hand. The AI handles them for you. These examples
-> are for power users who want to debug a single tool.
+See [CONTRIBUTING.md § Adding a new tool](../CONTRIBUTING.md). Key
+steps:
 
-### `sys_state_get` (full state)
-```json
-{"name": "sys_state_get", "arguments": {}}
-```
-
-### `sys_state_get` (markdown summary)
-```json
-{"name": "sys_state_get", "arguments": {"format": "markdown"}}
-```
-
-### `tool_data_profile`
-```json
-{"name": "tool_data_profile",
- "arguments": {"filepath": "inputs/raw_data/cohort.csv"}}
-```
-
-### `tool_research_method`
-```json
-{"name": "tool_research_method",
- "arguments": {"query": "logistic regression with imbalanced classes",
-               "limit": 5}}
-```
-
-### `tool_synthesize` — abstract section, conference venue
-```json
-{"name": "tool_synthesize",
- "arguments": {"section": "abstract", "output_type": "abstract"}}
-```
-
-### `tool_dashboard_create` — executive audience
-```json
-{"name": "tool_dashboard_create",
- "arguments": {"title": "Cohort 2024 — Q4 update", "audience": "executive"}}
-```
-
-### `tool_task_run` — background long job
-```json
-{"name": "tool_task_run",
- "arguments": {"command": "python workspace/03_train/scripts/train_v1.py",
-               "description": "GPU training run"}}
-```
+1. Implement in `src/research_os/tools/actions/<category>/<file>.py`.
+2. Add `TOOL_DEFINITIONS` entry in `server.py` with `short` +
+   `description` + `category` + `inputSchema`.
+3. Add a handler + register in `_HANDLERS`.
+4. Add to `_router_index.yaml` (either as a `decomposition` entry in a
+   protocol or as a `shortcut_intents` entry).
+5. Reference from at least one protocol or shortcut — preflight
+   complains about orphans.
+6. Add a test in `tests/tools/test_<area>.py`.

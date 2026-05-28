@@ -3,7 +3,7 @@
 import yaml
 
 from research_os.project_ops import scaffold_minimal_workspace
-from research_os.tools.actions.intake import intake_autofill
+from research_os.tools.actions.data.intake import intake_autofill
 
 
 def test_intake_autofill_with_only_data(tmp_path):

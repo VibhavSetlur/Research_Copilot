@@ -5,11 +5,11 @@ import json
 from research_os.server import (
     TOOL_DEFINITIONS,
     RateLimiter,
-    _envelope,
-    _error_envelope,
+    _error,
     _log_search,
     _resolve_tool_name,
-    _success_envelope,
+    _short_for_list,
+    _success,
     _text,
 )
 
@@ -39,12 +39,10 @@ def test_rate_limiter():
 
 
 def test_envelope_helpers():
-    assert _envelope({"x": 1}) == {"status": "success", "data": {"x": 1}}
-    assert _envelope() == {"status": "success", "data": {}}
-    assert _success_envelope({"y": 2}) == {"status": "success", "data": {"y": 2}}
-    err = _error_envelope("oops")
-    assert err["status"] == "error"
-    assert err["data"]["error"] == "oops"
+    assert _success({"x": 1}) == {"status": "success", "data": {"x": 1}}
+    assert _success() == {"status": "success", "data": {}}
+    err = _error("oops")
+    assert err == {"status": "error", "error": "oops"}
 
 
 def test_text_helper():
@@ -82,3 +80,37 @@ def test_dispatcher_resolves_legacy_aliases():
 
 def test_dispatcher_passes_underscore_names_through():
     assert _resolve_tool_name("sys_state_get") == "sys_state_get"
+
+
+def test_routing_tools_registered():
+    """sys_boot + tool_route + sys_tool_describe + plan tools must be wired."""
+    for name in (
+        "sys_boot",
+        "tool_route",
+        "tool_plan_advance",
+        "tool_plan_clear",
+        "sys_tool_describe",
+    ):
+        assert name in TOOL_DEFINITIONS, f"{name} missing from TOOL_DEFINITIONS"
+
+
+def test_short_for_list_uses_short_field_when_present():
+    schema = {
+        "short": "Tight one-liner.",
+        "description": "Long description that goes on and on and on...",
+    }
+    assert _short_for_list(schema) == "Tight one-liner."
+
+
+def test_short_for_list_falls_back_to_first_sentence():
+    schema = {
+        "description": "First sentence here. Second sentence with more detail.",
+    }
+    short = _short_for_list(schema)
+    assert short.startswith("First sentence here")
+    assert len(short) <= 160
+
+
+def test_short_for_list_caps_at_160_chars():
+    schema = {"description": "x" * 500}
+    assert len(_short_for_list(schema)) <= 160

@@ -1,0 +1,81 @@
+id: ablation_study
+name: Ablation Study
+version: '1.0.0'
+schema_version: '2.0'
+description: |
+  Systematic removal / replacement of model or pipeline components to
+  attribute performance to specific design choices. Standard practice for
+  ML/AI methods papers and any system-engineering research.
+trigger: |
+  Researcher says "ablate", "ablation", "remove component X", "ablation
+  table", "which part matters?". Usually triggered after a successful
+  modelling step where the headline result needs decomposition.
+
+steps:
+  - id: create_step
+    name: Create Ablation Step
+    description: sys_path_create name="ablation_<base_model>"
+
+  - id: enumerate_components
+    name: Enumerate Components Under Test
+    description: |
+      In outputs/reports/ablation_plan.md list:
+        - The base model / pipeline (with its exact configuration)
+        - Each component that can be ablated: name, why it might matter,
+          how it will be removed/replaced (zero-out | random | swap | omit)
+        - Whether ablations are one-at-a-time (additive) or factorial
+        - The metric(s) that decide whether the change is material
+
+  - id: baseline_lock
+    name: Lock the Baseline
+    description: |
+      Re-fit the base model with frozen seeds; save predictions + metrics to
+      outputs/data/baseline.parquet. Every ablation is measured against THIS
+      run, not against a new draw — eliminates seed noise as a confound.
+
+  - id: run_ablations
+    name: Run Ablations
+    description: |
+      For each component, fit the model with the component ablated. Use the
+      SAME train/val/test split, SAME seeds, SAME pre-processing pipeline
+      (except for the ablated piece). Save each run's predictions +
+      metrics under outputs/data/ablation_<component>.parquet.
+
+  - id: build_table
+    name: Ablation Table
+    description: |
+      outputs/reports/ablation_table.md with columns:
+        | Variant | <metric_1> | Δ vs baseline | <metric_2> | Δ vs baseline |
+      Highlight rows where Δ exceeds noise (e.g. > MC SE × 2). Tag rows as
+      essential | helpful | neutral | harmful.
+
+  - id: pair_with_qualitative
+    name: Qualitative Examples (optional but recommended)
+    description: |
+      For 2-3 ablations with the largest performance hit, show example
+      predictions where baseline succeeded and the ablated variant failed.
+      Save under outputs/reports/ablation_examples.md.
+
+  - id: report
+    name: Per-step Conclusions
+    description: |
+      conclusions.md identifies which components are doing the work, which
+      are decorative, and whether the headline claim of the parent paper
+      survives the ablations. Be conservative — small Δs across noisy
+      metrics rarely justify removing a component.
+
+expected_outputs:
+  - workspace/*/outputs/reports/ablation_plan.md
+  - workspace/*/outputs/reports/ablation_table.md
+
+quality_bar: |
+  - Every ablation uses the SAME data + SAME splits + SAME seeds as the
+    baseline.
+  - The "Δ vs baseline" column is reported with an uncertainty estimate
+    (Monte Carlo SE or bootstrap CI), not as a bare number.
+  - At least one component is shown to be essential AND at least one is
+    shown to be neutral or harmful — pure-confirmation ablations are
+    suspect.
+
+next_protocol: guidance/analysis_plan
+on_failure: guidance/dead_end_routing

@@ -490,32 +490,6 @@ class ResearchLedger:
         lines.append("")
         return "\n".join(lines)
 
-    def health(self, root: Path | None = None) -> dict:
-        """Returns actionable health indicators: paths, stage, pending approvals, and next step."""
-        state = self._load()
-        paths = state.get("paths", {})
-        path_ids = list(paths.keys())
-        active_paths = [k for k, v in paths.items() if isinstance(v, dict) and v.get("status") == "active"]
-        turns = len(state.get("conversation_turns", []))
-        completed_steps = len(state.get("completed_steps", []))
-        pending = False
-        if root:
-            pending = (root / ".os_state" / "pending_approval.txt").exists()
-        recommend_handoff = turns >= 4
-
-        return {
-            "current_path": state.get("current_path", "main"),
-            "pipeline_stage": state.get("pipeline_stage", "init"),
-            "number_of_paths": len(path_ids),
-            "active_paths": active_paths,
-            "completed_steps": completed_steps,
-            "pending_approval": pending,
-            "handoff_recommendation": "yes" if recommend_handoff else "no",
-            "handoff_reason": "Conversation length exceeds 4 turns" if recommend_handoff else None,
-            "estimated_context_used_pct": min(100, turns * 12),
-            "next_suggested_action": "Call sys.session.handoff" if recommend_handoff else "Continue current protocol",
-        }
-
     def get_project_summary(self, max_tokens: int = 500) -> str:
         """Return a compact project summary for new conversation injection.
 
@@ -585,55 +559,8 @@ class ResearchLedger:
             return truncated + "..."
         return summary
 
-    def add_conversation_turn(self, role: str, content: str) -> dict:
-        """Add a conversation turn to the ledger."""
-        state = self._load()
-        turns = state.setdefault("conversation_turns", [])
-        timestamp = datetime.now(timezone.utc).isoformat()
-        turns.append({"role": role, "content": content, "timestamp": timestamp})
-        self._save(state)
-        return state
-
-    def push_interrupt(self, task_state: dict) -> dict:
-        """Push current task to the interrupt stack."""
-        state = self._load()
-        stack = state.setdefault("interrupt_stack", [])
-        stack.append(task_state)
-        self._save(state)
-        return state
-
-    def pop_interrupt(self) -> Optional[dict]:
-        """Pop the last task from the interrupt stack."""
-        state = self._load()
-        stack = state.setdefault("interrupt_stack", [])
-        if stack:
-            task = stack.pop()
-            self._save(state)
-            return task
-        return None
-
-    def get_conversation_summary(self) -> str:
-        """Get a summary of recent conversation turns."""
-        state = self._load()
-        turns = state.get("conversation_turns", [])[-5:]
-        return "\n".join(f"{t['role'].capitalize()}: {t['content']}" for t in turns)
-
-    def get_active_task_summary(self) -> str:
-        """Get a summary of the current active task and plan."""
-        state = self._load()
-        intent = state.get("active_user_intent", "none")
-        plan = state.get("current_plan", {})
-        if not plan:
-            return f"Active Intent: {intent}\nNo plan active."
-
-        workflow = plan.get("workflow_name", "unknown")
-        steps = plan.get("workflow_steps", [])
-        return (
-            f"Active Intent: {intent}\nWorkflow: {workflow}\nSteps: {', '.join(steps)}"
-        )
-
     def snapshot_workspace(self, checkpoint_id: str, root: Path | None = None) -> dict:
-        """Snapshot workspace/ into .os_state/checkpoints/<checkpoint_id>/ using hardlinks."""
+        """Snapshot workspace/ into .os_state/checkpoints/<checkpoint_id>/."""
         if root is None:
             try:
                 root = find_project_root()
@@ -671,15 +598,12 @@ class ResearchLedger:
                 rel = f.relative_to(root)
                 dest = ckpt_dir / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    os.link(f, dest)
-                except OSError:
-                    shutil.copy2(f, dest)
+                shutil.copy2(f, dest)
                 manifest.append(
                     {
                         "path": str(rel),
                         "size": f.stat().st_size,
-                        "sha256": "hardlinked",
+                        "sha256": "copied",
                     }
                 )
 

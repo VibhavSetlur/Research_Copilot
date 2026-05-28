@@ -66,6 +66,12 @@ dev = [
 # need their respective system runtimes and are deliberately excluded.
 all = ["research-os[web,literature,viz,audit,ml,notebook]"]
 
+# "ci" is the lean install used by GitHub Actions: enough to lint + preflight
+# + run every test (which mocks the heavy bits) WITHOUT pulling shap /
+# xgboost / jupyter (slow / large compiled deps that aren't needed for
+# the test suite itself). The build job still validates the full wheel.
+ci = ["research-os[viz,audit]"]
+
 [project.scripts]
 research-os = "research_os.cli:main"
 

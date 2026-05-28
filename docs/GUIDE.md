@@ -1,8 +1,8 @@
 # Research OS — Guide
 
 Research OS is an MCP server. The AI in your IDE plans and reasons;
-Research OS executes, records state, enforces immutability, walks the AI
-through the right protocol for the current pipeline stage.
+Research OS executes, records state, enforces immutability, **picks the
+right protocol via a hierarchical router**, and walks the AI through it.
 
 > Research OS does NOT manage LLM provider keys. Your IDE owns model access.
 > The credentials Research OS uses (Crossref / Semantic Scholar / PubMed /
@@ -10,14 +10,40 @@ through the right protocol for the current pipeline stage.
 
 ---
 
+## 0. How the AI is supposed to use it (the cheap path)
+
+```
+1. sys_boot                            # one MCP call: state + config + history
+                                       # + dep inventory + next protocol +
+                                       # pause classification + active plan
+2. (await researcher's message)
+3. tool_route(prompt=<their message>)  # hierarchical L1→L2→L3 picker
+4. If complexity="high":
+     a. tool_plan_turn                 # batch sized to model_profile
+     b. execute every entry in this_turn; tool_plan_advance after each
+     c. if chat_split_recommended → sys_session_handoff + ask for fresh chat
+   If complexity="low":
+     • call shortcut_tool directly, OR
+     • sys_protocol_get name=<primary> format='summary' (~300 tokens)
+       → then format='step' + step_id='<id>' when ready to execute
+```
+
+A typical session boot is ~1.2K tokens (vs ~5K with the old multi-call
+pattern). See [PROTOCOLS.md](PROTOCOLS.md) for the router internals.
+
+---
+
 ## 1. Install
 
 ```bash
+pip install "research-os[ci] @ git+https://github.com/VibhavSetlur/Research-OS.git"
+# or
 pip install "research-os[all] @ git+https://github.com/VibhavSetlur/Research-OS.git"
 ```
 
-Optional extras: `web`, `literature`, `viz`, `execution`, `r`, `julia`,
-`audit`, `poster`, `ml`. The `all` extra is the easy default.
+Extras: `ci` (lean — used by GitHub Actions), `all` (everything except
+R / Julia / Docker, which need their own runtimes), or any subset of
+`web`, `literature`, `viz`, `audit`, `ml`, `notebook`.
 
 ## 2. Scaffold
 
@@ -79,56 +105,81 @@ say "not done yet".
 
 ### Side / on-demand protocols
 
+* `guidance/session_resume` — re-enter a paused project / new chat.
+* `guidance/chat_handoff` — end a session cleanly with full handoff doc.
+* `guidance/autopilot` — drive hands-off with explicit gates.
+* `guidance/casual_exploration` — lightweight scratch-first mode.
+* `guidance/quick_paper_review` — fast critical appraisal of someone
+  else's paper (orthogonal to the main project).
 * `guidance/iterative_planning` — for "what's next?" style work.
 * `guidance/dead_end_routing` — abandon a failed path cleanly.
 * `guidance/hypothesis_tracking` — register / update hypotheses.
 * `guidance/glossary_update` / `guidance/writing_standards`.
-* `methodology/{clinical_trials,machine_learning,meta_analysis,causal_inference_deep,survey_psychometrics,research_methods,tool_discovery}`.
-* `literature/{systematic_review,evidence_synthesis}`.
-* `synthesis/{synthesis_abstract,synthesis_poster,synthesis_dashboard}`.
-* `writing/{writing_core,writing_methods,writing_citations,writing_conclusions,writing_analysis_log,writing_readme}`.
+* `methodology/{clinical_trials, machine_learning, meta_analysis,
+  causal_inference_deep, survey_psychometrics, qualitative_research,
+  simulation_studies, replication_study, ablation_study, pilot_study,
+  mixed_methods, research_methods, tool_discovery}`.
+* `literature/{systematic_review, evidence_synthesis}`.
+* `synthesis/{synthesis_abstract, synthesis_poster, synthesis_dashboard,
+  synthesis_grant, synthesis_report}`.
+* `writing/{writing_core, writing_methods, writing_citations,
+  writing_conclusions, writing_analysis_log, writing_readme}`.
 * `visualization/figure_guidelines`.
 
 ---
 
-## 5. MCP tools (~75)
+## 5. MCP tools (94)
 
 > All names use underscores. Dot notation + legacy names are auto-rewritten.
+> Full catalogue: [TOOLS.md](TOOLS.md).
 
-### `sys_*` — workspace, state, files, paths, checkpoints, repair
+### Routing layer — call FIRST every session
 
 | Tool | Purpose |
 |---|---|
-| `sys_protocol_get/_list/_next/_validate/_log/_history` | Protocol discovery + execution log. |
-| `sys_state_get`        | Full / minimal / markdown state. |
-| `sys_workspace_scaffold/_tree` | Re-create / inspect the workspace tree. |
-| `sys_file_read/_write/_list/_delete/_validate_md` | File I/O (writes blocked in `inputs/raw_data` + `inputs/literature`). |
+| `sys_boot` | One call returns state + config + history + dep inventory + next protocol + pause classification + active plan. Replaces 4-5 separate calls. |
+| `tool_route` | Hierarchical L1→L2→L3 picker for "which protocol fits this prompt". Returns ambiguity-aware. |
+| `tool_plan_turn` | Per-turn batching sized to model_profile (small=1, medium=3, large=6 steps). |
+| `tool_plan_advance` / `tool_plan_clear` | Walk or discard the active plan. |
+| `sys_tool_describe` | Full description for one tool on demand (paired with trimmed `list_tools`). |
+| `sys_dep_inventory` | Which optional extras failed to import. |
+| `sys_protocol_get` | `format='summary'` (~300 tokens) / `format='step' step_id='...'` / `format='full'`. |
+
+### `sys_*` — workspace, state, files, paths, checkpoints
+
+| Tool | Purpose |
+|---|---|
+| `sys_state_get` | Full / minimal / markdown snapshot. (Prefer `sys_boot` at session start.) |
+| `sys_workspace_scaffold` / `_tree` | Re-create / inspect the workspace tree. |
+| `sys_file_read/_write/_list/_delete/_validate_md` | File I/O. |
 | `sys_path_create/_abandon/_list` | Numbered experiment folders. |
-| `sys_checkpoint_create/_rollback/_list` | Hardlinked workspace snapshots. |
+| `sys_checkpoint_create/_rollback/_list` | Workspace snapshots. |
 | `sys_config_get/_set/_validate` | researcher_config.yaml. |
-| `sys_notify`           | Append to `workspace/logs/notifications.log`. |
-| `sys_session_handoff`  | Markdown handoff + resume prompt. |
+| `sys_notify` | Append to `workspace/logs/notifications.log`. |
+| `sys_session_handoff` | Structured handoff doc + fresh checkpoint. |
 | `sys_env_snapshot/_docker_generate` | Capture + containerise the env. |
 
-### `tool_*` — search, exec, audit, synthesis, research, intake, scratch, tasks, repair
+### `tool_*` — research workflow
 
 | Tool | Purpose |
 |---|---|
+| `tool_session_resume` / `tool_progress_digest` / `tool_dead_end_lessons` | Session continuity + bookkeeping. |
+| `tool_quick_review` | Stage a critical-appraisal skeleton for someone else's paper. |
 | `tool_search_semantic_scholar/_pubmed/_crossref/_arxiv/_web` | Literature + web search. |
-| `tool_web_scrape` / `tool_literature_download` | Scrape a URL / save a PDF into `inputs/literature/`. |
-| `tool_python_exec` / `tool_r_exec` / `tool_julia_exec` / `tool_bash_exec` / `tool_notebook_exec` / `tool_rmarkdown_render` | Run scripts / notebooks. |
+| `tool_web_scrape` / `tool_literature_download` / `tool_literature_search_and_save` / `tool_step_literature_list` | URL scrape; per-step literature management. |
+| `tool_python_exec` / `_r` / `_julia` / `_bash` / `_notebook` / `_rmarkdown_render` | Run scripts / notebooks. Returncode-aware. |
 | `tool_package_install` | `pip install` + update requirements. |
-| `tool_data_sample` / `tool_data_profile` / `tool_data_convert` | Sample, profile, convert tabular data. |
+| `tool_data_sample` / `_profile` / `_convert` | Sample, profile, convert tabular data. |
 | `tool_audit_synthesis/_power/_assumptions/_figure/_citations/_reproducibility` | Real audits — citation lookups, statistical power, assumption tests, figure DPI, full re-runs. |
-| `tool_synthesize_plan` / `tool_synthesize` | Plan section order; build paper / abstract / etc. with verified citations. |
+| `tool_synthesize_plan` / `tool_synthesize` | Plan section order; build paper / abstract / poster / dashboard / grant / report with verified citations. |
 | `tool_latex_compile` / `tool_poster_create` / `tool_dashboard_create` | PDF + tikzposter + single-file HTML dashboard. |
-| `tool_research_method` / `tool_research_tool` / `tool_external_tool_instructions` / `tool_plan_step` | Reasoning helpers. |
+| `tool_research_method` / `tool_research_tool` / `tool_external_tool_instructions` / `tool_plan_step` | Reasoning + grounding helpers. |
 | `tool_plan_next_step` / `tool_branch_recommendation` | Iterative planning. |
 | `tool_intake_autofill` / `tool_context_intake` | Auto-fill + mid-flow context injection. |
-| `tool_task_run/_status/_list/_kill` | Real background subprocesses for shared servers. |
+| `tool_task_run/_status/_list/_kill` | Real background subprocesses (zombie-aware) for shared servers. |
 | `tool_scratch_write/_run/_list/_clear` | Workspace sandbox. |
 | `tool_workspace_repair` | Heal a broken workspace; never deletes. |
-| `tool_citations_verify` | Re-verify every citation_key in `workspace/citations.md` online. |
+| `tool_citations_verify` | Re-verify every citation_key in `workspace/citations.md`. |
 
 ### `mem_*` — append-only logs, decisions, hypotheses
 
@@ -141,21 +192,19 @@ say "not done yet".
 
 ## 6. Codebase layout
 
-After v1.2.0 the action modules live in eight subfolders, grouped by domain:
-
 ```
 src/research_os/
 ├── server.py                         # MCP server + dispatcher
 ├── cli.py                            # `init` + `start`
 ├── project_ops.py                    # scaffolding, state, mermaid, intake regen
 ├── config.py / errors.py / __init__.py
-├── protocols/                        # 34 YAML protocols
+├── protocols/                        # 47 YAML protocols + _router_index.yaml
 ├── state/                            # ResearchLedger
 ├── utils/                            # asset manager, common helpers
 └── tools/
-    ├── capability_registry.py
     └── actions/
-        ├── protocol.py               # the loader (top-level — fundamental)
+        ├── protocol.py               # YAML loader (cross-cutting)
+        ├── router.py                 # sys_boot, tool_route, plan_turn (cross-cutting)
         ├── state/                    # config, path, checkpoint, interaction,
         │                             # scratch, repair
         ├── data/                     # data, profiling, intake, context_intake
@@ -167,8 +216,10 @@ src/research_os/
         └── memory/                   # hypotheses, append-only helpers
 ```
 
-Back-compat shim modules (`tools/actions/config.py`, `data.py`, …) re-export
-from the subfolders so any older import paths keep working.
+All non-cross-cutting tools live inside one of the eight subpackages.
+Only `protocol.py` (YAML loader) and `router.py` (sys_boot + tool_route
++ plan_turn + active plan) live flat at the top — both touch every
+category, so flattening them avoids circular sub-packages.
 
 ---
 
@@ -241,7 +292,7 @@ api_keys:                         # all optional — NO LLM provider keys
   serpapi: ""
 ```
 
-### Domain presets
+### Domain presets (10)
 
 Copy any of these into `inputs/researcher_config.yaml`:
 
@@ -250,6 +301,11 @@ Copy any of these into `inputs/researcher_config.yaml`:
 * `templates/configs/genomics.yaml` — MINSEQE / MIAME.
 * `templates/configs/nlp_benchmark.yaml` — Model Cards.
 * `templates/configs/economic_panel.yaml` — AEA.
+* `templates/configs/qualitative_research.yaml` — COREQ / SRQR.
+* `templates/configs/geospatial.yaml` — MAUP-aware spatial analysis.
+* `templates/configs/time_series.yaml` — IJF-style forecasting.
+* `templates/configs/survival_analysis.yaml` — STROBE (observational) / CONSORT (RCT).
+* `templates/configs/psychometric.yaml` — AERA / APA Standards.
 
 ---
 

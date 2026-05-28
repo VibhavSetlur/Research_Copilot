@@ -458,11 +458,34 @@ def scaffold_minimal_workspace(
     _setup_gitignore(root)
     _write_getting_started(root, project_name)
     _update_manifest(root)
+    _prune_stale_gitkeeps(root)
     if git_init and not (root / ".git").exists():
         try:
             subprocess.run(["git", "init"], cwd=root, capture_output=True)
         except Exception:
             pass
+
+
+def _prune_stale_gitkeeps(root: Path) -> None:
+    """Remove .gitkeep from any TOP_LEVEL_DIR that now has real content.
+
+    Scaffold creates .gitkeep up front; later steps populate some dirs. The
+    .gitkeep then lingers and pollutes `tool_scratch_list`, manifest counts,
+    and confuses casual ``ls``. Keep .gitkeep only in dirs that stayed empty.
+    """
+    for rel in TOP_LEVEL_DIRS:
+        d = root / rel
+        if not d.is_dir():
+            continue
+        keep = d / ".gitkeep"
+        if not keep.exists():
+            continue
+        siblings = [p for p in d.iterdir() if p.name != ".gitkeep"]
+        if siblings:
+            try:
+                keep.unlink()
+            except OSError:
+                pass
 
 
 def _write_getting_started(root: Path, project_name: str) -> None:

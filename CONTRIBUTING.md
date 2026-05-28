@@ -1,24 +1,29 @@
 # Contributing to Research OS
 
-Thanks for being interested. Research OS is small on purpose — only contribute
-changes that keep the surface small and the protocols sharp.
+Thanks for being interested. Research OS is small on purpose — only
+contribute changes that keep the surface small and the protocols sharp.
 
 ## Architecture in one paragraph
 
-The AI IDE is the brain (Cursor / Claude / Antigravity / OpenCode / VS Code).
-Research OS is the body: it exposes ~50 MCP tools and 33 YAML protocols, and
-it enforces immutability (`inputs/raw_data/`, `inputs/literature/`) and
+The AI IDE is the brain (Cursor / Claude / Antigravity / OpenCode /
+VS Code / Windsurf / Continue / Aider). Research OS is the body: 94 MCP
+tools and 47 YAML protocols, plus a router that turns a user prompt into
+a protocol pick + planned tool sequence without loading every YAML. It
+enforces immutability (`inputs/raw_data/`, `inputs/literature/`) and
 provenance (`workspace/methods.md`, `workspace/analysis.md`,
-`.os_state/protocol_execution_log.jsonl`). It never calls an LLM itself.
+`.os_state/protocol_execution_log.jsonl`, `.os_state/active_plan.json`).
+It never calls an LLM itself.
 
 ## Development setup
 
 ```bash
 git clone https://github.com/VibhavSetlur/Research-OS.git
 cd Research-OS
-pip install -e ".[all,dev]"
-pytest                           # run the test suite
-ruff check . && ruff format .    # lint + format
+pip install -e ".[ci,dev]"           # lean install used by CI
+# or pip install -e ".[all,dev]"     # everything except R / Julia / Docker
+pytest                                # ~180 tests, ~3s
+ruff check src/ tests/ scripts/
+python scripts/preflight.py           # 12 wiring checks
 ```
 
 ## Adding or modifying a protocol
@@ -29,7 +34,7 @@ Keep the schema tight:
 ```yaml
 id: <protocol_id>
 name: <Human Name>
-version: '4.0.0'
+version: '5.0.0'
 schema_version: '2.0'
 description: One-line summary.
 trigger: When the AI should run this.
@@ -42,47 +47,67 @@ steps:
       Concrete tool calls (underscore form), one numbered action per step.
 expected_outputs:
   - path/to/file
-next_protocol: category/next_one     # null if terminal
+quality_bar: |
+  Pass/fail bullets that gate completion.
+next_protocol: category/next_one      # null if terminal
 on_failure: guidance/dead_end_routing # null if no fallback
 ```
 
 * The loader injects the standard `protocol_completion` step — do NOT add it.
-* `next_protocol` must point at a real protocol or `null`. Verify the chain
-  doesn't cycle.
-* Add the protocol's `expected_outputs` to `PIPELINE` in
-  `src/research_os/tools/actions/protocol.py` only if it's part of the main
-  pipeline.
+* `next_protocol` must point at a real protocol or `null`. Verify no cycles.
+* **REQUIRED**: add an entry for the new protocol to
+  `src/research_os/protocols/_router_index.yaml` with `intent_class`,
+  `sub_intent`, `summary`, and `triggers`. Preflight will fail if you
+  forget. Optionally add `shortcut_tool`, `token_estimate`, and a
+  `decomposition` list.
+* Add to `PIPELINE` in `src/research_os/tools/actions/protocol.py` only
+  if it's part of the main pipeline ordering.
 
 ## Adding a new tool
 
-1. Implement the action in `src/research_os/tools/actions/<file>.py`. Return a
-   dict with `status="success"|"error"` and either `data` or `message`.
-2. Add a JSON schema entry in `TOOL_DEFINITIONS` in `src/research_os/server.py`.
-   Use underscore naming (`sys_X_Y`, `tool_X_Y`, `mem_X_Y`).
-3. Add a handler `_handle_<name>(name, arguments, root)` and register it in
-   the `_HANDLERS` dict at the bottom of `server.py`.
-4. If you're replacing an old tool name, add it to `_ALIASES` so older
-   protocols keep working.
-5. Reference the tool from at least one protocol — orphaned tools become dead
-   code and will be removed in the next cleanup.
+1. Implement the action in `src/research_os/tools/actions/<category>/<file>.py`
+   (state/, data/, exec/, search/, research/, audit/, synthesis/,
+   memory/). Cross-cutting modules — `protocol.py` and `router.py` —
+   live flat at `tools/actions/`. Return a dict with
+   `status="success"|"error"` plus either `data` or `message`.
+2. Add an entry to `TOOL_DEFINITIONS` in `src/research_os/server.py`
+   with `short` (≤160 chars) + full `description` + `category` +
+   `inputSchema`. Use underscore naming (`sys_X_Y`, `tool_X_Y`, `mem_X_Y`).
+3. Add a handler `_handle_<name>(name, arguments, root)` and register it
+   in the `_HANDLERS` dict at the bottom of `server.py`.
+4. If the tool is something `tool_route` should know about, add it to
+   `_router_index.yaml` either as a `decomposition` entry in an existing
+   protocol or as a `shortcut_intents` entry.
+5. If you're replacing an old tool name, add the alias to `_ALIASES`
+   so older protocols keep working.
+6. Reference the tool from at least one protocol or shortcut — orphaned
+   tools become dead code and will be removed in the next cleanup.
 
 ## Testing
 
-Tests live in `tests/`. Run a focused subset with:
+Tests live in `tests/{unit,integration,tools}/`. Run a focused subset:
 
 ```bash
-pytest tests/test_protocols.py -k literature_search -v
+pytest tests/tools/test_router.py -v
+pytest tests/unit/test_protocols.py::TestProtocolLoading
 ```
+
+Add tests for any new tool's success + error paths in
+`tests/tools/test_<area>.py`. Router or protocol changes should ship
+with at least one test that exercises the new behaviour end-to-end.
 
 ## Style
 
-* Black / Ruff defaults; line length 100.
+* Ruff defaults; line length 100.
 * Type hints required on new functions.
 * One short module docstring at the top of every new file.
 * No emojis in source or markdown unless an existing convention requires it.
+* No backwards-compat shims for code that hasn't shipped. We're at 1.0.0;
+  breaking internal refactors are OK as long as the MCP surface
+  (`_HANDLERS` keys + JSON schemas) stays stable or has aliases.
 
 ## Reporting issues
 
-Use the GitHub issue templates. Include the version (`research-os start --help`
-or `pip show research-os`), the OS, the steps to reproduce, and the full
-traceback or relevant log excerpt from `workspace/logs/`.
+Use the GitHub issue templates. Include the version
+(`pip show research-os`), the OS, the steps to reproduce, the full
+traceback, and any relevant log excerpt from `workspace/logs/`.

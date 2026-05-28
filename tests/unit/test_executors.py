@@ -58,3 +58,20 @@ def test_missing_binary(workspace_root):
     with mock.patch("shutil.which", return_value=None):
         res = execute_r_script("script.R", workspace_root)
     assert res["status"] == "error"
+
+
+def test_bash_script_nonzero_exit_is_error(workspace_root):
+    """Previously execute_bash_script returned status=success for any completed
+    run regardless of exit code; downstream tools then reported a working
+    pipeline when the script had crashed. Regression test."""
+    p = workspace_root / "script.sh"
+    p.write_text('exit 1')
+    with mock.patch("subprocess.run") as mock_run:
+        mock_run.return_value = mock.MagicMock(
+            returncode=2, stdout="", stderr="boom\n"
+        )
+        res = execute_bash_script("script.sh", workspace_root)
+    assert res["status"] == "error"
+    assert res["exit_code"] == 2
+    assert res["code"] == 2  # legacy alias preserved
+    assert "boom" in res.get("message", "")

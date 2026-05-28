@@ -1,0 +1,57 @@
+# Qualitative Research — preset researcher_config.yaml
+# Copy to inputs/researcher_config.yaml. Tuned for interview / focus-group /
+# ethnographic studies with thematic, framework, grounded-theory, or content
+# analysis.
+
+project_name: "Qualitative Study"
+research_question: ""
+domain: "qualitative"
+hypotheses: []
+
+researcher:
+  name: ""
+  field: "qualitative research"
+  expertise_level: "intermediate"
+  institution: ""
+  orcid: ""
+
+interaction:
+  autonomy_level: "supervised"
+
+model_profile: "medium"
+
+runtime:
+  shared_server: false
+  long_running_threshold_seconds: 60
+  default_n_for_sampling: 10  # transcripts, not rows
+
+research_goal:
+  output_types: ["paper", "report"]
+  target_venue: "journal"
+  reporting_standard: "COREQ"  # SRQR is the broader fallback
+  suggested_methodology: "qualitative_research"
+  suggested_protocols:
+    - "methodology/qualitative_research"
+    - "guidance/iterative_planning"
+
+writing_preferences:
+  citation_style: "apa"
+  language: "en-US"
+
+api_keys:
+  semantic_scholar: ""
+  pubmed: ""
+  crossref: ""
+  firecrawl: ""
+  serpapi: ""
+
+domain_hints:
+  expected_columns: []  # transcripts are text, not tabular
+  expected_file_extensions: [.txt, .docx, .rtf, .md, .vtt, .srt, .json]
+  biases_to_monitor:
+    - researcher positionality / reflexivity gaps
+    - confirmation bias in coding
+    - over-generalising from a small purposive sample
+    - cherry-picking quotes
+    - lack of disconfirming-case engagement
+    - inadequate saturation evidence
