@@ -213,6 +213,87 @@ def _dep_inventory() -> dict:
 # tool_route — prompt → routing decision
 # ---------------------------------------------------------------------------
 
+# Tools that are always available regardless of protocol — the AI's
+# core navigation + bookkeeping vocabulary.
+_ESSENTIAL_TOOLS = (
+    "sys_boot",
+    "tool_route",
+    "tool_plan_turn",
+    "tool_plan_advance",
+    "tool_plan_clear",
+    "sys_protocol_get",
+    "sys_protocol_list",
+    "sys_protocol_log",
+    "sys_state_get",
+    "sys_file_read",
+    "sys_file_list",
+    "sys_notify",
+    "sys_tool_describe",
+    "sys_active_tools",
+    "mem_decision_log",
+)
+
+
+def _active_tools_for(
+    primary_data: dict | None,
+    shortcut_tool: str | None,
+) -> list[str]:
+    """Build the active tool shortlist tied to a chosen protocol.
+
+    Returns essentials + every tool referenced in the protocol's
+    decomposition + the shortcut tool (deduped, stable order).
+    """
+    out: list[str] = list(_ESSENTIAL_TOOLS)
+    if shortcut_tool and shortcut_tool not in out:
+        out.append(shortcut_tool)
+    if primary_data:
+        for entry in primary_data.get("decomposition", []) or []:
+            if isinstance(entry, dict):
+                t = entry.get("tool")
+                if t and t not in out:
+                    out.append(t)
+    return out
+
+
+def active_tools_for_protocol(protocol_name: str) -> dict[str, Any]:
+    """Public lookup — given a protocol name, return its active-tool shortlist.
+
+    Used by the standalone `sys_active_tools` MCP tool so the AI can fetch
+    a protocol's tool scope without re-routing.
+    """
+    try:
+        index = _load_index()
+        protocols = index.get("protocols", {}) or {}
+        data = protocols.get(protocol_name)
+        if not data:
+            return {
+                "status": "error",
+                "message": (
+                    f"Unknown protocol `{protocol_name}`. "
+                    "Call sys_protocol_list to browse."
+                ),
+            }
+        tools = _active_tools_for(data, data.get("shortcut_tool"))
+        return {
+            "status": "success",
+            "protocol": protocol_name,
+            "intent_class": data.get("intent_class"),
+            "sub_intent": data.get("sub_intent"),
+            "shortcut_tool": data.get("shortcut_tool"),
+            "active_tools": tools,
+            "active_tools_count": len(tools),
+            "advice": (
+                "Prefer these tools while executing the protocol. Other "
+                "tools remain reachable via sys_tool_describe, but stay "
+                "in this scope unless a step explicitly calls something "
+                "outside it."
+            ),
+        }
+    except Exception as e:
+        logger.exception("active_tools_for_protocol failed")
+        return {"status": "error", "message": str(e)}
+
+
 _COMPLEXITY_TOKENS = (
     " and then ",
     " then ",
@@ -369,6 +450,11 @@ def route_request(
                 bool(ask_user),
             ),
             "token_estimate": primary_data.get("token_estimate"),
+            "active_tools": (
+                _active_tools_for(primary_data, shortcut_tool)
+                if resolved_level == 3
+                else list(_ESSENTIAL_TOOLS)
+            ),
         }
 
         # Persist plan ONLY when we resolved to L3 AND the prompt is
@@ -607,6 +693,7 @@ def _shortcut_response(
             "needed."
         ),
         "token_estimate": None,
+        "active_tools": [*_ESSENTIAL_TOOLS, shortcut_hit["tool"]],
     }
     if persist_plan and is_complex:
         plan_path = _persist_active_plan(

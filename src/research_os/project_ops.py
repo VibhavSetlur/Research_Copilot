@@ -920,6 +920,13 @@ def create_numbered_experiment(
     _update_manifest(root)
     _update_workflow_mermaid(root)
     _prune_old_checkpoints(root, keep=5)
+    # Refresh DAG view best-effort; don't block step creation on failures.
+    try:
+        from research_os.tools.actions.state.path import workflow_dag
+
+        workflow_dag(root)
+    except Exception:
+        pass
 
     return {
         "path_id": branch_id,

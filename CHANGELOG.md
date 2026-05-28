@@ -6,6 +6,37 @@ versioning: [SemVer](https://semver.org).
 
 ## [1.0.0] — Stable release
 
+### Operational safety + ergonomics (post-routing finalization)
+
+* **`tool_route` returns `active_tools`** — a tight 10-15 tool shortlist
+  (essentials + the chosen protocol's decomposition tools) so the AI
+  focuses its working set instead of triaging all 98 tools every turn.
+  `sys_active_tools(protocol_name)` queries the same scope directly.
+* **`tool_workflow_dag`** — walks each numbered step's `data/input`
+  symlink, derives cross-step dependencies, writes
+  `docs/workflow_dag.mermaid` (+ PNG via `mmdc` if available).
+  Auto-refreshed on every `sys_path_create` / `sys_path_abandon`.
+* **`tool_step_env_lock`** — pins `requirements.txt` +
+  `python_version.txt` (+ optional `conda.yaml` + per-step `Dockerfile`)
+  inside `workspace/<NN>/environment/`. Each step becomes
+  self-contained and reproducible years later even if the global env
+  drifts.
+* **`tool_task_run` security** — argv[0] validated against
+  `runtime.command_allowlist` (default = common interpreters + benign
+  coreutils; bypass with `runtime.allow_arbitrary`); shell
+  metacharacters refused unless `runtime.allow_shell_meta`; per-task
+  CPU / RSS / file-size limits via `setrlimit`; every accepted task
+  audited to `workspace/logs/task_audit.log`.
+* **Search caching with TTL + 429 backoff** — file cache moved to
+  `.os_state/cache/search/<provider>/<hash>.json` with timestamped
+  envelopes; 24h default TTL (`runtime.cache_ttl_seconds` to override).
+  All literature providers now use a shared `_fetch_json_with_backoff`
+  helper that retries on 429 / 5xx and honours `Retry-After`.
+  `tool_cache_clear` wipes per-provider or older-than-N-days.
+* **Preflight protocol freshness check** — warns when a protocol
+  hasn't been touched in 180+ days (uses explicit `last_reviewed` field
+  or git mtime). Surfaces the 47-protocol maintenance burden early.
+
 ### Routing layer (token-efficient + anti-one-shot)
 
 * **`sys_boot`** — one MCP call returns project state + researcher

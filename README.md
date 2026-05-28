@@ -10,7 +10,7 @@ Cursor, VS Code, Windsurf, Continue, Aider) without managing any LLM
 provider keys.**
 
 Research OS is a [Model Context Protocol](https://modelcontextprotocol.io)
-server exposing 94 research tools and 47 YAML protocols. The AI in your
+server exposing 98 research tools and 47 YAML protocols. The AI in your
 IDE plans and reasons; Research OS executes, records state, enforces
 immutability, and walks the AI through the right protocol for the current
 pipeline stage. Every citation in every final output is verified online —
@@ -71,6 +71,11 @@ the install + IDE wiring without needing one.
 | AI burns tokens picking the wrong protocol | `tool_route` does a hierarchical L1→L2→L3 walk over `_router_index.yaml` and returns the answer in ~250 tokens. `sys_protocol_get format='summary'` loads a 300-token outline. A typical session boot costs ~1.2K tokens (vs ~5K under the old "load everything" pattern). |
 | AI one-shots complex prompts on smaller models | `tool_route` persists an `active_plan` for any complex prompt. `tool_plan_turn` slices it into batches sized to `model_profile` (1 / 3 / 6 steps per turn). When the plan won't fit one chat, it recommends a handoff + fresh chat. |
 | Same project, different AI tomorrow | `sys_session_handoff` snapshots a checkpoint + writes a "fresh AI can resume cold" doc. `tool_session_resume` reconstructs intent + status in one call. |
+| 98 tools is too many for the AI to triage every turn | `tool_route` returns an `active_tools` shortlist (~10-15 tools = essentials + the chosen protocol's decomposition). `sys_active_tools(protocol)` queries the same scope directly. AI focuses on the working set instead of every tool every turn. |
+| Need a visual of how steps depend on each other | `tool_workflow_dag` walks each numbered step's `data/input` symlink to derive cross-step edges, writes `docs/workflow_dag.mermaid` (+ PNG if `mmdc` is installed). Auto-refreshed on every `sys_path_create` / `sys_path_abandon`. |
+| Step results break years later when the global env drifts | `tool_step_env_lock` pins `requirements.txt` + `python_version.txt` (+ optional `conda.yaml` + per-step `Dockerfile`) inside `workspace/<NN>/environment/`. Each step is self-contained. |
+| AI runs runaway / unsafe shell commands on shared HPC | `tool_task_run` validates argv[0] against a configurable allowlist, refuses shell metacharacters by default, applies `setrlimit` for CPU / RSS / file-size, and audits every accepted task to `workspace/logs/task_audit.log`. |
+| API rate limits during heavy synthesis | Search providers cache results under `.os_state/cache/search/` with a 24h TTL (`runtime.cache_ttl_seconds`). 429s trigger exponential backoff honouring `Retry-After`. `tool_cache_clear` wipes per-provider or older-than-N-days. |
 
 ---
 
@@ -340,7 +345,7 @@ protocols + tools exist on disk.
 
 ## What's in the box
 
-* **94 MCP tools** across `sys_*`, `tool_*`, `mem_*` namespaces. Dot
+* **98 MCP tools** across `sys_*`, `tool_*`, `mem_*` namespaces. Dot
   notation (`sys.state.get`) and legacy names auto-rewrite. Run
   `python scripts/preflight.py` after install to verify everything is wired.
 * **47 YAML protocols** — the AI loads the right one based on what you ask.

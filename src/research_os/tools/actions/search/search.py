@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -48,6 +49,37 @@ def _env(name: str) -> str | None:
         return None
 
 
+# Cache TTL (seconds). Override via researcher_config.runtime.cache_ttl_seconds
+# or env var RESEARCH_OS_CACHE_TTL_SECONDS. Default 24h.
+_DEFAULT_CACHE_TTL = 24 * 60 * 60
+
+
+def _cache_ttl() -> int:
+    """Resolve cache TTL: env > researcher_config > default."""
+    env = os.environ.get("RESEARCH_OS_CACHE_TTL_SECONDS")
+    if env:
+        try:
+            return max(0, int(env))
+        except ValueError:
+            pass
+    try:
+        from research_os.utils.common import find_project_root
+
+        root = find_project_root()
+        if root:
+            cfg_path = root / "inputs" / "researcher_config.yaml"
+            if cfg_path.exists():
+                import yaml as _yaml
+
+                cfg = _yaml.safe_load(cfg_path.read_text()) or {}
+                rt = (cfg.get("runtime") or {})
+                if "cache_ttl_seconds" in rt:
+                    return max(0, int(rt["cache_ttl_seconds"]))
+    except Exception:
+        pass
+    return _DEFAULT_CACHE_TTL
+
+
 def _cache_path(query: str, source: str) -> Path | None:
     try:
         from research_os.utils.common import find_project_root
@@ -58,17 +90,25 @@ def _cache_path(query: str, source: str) -> Path | None:
     if not root:
         return None
     h = hashlib.md5(f"{source}::{query}".encode()).hexdigest()
-    return root / ".os_state" / "cache" / f"{source}_{h}.json"
+    return root / ".os_state" / "cache" / "search" / source / f"{h}.json"
 
 
 def _read_cache(query: str, source: str) -> list[dict[str, Any]] | None:
+    """Return cached results if present AND younger than TTL."""
     p = _cache_path(query, source)
-    if p and p.exists():
-        try:
-            return json.loads(p.read_text())
-        except Exception:
-            return None
-    return None
+    if not p or not p.exists():
+        return None
+    try:
+        age = time.time() - p.stat().st_mtime
+        if age > _cache_ttl():
+            return None  # stale
+        envelope = json.loads(p.read_text())
+        # Backward-compat: old cache files stored bare lists.
+        if isinstance(envelope, list):
+            return envelope
+        return envelope.get("results")
+    except Exception:
+        return None
 
 
 def _write_cache(query: str, source: str, data: list[dict[str, Any]]) -> None:
@@ -77,9 +117,73 @@ def _write_cache(query: str, source: str, data: list[dict[str, Any]]) -> None:
         return
     p.parent.mkdir(parents=True, exist_ok=True)
     try:
-        p.write_text(json.dumps(data))
+        from research_os.project_ops import now_iso
+
+        envelope = {
+            "cached_at": now_iso(),
+            "source": source,
+            "query": query,
+            "results": data,
+        }
+        p.write_text(json.dumps(envelope))
     except Exception:
         pass
+
+
+def cache_clear(
+    root: Path | None = None, *, source: str | None = None, older_than_days: int | None = None
+) -> dict[str, Any]:
+    """Wipe cached search results.
+
+    Args:
+        root: project root (auto-detected if None)
+        source: only clear entries for this provider
+                (semantic_scholar|crossref|pubmed|arxiv|web). None = all.
+        older_than_days: only clear entries older than N days. None = all.
+    """
+    try:
+        if root is None:
+            from research_os.utils.common import find_project_root
+
+            root = find_project_root()
+            if root is None:
+                return {"status": "error", "message": "No project root."}
+        cache_root = root / ".os_state" / "cache" / "search"
+        if not cache_root.exists():
+            return {"status": "success", "removed": 0, "message": "No cache to clear."}
+
+        cutoff = (
+            time.time() - older_than_days * 86400
+            if older_than_days is not None
+            else None
+        )
+        removed = 0
+        scanned = 0
+        for provider_dir in cache_root.iterdir():
+            if not provider_dir.is_dir():
+                continue
+            if source and provider_dir.name != source:
+                continue
+            for f in provider_dir.iterdir():
+                if not f.is_file() or f.suffix != ".json":
+                    continue
+                scanned += 1
+                if cutoff is not None and f.stat().st_mtime > cutoff:
+                    continue
+                try:
+                    f.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+        return {
+            "status": "success",
+            "scanned": scanned,
+            "removed": removed,
+            "ttl_seconds": _cache_ttl(),
+        }
+    except Exception as e:
+        logger.exception("cache_clear failed")
+        return {"status": "error", "message": str(e)}
 
 
 def _log_error(message: str) -> None:
@@ -106,6 +210,49 @@ def _log_error(message: str) -> None:
 _S2_LAST_CALL = 0.0
 
 
+def _fetch_json_with_backoff(
+    url: str,
+    headers: dict[str, str],
+    *,
+    timeout: int = 15,
+    max_attempts: int = 4,
+    provider: str = "?",
+) -> dict | None:
+    """GET JSON with exponential backoff on 429 / 5xx. Returns None on hard fail.
+
+    Backoff schedule: 1s, 2s, 4s (default 4 attempts → up to ~7s extra wait).
+    Honours ``Retry-After`` header when present.
+    """
+    for attempt in range(max_attempts):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts - 1:
+                retry_after = e.headers.get("Retry-After") if e.headers else None
+                wait = (
+                    float(retry_after)
+                    if retry_after and retry_after.isdigit()
+                    else min(2 ** attempt, 8)
+                )
+                _log_error(
+                    f"{provider} {e.code} on attempt {attempt + 1}; "
+                    f"sleeping {wait:.1f}s then retrying"
+                )
+                time.sleep(wait)
+                continue
+            _log_error(f"{provider} HTTP {e.code}: {e}")
+            return None
+        except Exception as e:
+            _log_error(f"{provider} failed (attempt {attempt + 1}): {e}")
+            if attempt < max_attempts - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return None
+    return None
+
+
 def search_semantic_scholar(query: str, limit: int = 5) -> list[dict[str, Any]]:
     """Search Semantic Scholar Graph API. Optional key raises rate limits."""
     global _S2_LAST_CALL
@@ -128,12 +275,10 @@ def search_semantic_scholar(query: str, limit: int = 5) -> list[dict[str, Any]]:
     headers = {"User-Agent": "Research-OS/1.0"}
     if api_key:
         headers["x-api-key"] = api_key
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-    except Exception as e:
-        _log_error(f"semantic_scholar failed: {e}")
+    data = _fetch_json_with_backoff(
+        url, headers, timeout=15, provider="semantic_scholar"
+    )
+    if data is None:
         return []
 
     results = []
@@ -161,14 +306,10 @@ def search_crossref(query: str, limit: int = 5) -> list[dict[str, Any]]:
         "https://api.crossref.org/works"
         f"?query={urllib.parse.quote(query)}&rows={limit}"
     )
-    try:
-        with urllib.request.urlopen(
-            urllib.request.Request(url, headers={"User-Agent": "Research-OS/1.0"}),
-            timeout=15,
-        ) as resp:
-            data = json.loads(resp.read())
-    except Exception as e:
-        _log_error(f"crossref failed: {e}")
+    data = _fetch_json_with_backoff(
+        url, {"User-Agent": "Research-OS/1.0"}, provider="crossref"
+    )
+    if data is None:
         return []
 
     items = (data.get("message") or {}).get("items", []) or []
@@ -202,30 +343,27 @@ def search_pubmed(query: str, limit: int = 5) -> list[dict[str, Any]]:
 
     api_key = _env("NCBI_API_KEY")
     base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    headers = {"User-Agent": "Research-OS/1.0"}
     esearch = (
         f"{base}/esearch.fcgi?db=pubmed&retmode=json"
         f"&retmax={limit}&term={urllib.parse.quote(query)}"
     )
     if api_key:
         esearch += f"&api_key={api_key}"
-    try:
-        with urllib.request.urlopen(esearch, timeout=15) as resp:
-            ids = (json.loads(resp.read()).get("esearchresult") or {}).get("idlist", []) or []
-    except Exception as e:
-        _log_error(f"pubmed esearch failed: {e}")
+    data = _fetch_json_with_backoff(esearch, headers, provider="pubmed_esearch")
+    if data is None:
         return []
+    ids = (data.get("esearchresult") or {}).get("idlist", []) or []
     if not ids:
         return []
 
     esummary = f"{base}/esummary.fcgi?db=pubmed&retmode=json&id={','.join(ids)}"
     if api_key:
         esummary += f"&api_key={api_key}"
-    try:
-        with urllib.request.urlopen(esummary, timeout=15) as resp:
-            summary = (json.loads(resp.read()).get("result") or {})
-    except Exception as e:
-        _log_error(f"pubmed esummary failed: {e}")
+    data = _fetch_json_with_backoff(esummary, headers, provider="pubmed_esummary")
+    if data is None:
         return []
+    summary = data.get("result") or {}
 
     results = []
     for pmid in ids:

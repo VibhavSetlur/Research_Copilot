@@ -49,3 +49,38 @@ def test_task_run_unknown_command(tmp_path):
 def test_task_status_unknown_id(tmp_path):
     res = task_status("task_nonexistent", tmp_path)
     assert res["status"] == "error"
+
+
+def test_task_run_refuses_binary_not_on_allowlist(tmp_path):
+    # nmap is a real binary that wouldn't be on the default allowlist.
+    res = task_run("nmap -sS 192.168.1.0/24", tmp_path)
+    assert res["status"] == "error"
+    assert "allowlist" in res["message"].lower()
+
+
+def test_task_run_refuses_shell_metachars(tmp_path):
+    # 'sleep' is allowed, but the `;` / `>` chars are flagged.
+    res = task_run("sleep 1; rm -rf /tmp/foo", tmp_path)
+    assert res["status"] == "error"
+    assert "metacharacters" in res["message"].lower()
+
+
+def test_task_run_audit_log_records_refusal(tmp_path):
+    task_run("nmap -sS 192.168.1.0/24", tmp_path)
+    audit = tmp_path / "workspace" / "logs" / "task_audit.log"
+    assert audit.exists()
+    body = audit.read_text()
+    assert "accepted" in body
+    assert "nmap" in body
+
+
+def test_task_run_allow_arbitrary_bypasses_allowlist(tmp_path):
+    import yaml as _yaml
+    # Scaffold a researcher_config first.
+    cfg_path = tmp_path / "inputs" / "researcher_config.yaml"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(_yaml.dump({"runtime": {"allow_arbitrary": True}}))
+    # 'sleep' is allowed regardless; use a less-common binary that
+    # exists on most systems.
+    res = task_run("printf hi", tmp_path)
+    assert res["status"] == "success"

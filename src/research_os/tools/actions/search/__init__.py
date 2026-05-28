@@ -6,6 +6,7 @@ from research_os.tools.actions.search.literature import (  # noqa: F401
     step_literature_list,
 )
 from research_os.tools.actions.search.search import (  # noqa: F401
+    cache_clear,
     retrieve_literature,
     scrape_web,
     search_arxiv,

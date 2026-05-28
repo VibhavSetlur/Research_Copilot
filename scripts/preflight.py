@@ -307,6 +307,80 @@ def check_router_index_consistent():
     )
 
 
+def check_protocol_freshness():
+    """Warn (don't fail) when a protocol hasn't been touched in 180+ days.
+
+    Looks first at an explicit ``last_reviewed: YYYY-MM-DD`` field on
+    each protocol YAML; falls back to git mtime when absent. Tracks the
+    maintenance burden of having 47+ protocols by surfacing stale ones
+    early instead of letting them quietly rot. Returns True (pass) when
+    nothing is over the threshold; otherwise returns False with the
+    stale list as detail (preflight overall still passes since this is a
+    soft check, but the detail line catches the eye).
+    """
+    import subprocess as _subprocess
+    from datetime import date, datetime
+
+    import yaml
+
+    STALE_DAYS = 180
+    today = date.today()
+    stale: list[str] = []
+    total = 0
+
+    for f in sorted(PROTOCOLS_DIR.rglob("*.yaml")):
+        if "light" in f.parts or f.name.startswith("_"):
+            continue
+        total += 1
+        try:
+            data = yaml.safe_load(f.read_text()) or {}
+        except Exception:
+            continue
+
+        # Prefer explicit field.
+        last_reviewed_raw = data.get("last_reviewed")
+        last_date = None
+        if last_reviewed_raw:
+            try:
+                last_date = datetime.strptime(
+                    str(last_reviewed_raw)[:10], "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                pass
+
+        # Fallback: git mtime via `git log -1 --format=%cI`.
+        if last_date is None:
+            try:
+                res = _subprocess.run(
+                    ["git", "log", "-1", "--format=%cI", "--", str(f)],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(REPO_ROOT),
+                    timeout=5,
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    last_date = datetime.fromisoformat(
+                        res.stdout.strip().split("T")[0]
+                    ).date()
+            except (OSError, _subprocess.TimeoutExpired, ValueError):
+                pass
+
+        if last_date is None:
+            continue  # Untracked / new; not stale.
+        age = (today - last_date).days
+        if age > STALE_DAYS:
+            rel = f.relative_to(PROTOCOLS_DIR).with_suffix("").as_posix()
+            stale.append(f"{rel} ({age}d)")
+
+    if stale:
+        return True, (
+            f"{total} protocols, {len(stale)} flagged for review "
+            f"(>{STALE_DAYS}d): {', '.join(stale[:3])}"
+            + ("..." if len(stale) > 3 else "")
+        )
+    return True, f"{total} protocols, all reviewed within {STALE_DAYS}d"
+
+
 def check_scaffold_smoke():
     """Scaffold a temp workspace + verify the minimum files appear."""
     import tempfile
@@ -367,6 +441,7 @@ def main() -> int:
     tally.check("Dispatcher aliases resolve", check_dispatcher_aliases)
     tally.check("Protocol tool refs all resolve", check_protocols_referenced_tools_resolve)
     tally.check("Router index references resolve", check_router_index_consistent)
+    tally.check("Protocol freshness (review cadence)", check_protocol_freshness)
     tally.check("Workspace scaffold smoke", check_scaffold_smoke)
 
     print()

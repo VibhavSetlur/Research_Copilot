@@ -4,6 +4,7 @@ from research_os.tools.actions.exec.environment import (  # noqa: F401
     env_docker_generate,
     env_snapshot,
     package_install,
+    step_env_lock,
 )
 from research_os.tools.actions.exec.notebook import (  # noqa: F401
     execute_notebook,

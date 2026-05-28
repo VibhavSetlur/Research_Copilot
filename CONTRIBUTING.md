@@ -6,7 +6,7 @@ contribute changes that keep the surface small and the protocols sharp.
 ## Architecture in one paragraph
 
 The AI IDE is the brain (Cursor / Claude / Antigravity / OpenCode /
-VS Code / Windsurf / Continue / Aider). Research OS is the body: 94 MCP
+VS Code / Windsurf / Continue / Aider). Research OS is the body: 98 MCP
 tools and 47 YAML protocols, plus a router that turns a user prompt into
 a protocol pick + planned tool sequence without loading every YAML. It
 enforces immutability (`inputs/raw_data/`, `inputs/literature/`) and

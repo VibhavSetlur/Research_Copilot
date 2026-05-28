@@ -115,6 +115,168 @@ def env_snapshot(root: Path) -> dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
+def step_env_lock(
+    root: Path,
+    *,
+    step_id: str | None = None,
+    write_conda_yaml: bool = False,
+    write_dockerfile: bool = False,
+) -> dict[str, Any]:
+    """Lock the current Python (+ optional R/Julia/conda) env into a SPECIFIC step.
+
+    Writes:
+      workspace/<step>/environment/requirements.txt   (pip freeze)
+      workspace/<step>/environment/python_version.txt
+      workspace/<step>/environment/session.yaml       (manifest of languages)
+      workspace/<step>/environment/conda.yaml         (if write_conda_yaml)
+      workspace/<step>/environment/Dockerfile         (if write_dockerfile)
+
+    Unlike env_snapshot (which auto-targets the most-recent numbered step),
+    this tool requires an explicit step_id so years-later reproduction is
+    deterministic. If step_id is omitted, falls back to the active step
+    with a clear warning in the response.
+    """
+    try:
+        if step_id:
+            step_dir = root / "workspace" / step_id
+            if not step_dir.is_dir():
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Step `{step_id}` not found under workspace/. "
+                        "Check the numbered slug or call sys_path_list first."
+                    ),
+                }
+            warning = None
+        else:
+            active = _active_experiment_dir(root)
+            if not active:
+                return {
+                    "status": "error",
+                    "message": "No step_id given and no active numbered step found.",
+                }
+            step_dir = active
+            warning = (
+                f"step_id omitted — defaulted to most-recent active step "
+                f"`{active.name}`. Pass step_id explicitly for deterministic "
+                "long-term reproduction."
+            )
+
+        env_dir = step_dir / "environment"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        artifacts: list[str] = []
+
+        # Pin the interpreter version explicitly — pip freeze doesn't.
+        py_version = sys.version.split()[0]
+        (env_dir / "python_version.txt").write_text(py_version + "\n")
+        artifacts.append("python_version.txt")
+
+        # pip freeze
+        res = subprocess.run(
+            [sys.executable, "-m", "pip", "freeze"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if res.returncode == 0:
+            (env_dir / "requirements.txt").write_text(res.stdout)
+            artifacts.append("requirements.txt")
+        else:
+            return {
+                "status": "error",
+                "message": f"pip freeze failed: {res.stderr.strip()}",
+            }
+
+        session: dict[str, Any] = {
+            "step_id": step_dir.name,
+            "locked_at": _now_iso(),
+            "languages": [
+                {"name": "python", "version": py_version, "manager": "pip"}
+            ],
+        }
+
+        # R / Julia / conda passthroughs — only if a project-level lockfile
+        # exists. Step-local copies make the step self-contained.
+        for lock_name, lang, manager in [
+            ("renv.lock", "R", "renv"),
+            ("Project.toml", "julia", "Pkg"),
+            ("environment.yml", "conda", "conda"),
+        ]:
+            src = root / lock_name
+            if src.exists():
+                shutil.copy(src, env_dir / lock_name)
+                session["languages"].append({"name": lang, "manager": manager})
+                artifacts.append(lock_name)
+                # Julia: also copy Manifest.toml if present.
+                if lock_name == "Project.toml":
+                    man = root / "Manifest.toml"
+                    if man.exists():
+                        shutil.copy(man, env_dir / "Manifest.toml")
+                        artifacts.append("Manifest.toml")
+
+        (env_dir / "session.yaml").write_text(
+            yaml.dump(session, sort_keys=False)
+        )
+        artifacts.append("session.yaml")
+
+        if write_conda_yaml:
+            # Synthesize a conda.yaml that pins python + lists pip deps.
+            conda_doc = {
+                "name": f"research-os-{step_dir.name}",
+                "channels": ["defaults"],
+                "dependencies": [
+                    f"python={py_version}",
+                    "pip",
+                    {
+                        "pip": [
+                            ln.strip()
+                            for ln in (env_dir / "requirements.txt").read_text().splitlines()
+                            if ln.strip() and not ln.startswith("#")
+                        ]
+                    },
+                ],
+            }
+            (env_dir / "conda.yaml").write_text(yaml.dump(conda_doc, sort_keys=False))
+            artifacts.append("conda.yaml")
+
+        if write_dockerfile:
+            lines = [
+                f"# Auto-generated per-step lock for {step_dir.name}",
+                f"FROM python:{py_version.rsplit('.', 1)[0]}-slim",
+                "ENV DEBIAN_FRONTEND=noninteractive",
+                "WORKDIR /step",
+                "COPY environment/requirements.txt /step/requirements.txt",
+                "RUN pip install --no-cache-dir -r requirements.txt",
+                "COPY . /step",
+                'CMD ["/bin/bash"]',
+            ]
+            (env_dir / "Dockerfile").write_text("\n".join(lines) + "\n")
+            artifacts.append("Dockerfile")
+
+        result = {
+            "status": "success",
+            "step_id": step_dir.name,
+            "env_dir": str(env_dir.relative_to(root)),
+            "artifacts": artifacts,
+            "python_version": py_version,
+            "package_count": len(
+                [ln for ln in (env_dir / "requirements.txt").read_text().splitlines() if ln.strip()]
+            ),
+        }
+        if warning:
+            result["warning"] = warning
+        return result
+    except Exception as e:
+        logger.exception("step_env_lock failed")
+        return {"status": "error", "message": str(e)}
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
+
+
 def env_docker_generate(root: Path) -> dict[str, Any]:
     """Generate a Dockerfile from the latest environment snapshot."""
     try:

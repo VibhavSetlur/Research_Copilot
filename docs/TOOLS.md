@@ -1,6 +1,6 @@
 # Tool Catalog
 
-**94 MCP tools** across three namespaces. Names use underscores; dot
+**98 MCP tools** across three namespaces. Names use underscores; dot
 notation (`sys.state.get`) and legacy names (`sys_guidance_get`) auto-rewrite.
 
 For most users this is a quick lookup. For *when* to use a tool, see
@@ -31,6 +31,8 @@ the router picks one for you.
 | `sys_boot` | (Listed above — call first.) |
 | `sys_tool_describe` | (Listed above — full description on demand.) |
 | `sys_dep_inventory` | (Listed above — missing-extras report.) |
+| `sys_active_tools` | Given a protocol name, returns the tight ~10-15 tool shortlist (essentials + decomposition tools) the AI should prefer while executing it. |
+| `tool_workflow_dag` | Build a DAG of numbered steps + data dependencies; write `docs/workflow_dag.mermaid` (+ PNG if `mmdc` present). Auto-refreshed on path create/abandon. |
 | `sys_protocol_get` | Load a protocol YAML. Supports `format='summary'` (~300 tokens), `format='step' step_id='<id>'`, or `format='full'`. |
 | `sys_protocol_list` | List every protocol + one-line summary. |
 | `sys_protocol_next` | Recommend the next protocol from state + on-disk artifacts. |
@@ -85,6 +87,7 @@ the router picks one for you.
 | `tool_literature_download` | Save a paper PDF. Pass `step_id='NN_<slug>'` to scope to a step. |
 | `tool_literature_search_and_save` | Search + download top-N PDFs in one shot. |
 | `tool_step_literature_list` | List PDFs in one step's literature/ (or across all steps). |
+| `tool_cache_clear` | Wipe cached search results (per-provider or older-than-N-days). Cache TTL defaults to 24h (configurable via `runtime.cache_ttl_seconds`). |
 
 ### Script execution
 
@@ -97,6 +100,7 @@ the router picks one for you.
 | `tool_notebook_exec` | `.ipynb` (jupyter nbconvert --execute --inplace) |
 | `tool_rmarkdown_render` | `.Rmd` / `.qmd` (rmarkdown::render OR quarto render) |
 | `tool_package_install` | pip install + append to environment/requirements.txt |
+| `tool_step_env_lock` | Pin per-step `requirements.txt` + `python_version.txt` (+ optional `conda.yaml` / `Dockerfile`). Use for any step you intend to publish. |
 
 ### Long-running background work
 

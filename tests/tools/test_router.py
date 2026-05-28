@@ -1,10 +1,11 @@
-"""Tests for sys_boot, tool_route (hierarchical), per-turn batching, and
-the active-plan decomposition."""
+"""Tests for sys_boot, tool_route (hierarchical), per-turn batching,
+active tool scoping, and the active-plan decomposition."""
 
 import json
 
 from research_os.project_ops import scaffold_minimal_workspace
 from research_os.tools.actions.router import (
+    active_tools_for_protocol,
     advance_plan,
     clear_active_plan,
     plan_turn,
@@ -218,6 +219,37 @@ def test_plan_turn_small_model_one_step_per_turn(tmp_path):
     assert res["model_profile"] == "small"
     assert res["turn_budget"] == 1
     assert len(res["this_turn"]) == 1
+
+
+def test_route_returns_active_tools(tmp_path):
+    """tool_route response must include an active_tools shortlist."""
+    scaffold_minimal_workspace(tmp_path, "Active Tools Test")
+    res = route_request("fill the intake", tmp_path)
+    assert res["status"] == "success"
+    assert "active_tools" in res
+    tools = res["active_tools"]
+    assert isinstance(tools, list)
+    assert "sys_boot" in tools         # essential
+    assert "tool_route" in tools       # essential
+    assert "tool_intake_autofill" in tools  # protocol's shortcut
+
+
+def test_active_tools_for_protocol_direct_lookup(tmp_path):
+    scaffold_minimal_workspace(tmp_path, "Active Tools Direct")
+    res = active_tools_for_protocol("synthesis/synthesis_paper")
+    assert res["status"] == "success"
+    assert res["intent_class"] == "synthesize"
+    assert res["sub_intent"] == "paper"
+    # Decomposition includes tool_synthesize.
+    assert "tool_synthesize" in res["active_tools"]
+    # Essentials still present.
+    assert "sys_boot" in res["active_tools"]
+    assert res["active_tools_count"] > 10
+
+
+def test_active_tools_for_unknown_protocol(tmp_path):
+    res = active_tools_for_protocol("nonexistent/ghost")
+    assert res["status"] == "error"
 
 
 def test_plan_turn_recommends_chat_split_when_long(tmp_path):

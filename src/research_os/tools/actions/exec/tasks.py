@@ -4,6 +4,20 @@ Designed for shared-server workflows: a long-running script gets backgrounded
 so the conversation doesn't block. The AI polls `tool_task_status` instead of
 waiting. State persists to ``.os_state/tasks/`` so tasks survive a server
 restart (you can still query status by PID).
+
+Security model (configurable via researcher_config.runtime):
+  command_allowlist     list of allowed argv[0] binaries (basename match).
+                        Default = common interpreters + git + a small set.
+  allow_arbitrary       bool. When true, allowlist check is skipped.
+  max_cpu_seconds       per-process CPU time cap (setrlimit RLIMIT_CPU).
+  max_memory_mb         per-process RSS cap (setrlimit RLIMIT_AS).
+  max_file_size_mb      per-process file-size cap (setrlimit RLIMIT_FSIZE).
+
+A potentially dangerous shell metachar (`;`, `|`, `>`, `<`, `&&`, `||`,
+`$(`, backtick) in the raw command string warns or refuses based on the
+``allow_shell_meta`` flag.
+
+Every accepted task is logged to ``workspace/logs/task_audit.log``.
 """
 
 from __future__ import annotations
@@ -11,6 +25,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import resource
 import shlex
 import signal
 import subprocess
@@ -20,9 +36,38 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 logger = logging.getLogger("research_os.tools.tasks")
 
 TASKS_DIR_NAME = "tasks"
+
+# Default allowlist — common research interpreters + a small set of helpers.
+# Add to / override with `runtime.command_allowlist` in researcher_config.
+_DEFAULT_ALLOWLIST = {
+    # Interpreters
+    "python", "python3", "python3.10", "python3.11", "python3.12",
+    "Rscript", "R",
+    "julia",
+    "bash", "sh",
+    "jupyter", "jupyter-nbconvert", "quarto",
+    "ipython",
+    # Dev + research helpers
+    "git",
+    "make",
+    "node", "npm",
+    "snakemake", "nextflow",
+    "pytest", "tox", "nox",
+    "rmarkdown", "knitr",
+    "stata", "mlr",
+    # Safe coreutils (used in test scaffolding + benign placeholders).
+    # These don't write outside cwd by default and have no destructive
+    # behaviour that isn't already obvious from the argv.
+    "sleep", "true", "false", "echo",
+}
+
+# Shell metachars that warrant scrutiny (might still be legitimate).
+_DANGEROUS_META = re.compile(r"[;|&]{2}|[;|&<>`]|\$\(")
 
 
 def _tasks_dir(root: Path) -> Path:
@@ -46,6 +91,120 @@ def _load(task_path: Path) -> dict[str, Any] | None:
         return json.loads(task_path.read_text())
     except Exception:
         return None
+
+
+def _read_runtime_config(root: Path) -> dict:
+    cfg_path = root / "inputs" / "researcher_config.yaml"
+    if not cfg_path.exists():
+        return {}
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text()) or {}
+        return (cfg.get("runtime") or {})
+    except Exception:
+        return {}
+
+
+def _check_command_safety(
+    raw_command: str | None,
+    argv: list[str],
+    runtime_cfg: dict,
+) -> tuple[bool, str]:
+    """Return (ok, reason). When not ok, reason is the refusal text."""
+    if not argv:
+        return False, "Empty argv."
+
+    if not runtime_cfg.get("allow_arbitrary"):
+        allowlist = set(_DEFAULT_ALLOWLIST)
+        extra = runtime_cfg.get("command_allowlist") or []
+        if isinstance(extra, list):
+            allowlist.update(str(x) for x in extra)
+        binary = Path(argv[0]).name
+        if binary not in allowlist:
+            return False, (
+                f"Refused: `{binary}` not on the command_allowlist. "
+                f"Either add it via researcher_config "
+                f"(runtime.command_allowlist) or set "
+                f"runtime.allow_arbitrary=true for this workspace."
+            )
+
+    if raw_command and not runtime_cfg.get("allow_shell_meta", False):
+        if _DANGEROUS_META.search(raw_command):
+            return False, (
+                "Refused: command contains shell metacharacters "
+                "(`;`, `|`, `&&`, `||`, `>`, `<`, `$(...)`, backtick). "
+                "Wrap the work in an actual script and re-invoke, or set "
+                "runtime.allow_shell_meta=true if you know what you're doing."
+            )
+    return True, ""
+
+
+def _audit_log(
+    root: Path,
+    *,
+    task_id: str,
+    argv: list[str],
+    cwd: str,
+    description: str,
+    pid: int | None,
+    accepted: bool,
+    reason: str = "",
+) -> None:
+    log_path = root / "workspace" / "logs" / "task_audit.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": _now(),
+        "task_id": task_id,
+        "argv": argv,
+        "cwd": cwd,
+        "description": description,
+        "pid": pid,
+        "accepted": accepted,
+        "reason": reason,
+    }
+    try:
+        with open(log_path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as e:
+        logger.warning(f"task_audit write failed: {e}")
+
+
+def _make_preexec(runtime_cfg: dict):
+    """Return a preexec_fn that applies resource limits in the child.
+
+    Returns None if no limits configured (avoids fork-time overhead).
+    """
+    max_cpu = runtime_cfg.get("max_cpu_seconds")
+    max_mem_mb = runtime_cfg.get("max_memory_mb")
+    max_fsize_mb = runtime_cfg.get("max_file_size_mb")
+    if not any((max_cpu, max_mem_mb, max_fsize_mb)):
+        return None
+
+    def _preexec() -> None:
+        # Detach from controlling terminal (already done by start_new_session,
+        # but harmless to repeat).
+        try:
+            os.setsid()
+        except OSError:
+            pass
+        if max_cpu:
+            try:
+                resource.setrlimit(resource.RLIMIT_CPU, (int(max_cpu), int(max_cpu)))
+            except (ValueError, OSError):
+                pass
+        if max_mem_mb:
+            try:
+                cap = int(max_mem_mb) * 1024 * 1024
+                resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+            except (ValueError, OSError):
+                pass
+        if max_fsize_mb:
+            try:
+                cap = int(max_fsize_mb) * 1024 * 1024
+                resource.setrlimit(resource.RLIMIT_FSIZE, (cap, cap))
+            except (ValueError, OSError):
+                pass
+
+    return _preexec
 
 
 def _pid_alive(pid: int) -> bool:
@@ -97,17 +256,25 @@ def task_run(command: str | list[str], root: Path, *, cwd: str | None = None,
 
     ``command`` can be a string (shell-tokenised) or a list of argv items.
     stdout + stderr are tee'd to ``.os_state/tasks/<id>.log``.
+
+    Safety: argv[0] is checked against ``runtime.command_allowlist`` (set
+    ``allow_arbitrary=true`` to skip). Shell metacharacters in a string
+    command are refused unless ``allow_shell_meta=true``. Resource limits
+    (CPU / memory / file size) are applied via ``setrlimit`` when
+    configured. Every accepted task is audited to
+    ``workspace/logs/task_audit.log``.
     """
     try:
-        task_id = f"task_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        task_id = (
+            f"task_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            f"_{uuid.uuid4().hex[:6]}"
+        )
         tasks_dir = _tasks_dir(root)
         log_path = tasks_dir / f"{task_id}.log"
         meta_path = tasks_dir / f"{task_id}.json"
 
-        if isinstance(command, str):
-            argv = shlex.split(command)
-        else:
-            argv = list(command)
+        raw_command = command if isinstance(command, str) else None
+        argv = shlex.split(command) if isinstance(command, str) else list(command)
 
         # Resolve cwd against root if relative.
         if cwd:
@@ -118,6 +285,24 @@ def task_run(command: str | list[str], root: Path, *, cwd: str | None = None,
         else:
             cwd_str = str(root)
 
+        # Safety check FIRST — refuse early, never spawn.
+        runtime_cfg = _read_runtime_config(root)
+        ok, reason = _check_command_safety(raw_command, argv, runtime_cfg)
+        if not ok:
+            _audit_log(
+                root,
+                task_id=task_id,
+                argv=argv,
+                cwd=cwd_str,
+                description=description,
+                pid=None,
+                accepted=False,
+                reason=reason,
+            )
+            return {"status": "error", "message": reason}
+
+        preexec_fn = _make_preexec(runtime_cfg)
+
         log_file = open(log_path, "w")
         try:
             proc = subprocess.Popen(
@@ -126,9 +311,20 @@ def task_run(command: str | list[str], root: Path, *, cwd: str | None = None,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
+                preexec_fn=preexec_fn,
             )
         except FileNotFoundError as e:
             log_file.close()
+            _audit_log(
+                root,
+                task_id=task_id,
+                argv=argv,
+                cwd=cwd_str,
+                description=description,
+                pid=None,
+                accepted=False,
+                reason=f"Command not found: {e}",
+            )
             return {"status": "error", "message": f"Command not found: {e}"}
 
         meta = {
@@ -141,8 +337,22 @@ def task_run(command: str | list[str], root: Path, *, cwd: str | None = None,
             "started_at": _now(),
             "status": "running",
             "log_path": str(log_path.relative_to(root)),
+            "limits": {
+                k: runtime_cfg.get(k)
+                for k in ("max_cpu_seconds", "max_memory_mb", "max_file_size_mb")
+                if runtime_cfg.get(k)
+            },
         }
         _save(meta_path, meta)
+        _audit_log(
+            root,
+            task_id=task_id,
+            argv=argv,
+            cwd=cwd_str,
+            description=description,
+            pid=proc.pid,
+            accepted=True,
+        )
         # Don't wait — return immediately. The file handle stays open in the
         # subprocess; the parent reference is fine to drop.
         return {
@@ -150,6 +360,7 @@ def task_run(command: str | list[str], root: Path, *, cwd: str | None = None,
             "task_id": task_id,
             "pid": proc.pid,
             "log_path": meta["log_path"],
+            "limits": meta["limits"],
             "message": f"Started background task {task_id} (pid {proc.pid}).",
         }
     except Exception as e:

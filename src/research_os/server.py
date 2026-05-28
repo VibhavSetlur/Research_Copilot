@@ -250,6 +250,16 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
             "required": ["tool_name"],
         },
     },
+    "sys_active_tools": {
+        "short": "Active tool shortlist for a protocol (essentials + decomposition tools).",
+        "description": "Given a protocol name, return the tight set of tools the AI should prefer while executing it: ~10-15 tools = essentials + everything the protocol's decomposition actually calls. Use after sys_protocol_get to scope your working set instead of triaging all 94 tools per turn.",
+        "category": "routing",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"protocol_name": {"type": "string"}},
+            "required": ["protocol_name"],
+        },
+    },
 
     # ── Protocols / guidance ──────────────────────────────────────────
     "sys_protocol_get": {
@@ -1216,6 +1226,57 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
         "category": "state",
         "inputSchema": {"type": "object", "properties": {}},
     },
+
+    # ── New: caching, DAG, step env lock ─────────────────────────────
+    "tool_cache_clear": {
+        "short": "Wipe cached search results (optionally per-provider or older-than-N-days).",
+        "description": "Manage the file-backed search cache at .os_state/cache/search/<provider>/. Call when you suspect stale results, or after a long break to free disk. Cache TTL defaults to 24h (configurable via runtime.cache_ttl_seconds).",
+        "category": "search",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "description": "Restrict to one provider (semantic_scholar | crossref | pubmed | arxiv | web). Omit for all.",
+                },
+                "older_than_days": {
+                    "type": "number",
+                    "description": "Only delete entries older than this many days. Omit for all entries.",
+                },
+            },
+        },
+    },
+    "tool_step_env_lock": {
+        "short": "Pin per-step requirements.txt + python_version.txt (optionally conda.yaml + Dockerfile).",
+        "description": "Lock the current Python environment INSIDE a specific numbered step's environment/ folder so the step is reproducible years later, even if the global workspace env drifts. Writes requirements.txt + python_version.txt + session.yaml. Pass write_conda_yaml=true to add a conda spec; write_dockerfile=true to add a per-step Dockerfile. Prefer this over sys_env_snapshot for any step you intend to publish.",
+        "category": "execution",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "step_id": {
+                    "type": "string",
+                    "description": "Numbered step slug (e.g. '01_baseline_eda'). Defaults to the most-recent active step but a warning is returned.",
+                },
+                "write_conda_yaml": {"type": "boolean"},
+                "write_dockerfile": {"type": "boolean"},
+            },
+        },
+    },
+    "tool_workflow_dag": {
+        "short": "Build a DAG of numbered steps + their data dependencies; write docs/workflow_dag.mermaid.",
+        "description": "Walks each numbered step's data/input symlinks to derive cross-step dependencies, then writes docs/workflow_dag.mermaid with colour-coded nodes (active / completed / dead_end). Pass render_png=true to also emit a PNG (requires mmdc — npm install -g @mermaid-js/mermaid-cli). Auto-refreshed by sys_path_create and sys_path_abandon so the DAG stays in sync without manual calls.",
+        "category": "state",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "render_png": {"type": "boolean"},
+                "output_dir": {
+                    "type": "string",
+                    "description": "Where to write (default: docs).",
+                },
+            },
+        },
+    },
 }
 
 
@@ -1355,6 +1416,58 @@ def _handle_tool_plan_clear(name, arguments, root):
     if res.get("status") == "success":
         return _text(_success(res))
     return _text(_error(res.get("message", "tool_plan_clear failed")))
+
+
+def _handle_sys_active_tools(name, arguments, root):
+    from research_os.tools.actions.router import active_tools_for_protocol
+
+    p_name = arguments.get("protocol_name")
+    if not p_name:
+        return _text(_error("protocol_name is required"))
+    res = active_tools_for_protocol(p_name)
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "sys_active_tools failed")))
+
+
+def _handle_tool_cache_clear(name, arguments, root):
+    from research_os.tools.actions.search import cache_clear
+
+    res = cache_clear(
+        root,
+        source=arguments.get("source"),
+        older_than_days=arguments.get("older_than_days"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_cache_clear failed")))
+
+
+def _handle_tool_step_env_lock(name, arguments, root):
+    from research_os.tools.actions.exec import step_env_lock
+
+    res = step_env_lock(
+        root,
+        step_id=arguments.get("step_id"),
+        write_conda_yaml=bool(arguments.get("write_conda_yaml", False)),
+        write_dockerfile=bool(arguments.get("write_dockerfile", False)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_step_env_lock failed")))
+
+
+def _handle_tool_workflow_dag(name, arguments, root):
+    from research_os.tools.actions.state import workflow_dag
+
+    res = workflow_dag(
+        root,
+        render_png=bool(arguments.get("render_png", False)),
+        output_dir=arguments.get("output_dir", "docs"),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "tool_workflow_dag failed")))
 
 
 def _handle_sys_tool_describe(name, arguments, root):
@@ -2312,6 +2425,10 @@ _HANDLERS = {
     "tool_plan_turn": _handle_tool_plan_turn,
     "tool_plan_clear": _handle_tool_plan_clear,
     "sys_tool_describe": _handle_sys_tool_describe,
+    "sys_active_tools": _handle_sys_active_tools,
+    "tool_cache_clear": _handle_tool_cache_clear,
+    "tool_step_env_lock": _handle_tool_step_env_lock,
+    "tool_workflow_dag": _handle_tool_workflow_dag,
     # protocol
     "sys_protocol_get": _handle_sys_protocol_get,
     "sys_protocol_list": _handle_sys_protocol_list,

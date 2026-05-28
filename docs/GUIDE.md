@@ -128,7 +128,7 @@ say "not done yet".
 
 ---
 
-## 5. MCP tools (94)
+## 5. MCP tools (98)
 
 > All names use underscores. Dot notation + legacy names are auto-rewritten.
 > Full catalogue: [TOOLS.md](TOOLS.md).
