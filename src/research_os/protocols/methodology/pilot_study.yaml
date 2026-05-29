@@ -12,6 +12,17 @@ trigger: |
   full study", or research_design indicates a new methodology that hasn't
   been used by this team before.
 
+editorial_voice:
+  mode: guidance
+  rules:
+    - "A pilot is not a small confirmatory study. If the writeup
+       reports the primary effect estimate as a headline, the pilot
+       was misused."
+    - "Variance estimates from a pilot are noisy by construction —
+       use a conservative inflation factor (the UCL of the pilot
+       variance is a defensible default) when feeding them into a
+       full-study power calculation."
+
 steps:
   - id: declare_pilot_aim
     name: Declare Pilot Aim Explicitly

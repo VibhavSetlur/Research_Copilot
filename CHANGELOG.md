@@ -4,6 +4,134 @@ All notable changes to Research OS are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) ·
 versioning: [SemVer](https://semver.org).
 
+## [2.1.0] — Reasoning scaffolds, branch-aware paths, domain-agnostic deep research
+
+Doctrine + capability release. Codifies the protocol-design principle
+that should have been explicit from day one (**scaffolds, not
+scripts**), prunes prescriptive content that violated it, adds a
+literature-grounded **deep-domain-research** layer for subfields where
+the analysis is a multi-stage canonical pipeline, ships
+**branch-aware path naming** so alternative analytical paths live
+side-by-side under explicit lineage tags, and adds a confidence-gated
+**alternative-path proposal** tool. Backward-compatible — no breaking
+changes to state schema or tool signatures; new behaviours are opt-in.
+
+### Principle (new) — scaffold not script
+A new doctrine doc at [`docs/PROTOCOL_DOCTRINE.md`](docs/PROTOCOL_DOCTRINE.md)
+states the operating principle: every protocol names the QUESTIONS
+the AI must answer + the GROUNDING it must cite, never the answers.
+Tools, thresholds, finite method menus, and canned step sequences are
+prescription and out of scope. The doctrine names the patterns that
+count as each, with concrete examples. `CONTRIBUTING.md` now links to
+it as required reading before protocol edits.
+
+### Methodology protocols — de-prescriptivized
+All 14 methodology protocols re-audited against the doctrine.
+Substantive rewrites:
+* `methodology_selection.yaml` — removed the 14-row
+  `(outcome × structure × dim) → method` lookup table. Replaced with
+  a literature-grounded candidate-enumeration scaffold that demands
+  the AI surface candidates via `tool_research_method` and never pick
+  from memory or a fixed menu. The list-of-canned-assumption-tests is
+  similarly replaced with a "name the falsifying diagnostic, cite
+  the source" scaffold.
+* `clinical_trials.yaml` — removed |SMD| > 0.10, MICE-as-default, the
+  canned step sequence. Replaced with reasoning about randomisation,
+  missingness mechanism, analysis population, and SAP alignment.
+* `survey_psychometrics.yaml` — removed CFI ≥ 0.95, RMSEA ≤ 0.06,
+  α-band thresholds. Replaced with field-cited reliability and
+  factor-structure reasoning.
+* `machine_learning.yaml` — removed 70/15/15, SHAP-as-default, named
+  metrics. Replaced with a "split mirrors deployment" scaffold +
+  leakage audit + cost-structure-driven metric reasoning.
+* `causal_inference_deep.yaml` — removed dowhy/econml-as-default,
+  identification-strategy table. Replaced with DAG-first reasoning +
+  literature-grounded identification + sensitivity-to-unmeasured-
+  confounding scaffold.
+* `meta_analysis.yaml` — removed I² interpretation cutoffs and named
+  estimators; effect-size scale + pooling-model choice now follow
+  from the outcome family + field convention.
+* `timeseries_analysis.yaml` — removed the method-family lookup table
+  (`Univariate · stationary · short → ARMA`, etc.); replaced with
+  reasoning about the dimensions that drive method choice +
+  literature-grounded candidate enumeration.
+* `qualitative_research.yaml` — removed the "aim for 30-100 codes /
+  5-20 categories / 3-7 themes" prescriptions; counts now follow
+  data + analytic tradition.
+
+Light touches (added `editorial_voice` blocks anchoring the scaffold
+tone; no content rewrites): `ablation_study`, `pilot_study`,
+`mixed_methods`, `simulation_studies`, `replication_study`.
+
+`bayesian_analysis` already met the doctrine — unchanged.
+
+### New protocol — `methodology/deep_domain_research`
+Domain-agnostic reasoning scaffold for entering an unfamiliar subfield.
+Six steps: identify the specific subfield from project signals (not
+from a list in the protocol), survey the literature for the field's
+canonical pipeline with ≥3 cited sources, propose a per-stage
+skeleton (tool × language × runtime — polyglot pipelines are
+first-class), build an assumption matrix that names falsifying
+diagnostics per stage, run a confidence-gated alternative-path
+scan, commit. `domain_analysis` routes here when the subfield is
+non-trivial; `methodology_selection` consults the committed
+`docs/pipeline_plan.md` first when it exists. Contains zero
+domain-specific defaults — the AI generates everything per project
+from the literature.
+
+### New tool — `tool_alternative_path_propose`
+Confidence-gated alternative-pipeline scan. Pulls literature on the
+user's chosen method AND on alternatives framed for the specific data
+shape, counts comparative-evidence signals, and returns either
+`recommendation: commit_user_method` (silent — default) or
+`recommendation: branch_to_alternative` (surface ONE alternative
+once, branch on confirmation). Anti-spam by design.
+
+### Branch-aware path naming
+`sys_path_create` gains a `branch_of` parameter. When set, the new
+folder is named `NN_<slug>_path_<k>` (e.g. `05_glmm_path_1`) and its
+`data/input` symlinks to the PARENT step's output rather than to the
+previous numbered step. The branch lineage flows through every
+subsequent step created with `branch_of` pointing back into the same
+lineage — so a forked analytical path's steps share the `_path_<k>`
+suffix. Dead-ends stack: `05_glmm_path_1` →
+`05_glmm_path_1__DEAD_END`. State records `branch_of` +
+`path_lineage` per path.
+
+### Config presets — removed
+The 10 modality-specific preset configs (`rct_config`, `genomics`,
+`psychometric`, `epidemiology_observational`, `nlp_benchmark`,
+`economic_panel`, `qualitative_research`, `geospatial`, `time_series`,
+`survival_analysis`) are deleted. They violated the scaffold doctrine
+by baking in canonical pipelines, expected columns, and "right"
+reporting standards per modality. There is now ONE template:
+`templates/researcher_config.yaml` (all fields blank). The AI fills it
+per-project from intake signals + literature.
+
+For *patterns* the AI can recognise without copying, see
+[`docs/DOMAIN_HINT_EXAMPLES.md`](docs/DOMAIN_HINT_EXAMPLES.md) —
+three cross-domain reasoning patterns, explicitly not a taxonomy.
+
+### Wiring
+* `_router_index.yaml` adds `subfield_pipeline` sub-intent and the
+  `methodology/deep_domain_research` entry with cross-domain trigger
+  phrases.
+* `domain/domain_analysis.yaml` gains a `route_to_deep_domain_research`
+  step and points to the new protocol when the subfield is non-trivial.
+* `methodology/methodology_selection.yaml` gains a
+  `load_pipeline_plan_if_present` first step so it operates on top of
+  the committed pipeline rather than from a blank slate.
+
+### Tests
+* `tests/unit/test_branch_paths.py` — 9 tests covering branch naming,
+  lineage inheritance through downstream steps, dead-end suffix
+  stacking, data/input wiring to the parent's output.
+
+### Validation
+* 53 protocols load (13 preflight checks pass), 138 tools wired
+* 259 tests pass, 1 skipped
+* `ruff check src tests scripts` clean
+
 ## [2.0.0] — National-lab quality overhaul
 
 Major release. 137 MCP tools (up from 98), 52 protocols (up from 47),

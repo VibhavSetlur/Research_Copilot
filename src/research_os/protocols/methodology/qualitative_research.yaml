@@ -40,30 +40,38 @@ steps:
       a .md copy via sys_file_write so coding can be text-aware.
 
   - id: coding_pass_1
-    name: Open Coding — First Pass
+    name: Open coding — first pass
     description: |
-      Use scripts/qual_code_v1.py (or .R) to produce outputs/reports/
-      open_codes.md with: code label, definition, source quote (with
-      transcript + line ref). Aim for 30-100 codes; don't pre-cluster.
-      Custom or assisted (LLM-aided) coding is allowed — mem_methods_append
+      Produce `outputs/reports/open_codes.md` with one row per code:
+      label, definition, source quote (with transcript + line ref).
+      The number of codes is data-driven, not target-driven — code
+      until the next transcript stops producing new codes. Custom or
+      assisted (LLM-aided) coding is allowed; `mem_methods_append`
       MUST document which.
 
   - id: coding_pass_2
-    name: Axial / Focused Coding
+    name: Axial / focused coding
     description: |
-      Cluster open codes into 5-20 categories. Document the codebook in
-      outputs/reports/codebook.md with: code, definition, inclusion criteria,
-      exclusion criteria, exemplar quote.
+      Cluster open codes into categories. Document the codebook in
+      `outputs/reports/codebook.md` with: code, definition, inclusion
+      criteria, exclusion criteria, exemplar quote. The number of
+      categories follows from the data + the analytic tradition
+      (thematic analysis tends to converge to fewer than grounded
+      theory's axial step); cite the methodological source for the
+      tradition being followed.
 
   - id: theme_synthesis
-    name: Theme Synthesis
+    name: Theme synthesis
     description: |
-      Distil 3-7 themes. Each theme gets a section in
-      outputs/reports/themes.md:
+      Distil themes from the categories. The right number is whatever
+      the data supports — three themes can be sufficient for a
+      focused study; a deep ethnography may carry more. Each theme
+      gets a section in `outputs/reports/themes.md`:
         - Theme name (verb-phrase or descriptive)
         - One-sentence essence
         - Constituent codes
-        - 2-4 illustrative quotes (with transcript IDs)
+        - Illustrative quotes (with transcript IDs) — enough to
+          demonstrate the theme without flooding the reader
         - Negative / disconfirming case, if any
 
   - id: trustworthiness

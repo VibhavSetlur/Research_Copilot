@@ -1,0 +1,169 @@
+# Protocol doctrine — scaffold, not script
+
+A Research OS protocol gives the AI a **scaffold for reasoning**, not
+a **script to execute**. This is the single most important rule for
+anyone editing a protocol or adding a new one. If you internalise
+nothing else from this file, internalise that.
+
+## The principle
+
+A scaffold names:
+1. The **questions** worth asking about a project
+2. The **dimensions** worth reasoning over
+3. The **grounding** the answer must cite
+4. The **artefacts** that record the reasoning
+
+A scaffold does NOT name:
+1. The specific method
+2. The specific tool / library / CLI
+3. The specific threshold / cutoff / hyperparameter
+4. The specific step sequence
+
+The AI fills in the specifics per project, from the literature, never
+from training memory or from a table in the protocol.
+
+## Why
+
+Three reasons.
+
+**Reasoning generalises; recipes don't.** A protocol that says "use
+DESeq2 with ~condition design" is correct for one decade in one
+subfield and silently wrong everywhere else. A protocol that says
+"reason about the outcome's distributional family + the dependency
+structure + the field's current best-practice estimator" is correct
+in every era of every field.
+
+**Prescription erodes the AI's reasoning surface.** When a protocol
+hands the AI an answer, the AI stops looking — even when the answer
+is wrong for the current project. Scaffolds force the AI to *justify*
+each commitment, which surfaces the cases where the default would
+have been wrong.
+
+**Maintenance debt.** A repository of 47 prescriptive protocols
+becomes a repository of 47 things that go stale at different rates.
+Scaffolds are stable across decades because the *questions* don't
+change as fast as the *answers*.
+
+## How to spot prescription in a protocol
+
+A description that contains any of the below is suspect:
+
+- A finite menu of methods mapped from data shape, like
+  `Continuous · independent · low-D → OLS / Ridge / LASSO`. *(Real
+  example, now removed.)*
+- A named threshold without a citation, like `CFI ≥ 0.95`,
+  `|SMD| > 0.10`, `I² > 75% = considerable`. The threshold may even
+  be the field convention — but stating it without a source pushes
+  the AI to copy it instead of looking it up for THIS field.
+- A specific tool / library name as the default, like "use dowhy /
+  econml / SHAP / MICE". The tool is fine to mention as an example;
+  it is not fine to default-pick.
+- A canned step sequence with no branch points, like
+  "randomisation_check → ITT/PP → MICE → primary_analysis →
+  safety → CONSORT". Each step might be reasonable; the
+  fixed order asserts that this is the right shape for every project
+  in the methodology, which it never is.
+- A specific split ratio, sample-size cutoff, or count, like
+  "70/15/15 split", "Aim for 30-100 codes", "minimum 10 studies".
+  Numerical defaults masquerade as scaffolds; they're recipes.
+
+## How to write scaffold language
+
+Patterns that work:
+
+- **Name the question, not the answer.** "What's the outcome's
+  distributional family on this sample?" beats "Use a Poisson GLM for
+  count data."
+- **Name the dimension, not the value.** "Justify the split from the
+  deployment regime" beats "Use a 70/15/15 split."
+- **Demand grounding, not a tool.** "Surface the field's current
+  best-practice estimator via `tool_research_method`" beats "Use
+  DESeq2."
+- **Frame thresholds as field-specific.** "Cite the source for
+  whichever cutoff is used" beats "Use CFI ≥ 0.95."
+- **State the failure mode, not the procedure.** "Treating clusters
+  as fixed when they were fit on the same data inflates type-I error"
+  beats "Run the test on a holdout sample."
+
+## When prescription IS the right answer
+
+Some commitments aren't optional and shouldn't be scaffolded around:
+
+- **Reproducibility primitives.** "Set RNG seeds explicitly; print
+  library versions" is prescription, but it's prescription about the
+  *system*, not about the *science*. Keep it.
+- **Mechanical conventions.** "Save figures to
+  `outputs/figures/` at ≥300 DPI" is prescription. It's about file
+  layout that downstream tooling depends on, not about the analysis.
+  Keep it.
+- **Universal failures of inference.** "Cluster-then-DE without
+  pseudo-bulk aggregation is pseudo-replication" is a fact about
+  inference, not a methodology choice. Stating the failure mode as a
+  rule is fine.
+
+The line: prescription about WHO uses what tool is bad; prescription
+about HOW the system records the work is good.
+
+## Reviewer's checklist
+
+Before merging a protocol change, walk every step:
+
+1. Could a researcher in a different field use this step? If the
+   answer requires renaming the methodology, it's scaffolded; if it
+   requires rewriting the step, it's prescribed.
+2. Does the step name a tool or threshold? If yes, is it tagged as
+   "the literature names" / "the field's reporting standard names" /
+   "cite the source"? If not, rewrite.
+3. If you removed every tool name, library name, and numerical
+   threshold from the step description, would the step still tell
+   the AI what to do? If yes, the step is a scaffold. If no, it was
+   a recipe.
+4. Does the step demand citation for every commitment? Reasoning
+   without grounding is just opinion.
+
+## Examples
+
+Prescription:
+
+```yaml
+- id: factor_structure
+  description: |
+    EFA / CFA. Report:
+      CFA → CFI, TLI (≥0.95), RMSEA (≤0.06), SRMR (≤0.08).
+```
+
+Scaffold:
+
+```yaml
+- id: factor_structure
+  description: |
+    Decide between exploratory and confirmatory factor analysis.
+    Report whichever fit indices the field treats as canonical for
+    this kind of model. Thresholds are field-specific — cite the
+    source.
+```
+
+Prescription:
+
+```yaml
+- id: data_split
+  description: |
+    Stratified 70/15/15 split. Set random_state explicitly.
+```
+
+Scaffold:
+
+```yaml
+- id: evaluation_regime
+  description: |
+    The split mirrors the deployment regime. Time-forward
+    deployment → time-forward split. Cross-institution deployment →
+    leave-one-institution-out split. A random k-fold split requires
+    a positive justification, not a default.
+```
+
+---
+
+If you read a step in a protocol that fails the checklist above,
+file the rewrite or do it yourself. The point of this file is that
+the principle outlives any one person editing the codebase.

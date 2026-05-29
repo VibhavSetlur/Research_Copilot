@@ -1,0 +1,257 @@
+id: deep_domain_research
+name: Deep Domain Research (subfield-canonical pipeline)
+version: '1.1.0'
+schema_version: '2.0'
+description: |
+  Reasoning scaffold for entering an unfamiliar subfield. Before any
+  statistical test or tool is named, this protocol walks the AI
+  through:
+    1. identifying the project's SPECIFIC subfield from real signals
+       (not picking from a hardcoded list),
+    2. surveying the literature for whatever the field currently
+       considers its canonical analytical chain (≥3 cited sources),
+    3. proposing a project-specific pipeline skeleton where every
+       stage carries its own tool / language / runtime — all chosen
+       from the literature, not from training memory,
+    4. writing an assumption matrix that NAMES the falsifying
+       diagnostic per stage (without prescribing the test family),
+    5. confidence-gated proposal of ONE alternative pipeline when the
+       literature genuinely supports it.
+
+  This protocol is domain-agnostic by design. It contains no preferred
+  fields, tools, or methods — those come from the AI's literature pass
+  on the specific project.
+
+trigger: |
+  After `domain_analysis`, OR whenever:
+    - The researcher names a specific subfield the AI is uncertain
+      about ("I'm doing X" where the right pipeline for X isn't obvious
+      from a generic methodology protocol).
+    - The data modality calls for a multi-stage chain of tools rather
+      than a single statistical test.
+    - The researcher asks "what is the best-practice pipeline for X?"
+    - Routing chose `methodology` and `domain_analysis` produced only
+      a high-level domain label without a concrete pipeline.
+
+prerequisites:
+  - "`domain_analysis` has run (high-level domain known)."
+  - "inputs/intake.md filled OR raw_data has discriminating files (so the subfield can be inferred from signals, not assumed)."
+
+editorial_voice:
+  mode: hybrid
+  rules:
+    - "This protocol is a scaffold for reasoning, not a recipe. It
+       names questions to ask, not answers to use."
+    - "Statistical tests are DOWNSTREAM of the pipeline. The
+       protocol's job is to scope the pipeline; methodology_selection
+       picks the test per stage that needs one."
+    - "Never name a method, tool, library, or threshold from training
+       memory alone. Every pipeline stage cites at least one primary
+       methods paper + one recent best-practice / benchmark paper."
+    - "Confidence-gate alternative paths. Only surface an alternative
+       pipeline when the literature scan shows ≥3 comparative signals
+       that it would meaningfully out-perform the primary on THIS
+       data shape. Silent acceptance is the default."
+    - "Choose the runtime per stage, not globally. Pipelines can be
+       polyglot when the canonical tool for a stage lives in a
+       different language than the rest. Justify each runtime choice
+       from the tool's actual home, not from the project's default."
+
+steps:
+  - id: identify_subfield
+    name: Identify the specific subfield (from signals, not a list)
+    description: |
+      A "subfield" is whatever level of specificity actually changes
+      the analytical pipeline. "Bioinformatics" is rarely specific
+      enough; "X with Y constraint" usually is. The AI must
+      synthesise this from the project's own signals — not from a
+      menu in this file.
+
+      Signals to combine:
+        - file extensions and on-disk layout under inputs/raw_data/
+        - column or field names in tabular files
+        - tooling already present in inputs/context/ or environment/
+        - the researcher's own framing of the question
+        - upstream literature already in inputs/literature/
+
+      What to write:
+        - `docs/subfield_summary.md` with:
+          * the subfield label, in the AI's own words (not a slug
+            from a fixed taxonomy)
+          * 2-3 sentences justifying why the label is at the right
+            level of specificity for the pipeline to differ from a
+            generic one in the same parent domain
+          * the signals consulted (named files, named columns)
+          * if signals point to TWO subfields, say so explicitly and
+            recommend running the protocol once per subfield
+
+      What NOT to do:
+        - Pattern-match the project against a list of known subfields
+          and pick the closest. The list doesn't exist in this file
+          for a reason.
+        - Describe the subfield in such generic terms that the
+          pipeline choices below would be identical for any project
+          in the parent domain.
+
+      The test of a good subfield label: name three pipeline choices
+      that would differ between this subfield and the adjacent one.
+      If you can't, the label is too generic — narrow it.
+
+  - id: survey_state_of_the_art_pipeline
+    name: Survey the subfield's canonical pipeline (MANDATORY literature pass)
+    description: |
+      Search for the WHOLE pipeline, not one tool. Demand ≥3 cited
+      sources spanning:
+        - a current best-practices / community-standard reference
+          (whatever the subfield treats as canonical — a tutorial, a
+          consensus paper, a community whitepaper)
+        - a recent benchmark or comparison paper (last 24-36 months)
+          showing which tools win on which data shapes
+        - a methods paper for the single most critical pipeline
+          stage (the stage where a bad choice would invalidate
+          everything downstream)
+
+      Tools:
+        tool_search_semantic_scholar query="<subfield> best practices pipeline <year>"
+        tool_search_pubmed query="<subfield> benchmark comparison"  # if life-sciences-adjacent
+        tool_search_web query="<subfield> canonical workflow tutorial"
+
+      Persist the most informative sources via
+      `tool_literature_search_and_save` (into the project-global
+      `inputs/literature/` corpus).
+
+      Write `outputs/reports/pipeline_survey_<subfield_slug>.md`:
+        - canonical pipeline stages, in order
+        - the leading tool / library / CLI per stage WITH the primary
+          citation supporting that choice
+        - data-shape gotchas the literature flags for THIS subfield
+        - the reporting standard the field expects and what fields
+          it requires
+
+      If the field is too young / too niche / too cross-disciplinary
+      for a canonical pipeline to exist, that's a finding — write it
+      as such. The next step then asks the researcher to propose the
+      skeleton themselves with the AI's literature pass as input.
+
+  - id: propose_pipeline_skeleton
+    name: Propose the pipeline skeleton (stages × tools × runtime)
+    description: |
+      Translate the literature survey into a concrete pipeline
+      skeleton for THIS project. Write to `docs/pipeline_plan.md`
+      as a YAML block with one entry per stage:
+
+        - stage: <name>
+          purpose: <one line — what this stage produces>
+          tool: <library / CLI / model>
+          language: <whatever the tool's home language is — py / r /
+                     jl / cli / nextflow / snakemake / matlab / ...>
+          environment: <where it runs — project-global env /
+                       step-specific requirements.txt / Apptainer /
+                       Snakemake / Nextflow / HPC>
+          inputs: <which prior-stage outputs>
+          outputs: <what this stage writes>
+          assumptions: <bullet list — feeds the next step>
+          citation_key: <primary methods paper for THIS stage>
+
+      Runtime selection — reason from the tool, not the project:
+        - The right runtime is wherever the canonical tool actually
+          lives. Polyglot pipelines are fine and often necessary.
+        - Heavy stages → background via `tool_task_run` or HPC via
+          `tool_slurm_submit`.
+        - Tag any stage that needs a step-specific environment so
+          `tool_step_env_lock` runs for that step alone.
+
+      Then call `mem_decision_log` with the pipeline choice + the
+      runner-up tool per stage. Runners-up are not waste — they are
+      the sensitivity-analysis options for later.
+
+  - id: assumption_design_matrix
+    name: Build the assumption matrix (per-stage)
+    description: |
+      For each pipeline stage that has any inferential or selection
+      content, write one row into `docs/assumption_matrix.md`:
+
+        | Stage | Assumption | Falsifying diagnostic | Mitigation |
+
+      Rules:
+        - The diagnostic names a CHECK, not a TEST. "residual-deviance
+          plot" is a check; the AI picks the specific test in
+          `methodology_selection` when the check fails.
+        - The mitigation names what the AI would do IF the check
+          flags the assumption — switch model family, restrict the
+          sample, re-tune, branch.
+        - Source the assumptions from the cited methods paper for
+          that stage, not from a generic checklist.
+
+      The assumption matrix is what `methodology_selection` reads
+      first when it picks the test family per stage. The point: every
+      assumption check is grounded in the SUBFIELD's literature, not
+      in a generic table.
+
+  - id: propose_alternative_paths
+    name: Confidence-gated alternative-path proposal
+    description: |
+      Run `tool_alternative_path_propose` for the pipeline's central
+      methodological choice (whichever stage is the load-bearing
+      decision — the one where a different tool would produce a
+      meaningfully different downstream result).
+
+      Behaviour:
+        - If the tool returns `recommendation: commit_user_method` —
+          stay silent. The primary pipeline is the only path.
+        - If `recommendation: branch_to_alternative` — surface ONE
+          alternative to the researcher, phrased as:
+            "I noticed the literature on <X> often prefers <Y> for
+             data like ours because <Z>. Want me to run that as
+             `<slug>_alt_path_<k>` alongside the primary?"
+          On confirmation, call:
+            sys_path_create name="<slug>_alt" branch_of=<current_path>
+          On rejection, log via `mem_decision_log` (context =
+          "alternative pipeline considered and declined").
+
+      AUTONOMY GATE:
+        manual / supervised → present + wait.
+        autopilot           → only branch if the tool returned
+                              `branch_to_alternative` AND the
+                              alternative does not change the
+                              primary reporting standard.
+
+      Hard rule: never propose more than ONE alternative per step.
+      Two-alternative comparisons happen via repeated calls AFTER
+      results land, not pre-emptively.
+
+  - id: commit_pipeline_or_branch
+    name: Commit the pipeline (+ optional branch)
+    description: |
+      Final commit:
+        - The primary pipeline becomes the active path's
+          `pipeline.yaml` via `tool_step_pipeline_define`. Each
+          stage from `docs/pipeline_plan.md` becomes a pipeline
+          node.
+        - If an alternative was branched, that branch carries its
+          own `pipeline.yaml` and runs independently — outputs land
+          under `workspace/<NN>_<slug>_alt_path_<k>/`.
+        - `mem_methods_append` records the primary pipeline with
+          one entry per stage (method, implementation, parameters,
+          justification, citation_key).
+        - `mem_decision_log` records:
+            context = "Pipeline commit for <subfield>"
+            selected = "<primary pipeline summary>"
+            rationale = "<2 sentences citing the survey paper + the
+                         benchmark paper>"
+            options_considered = [<runner-up tools per stage>]
+        - `mem_hypothesis_update` flips each hypothesis the pipeline
+          touches into `testing` status.
+
+      Then route to `methodology_selection`, which will operate ON
+      TOP of the committed pipeline rather than from a blank slate.
+
+expected_outputs:
+  - docs/subfield_summary.md
+  - docs/pipeline_plan.md
+  - docs/assumption_matrix.md
+  - outputs/reports/pipeline_survey_<subfield>.md
+  - outputs/reports/alternative_path_<task>.md (when run)
+
+next_protocol: methodology/methodology_selection
+on_failure: guidance/dead_end_routing

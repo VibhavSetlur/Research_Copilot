@@ -28,6 +28,14 @@ python scripts/preflight.py           # 12 wiring checks
 
 ## Adding or modifying a protocol
 
+**Read [`docs/PROTOCOL_DOCTRINE.md`](docs/PROTOCOL_DOCTRINE.md) first.**
+Every protocol must be a SCAFFOLD for reasoning, never a SCRIPT to
+execute. The doctrine names the patterns that count as prescription
+(specific tools, specific thresholds, finite menus of methods, canned
+step sequences) and the patterns that count as scaffolding (questions
+to ask, dimensions to reason over, demands for grounding). Reviews
+reject prescriptive protocols on sight.
+
 Each protocol lives at `src/research_os/protocols/<category>/<name>.yaml`.
 Keep the schema tight:
 

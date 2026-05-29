@@ -11,6 +11,16 @@ trigger: |
   the model", "survey + focus groups", or research_design indicates a
   convergent / sequential / embedded mixed-methods design.
 
+editorial_voice:
+  mode: guidance
+  rules:
+    - "Mixed methods is the integration, not the co-presence. Two
+       strands that never meet in interpretation is not mixed methods."
+    - "Each strand follows its OWN reporting standard. Mixing is not
+       an excuse to lower the bar on either."
+    - "The integration plan is written before either strand's results
+       are read — otherwise integration becomes confirmation bias."
+
 steps:
   - id: design_typology
     name: Declare Mixed-Methods Design Type

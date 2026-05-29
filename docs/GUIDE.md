@@ -292,20 +292,18 @@ api_keys:                         # all optional — NO LLM provider keys
   serpapi: ""
 ```
 
-### Domain presets (10)
+### One config, no presets
 
-Copy any of these into `inputs/researcher_config.yaml`:
+There is ONE template: `templates/researcher_config.yaml`. Every field
+is blank. Copy it to `inputs/researcher_config.yaml` and let the AI
+fill it from your `inputs/` + an `intake_autofill` pass — never from a
+modality-specific preset. Modality presets bake in a "right answer"
+the project may not actually have.
 
-* `templates/configs/rct_config.yaml` — RCT (CONSORT).
-* `templates/configs/epidemiology_observational.yaml` — STROBE.
-* `templates/configs/genomics.yaml` — MINSEQE / MIAME.
-* `templates/configs/nlp_benchmark.yaml` — Model Cards.
-* `templates/configs/economic_panel.yaml` — AEA.
-* `templates/configs/qualitative_research.yaml` — COREQ / SRQR.
-* `templates/configs/geospatial.yaml` — MAUP-aware spatial analysis.
-* `templates/configs/time_series.yaml` — IJF-style forecasting.
-* `templates/configs/survival_analysis.yaml` — STROBE (observational) / CONSORT (RCT).
-* `templates/configs/psychometric.yaml` — AERA / APA Standards.
+For *patterns* the AI can use to recognise project shapes (without
+copying), see [`docs/DOMAIN_HINT_EXAMPLES.md`](DOMAIN_HINT_EXAMPLES.md).
+That file is deliberately small and cross-domain — three reasoning
+patterns, not a taxonomy.
 
 ---
 

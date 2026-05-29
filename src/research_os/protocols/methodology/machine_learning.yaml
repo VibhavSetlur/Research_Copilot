@@ -1,79 +1,160 @@
 id: machine_learning
-name: Machine Learning (TRIPOD-AI)
-version: '4.0.0'
+name: Machine Learning / Predictive Modelling
+version: '5.0.0'
 schema_version: '2.0'
-description: Standard ML / predictive modelling workflow with calibration, interpretation, and TRIPOD-style reporting.
-trigger: Goal is prediction or classification; ML approach selected during methodology_selection.
+description: |
+  Reasoning scaffold for a predictive-modelling workflow. Names the
+  decisions an ML analysis must reason through (evaluation regime,
+  leakage surface, baseline choice, calibration, interpretation,
+  failure-mode reporting) without prescribing split ratios, specific
+  algorithms, specific interpretation tools, or specific metrics —
+  those depend on the deployment story + the field's current
+  benchmark practice.
+trigger: Goal is prediction or classification; an ML approach was selected during methodology_selection.
+
+editorial_voice:
+  mode: guidance
+  rules:
+    - "The evaluation regime mirrors the deployment regime. A model
+       deployed on next-month data needs a temporal split; a model
+       deployed across hospitals needs a leave-one-hospital-out
+       split; the random k-fold default is wrong as often as right."
+    - "Baseline choice IS a methodology decision. A complex model
+       beating a trivial baseline is a meaningful claim; a complex
+       model beating a hand-tuned strong baseline is a more
+       meaningful one. The field's recent literature names the
+       fair-comparison baseline — surface it, don't guess."
+    - "Report failure modes, not just headline metrics. An aggregate
+       AUROC of 0.85 with a 0.55 AUROC on a subgroup is a worse
+       model than the headline suggests."
+    - "Reporting follows the deployment story. Clinical → TRIPOD-AI /
+       CONSORT-AI; high-stakes decisions → Model Cards + Data
+       Sheets; pure benchmark → the benchmark's reporting card.
+       Surface the standard from the literature; don't default."
 
 steps:
-  - id: create_step
-    name: Create ML Experiment Step
-    description: sys_path_create name="ml_<task>" hypothesis="<model> outperforms baseline on <metric>"
-
-  - id: data_split
-    name: Train / Validation / Test Split
+  - id: frame_the_task
+    name: Frame the prediction task + deployment regime
     description: |
-      Stratified split (preserves class proportions). Default 70/15/15 unless
-      sample size dictates otherwise. Set random_state explicitly. Hold the test
-      set OUT until the very end. Document split sizes per class to outputs/reports/data_split.md.
+      Write to `outputs/reports/task_framing.md`:
+        - Prediction target + outcome type (binary, multi-class,
+          regression, ranking, sequence, structured, ...).
+        - Deployment regime: who consumes the prediction, when, on
+          which population?
+        - The temporal / spatial / institutional gap between training
+          data and the deployment distribution.
+        - The decision the prediction informs + the cost of false
+          positives vs. false negatives in that decision context.
 
-  - id: preprocessing
-    name: Feature Engineering & Preprocessing
-    description: |
-      Fit imputers, scalers, encoders ONLY on the training fold (wrap in a
-      sklearn Pipeline or equivalent). Document every transformation.
-      Watch for data leakage: target encoding without proper CV, time-aware
-      features in cross-sectional data, etc.
+      Every downstream choice — split, metric, baseline,
+      interpretation — follows from this framing.
 
-  - id: baseline_then_main
-    name: Baseline → Main Model
+  - id: evaluation_regime
+    name: Choose the evaluation regime (split → deployment match)
     description: |
-      ALWAYS fit a trivial baseline first (DummyClassifier most-frequent, naive
-      mean, etc.). Then the candidate main model. Report both metrics — never
-      report only the main model.
+      The split must mirror the deployment gap from the previous
+      step. Reason about:
+        - Time: if deployment is forward in time, split by time.
+        - Group: if deployment is across institutions / subjects /
+          devices, split by group (no leakage across the split).
+        - Distribution shift: if deployment is on a shifted
+          distribution, hold out a shifted slice for evaluation.
+        - Small data: cross-validation or bootstrap; report
+          uncertainty across folds.
 
-  - id: hyperparameter_tuning
-    name: CV-based Hyperparameter Tuning
-    description: |
-      Use stratified K-fold CV on the TRAINING set only. Use a search strategy
-      proportional to the search space (grid for small, Bayesian/Hyperopt for large).
-      Log the chosen hyperparameters to outputs/reports/hyperparameters.json.
+      Document the split rationale + sizes in
+      `outputs/reports/evaluation_regime.md`. A random k-fold split
+      requires a positive justification, not a default.
 
-  - id: metrics
-    name: Compute Held-out Metrics
+  - id: leakage_audit
+    name: Leakage audit BEFORE training
     description: |
-      Evaluate ONLY on the held-out test set. Report:
-        Classification → AUROC, AUPRC, Brier score, calibration slope/intercept,
-          confusion matrix, F1 per class.
-        Regression → RMSE, MAE, R^2, residual plot.
-      Save to outputs/reports/test_metrics.json AND outputs/figures/roc_curve.png
-      (or relevant figure) at ≥300 DPI.
+      Walk every feature + every preprocessing step and ask: could
+      this carry information from the held-out target distribution
+      into the training set? Common sources to reason about:
+        - Target encoding without proper CV.
+        - Time-dependent features in a temporal split.
+        - Group-identifying features in a group split.
+        - Imputation / normalisation fit on the full data.
+        - Look-ahead features (e.g. "patient eventually diagnosed").
+        - Shared upstream corpora (LLM eval contamination).
+
+      Document the audit + the wrapping discipline (pipeline,
+      transformer-on-train-only, fold-aware preprocessing) in
+      `outputs/reports/leakage_audit.md`.
+
+  - id: baselines
+    name: Choose baselines — trivial AND strong
+    description: |
+      Always fit a trivial baseline (most-frequent / mean predictor
+      / random / nearest-neighbour) — sets the floor. Also fit the
+      strong baseline the field's recent benchmark literature names —
+      this is what the main model must actually beat. Surface the
+      strong baseline via `tool_research_method`; do not pick from
+      memory.
+
+  - id: train_and_tune
+    name: Train + tune
+    description: |
+      Hyperparameter search uses only the training portion + the
+      evaluation regime's CV folds. Document the search space, the
+      search strategy + its budget, the chosen hyperparameters. Set
+      seeds explicitly; report whether results are seed-sensitive.
+
+  - id: held_out_metrics
+    name: Held-out metrics matched to the deployment cost structure
+    description: |
+      Compute on the held-out set ONLY. Which metrics to report
+      follows from the task framing's cost structure:
+        - Asymmetric costs → precision-recall + cost-weighted error.
+        - Probabilistic decisions → calibration + Brier / NLL.
+        - Ranking decisions → AUROC + AUPRC.
+        - Continuous outcomes → error + residual diagnostics.
+        - Subgroup-sensitive deployment → per-subgroup breakdown.
+      The benchmark literature for the field names the headline
+      metric; surface it.
 
   - id: interpretation
-    name: Model Interpretation
+    name: Interpretation — match method to model + audience
     description: |
-      Generate SHAP (global + per-instance) or permutation importance for the
-      top features. Save outputs/figures/shap_summary.png and
-      outputs/reports/feature_importance.md.
+      Pick interpretation tools that fit the model family + the
+      deployment audience. Surface options via `tool_research_method`
+      framed as "interpretability for <model family> in <deployment
+      context>". Document which option was chosen + why, with
+      citation. Aggregate explanations alone are insufficient when
+      individual predictions drive decisions — include per-instance
+      explanations on representative cases.
 
-  - id: error_analysis
-    name: Error Analysis
+  - id: failure_mode_analysis
+    name: Failure-mode + subgroup analysis
     description: |
-      Slice errors by demographics or other meaningful subgroups. Flag any
-      subgroup where performance drops >10% relative to overall. Save to
-      outputs/reports/error_analysis.md.
+      Slice errors by every subgroup the deployment story makes
+      relevant (demographics, institutions, time bins, distribution
+      slices). Flag any subgroup where the headline metric drops
+      meaningfully — what counts as "meaningfully" depends on the
+      cost structure. Document candidate causes (data quantity,
+      label noise, distribution shift) for each flagged subgroup.
 
-  - id: tripod_card
-    name: Model Card / TRIPOD-AI Reporting
+  - id: model_card
+    name: Model card / reporting-standard compliance
     description: |
-      Write a model card at outputs/reports/model_card.md covering: intended use,
-      training data, evaluation data, metrics, ethical considerations, limitations,
-      caveats. Follow TRIPOD-AI checklist when the domain is clinical.
+      Write a model card at `outputs/reports/model_card.md` covering:
+        - intended use + out-of-scope use
+        - training-data provenance + known biases
+        - evaluation regime + held-out metrics + per-subgroup
+          breakdown
+        - failure modes observed during the audit above
+        - ethical considerations the deployment context raises
+      If the field has a stricter reporting standard (TRIPOD-AI for
+      clinical, Data Sheets for foundational datasets, the
+      benchmark's official card for benchmarks) — that standard
+      governs; the model card extends it, doesn't replace it.
 
 expected_outputs:
-  - workspace/*/outputs/reports/test_metrics.json
+  - workspace/*/outputs/reports/task_framing.md
+  - workspace/*/outputs/reports/evaluation_regime.md
+  - workspace/*/outputs/reports/leakage_audit.md
   - workspace/*/outputs/reports/model_card.md
-  - workspace/*/outputs/figures
 
 next_protocol: guidance/analysis_plan
 on_failure: guidance/dead_end_routing

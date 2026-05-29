@@ -62,25 +62,28 @@ steps:
   - id: pick_method_family
     name: Pick a method family
     description: |
-      The method follows the characterisation. A non-exhaustive map:
+      The method follows from the series characterisation. The
+      dimensions that drive the choice are stable across fields:
+        - univariate vs. multivariate
+        - stationary vs. non-stationary
+        - presence + number of seasonalities
+        - forecasting vs. intervention analysis vs. structural-break
+          detection
+        - presence of exogenous covariates
+        - sample size (long enough for ML; short enough that classical
+          methods win)
+        - need for interpretable parameters vs. black-box accuracy
 
-        Univariate · stationary · short             → ARMA
-        Univariate · non-stationary · with trend    → ARIMA (with d=1 or 2)
-        Univariate · seasonal                        → SARIMA / TBATS
-        Univariate · multiple seasonalities          → Prophet / MSTL + ARMA
-        State-space + interpretation                 → Structural time series / BSTS
-        Intervention analysis                        → Interrupted time series
-        Forecasting with exog covariates             → ARIMAX / dynamic regression
-        Cross-sectional time-series (panels)         → Panel data methods / hierarchical model
-        High-frequency / irregular                   → Hawkes / point process
-        ML forecasting baseline                      → Naive seasonal + ETS + ARIMA
-        ML forecasting deep                          → Temporal Fusion Transformer / N-BEATS / N-HiTS
-        Bayesian forecasting                         → BSTS (CausalImpact) / Prophet / Bayesian SSM
-        Structural-break detection                   → Bai-Perron / changepoint detection
-        Multivariate / VAR                           → VAR + Granger causality if appropriate
+      Reason through these dimensions for THIS series, then ground
+      the candidate methods via `methodology_selection`'s grounding
+      step. Do NOT pick a method from memory because it matches the
+      dimension labels — the field's recent forecasting-benchmark
+      literature names which methods win on which combinations, and
+      the answer changes faster than any static table can keep up.
 
-      For decisive single-step choices, ground in literature via
-      methodology_selection's grounding step.
+      Record the dimension-by-dimension reasoning + the 2-3 candidates
+      surfaced from the literature in
+      `outputs/reports/<step>_method_choice.md`.
 
   - id: stationarity_decision
     name: Stationarity decision (when classical methods apply)

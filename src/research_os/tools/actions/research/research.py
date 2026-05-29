@@ -589,3 +589,247 @@ def plan_step_grounded(
     except Exception as e:
         logger.exception("plan_step_grounded failed")
         return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Alternative-path proposal — surface a potentially-better methodology
+# ---------------------------------------------------------------------------
+
+
+def _next_branch_suffix(workspace: Path) -> int:
+    """Compute the next `_path_<k>` suffix available across the workspace."""
+    import re as _re
+
+    pat = _re.compile(r"_path_(\d+)(?:__DEAD_END)?$")
+    best = 0
+    if not workspace.exists():
+        return 1
+    for p in workspace.iterdir():
+        if not p.is_dir() or not _re.match(r"^\d{2,3}_", p.name):
+            continue
+        m = pat.search(p.name)
+        if m:
+            best = max(best, int(m.group(1)))
+    return best + 1
+
+
+def alternative_path_propose(
+    task: str,
+    user_method: str,
+    root: Path,
+    *,
+    data_summary: str = "",
+    limit: int = 5,
+) -> dict[str, Any]:
+    """Surface an alternative pipeline ONLY when literature evidence is strong.
+
+    Behaviour
+    ---------
+    1. Pulls literature on both the user's method AND alternatives
+       framed against the same task + data shape.
+    2. Writes a structured ``alternative_path_<slug>.md`` report into the
+       active step's ``outputs/reports/`` (or ``workspace/logs/``).
+    3. Returns a structured proposal the AI surfaces to the researcher
+       before committing — confidence-gated so quiet runs stay quiet.
+
+    The tool DOES NOT create the branch. The AI surfaces the proposal,
+    asks the researcher, and only on confirmation calls
+    ``sys_path_create branch_of=<current_path>`` with ``suggested_branch_name``.
+
+    Confidence policy
+    -----------------
+    Only flag an alternative when the literature retrieval surfaces ≥3
+    sources framing the alternative as a meaningful improvement for the
+    SPECIFIC data shape described (paired samples, sparse counts,
+    hierarchical structure, etc.). Otherwise return
+    ``recommendation = "commit_user_method"`` — silent acceptance.
+    """
+    try:
+        from research_os.project_ops import load_state
+        from research_os.tools.actions.audit.audit import get_current_path
+        from research_os.tools.actions.search.search import (
+            search_semantic_scholar,
+            search_web,
+        )
+
+        workspace = root / "workspace"
+        current = get_current_path(root) or ""
+        state = load_state(root)
+        # The researcher's autonomy level shapes how loudly we surface the
+        # alternative — autopilot still asks, but supervised invites the
+        # researcher to weigh in directly.
+        interaction = (
+            (state.get("interaction") if isinstance(state.get("interaction"), dict) else None)
+            or {}
+        )
+        autonomy = interaction.get("autonomy_level") or "supervised"
+
+        primary_q = f"{task} {user_method}"
+        alt_q = f"{task} alternative to {user_method}"
+        data_q = (
+            f"{task} {user_method} {data_summary}"
+            if data_summary else
+            f"{task} {user_method} method comparison"
+        )
+
+        academic: list[dict[str, Any]] = []
+        for q in (primary_q, alt_q, data_q):
+            try:
+                for paper in search_semantic_scholar(q, limit=limit):
+                    academic.append({**paper, "_query": q})
+            except Exception as e:
+                logger.warning(f"alt_path s2 lookup '{q}' failed: {e}")
+
+        web: list[dict[str, Any]] = []
+        for q in (f"{task} {user_method} vs", f"best practice {task}"):
+            try:
+                hits = search_web(q, limit=limit).get("results", []) or []
+                for h in hits:
+                    h["_query"] = q
+                    web.append(h)
+            except Exception as e:
+                logger.warning(f"alt_path web lookup '{q}' failed: {e}")
+
+        # Dedupe academic by title.
+        seen_titles: set[str] = set()
+        unique_academic: list[dict[str, Any]] = []
+        for src in academic:
+            key = (src.get("title") or "").strip().lower()
+            if not key or key in seen_titles:
+                continue
+            seen_titles.add(key)
+            unique_academic.append(src)
+
+        # Crude confidence signal: how many academic hits referenced
+        # "alternative" / "compared with" / "better" / "outperforms" in
+        # title or abstract. The AI does the final judging; this just
+        # gates silent runs.
+        signals = 0
+        keywords = ("alternative", "outperform", "compared with", "better than",
+                    "preferable", "robust to", "more accurate", "more powerful")
+        for src in unique_academic:
+            blob = ((src.get("title") or "") + " " + (src.get("abstract") or "")).lower()
+            if any(k in blob for k in keywords):
+                signals += 1
+
+        recommendation = "commit_user_method"
+        if signals >= 3:
+            recommendation = "branch_to_alternative"
+
+        suggested_branch_name = ""
+        if current:
+            # Strip lineage tag from the parent slug — the new branch
+            # gets its own lineage from sys_path_create.
+            import re as _re
+
+            slug = _re.sub(r"^\d{2,3}_", "", current)
+            slug = _re.sub(r"_path_\d+(?:__DEAD_END)?$", "", slug)
+            slug = _re.sub(r"__DEAD_END$", "", slug)
+            suggested_branch_name = f"{slug}_alt"
+
+        # Build the report.
+        lines = [
+            f"# Alternative-path scan — {task}",
+            f"*Generated: {datetime.now(timezone.utc).isoformat()}*",
+            "",
+            f"## User's proposed method\n`{user_method}`",
+            "",
+        ]
+        if data_summary:
+            lines.extend([f"## Data context\n{data_summary}", ""])
+        lines.extend([
+            "## Literature signals",
+            f"- Academic sources surfaced: **{len(unique_academic)}**",
+            f"- Web/best-practice sources: **{len(web)}**",
+            f"- Comparative-evidence signals (titles/abstracts hinting at "
+            f"alternative-being-better): **{signals}**",
+            "",
+            f"## Recommendation: `{recommendation}`",
+            "",
+        ])
+        if recommendation == "commit_user_method":
+            lines.append(
+                "The literature scan did not surface strong evidence that an "
+                "alternative pipeline would meaningfully outperform the user's "
+                "method on this data shape. Proceed with the user's choice.\n"
+            )
+        else:
+            lines.append(
+                "Literature surfaces ≥3 comparative signals. The AI should "
+                "synthesise the evidence below into ONE candidate alternative "
+                "and surface it to the researcher BEFORE branching — phrased "
+                "as 'I noticed the literature on X often prefers Y for data "
+                "like ours because Z. Would you like to run that as "
+                f"`{suggested_branch_name or '<slug>_alt'}` alongside the "
+                "primary?'.\n"
+            )
+        lines.extend(["", "## Top academic sources", ""])
+        for src in unique_academic[:8]:
+            title = (src.get("title") or "")[:160]
+            year = src.get("year") or ""
+            authors = ", ".join((src.get("authors") or [])[:3])
+            url = src.get("url") or src.get("doi") or ""
+            lines.append(f"- **{title}** · {authors} ({year})")
+            if url:
+                lines.append(f"  {url}")
+            abstract = (src.get("abstract") or "").strip()
+            if abstract:
+                lines.append(f"  > {abstract[:280]}{'…' if len(abstract) > 280 else ''}")
+
+        lines.extend(["", "## Best-practice / web", ""])
+        for r in web[:6]:
+            t = (r.get("title") or "")[:160]
+            u = r.get("url") or ""
+            d = (r.get("description") or "")[:240]
+            lines.append(f"- **{t}** {u}\n  > {d}")
+
+        lines.extend([
+            "",
+            "## How to act on this",
+            "1. The AI reads the evidence above and decides which ONE "
+            "alternative is best supported.",
+            "2. If `commit_user_method`: tell the researcher you considered "
+            "alternatives and stuck with their choice (one-line note in "
+            "analysis.md is enough).",
+            "3. If `branch_to_alternative`: phrase the proposal to the "
+            "researcher exactly once. On confirmation, call "
+            f"`sys_path_create name=\"<slug>_alt\" branch_of=\"{current or '<current>'}\"` "
+            "— that produces an `NN_<slug>_alt_path_<k>` folder that runs "
+            "alongside the primary without disturbing it.",
+            "4. Log the decision with `mem_decision_log`.",
+        ])
+
+        out_dir = (
+            workspace / current / "outputs" / "reports"
+            if current and (workspace / current).is_dir()
+            else workspace / "logs"
+        )
+        out_dir.mkdir(parents=True, exist_ok=True)
+        report_path = out_dir / f"alternative_path_{_slug(task)}.md"
+        report_path.write_text("\n".join(lines) + "\n")
+
+        return {
+            "status": "success",
+            "task": task,
+            "user_method": user_method,
+            "current_path": current,
+            "academic_count": len(unique_academic),
+            "web_count": len(web),
+            "comparative_signals": signals,
+            "recommendation": recommendation,
+            "suggested_branch_name": suggested_branch_name,
+            "suggested_branch_suffix_hint": _next_branch_suffix(workspace),
+            "autonomy_level": autonomy,
+            "report_path": str(report_path.relative_to(root)),
+            "academic": unique_academic[:8],
+            "web": web[:6],
+            "advice": (
+                "Surface the proposal to the researcher ONCE if recommendation "
+                "= 'branch_to_alternative'. Stay silent (just commit) "
+                "otherwise — proposing weak alternatives erodes the "
+                "researcher's trust."
+            ),
+        }
+    except Exception as e:
+        logger.exception("alternative_path_propose failed")
+        return {"status": "error", "message": str(e)}

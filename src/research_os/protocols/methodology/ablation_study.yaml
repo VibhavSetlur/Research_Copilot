@@ -11,6 +11,16 @@ trigger: |
   table", "which part matters?". Usually triggered after a successful
   modelling step where the headline result needs decomposition.
 
+editorial_voice:
+  mode: guidance
+  rules:
+    - "Ablation establishes attribution, not improvement. Frame
+       conclusions in those terms — 'component X is doing the work',
+       not 'we proved component X is best'."
+    - "Same data, same splits, same seeds as the baseline — variation
+       isolates the ablated component, nothing else."
+    - "Report uncertainty on the Δ, not just the point."
+
 steps:
   - id: create_step
     name: Create Ablation Step

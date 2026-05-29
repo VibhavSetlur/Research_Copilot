@@ -13,6 +13,17 @@ trigger: |
   "agent-based model", "compare estimators under known truth". Domain may
   be stats, ML, ops research, epidemiology, climate, etc.
 
+editorial_voice:
+  mode: guidance
+  rules:
+    - "ADEMP is written BEFORE any code runs. Backfilling ADEMP after
+       results land is rationalisation, not specification."
+    - "Monte Carlo SE accompanies every point estimate — bare
+       performance numbers without their MC SE are misleading."
+    - "A simulation's conclusions only generalise as far as its
+       data-generating mechanism. The limitations section names what
+       the DGM did NOT cover."
+
 steps:
   - id: create_step
     name: Create Simulation Step

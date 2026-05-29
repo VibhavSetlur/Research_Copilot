@@ -1309,13 +1309,53 @@ def _seed_step_subfolder_readmes(
     )
 
 
+_PATH_LINEAGE_RE = re.compile(r"_path_(\d+)(?:__DEAD_END)?$")
+
+
+def _extract_path_lineage(branch_id: str) -> int | None:
+    """Return the branch lineage number embedded in a folder name, or None.
+
+    ``05_glmm_path_2`` → ``2``; ``05_glmm`` → ``None``; ``05_glmm_path_2__DEAD_END`` → ``2``.
+    """
+    m = _PATH_LINEAGE_RE.search(branch_id)
+    return int(m.group(1)) if m else None
+
+
+def _max_path_lineage(workspace: Path) -> int:
+    """Largest existing ``_path_<k>`` lineage tag across the workspace."""
+    best = 0
+    if not workspace.exists():
+        return 0
+    for p in workspace.iterdir():
+        if not (p.is_dir() and re.match(r"^\d{2,3}_", p.name)):
+            continue
+        k = _extract_path_lineage(p.name)
+        if k is not None and k > best:
+            best = k
+    return best
+
+
 def create_numbered_experiment(
     root: Path,
     name: str,
     hypothesis: str = "",
     from_step: str | None = None,
+    branch_of: str | None = None,
 ) -> dict:
-    """Create the next numbered experiment folder + wire up its data link."""
+    """Create the next numbered experiment folder + wire up its data link.
+
+    Branching
+    ---------
+    Pass ``branch_of=<existing path_id>`` to fork a new analytical path off
+    an existing step. The new folder name carries a ``_path_<k>`` lineage
+    suffix (e.g. ``05_glmm_path_1``). Subsequent calls that branch off a
+    step ALREADY carrying a lineage tag inherit it — the lineage flows
+    through every downstream step on the branch. A brand-new fork
+    receives the next free lineage number (max existing + 1).
+
+    Dead-ends keep the existing ``__DEAD_END`` convention and stack with
+    branch tags: ``05_glmm_path_1`` → ``05_glmm_path_1__DEAD_END``.
+    """
     workspace = root / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
 
@@ -1328,7 +1368,39 @@ def create_numbered_experiment(
                 pass
     next_num = max_num + 1
     slug = slugify(name, "experiment")
-    branch_id = f"{next_num:02d}_{slug}"
+
+    # Resolve branch lineage. Order of precedence:
+    #   1. `branch_of` names an existing step → inherit its lineage if any,
+    #      otherwise allocate a fresh lineage number.
+    #   2. No `branch_of` → no lineage tag (main path).
+    lineage: int | None = None
+    parent_id: str | None = None
+    if branch_of:
+        # Allow callers to pass either the full `NN_slug` or the dead-end
+        # variant; we resolve to the real on-disk folder.
+        candidates = [branch_of, branch_of.removesuffix("__DEAD_END")]
+        parent_dir: Path | None = None
+        for cand in candidates:
+            cand_dir = workspace / cand
+            if cand_dir.is_dir():
+                parent_dir = cand_dir
+                parent_id = cand
+                break
+            # Tolerate when only the dead-end variant exists on disk.
+            cand_dead = workspace / f"{cand}__DEAD_END"
+            if cand_dead.is_dir():
+                parent_dir = cand_dead
+                parent_id = cand_dead.name
+                break
+        if parent_dir is None:
+            raise ValueError(f"branch_of step '{branch_of}' not found in workspace/")
+        inherited = _extract_path_lineage(parent_dir.name)
+        lineage = inherited if inherited is not None else _max_path_lineage(workspace) + 1
+
+    if lineage is not None:
+        branch_id = f"{next_num:02d}_{slug}_path_{lineage}"
+    else:
+        branch_id = f"{next_num:02d}_{slug}"
     exp_dir = workspace / branch_id
 
     if exp_dir.exists():
@@ -1346,9 +1418,19 @@ def create_numbered_experiment(
         for sub in EXPERIMENT_SUBDIRS:
             (exp_dir / sub).mkdir(parents=True, exist_ok=True)
 
-        # Wire data/input/
+        # Wire data/input/ — branch steps draw from their parent's output;
+        # non-branch steps draw from the prior numbered step's output (or
+        # raw_data for step 01).
         data_input = exp_dir / "data" / "input"
-        if next_num == 1:
+        if parent_id:
+            parent_output = workspace / parent_id / "data" / "output"
+            parent_output.mkdir(parents=True, exist_ok=True)
+            try:
+                data_input.rmdir()
+                data_input.symlink_to(parent_output.absolute())
+            except OSError:
+                pass
+        elif next_num == 1:
             raw_dir = root / "inputs" / "raw_data"
             raw_dir.mkdir(parents=True, exist_ok=True)
             try:
@@ -1358,7 +1440,12 @@ def create_numbered_experiment(
                 pass
         else:
             prev_num = next_num - 1
+            # Prefer main-path predecessors over branch siblings when both exist.
             prev_dirs = sorted(
+                p for p in workspace.iterdir()
+                if p.is_dir() and re.match(rf"^{prev_num:02d}_", p.name)
+                and _extract_path_lineage(p.name) is None
+            ) or sorted(
                 p for p in workspace.iterdir()
                 if p.is_dir() and re.match(rf"^{prev_num:02d}_", p.name)
             )
@@ -1442,7 +1529,7 @@ def create_numbered_experiment(
 
     # State update
     state = load_state(root)
-    state["paths"][branch_id] = {
+    path_entry: dict[str, Any] = {
         "path_id": branch_id,
         "experiment_number": next_num,
         "status": "active",
@@ -1450,6 +1537,11 @@ def create_numbered_experiment(
         "experiment_dir": f"workspace/{branch_id}",
         "created_at": now_iso(),
     }
+    if lineage is not None:
+        path_entry["path_lineage"] = lineage
+    if parent_id:
+        path_entry["branch_of"] = parent_id
+    state["paths"][branch_id] = path_entry
     state["current_path"] = branch_id
     state["step"] = next_num
     if state.get("pipeline_stage") in (None, "init", "planned"):
@@ -1471,6 +1563,8 @@ def create_numbered_experiment(
         "experiment_number": next_num,
         "experiment_dir": str(exp_dir.absolute()),
         "from_step": from_step,
+        "branch_of": parent_id,
+        "path_lineage": lineage,
         "paths_created": [str(exp_dir / sub) for sub in EXPERIMENT_SUBDIRS],
     }
 

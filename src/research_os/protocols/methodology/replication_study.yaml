@@ -11,6 +11,19 @@ trigger: |
   data", "we want to check finding Y". Inputs/literature/ should contain the
   paper being replicated (PDF + its supplementary if available).
 
+editorial_voice:
+  mode: guidance
+  rules:
+    - "The replication criterion is declared BEFORE the new estimate
+       is seen. Moving the criterion after seeing the result is the
+       biggest failure mode in replication studies."
+    - "Failed replications are findings, not embarrassments. Frame
+       them as 'did not replicate in this sample under this
+       specification' rather than 'the original was wrong'."
+    - "Document the translation work explicitly when the replication
+       is done in a different runtime than the original — every
+       translation decision is a potential source of divergence."
+
 steps:
   - id: classify_replication_type
     name: Classify Replication Type

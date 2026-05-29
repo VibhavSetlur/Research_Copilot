@@ -707,16 +707,16 @@ AI ⤺ tool: tool_route → methodology/simulation_studies
 ## Day 5 — A totally different project (qualitative interviews + mixed methods)
 
 You start a second project in a new folder. This is to demo the
-**qualitative_research** and **mixed_methods** protocols + the
-**qualitative_research** domain config.
+**qualitative_research** and **mixed_methods** protocols. There are no
+modality-specific config presets — `research-os init` writes the one
+neutral `researcher_config.yaml`, and `domain_analysis` infers the
+qualitative shape from the transcripts.
 
 ```
 $ mkdir -p ~/projects/penguin-keepers-interviews && cd ~/projects/penguin-keepers-interviews
 $ research-os init --name "Penguin Keeper Practices"
 
-# Copy the qualitative preset config
-$ cp /path/to/Research-OS/templates/configs/qualitative_research.yaml \
-     inputs/researcher_config.yaml
+# The init wrote inputs/researcher_config.yaml as a neutral template.
 $ chmod 600 inputs/researcher_config.yaml
 
 # Add the transcripts (whatever you have — even just plain text)

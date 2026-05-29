@@ -18,7 +18,8 @@ Targets the writing the AI puts into ``synthesis/*.md``, per-step
   elsewhere, but the auditor surfaces it as part of the unified
   report so reviewers see it in one place.
 * **Reporting-standard compliance** — CONSORT, STROBE, PRISMA section
-  checks based on the project's domain config.
+  checks based on the standard the project's `domain_analysis` step
+  surfaced from the literature.
 
 Output: ``workspace/logs/prose_audit.md`` + a structured dict the
 master quality auditor can consume.

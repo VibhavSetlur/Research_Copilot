@@ -1,68 +1,107 @@
 id: meta_analysis
 name: Meta-Analysis
-version: '4.0.0'
+version: '5.0.0'
 schema_version: '2.0'
-description: Pool effect sizes from primary studies, evaluate heterogeneity and publication bias.
-trigger: Systematic review with ≥3 quantitatively comparable studies.
+description: |
+  Reasoning scaffold for pooling effect estimates across primary
+  studies. Names the decisions a defensible meta-analysis must
+  reason through (effect-size harmonisation, heterogeneity, pooling
+  model, publication bias, sensitivity) without prescribing specific
+  estimators, thresholds, or tools — those follow from the type of
+  outcome + the field's reporting convention.
+trigger: Systematic review with quantitatively comparable studies.
+
 prerequisites:
   - literature/systematic_review or literature/evidence_synthesis has been run
-  - data_extraction.csv exists with effect sizes + SEs (or sufficient stats)
+  - data_extraction.csv exists with effect sizes + SEs (or sufficient stats to compute them)
+
+editorial_voice:
+  mode: guidance
+  rules:
+    - "The choice of effect-size scale is determined by the outcome
+       type AND the convention in the field's recent meta-analytic
+       literature. Defaulting to one scale without checking is sloppy."
+    - "Heterogeneity is information, not a nuisance. The point is to
+       characterise variation in effects, not to suppress it. Pooling
+       across heterogeneous studies and reporting a single number
+       hides the science."
+    - "Publication-bias diagnostics only become informative with
+       enough studies; below that threshold, the absence of bias
+       evidence is not evidence of its absence — state this
+       explicitly."
 
 steps:
-  - id: create_step
-    name: Create Meta-Analysis Step
-    description: sys_path_create name="meta_<outcome>" hypothesis="<pooled effect direction>"
-
   - id: harmonise_effect_sizes
-    name: Harmonise Effect Sizes
+    name: Harmonise effect sizes onto a common scale
     description: |
-      Convert all studies to a common effect size:
-        Continuous outcome → Standardised Mean Difference (Cohen's d / Hedges' g).
-        Binary outcome     → log Odds Ratio or log Risk Ratio.
-        Correlations       → Fisher Z.
-      Compute / impute SE when only CI is given.
+      For each primary study, derive a comparable effect size +
+      standard error. The right scale depends on the outcome family:
+      continuous outcomes have standardised mean differences,
+      binary outcomes have log-odds / log-risk ratios, correlations
+      have Fisher Z. Whichever family — cite the convention the
+      field uses + the standard reference for the conversion
+      formulae. If a study reports only a CI or a p-value, document
+      how the SE was recovered.
 
   - id: heterogeneity
-    name: Assess Heterogeneity
+    name: Characterise heterogeneity
     description: |
-      Compute Cochran's Q (chi^2), tau^2 (between-study variance), I^2 (% of
-      total variance from heterogeneity). Interpret I^2:
-        < 25% low, 25-50% moderate, 50-75% substantial, > 75% considerable.
-      If substantial, prefer random-effects model. Document in outputs/reports/heterogeneity.md.
+      Compute the heterogeneity statistics the field treats as
+      canonical (typically a between-study variance estimate, a
+      relative heterogeneity measure, and a homogeneity test). Cite
+      the source for whichever interpretive scale is used to label
+      "low / moderate / substantial". Visualise the distribution of
+      study-level effects (forest plot + a heterogeneity panel) so
+      a reader can see the variation, not just read a percentage.
 
   - id: pool
-    name: Pool the Effect
+    name: Pool the effect — choose the model
     description: |
-      Random-effects (REML or DerSimonian-Laird) is default. Fixed-effects only
-      when heterogeneity is negligible. Use a library (pymeta, metafor in R via
-      tool_r_exec, or statsmodels). Save pooled estimate + 95% CI to
-      outputs/reports/pooled_effect.json.
+      The pooling model follows from the heterogeneity reasoning:
+      random-effects when between-study variance is non-negligible,
+      fixed-effect / common-effect when the studies plausibly share
+      one underlying effect. The estimator within random-effects
+      (REML, DerSimonian-Laird, Hartung-Knapp-Sidik-Jonkman,
+      Bayesian) is also a literature-grounded choice — small
+      study counts favour estimators with better small-sample
+      properties; the field's recent guidance names which. Save the
+      pooled estimate + uncertainty interval to
+      `outputs/reports/pooled_effect.json`.
 
   - id: forest_plot
-    name: Forest Plot
+    name: Forest plot
     description: |
-      Generate a publication-grade forest plot at
-      outputs/figures/forest_plot.png (≥300 DPI). Order studies by year or
-      effect size. Mark the pooled diamond.
+      Build a publication-grade forest plot at
+      `outputs/figures/<step>_forest_plot.png`. Order, annotations,
+      and weights follow the field's convention.
 
   - id: publication_bias
-    name: Publication Bias
+    name: Publication-bias diagnostics
     description: |
-      With ≥10 studies, run Egger's regression test + funnel plot.
-      Save funnel plot to outputs/figures/funnel_plot.png and test stats to
-      outputs/reports/publication_bias.md. If asymmetric, run trim-and-fill
-      sensitivity analysis.
+      Conventional small-study / publication-bias diagnostics
+      (funnel-plot asymmetry, regression-based tests, selection
+      models) require enough studies to be informative — the
+      conventional minimum is around 10 but varies by field. If the
+      sample falls short, state this and skip the formal test rather
+      than mis-applying it. If applicable, run AT LEAST one diagnostic
+      + a corresponding sensitivity analysis (trim-and-fill,
+      selection-model adjustment, PET-PEESE).
 
-  - id: sensitivity
-    name: Sensitivity & Subgroup
+  - id: sensitivity_and_subgroup
+    name: Sensitivity + pre-specified subgroup analyses
     description: |
-      Run sensitivity analyses pre-specified in the review protocol:
-      leave-one-out, removal of high-RoB studies, subgroup by population /
-      design / era. Tabulate to outputs/tables/sensitivity.csv.
+      Run only the sensitivity / subgroup analyses pre-specified in
+      the review protocol — post-hoc subgrouping is hypothesis
+      generation, not confirmation. Standard sensitivity moves:
+      leave-one-out, exclusion of high-risk-of-bias studies, swap
+      of pooling estimator. Document each + report whether the
+      conclusion is robust.
 
 expected_outputs:
-  - workspace/*/outputs/figures/forest_plot.png
+  - workspace/*/outputs/figures/<step>_forest_plot.png
   - workspace/*/outputs/reports/pooled_effect.json
+  - workspace/*/outputs/reports/heterogeneity.md
+  - workspace/*/outputs/reports/publication_bias.md
 
 next_protocol: guidance/analysis_plan
 on_failure: guidance/dead_end_routing

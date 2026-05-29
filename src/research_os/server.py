@@ -425,7 +425,16 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
 
     # ── Experiment paths ──────────────────────────────────────────────
     "sys_path_create": {
-        "description": "Create the next numbered experiment folder (workspace/NN_<slug>/). Populates README, conclusions, scripts/, data/, outputs/, environment/ subdirs. Updates state.",
+        "description": (
+            "Create the next numbered experiment folder (workspace/NN_<slug>/). "
+            "Populates README, conclusions, scripts/, data/, outputs/, environment/ "
+            "subdirs. Updates state. Pass `branch_of=<existing path_id>` to fork an "
+            "alternative analytical path — the new folder is named "
+            "NN_<slug>_path_<k>, the path lineage carries through every subsequent "
+            "step created with branch_of pointing back into the same lineage, and "
+            "the new step's data/input symlinks to the PARENT step's output rather "
+            "than to the previous numbered step (so branches are genuine forks)."
+        ),
         "category": "path",
         "inputSchema": {
             "type": "object",
@@ -445,12 +454,27 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
                     ),
                 },
                 "hypothesis": {"type": "string"},
+                "branch_of": {
+                    "type": "string",
+                    "description": (
+                        "Optional parent step id (e.g. '04_logistic_regression'). "
+                        "When set, the new folder gets a `_path_<k>` suffix and "
+                        "the data/input is wired to the parent's output. Use when "
+                        "the researcher wants to test an alternative pipeline "
+                        "alongside the current one rather than replacing it."
+                    ),
+                },
             },
             "required": ["name"],
         },
     },
     "sys_path_abandon": {
-        "description": "Mark an experiment as a dead end. Renames the folder to NN_<slug>__DEAD_END and writes the rationale to analysis.md.",
+        "description": (
+            "Mark an experiment as a dead end. Renames the folder to "
+            "NN_<slug>__DEAD_END (lineage tags such as `_path_2` are preserved, "
+            "so a dead-ended branch becomes NN_<slug>_path_2__DEAD_END) and "
+            "writes the rationale to analysis.md."
+        ),
         "category": "path",
         "inputSchema": {
             "type": "object",
@@ -1547,6 +1571,43 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
             "required": ["tool_name", "purpose", "url"],
         },
     },
+    "tool_alternative_path_propose": {
+        "description": (
+            "Confidence-gated alternative-pipeline scan. Pulls literature on "
+            "the user's chosen method AND on alternatives framed for the "
+            "specific data shape, counts comparative-evidence signals, and "
+            "returns a recommendation: `commit_user_method` (stay quiet — "
+            "default) OR `branch_to_alternative` (surface the alternative to "
+            "the researcher ONCE and, on confirmation, call `sys_path_create "
+            "branch_of=<current>` to create an `NN_<slug>_alt_path_<k>` fork "
+            "alongside the primary). Writes "
+            "`outputs/reports/alternative_path_<slug>.md` with the cited "
+            "evidence. Use BEFORE committing a methodology when you suspect a "
+            "subfield-canonical alternative could materially out-perform the "
+            "researcher's first instinct — but DO NOT call repeatedly for "
+            "the same step (proposing weak alternatives erodes trust)."
+        ),
+        "category": "research",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "What the step is trying to do, e.g. 'differential expression on bulk RNA-seq with paired samples'.",
+                },
+                "user_method": {
+                    "type": "string",
+                    "description": "The method the user proposed (or the AI's default), e.g. 'DESeq2 with ~condition design'.",
+                },
+                "data_summary": {
+                    "type": "string",
+                    "description": "Short data-shape note that helps the literature scan (sample size, paired-ness, sparsity, etc.). Optional but recommended.",
+                },
+                "limit": {"type": "number"},
+            },
+            "required": ["task", "user_method"],
+        },
+    },
     "tool_plan_step": {
         "description": "Force a complex step to be broken into atomic sub-tasks BEFORE coding. Writes a plan markdown the AI executes piecewise. Required by analysis_plan when scope is non-trivial.",
         "category": "research",
@@ -2264,6 +2325,7 @@ def _handle_sys_path_create(name, arguments, root):
             root,
             arguments["name"],
             hypothesis=arguments.get("hypothesis", ""),
+            branch_of=arguments.get("branch_of"),
         )
         return _text(_success(res))
     except Exception as e:
@@ -3314,6 +3376,21 @@ def _handle_tool_external_tool_instructions(name, arguments, root):
     return _text(_error(res.get("message", "external_tool_instructions failed")))
 
 
+def _handle_tool_alternative_path_propose(name, arguments, root):
+    from research_os.tools.actions.research.research import alternative_path_propose
+
+    res = alternative_path_propose(
+        arguments["task"],
+        arguments["user_method"],
+        root,
+        data_summary=arguments.get("data_summary", ""),
+        limit=int(arguments.get("limit", 5)),
+    )
+    if res.get("status") == "success":
+        return _text(_success(res))
+    return _text(_error(res.get("message", "alternative_path_propose failed")))
+
+
 def _handle_tool_plan_step(name, arguments, root):
     from research_os.tools.actions.research.research import plan_step
 
@@ -3744,6 +3821,7 @@ _HANDLERS = {
     "tool_research_method": _handle_tool_research_method,
     "tool_research_tool": _handle_tool_research_tool,
     "tool_external_tool_instructions": _handle_tool_external_tool_instructions,
+    "tool_alternative_path_propose": _handle_tool_alternative_path_propose,
     "tool_plan_step": _handle_tool_plan_step,
     # intake autofill
     "tool_intake_autofill": _handle_tool_intake_autofill,

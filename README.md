@@ -414,10 +414,11 @@ protocols + tools exist on disk.
   boot/resume, autopilot mode with explicit gates, quick paper review,
   casual exploration, chat/AI-to-AI handoff, iterative planning,
   dead-end routing).
-* **10 domain presets** for `researcher_config.yaml`: RCTs, observational
-  epidemiology, genomics, NLP benchmarks, economic panels, qualitative
-  research, geospatial / remote sensing, time-series / forecasting,
-  survival / time-to-event, psychometric / survey.
+* **One neutral config** at `templates/researcher_config.yaml`. No
+  modality presets — `domain_analysis` infers the project shape from
+  signals + literature, and the AI fills the config per-project. See
+  [`docs/DOMAIN_HINT_EXAMPLES.md`](docs/DOMAIN_HINT_EXAMPLES.md) for
+  three cross-domain reasoning patterns (never templates to copy).
 * **8 IDE rule templates** auto-dropped on init.
 * **Real, verified citations** — synthesis outputs cannot contain
   hallucinated references.

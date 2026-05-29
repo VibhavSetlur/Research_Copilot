@@ -57,8 +57,28 @@ steps:
       Cite at least one anchor source in docs/domain_summary.md. The standards
       list above is a starting point — verify it's current.
 
+  - id: route_to_deep_domain_research
+    name: Route to Deep Domain Research (when subfield needs the canonical pipeline)
+    description: |
+      If the project is in a subfield where the right analysis is a
+      multi-stage canonical pipeline (snRNA-seq, metagenomics, protein
+      embeddings, fMRI, MD simulations, structural causal inference,
+      ...) — i.e. anywhere "what tools do people actually use here?"
+      is a non-trivial question — route to
+      `methodology/deep_domain_research` BEFORE `research_design`.
+
+      That protocol identifies the specific subfield, surveys the
+      literature for the canonical pipeline (≥3 cited sources), and
+      writes `docs/pipeline_plan.md` + `docs/assumption_matrix.md`.
+      `research_design` then operates on top of a committed pipeline
+      rather than from a blank slate.
+
+      Skip this if the domain is generic (a simple t-test of two means
+      on a clean tabular dataset, a basic linear regression) — go
+      straight to `research_design`.
+
 expected_outputs:
   - docs/domain_summary.md
 
-next_protocol: domain/research_design
+next_protocol: methodology/deep_domain_research
 on_failure: guidance/dead_end_routing
